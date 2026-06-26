@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/core/routes/routes_name.dart';
-import 'package:unipos/domain/store/restaurant/license_store.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/routes/routes_name.dart';
+import 'package:billberrylite/domain/store/restaurant/license_store.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 /// Shown after "I'm a New User" — validates the key upfront and saves it as
 /// pending. Activation (requiring businessname) fires automatically after

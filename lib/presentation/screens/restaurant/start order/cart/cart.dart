@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/presentation/screens/restaurant/start%20order/cart/takeaway.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/presentation/screens/restaurant/start%20order/cart/takeaway.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
@@ -389,29 +390,16 @@ class _CartScreenState extends State<CartScreen>
         actions: [
           IconButton(
             icon: Icon(Icons.delete_outline, color: Colors.white, size: 22),
-            onPressed: () {
-              final hInset = !AppResponsive.isMobile(context)
-                  ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-                  : 24.0;
-              showDialog(
+            onPressed: () async {
+              final confirmed = await showAppConfirmDialog(
                 context: context,
-                builder: (_) => AlertDialog(
-                  insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  title: Text('Clear Cart', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 17)),
-                  content: Text('Remove all items from cart?', style: GoogleFonts.poppins(fontSize: 14)),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
-                    ),
-                    TextButton(
-                      onPressed: () { Navigator.pop(context); clearCart(); },
-                      child: Text('Clear', style: GoogleFonts.poppins(color: Colors.red)),
-                    ),
-                  ],
-                ),
+                title: 'Clear Cart',
+                message: 'Remove all items from cart?',
+                confirmLabel: 'Clear',
+                accent: AppColors.danger,
+                icon: Icons.remove_shopping_cart_outlined,
               );
+              if (confirmed) clearCart();
             },
           ),
           SizedBox(width: 4),
@@ -715,65 +703,141 @@ class _CartScreenState extends State<CartScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          insetPadding: EdgeInsets.symmetric(horizontal: mergeHInset, vertical: 24),
-          title: Text(
-            'Confirm Merge',
-            style: GoogleFonts.poppins(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: Column(
+        return Dialog(
+          insetPadding:
+              EdgeInsets.symmetric(horizontal: mergeHInset, vertical: 24),
+          backgroundColor: AppColors.white,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Merge ${sourceOrder.tableNo} into ${widget.existingOrder!.tableNo}?',
-                style: GoogleFonts.poppins(fontSize: 14),
-              ),
-              SizedBox(height: 16),
+              // Header — accent badge + title
               Container(
-                padding: EdgeInsets.all(12),
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.shade200),
+                  color: AppColors.warning.withValues(alpha: 0.08),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(16)),
                 ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.call_merge_rounded,
+                          color: AppColors.warning, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Confirm Merge',
+                        style: GoogleFonts.poppins(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Body — question + consequences box
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'This will:',
+                      'Merge ${sourceOrder.tableNo} into ${widget.existingOrder!.tableNo}?',
                       style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                          height: 1.5),
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: AppColors.warning.withValues(alpha: 0.25)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('This will:',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary)),
+                          const SizedBox(height: 8),
+                          _buildMergeInfoRow(
+                              'Combine all items from both tables'),
+                          _buildMergeInfoRow('Merge KOT numbers for tracking'),
+                          _buildMergeInfoRow('Add up the totals'),
+                          _buildMergeInfoRow('Free ${sourceOrder.tableNo} table'),
+                          _buildMergeInfoRow(
+                              'Keep everything under ${widget.existingOrder!.tableNo}'),
+                        ],
                       ),
                     ),
-                    SizedBox(height: 8),
-                    _buildMergeInfoRow('• Combine all items from both tables'),
-                    _buildMergeInfoRow('• Merge KOT numbers for tracking'),
-                    _buildMergeInfoRow('• Add up the totals'),
-                    _buildMergeInfoRow('• Free ${sourceOrder.tableNo} table'),
-                    _buildMergeInfoRow('• Keep everything under ${widget.existingOrder!.tableNo}'),
                   ],
+                ),
+              ),
+              // Actions — balanced full-width buttons
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.textSecondary,
+                            side: BorderSide(color: AppColors.divider),
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: Text('Cancel',
+                              style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.warning,
+                            foregroundColor: AppColors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: Text('Merge Tables',
+                              style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w600),
+                              textAlign: TextAlign.center),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange.shade700,
-              ),
-              child: Text('Merge Tables'),
-            ),
-          ],
         );
       },
     );
@@ -785,10 +849,28 @@ class _CartScreenState extends State<CartScreen>
 
   Widget _buildMergeInfoRow(String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Text(
-        text,
-        style: GoogleFonts.poppins(fontSize: 11),
+      padding: const EdgeInsets.only(bottom: 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 6),
+            width: 5,
+            height: 5,
+            decoration: const BoxDecoration(
+              color: AppColors.warning,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                  fontSize: 12, color: AppColors.textSecondary),
+            ),
+          ),
+        ],
       ),
     );
   }

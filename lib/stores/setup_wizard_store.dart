@@ -1,17 +1,17 @@
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobx/mobx.dart';
-import 'package:unipos/data/models/common/business_type.dart';
-import 'package:unipos/data/models/common/business_details.dart';
-import 'package:unipos/models/tax_details.dart';
-import 'package:unipos/data/repositories/business_type_repository.dart';
-import 'package:unipos/data/repositories/business_details_repository.dart';
-import 'package:unipos/data/repositories/tax_details_repository.dart';
-import 'package:unipos/core/config/app_config.dart';
-import 'package:unipos/core/init/hive_init.dart';
-import 'package:unipos/core/di/service_locator.dart' as sl;
-import 'package:unipos/domain/services/retail/store_settings_service.dart';
-import 'package:unipos/domain/services/common/device_id_service.dart';
+import 'package:billberrylite/data/models/common/business_type.dart';
+import 'package:billberrylite/data/models/common/business_details.dart';
+import 'package:billberrylite/models/tax_details.dart';
+import 'package:billberrylite/data/repositories/business_type_repository.dart';
+import 'package:billberrylite/data/repositories/business_details_repository.dart';
+import 'package:billberrylite/data/repositories/tax_details_repository.dart';
+import 'package:billberrylite/core/config/app_config.dart';
+import 'package:billberrylite/core/init/hive_init.dart';
+import 'package:billberrylite/core/di/service_locator.dart' as sl;
+import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
+import 'package:billberrylite/domain/services/common/device_id_service.dart';
 
 part 'setup_wizard_store.g.dart';
 
@@ -138,11 +138,13 @@ abstract class _SetupWizardStore with Store {
   @computed
   bool get isBusinessTypeLocked => AppConfig.isBusinessModeSet;
 
-  // Default business types list
+  // Default business types list. Retail is hidden while AppConfig.retailEnabled
+  // is false (restaurant-only release) — flip that flag to bring it back.
   @computed
   List<Map<String, String>> get businessTypes => [
         {'id': 'restaurant', 'name': 'Restaurant', 'description': 'Food service and dining', 'icon': 'restaurant'},
-        {'id': 'retail', 'name': 'Retail Store', 'description': 'General retail and shopping', 'icon': 'store'},
+        if (AppConfig.retailEnabled)
+          {'id': 'retail', 'name': 'Retail Store', 'description': 'General retail and shopping', 'icon': 'store'},
       ];
 
   // ==================== ACTIONS ====================
@@ -357,12 +359,17 @@ abstract class _SetupWizardStore with Store {
 
           // Initialize boxes and dependencies for the saved type
           // This is crucial when restoring a setup session
-          final mode = savedType.id == 'restaurant' 
-              ? BusinessMode.restaurant 
+          final mode = savedType.id == 'restaurant'
+              ? BusinessMode.restaurant
               : BusinessMode.retail;
-          
+
           await HiveInit.initializeForMode(mode);
           await _registerBusinessDependencies(mode);
+        } else if (!AppConfig.retailEnabled) {
+          // Retail is hidden, so Restaurant is the only option. Auto-select it
+          // (sets mode + initializes Hive boxes + registers deps) so the wizard
+          // can skip the now-redundant Business Type step.
+          await selectBusinessType('restaurant', 'Restaurant');
         }
       }
 

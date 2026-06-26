@@ -14,7 +14,7 @@ import '../../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../../data/models/restaurant/db/itemvariantemodel_312.dart';
 import '../../../../../../data/models/restaurant/db/toppingmodel_304.dart';
 import '../../../../../../data/models/restaurant/db/variantmodel_305.dart';
-import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
+import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
 
 class TestDataGenerator {
   static final Random _random = Random();

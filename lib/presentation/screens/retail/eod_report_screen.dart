@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/domain/services/retail/eod_report_service.dart';
+import 'package:billberrylite/domain/services/retail/eod_report_service.dart';
 
 /// End of Day Report Screen
 class EODReportScreen extends StatefulWidget {

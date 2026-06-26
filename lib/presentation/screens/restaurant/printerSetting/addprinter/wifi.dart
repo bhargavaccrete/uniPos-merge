@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 
 /// WiFi/LAN Printer setup screen.
 ///
@@ -426,28 +426,13 @@ class _WifiLanState extends State<WifiLan> {
 
   /// Delete with confirmation dialog
   Future<void> _confirmDelete(String id, String name) async {
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        title: Text('Delete Printer', style: GoogleFonts.poppins()),
-        content: Text('Remove "$name" from saved printers?',
-            style: GoogleFonts.poppins()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child:
-                const Text('Delete', style: TextStyle(color: AppColors.danger)),
-          ),
-        ],
-      ),
+      title: 'Delete Printer',
+      message: 'Remove "$name" from saved printers?',
+      confirmLabel: 'Delete',
+      accent: AppColors.danger,
+      icon: Icons.delete_rounded,
     );
 
     if (confirmed == true) {

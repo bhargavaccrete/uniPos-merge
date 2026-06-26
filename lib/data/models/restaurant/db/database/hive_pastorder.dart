@@ -1,6 +1,6 @@
 
 import 'package:hive/hive.dart';
-import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
+import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
 
 class HivePastOrder{
   static const String _boxName = 'pastorderBox';

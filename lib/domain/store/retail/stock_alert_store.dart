@@ -1,5 +1,5 @@
 import 'package:mobx/mobx.dart';
-import 'package:unipos/domain/services/retail/stock_alert_service.dart';
+import 'package:billberrylite/domain/services/retail/stock_alert_service.dart';
 
 part 'stock_alert_store.g.dart';
 

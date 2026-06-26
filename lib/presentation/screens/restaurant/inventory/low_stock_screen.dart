@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/util/color.dart';
 
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../domain/services/restaurant/stock_adjust_service.dart';
 import '../../../widget/componets/common/app_text_field.dart';
+import '../../../widget/componets/common/app_dialog.dart';
 import '../../../widget/componets/common/primary_app_bar.dart';
 
 /// Flat, actionable list of every item/variant that is low or out of stock.
@@ -39,14 +40,16 @@ class _LowStockScreenState extends State<LowStockScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(
-            'Add Stock — ${e.variantName != null ? '${e.item.name} (${e.variantName})' : e.item.name}',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 15),
-          ),
-          content: Column(
+        builder: (ctx, setLocal) => AppDialogShell(
+          title: 'Add Stock',
+          subtitle: e.variantName != null
+              ? '${e.item.name} (${e.variantName})'
+              : e.item.name,
+          accent: AppColors.primary,
+          icon: Icons.add_box_rounded,
+          body: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               AppTextField(
                 controller: qtyController,
@@ -82,15 +85,11 @@ class _LowStockScreenState extends State<LowStockScreen> {
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text('Cancel',
-                  style: GoogleFonts.poppins(color: AppColors.textSecondary)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            appDialogCancelButton(ctx),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: 'Add',
               onPressed: () => Navigator.pop(ctx, true),
-              child: Text('Add', style: GoogleFonts.poppins(color: Colors.white)),
             ),
           ],
         ),

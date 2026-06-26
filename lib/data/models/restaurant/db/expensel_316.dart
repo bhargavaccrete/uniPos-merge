@@ -2,7 +2,7 @@
 
 
 import 'package:hive/hive.dart';
-import 'package:unipos/core/constants/hive_type_ids.dart';
+import 'package:billberrylite/core/constants/hive_type_ids.dart';
 part 'expensel_316.g.dart';
 
 @HiveType(typeId: HiveTypeIds.restaurantExpense1)

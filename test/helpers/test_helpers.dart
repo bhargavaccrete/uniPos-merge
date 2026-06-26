@@ -3,7 +3,7 @@
 /// WHY: Multiple test files need CartItem objects. Instead of duplicating
 /// the helper in every test file, we define it once here and import it.
 /// This is the test equivalent of a shared utility.
-import 'package:unipos/data/models/restaurant/db/cartmodel_308.dart';
+import 'package:billberrylite/data/models/restaurant/db/cartmodel_308.dart';
 
 /// Create a minimal CartItem for testing.
 ///

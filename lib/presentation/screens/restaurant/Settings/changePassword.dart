@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import '../../../../util/restaurant/restaurant_auth_helper.dart';
 import '../../../widget/componets/common/app_text_field.dart';
 import '../../../../util/common/app_responsive.dart';
@@ -92,66 +93,17 @@ class _ChangepasswordState extends State<Changepassword> {
     }
   }
 
-  void _showSuccessDialog() {
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    showDialog(
+  Future<void> _showSuccessDialog() async {
+    await showAppInfoDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.green.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.check_rounded,
-                  color: Colors.green, size: 40),
-            ),
-            const SizedBox(height: 16),
-            Text('Password Changed!',
-                style: GoogleFonts.poppins(
-                    fontSize: 18, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            Text(
-              'Your password has been updated successfully.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                  fontSize: 13, color: AppColors.textSecondary),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).pop();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-                child: Text('Done',
-                    style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15)),
-              ),
-            ),
-          ],
-        ),
-      ),
+      title: 'Password Changed!',
+      message: 'Your password has been updated successfully.',
+      buttonLabel: 'Done',
+      accent: AppColors.success,
+      icon: Icons.check_circle_rounded,
     );
+    // Close the change-password screen after acknowledging.
+    if (mounted) Navigator.of(context).pop();
   }
 
   @override

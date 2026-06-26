@@ -23,6 +23,11 @@ enum BusinessMode { none, restaurant, retail }
 class AppConfig {
   AppConfig._(); // Private constructor
 
+  /// Feature flag: retail mode is hidden for now (restaurant-only release).
+  /// The retail code is intact — flip this to `true` to re-enable retail in
+  /// onboarding (business-type selection, splash/walkthrough copy, etc.).
+  static const bool retailEnabled = false;
+
   static const String _boxName = 'appConfigBox';
   static const String _businessModeKey = 'businessMode';
   static const String _isSetupCompleteKey = 'isSetupComplete';

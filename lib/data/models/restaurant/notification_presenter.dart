@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:unipos/core/routes/routes_name.dart';
-import 'package:unipos/data/models/restaurant/dashboard_alert.dart';
-import 'package:unipos/data/models/restaurant/db/app_notification_model.dart';
+import 'package:billberrylite/core/routes/routes_name.dart';
+import 'package:billberrylite/data/models/restaurant/dashboard_alert.dart';
+import 'package:billberrylite/data/models/restaurant/db/app_notification_model.dart';
 
 /// Android notification channel ids (created in LocalNotificationService).
 class NotificationChannels {
@@ -99,7 +99,7 @@ class NotificationPresenter {
       case 'app_update':
         return NotificationView(
           title: 'App Update Available',
-          body: d['message'] ?? 'A new version of UniPOS is available.',
+          body: d['message'] ?? 'A new version of Bill Berry Lite is available.',
           severity: AlertSeverity.info,
           icon: Icons.system_update_rounded,
           channelId: NotificationChannels.appAlerts,

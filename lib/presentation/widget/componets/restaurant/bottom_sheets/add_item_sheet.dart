@@ -16,6 +16,7 @@ import '../../../../screens/restaurant/item/add_more_info_screen.dart';
 import 'tax_selector_sheet.dart';
 import 'add_category_dialog.dart';
 import '../../common/app_text_field.dart';
+import '../../common/app_dialog.dart';
 import 'add_item_form_state.dart';
 import 'category_selector_sheet.dart';
 import 'image_picker_sheet.dart';
@@ -203,28 +204,9 @@ class _AddItemSheetState extends State<AddItemSheet> {
   }
 
   void _showValidationError(ValidationResult validation) {
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    showDialog(
+    showAppErrorDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Missing Required Fields',
-            style:
-                GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16)),
-        content: Text(validation.errorMessage,
-            style: GoogleFonts.poppins(fontSize: 14)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('OK',
-                style: GoogleFonts.poppins(
-                    color: AppColors.primary, fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
+      errors: validation.missingFields,
     );
   }
 
@@ -494,7 +476,10 @@ class _AddItemSheetState extends State<AddItemSheet> {
                 fontWeight: FontWeight.w600,
                 color: AppColors.primary)),
       ),
-      keyboardType: TextInputType.number,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: [
+        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+      ],
     );
   }
 
@@ -588,6 +573,9 @@ class _AddItemSheetState extends State<AddItemSheet> {
       hint: '0',
       icon: Icons.inventory_2_rounded,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: [
+        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+      ],
     );
   }
 
@@ -618,6 +606,9 @@ class _AddItemSheetState extends State<AddItemSheet> {
               hint: 'Default: ${AppSettings.lowStockThreshold.toStringAsFixed(0)} $unit',
               icon: Icons.warning_amber_rounded,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+              ],
             );
           }),
         ],

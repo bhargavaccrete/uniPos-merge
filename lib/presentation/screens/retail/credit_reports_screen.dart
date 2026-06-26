@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/di/service_locator.dart';
-import 'package:unipos/data/models/retail/hive_model/credit_payment_model_218.dart';
-import 'package:unipos/data/models/retail/hive_model/customer_model_208.dart';
-import 'package:unipos/data/models/retail/hive_model/sale_model_203.dart';
+import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model_218.dart';
+import 'package:billberrylite/data/models/retail/hive_model/customer_model_208.dart';
+import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 
 import 'customer_detail_screen.dart';
 

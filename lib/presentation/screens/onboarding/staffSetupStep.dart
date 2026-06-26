@@ -2,18 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/stores/setup_wizard_store.dart';
+import 'package:billberrylite/stores/setup_wizard_store.dart';
 import '../../../util/common/app_responsive.dart';
-import 'package:unipos/core/config/app_config.dart';
-import 'package:unipos/data/models/retail/hive_model/staff_model_222.dart';
-import 'package:unipos/data/models/restaurant/db/staffModel_310.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/core/config/app_config.dart';
+import 'package:billberrylite/data/models/retail/hive_model/staff_model_222.dart';
+import 'package:billberrylite/data/models/restaurant/db/staffModel_310.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/di/service_locator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../util/restaurant/restaurant_auth_helper.dart';
 import '../../../util/color.dart';
+import '../../widget/componets/common/app_dialog.dart';
 import '../../../presentation/widget/componets/common/app_text_field.dart';
 
 /// Staff Setup Step — Business Mode Aware
@@ -649,30 +650,17 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
     if (_firstNameController.text.isNotEmpty ||
         _lastNameController.text.isNotEmpty ||
         _pinController.text.isNotEmpty) {
-      final shouldContinue = await showDialog<bool>(
+      final shouldContinue = await showAppConfirmDialog(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Unsaved Staff Member'),
-          content: const Text(
-              'You have entered details for a staff member but haven\'t added them yet. Are you sure you want to continue without saving?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.warning,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Continue Without Saving'),
-            ),
-          ],
-        ),
+        title: 'Unsaved Staff Member',
+        message:
+            'You have entered details for a staff member but haven\'t added them yet. Are you sure you want to continue without saving?',
+        confirmLabel: 'Continue Without Saving',
+        accent: AppColors.warning,
+        icon: Icons.warning_amber_rounded,
       );
 
-      if (shouldContinue != true) {
+      if (!shouldContinue) {
         return; // User canceled
       }
     }

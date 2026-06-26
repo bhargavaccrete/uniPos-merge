@@ -1,8 +1,8 @@
 import 'package:hive/hive.dart';
-import 'package:unipos/core/constants/hive_type_ids.dart';
+import 'package:billberrylite/core/constants/hive_type_ids.dart';
 import 'package:uuid/uuid.dart';
-import 'package:unipos/core/config/app_config.dart';
-import 'package:unipos/util/restaurant/staticswitch.dart';
+import 'package:billberrylite/core/config/app_config.dart';
+import 'package:billberrylite/util/restaurant/staticswitch.dart';
 
 part 'sale_item_model_204.g.dart';
 

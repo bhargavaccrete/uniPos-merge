@@ -9,8 +9,8 @@ import 'package:file_picker/file_picker.dart';
 import '../util/color.dart';
 import '../util/responsive.dart';
 
-import 'package:unipos/presentation/screens/retail/import_product/bulk_import_screen.dart';
-import 'package:unipos/presentation/screens/retail/payment_setup_navigation_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/import_product/bulk_import_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/payment_setup_navigation_screen.dart';
 
 // ============== PRODUCT MANAGEMENT SCREEN ==============
 class ProductManagementScreen extends StatefulWidget {

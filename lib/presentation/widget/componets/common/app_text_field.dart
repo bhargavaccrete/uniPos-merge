@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/restaurant/staticswitch.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/visual_keyboard.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/restaurant/staticswitch.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/componets/visual_keyboard.dart';
 
 /// Unified text field widget for the entire app.
 /// Replaces [CommonTextForm] and all inline `_fieldDec()` helpers.

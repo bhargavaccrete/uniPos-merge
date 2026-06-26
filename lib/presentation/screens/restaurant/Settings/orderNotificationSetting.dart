@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 
 class OrderNotificationsettings extends StatefulWidget {
   @override

@@ -157,7 +157,7 @@ Future<Response> updateKdsStatusHandler(Request request, String id) async {
     await orderStore.updateOrder(updatedOrder);
 
 
-    // Broadcast status change to all connected clients (UniPOS + other KDS apps)
+    // Broadcast status change to all connected clients (Bill Berry Lite + other KDS apps)
     // Convert integer keys to strings for JSON encoding
     final kotStatusesJson = orderToUpdate.kotStatuses?.map((key, value) => MapEntry(key.toString(), value));
 

@@ -1,5 +1,5 @@
 import 'package:hive/hive.dart';
-import 'package:unipos/core/constants/hive_type_ids.dart';
+import 'package:billberrylite/core/constants/hive_type_ids.dart';
 part 'staffModel_310.g.dart';
 
 @HiveType(typeId:HiveTypeIds.restaurantStaff)

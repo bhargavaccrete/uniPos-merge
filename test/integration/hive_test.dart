@@ -1,12 +1,12 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
-import 'package:unipos/core/constants/hive_type_ids.dart';
-import 'package:unipos/data/models/restaurant/db/cartmodel_308.dart';
-import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
-import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
-import 'package:unipos/data/models/restaurant/db/itemvariantemodel_312.dart';
-import 'package:unipos/data/models/restaurant/db/saved_printer_model.dart';
+import 'package:billberrylite/core/constants/hive_type_ids.dart';
+import 'package:billberrylite/data/models/restaurant/db/cartmodel_308.dart';
+import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
+import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
+import 'package:billberrylite/data/models/restaurant/db/itemvariantemodel_312.dart';
+import 'package:billberrylite/data/models/restaurant/db/saved_printer_model.dart';
 
 /// HIVE INTEGRATION TESTS
 ///

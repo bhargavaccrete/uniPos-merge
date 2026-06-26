@@ -111,13 +111,9 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  SizedBox(height: AppResponsive.mediumSpacing(context)),
                   _buildHeader(),
                   SizedBox(height: AppResponsive.extraLargeSpacing(context)),
                   _buildUserCards(isMobile: true),
-                  SizedBox(height: AppResponsive.largeSpacing(context)),
-                  _buildFooterInfo(),
-                  SizedBox(height: AppResponsive.mediumSpacing(context)),
                 ],
               ),
           ),
@@ -137,8 +133,6 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
             _buildHeader(),
             SizedBox(height: AppResponsive.extraLargeSpacing(context)),
             _buildUserCards(isMobile: false),
-            SizedBox(height: AppResponsive.largeSpacing(context)),
-            _buildFooterInfo(),
           ],
         ),
       ),
@@ -156,8 +150,6 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
             _buildHeader(),
             SizedBox(height: AppResponsive.extraLargeSpacing(context)),
             _buildUserCards(isMobile: false),
-            SizedBox(height: AppResponsive.largeSpacing(context)),
-            _buildFooterInfo(),
           ],
         ),
       ),
@@ -198,7 +190,7 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
           ),
           SizedBox(height: AppResponsive.mediumSpacing(context)),
           Text(
-            'Welcome to UniPOS',
+            'Welcome to Bill Berry Lite',
             style: TextStyle(
               fontSize: AppResponsive.getValue(context, mobile: 24.0, tablet: 30.0, desktop: 36.0),
               fontWeight: FontWeight.bold,
@@ -361,33 +353,4 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
     );
   }
 
-  Widget _buildFooterInfo() {
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: Container(
-        padding: AppResponsive.cardPadding(context),
-        decoration: BoxDecoration(
-          color: AppColors.info.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-          border: Border.all(color: AppColors.info.withOpacity(0.3)),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.info_outline, color: AppColors.info, size: AppResponsive.iconSize(context)),
-            SizedBox(width: AppResponsive.smallSpacing(context)),
-            Expanded(
-              child: Text(
-                'Your data is stored locally and encrypted. Always keep regular backups to prevent data loss.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: AppResponsive.smallFontSize(context),
-                  color: AppColors.darkNeutral.withOpacity(0.8),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

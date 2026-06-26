@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/core/constants/cash_denominations.dart';
-import 'package:unipos/domain/services/restaurant/day_management_service.dart';
-import 'package:unipos/domain/services/restaurant/eod_service.dart';
+import 'package:billberrylite/core/constants/cash_denominations.dart';
+import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
+import 'package:billberrylite/domain/services/restaurant/eod_service.dart';
 
 class StartDayScreen extends StatefulWidget {
   const StartDayScreen({super.key});

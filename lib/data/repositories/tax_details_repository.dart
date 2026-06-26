@@ -1,5 +1,5 @@
 import 'package:hive/hive.dart';
-import 'package:unipos/models/tax_details.dart';
+import 'package:billberrylite/models/tax_details.dart';
 
 /// Repository for TaxDetails - handles only Hive CRUD operations
 /// No UI logic, no MobX - just database operations

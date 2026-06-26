@@ -201,9 +201,18 @@ class RestaurantSession {
   static bool canAccess(String feature) {
     if (isAdmin || staffRole == 'Manager') return true;
     if (staffRole == 'Cashier') {
-      // Cashier cannot access reports, staff management, or cash drawer
-      if (feature == 'reports' || feature == 'manageStaff' || feature == 'cashDrawer') return false;
-      return true;
+      // Cashier may take orders, manage customers, and view/adjust inventory —
+      // but NOT reports, staff, cash drawer, or store/admin configuration
+      // (Settings, its sub-screens, Licensing, Payment Methods, admin password,
+      // Order Settings, Data Generator — all gated by 'settings' — and Tax).
+      const blocked = {
+        'reports',
+        'manageStaff',
+        'cashDrawer',
+        'settings',
+        'taxSettings',
+      };
+      return !blocked.contains(feature);
     }
     // Other staff roles: orders only
     return feature == 'startOrder';

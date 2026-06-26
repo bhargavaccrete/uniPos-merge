@@ -3,12 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
-import 'package:unipos/util/images.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/images.dart';
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../util/restaurant/audit_trail_helper.dart';
@@ -307,35 +308,21 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
   }
 
 
-  void _showDeleteDialog(Category category) {
+  void _showDeleteDialog(Category category) async {
     final itemCount = itemStore.items.where((i) => i.categoryOfItem == category.id).length;
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    showDialog(
+    final confirmed = await showAppConfirmDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: Text('Delete "${category.name}"?', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16)),
-        content: Text(
-          itemCount > 0
-              ? 'This will also delete $itemCount item${itemCount > 1 ? 's' : ''} in this category.'
-              : 'This category has no items.',
-          style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey)),
-          ),
-          TextButton(
-            onPressed: () { _deleteCategoryhive(category.id); Navigator.pop(context); },
-            child: Text('Delete', style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.w500)),
-          ),
-        ],
-      ),
+      title: 'Delete "${category.name}"?',
+      message: itemCount > 0
+          ? 'This will also delete $itemCount item${itemCount > 1 ? 's' : ''} in this category.'
+          : 'This category has no items.',
+      confirmLabel: 'Delete',
+      accent: AppColors.danger,
+      icon: Icons.delete_outline,
     );
+    if (confirmed) {
+      _deleteCategoryhive(category.id);
+    }
   }
 
   Widget _buildAddButton() {

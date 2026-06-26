@@ -1,4 +1,4 @@
-package com.example.unipos
+package com.accrete.billberrylite
 
 import io.flutter.embedding.android.FlutterActivity
 

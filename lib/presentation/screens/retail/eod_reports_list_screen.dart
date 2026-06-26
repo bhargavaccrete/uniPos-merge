@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
-import 'package:unipos/domain/services/restaurant/eod_service.dart';
-import 'package:unipos/presentation/screens/retail/eod_report_detail_screen.dart';
+import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
+import 'package:billberrylite/domain/services/restaurant/eod_service.dart';
+import 'package:billberrylite/presentation/screens/retail/eod_report_detail_screen.dart';
 
 /// EOD Reports List Screen - Shows all saved EOD reports
 class EODReportsListScreen extends StatefulWidget {

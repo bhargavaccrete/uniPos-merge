@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:unipos/util/restaurant/restaurant_session.dart';
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
-import 'package:unipos/util/restaurant/audit_trail_helper.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
+import 'package:billberrylite/util/restaurant/audit_trail_helper.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 
 class EditCategory extends StatefulWidget {
   final Category category;

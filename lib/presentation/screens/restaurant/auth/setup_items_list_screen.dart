@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
-import 'package:unipos/data/models/restaurant/db/itemvariantemodel_312.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/currency_helper.dart';
-import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/edit_item.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
+import 'package:billberrylite/data/models/restaurant/db/itemvariantemodel_312.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/presentation/screens/restaurant/manage%20menu/tab/edit_item.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 
 /// Full-detail item list opened from the Setup Wizard "View Added Items" banner.
 /// Shows every item in itemStore with variants, choices, extras, stock, tax.

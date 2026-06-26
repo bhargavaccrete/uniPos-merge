@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/core/routes/routes_name.dart';
-import 'package:unipos/domain/store/restaurant/license_store.dart';
-import 'package:unipos/presentation/screens/restaurant/auth/license_lock_screen.dart';
-import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
-import 'package:unipos/util/restaurant/restaurant_session.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/routes/routes_name.dart';
+import 'package:billberrylite/domain/store/restaurant/license_store.dart';
+import 'package:billberrylite/presentation/screens/restaurant/auth/license_lock_screen.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 
 /// Wraps protected restaurant screens.
 ///

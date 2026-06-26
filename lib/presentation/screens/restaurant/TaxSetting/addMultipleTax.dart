@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/di/service_locator.dart';
@@ -12,7 +13,7 @@ import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../widget/componets/common/app_text_field.dart';
 import '../../../widget/componets/common/primary_app_bar.dart';
 import 'apply_tax_screen.dart';
-import 'package:unipos/util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 class Addtax extends StatefulWidget {
   @override
@@ -115,11 +116,8 @@ class _AddtaxState extends State<Addtax> {
   }
 
 
-  Future<void> _delete(String id)async{
-    final success = await taxStore.deleteTax(id);
-    if(success && mounted) {
-      Navigator.pop(context);
-    }
+  Future<void> _delete(String id) async {
+    await taxStore.deleteTax(id);
   }
 
   Future<void> _applyTaxToAllItems(String taxId, double taxPercentage) async {
@@ -269,7 +267,7 @@ class _AddtaxState extends State<Addtax> {
                                     ),
                                     SizedBox(width: 8),
                                     IconButton(
-                                      onPressed: () => _showDeleteConfirmation(context, isTablet, tax.id),
+                                      onPressed: () => _showDeleteConfirmation(context, tax.id),
                                       icon: Icon(Icons.delete_rounded),
                                       color: Colors.red,
                                       style: IconButton.styleFrom(
@@ -354,77 +352,19 @@ class _AddtaxState extends State<Addtax> {
   }
 
 
-  void _showDeleteConfirmation(BuildContext context, bool isTablet, String taxId) {
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    showDialog(
+  void _showDeleteConfirmation(BuildContext context, String taxId) async {
+    final confirmed = await showAppConfirmDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.warning_rounded,
-                color: Colors.red,
-                size: 24,
-              ),
-            ),
-            SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Delete Tax?',
-                style: GoogleFonts.poppins(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-        content: Text(
+      title: 'Delete Tax?',
+      message:
           'Are you sure you want to delete this tax? This action cannot be undone.',
-          style: GoogleFonts.poppins(fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: Colors.grey.shade700,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => _delete(taxId),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: Text(
-              'Delete',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
+      confirmLabel: 'Delete',
+      accent: AppColors.danger,
+      icon: Icons.warning_rounded,
     );
+    if (confirmed) {
+      await _delete(taxId);
+    }
   }
 
 
@@ -523,45 +463,46 @@ class _AddtaxState extends State<Addtax> {
           ),
         SizedBox(height: AppResponsive.getValue(context, mobile: 24.0, tablet: 28.0, desktop: 32.0)),
         Row(
-          mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              style: TextButton.styleFrom(
-                padding: EdgeInsets.symmetric(
-                  horizontal: AppResponsive.getValue(context, mobile: 20.0, tablet: 24.0, desktop: 28.0),
-                  vertical: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(context),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textSecondary,
+                  side: BorderSide(color: AppColors.divider),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
-              ),
-              child: Text(
-                'Cancel',
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
-                  color: Colors.grey.shade700,
-                  fontWeight: FontWeight.w500,
+                child: Text(
+                  'Cancel',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
-            SizedBox(width: 12),
-            ElevatedButton(
-              onPressed: () => _addOrUpdateTax(existingTax: existingTax),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(
-                  horizontal: AppResponsive.getValue(context, mobile: 24.0, tablet: 28.0, desktop: 32.0),
-                  vertical: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => _addOrUpdateTax(existingTax: existingTax),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  elevation: 0,
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                elevation: 0,
-              ),
-              child: Text(
-                isEdit ? 'Update' : 'Add Tax',
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
-                  fontWeight: FontWeight.w600,
+                child: Text(
+                  isEdit ? 'Update' : 'Add Tax',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
@@ -587,13 +528,79 @@ class _AddtaxState extends State<Addtax> {
       return showDialog(
         context: context,
         builder: (context) => StatefulBuilder(
-          builder: (context, setModalState) => Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            insetPadding: EdgeInsets.symmetric(horizontal: 80, vertical: 60),
-            child: Padding(
-              padding: const EdgeInsets.all(28),
-              child: _buildFormContent(isTablet, isEdit, setModalState, existingTax: existingTax),
+          builder: (context, setModalState) => AppDialogShell(
+            title: isEdit ? 'Edit Tax' : 'Add New Tax',
+            accent: AppColors.primary,
+            icon: isEdit ? Icons.edit_rounded : Icons.add_circle_rounded,
+            body: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: AppTextField(
+                        controller: _taxNameController,
+                        label: 'Tax Name',
+                        hint: 'e.g. GST, VAT',
+                        icon: Icons.receipt_outlined,
+                        required: true,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: AppTextField(
+                        controller: _taxNumberController,
+                        label: 'Tax %',
+                        hint: 'e.g. 18',
+                        icon: Icons.percent_rounded,
+                        keyboardType: TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+                if (!isEdit)
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceLight,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Checkbox(
+                          value: _ischecked1,
+                          activeColor: AppColors.primary,
+                          onChanged: (bool? value) {
+                            setModalState(() => _ischecked1 = value ?? false);
+                          },
+                        ),
+                        Expanded(
+                          child: Text(
+                            'Apply to all existing items',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0),
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
+            actions: [
+              appDialogCancelButton(context),
+              const SizedBox(width: 12),
+              appDialogPrimaryButton(
+                label: isEdit ? 'Update' : 'Add Tax',
+                onPressed: () => _addOrUpdateTax(existingTax: existingTax),
+              ),
+            ],
           ),
         ),
       );

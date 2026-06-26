@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
+import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
 
 /// EOD Report Detail Screen - Shows detailed view of a single EOD report
 class EODReportDetailScreen extends StatelessWidget {

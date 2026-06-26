@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/util/common/app_responsive.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import 'mulTextFelids&userinfoPopUp.dart';
 
 class Showdialog extends StatelessWidget {

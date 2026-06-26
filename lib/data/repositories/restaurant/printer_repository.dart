@@ -1,6 +1,6 @@
 import 'package:hive/hive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:unipos/core/constants/hive_box_names.dart';
+import 'package:billberrylite/core/constants/hive_box_names.dart';
 import '../../models/restaurant/db/saved_printer_model.dart';
 
 /// Repository layer for saved thermal printers (Restaurant)

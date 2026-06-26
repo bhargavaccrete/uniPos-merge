@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/util/color.dart';
 
 import '../../../../../constants/restaurant/color.dart';
 

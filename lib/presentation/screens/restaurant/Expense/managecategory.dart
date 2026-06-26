@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/data/models/restaurant/db/expensemodel_315.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
+import 'package:billberrylite/data/models/restaurant/db/expensemodel_315.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 
 class ManageCategory extends StatefulWidget {
   const ManageCategory({super.key});
@@ -170,13 +171,38 @@ class _ManageCategoryState extends State<ManageCategory> {
                   if (isTablet) {
                     showDialog(
                       context: context,
-                      builder: (context) => Dialog(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        insetPadding: EdgeInsets.symmetric(horizontal: 100, vertical: 60),
-                        child: Padding(
-                          padding: const EdgeInsets.all(28),
-                          child: formContent,
+                      builder: (context) => AppDialogShell(
+                        title: 'Add New Category',
+                        accent: AppColors.primary,
+                        icon: Icons.add_circle_rounded,
+                        body: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Category Name',
+                              style: GoogleFonts.poppins(
+                                fontSize: isTablet ? 15 : 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            SizedBox(height: 10),
+                            AppTextField(
+                              controller: categoryController,
+                              hint: 'Enter category name',
+                              icon: Icons.category_outlined,
+                            ),
+                          ],
                         ),
+                        actions: [
+                          appDialogCancelButton(context),
+                          const SizedBox(width: 12),
+                          appDialogPrimaryButton(
+                            label: 'Add Category',
+                            onPressed: () => AddECategory(),
+                          ),
+                        ],
                       ),
                     );
                   } else {
@@ -353,69 +379,16 @@ class _ManageCategoryState extends State<ManageCategory> {
                             ),
                             child: IconButton(
                               onPressed: () async {
-                                final hInset = !AppResponsive.isMobile(context)
-                                    ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-                                    : 24.0;
-                                final confirm = await showDialog<bool>(
+                                final confirm = await showAppConfirmDialog(
                                   context: context,
-                                  builder: (context) => AlertDialog(
-                                    insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    title: Row(
-                                      children: [
-                                        Container(
-                                          padding: EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: Colors.red.withValues(alpha:0.1),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Icon(Icons.delete_rounded, color: Colors.red, size: 24),
-                                        ),
-                                        SizedBox(width: 12),
-                                        Text(
-                                          'Delete Category',
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    content: Text(
+                                  title: 'Delete Category',
+                                  message:
                                       'Are you sure you want to delete "${category.name}"?',
-                                      style: GoogleFonts.poppins(fontSize: 14),
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context, false),
-                                        child: Text(
-                                          'Cancel',
-                                          style: GoogleFonts.poppins(
-                                            color: AppColors.textSecondary,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ),
-                                      ElevatedButton(
-                                        onPressed: () => Navigator.pop(context, true),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.red,
-                                          elevation: 0,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                        ),
-                                        child: Text(
-                                          'Delete',
-                                          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                  confirmLabel: 'Delete',
+                                  accent: AppColors.danger,
+                                  icon: Icons.delete_outline,
                                 );
-                                if (confirm == true) {
+                                if (confirm) {
                                   await _delete(category.id);
                                 }
                               },

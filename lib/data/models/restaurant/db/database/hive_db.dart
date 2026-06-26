@@ -1,6 +1,6 @@
 import 'package:hive/hive.dart';
 
-import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
+import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
 
 import '../itemmodel_302.dart';
 

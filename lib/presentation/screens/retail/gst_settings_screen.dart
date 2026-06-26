@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/retail/hive_model/category_model_215.dart';
-import 'package:unipos/domain/services/retail/gst_service.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/models/retail/hive_model/category_model_215.dart';
+import 'package:billberrylite/domain/services/retail/gst_service.dart';
 
 import 'package:uuid/uuid.dart';
 

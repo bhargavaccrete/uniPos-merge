@@ -1,7 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/util/color.dart';
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
@@ -12,9 +12,9 @@ import '../util/restaurant_print_helper.dart';
 import '../start order/cart/customerdetails.dart';
 import 'partial_refund_dialog.dart';
 import '../../../../util/common/currency_helper.dart';
-import 'package:unipos/util/common/decimal_settings.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import '../../../../util/restaurant/staticswitch.dart';
 import '../../../../util/common/app_responsive.dart';
 class Orderdetails extends StatefulWidget {

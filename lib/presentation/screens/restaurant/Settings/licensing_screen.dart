@@ -4,14 +4,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/license_model.dart';
-import 'package:unipos/domain/store/restaurant/company_store.dart';
-import 'package:unipos/domain/store/restaurant/license_store.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
-import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/models/restaurant/license_model.dart';
+import 'package:billberrylite/domain/store/restaurant/company_store.dart';
+import 'package:billberrylite/domain/store/restaurant/license_store.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 
 class LicensingScreen extends StatefulWidget {
   const LicensingScreen({super.key});
@@ -55,47 +56,20 @@ class _LicensingScreenState extends State<LicensingScreen> {
     );
   }
 
-  void _confirmDeactivate() {
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) -
-                    AppResponsive.dialogWidth(context)) /
-                2)
-            .clamp(40.0, 200.0)
-        : 24.0;
-    showDialog(
+  Future<void> _confirmDeactivate() async {
+    final ok = await showAppConfirmDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        insetPadding:
-            EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Deactivate License'),
-        content: const Text(
+      title: 'Deactivate License',
+      message:
           'This will remove the license from this device. A new license key will be required to reactivate.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.danger,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () async {
-              Navigator.pop(context);
-              _showSnack('License removed from this device', isError: false);
-              await _store.deactivateLicense();
-            },
-            child: const Text('Deactivate',
-                style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
+      confirmLabel: 'Deactivate',
+      accent: AppColors.danger,
+      icon: Icons.gpp_bad_rounded,
     );
+    if (ok) {
+      _showSnack('License removed from this device', isError: false);
+      await _store.deactivateLicense();
+    }
   }
 
   void _showSnack(String msg, {required bool isError}) {

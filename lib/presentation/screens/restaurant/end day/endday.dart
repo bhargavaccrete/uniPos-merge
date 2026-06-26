@@ -1,35 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:hive/hive.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:unipos/domain/services/retail/store_settings_service.dart';
-import 'package:unipos/util/common/currency_helper.dart';
-import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/util/restaurant/restaurant_session.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/core/constants/hive_box_names.dart';
-import 'package:unipos/data/models/restaurant/db/attendance_model.dart';
-import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
-import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
-import 'package:unipos/data/models/restaurant/db/cartmodel_308.dart';
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/constants/hive_box_names.dart';
+import 'package:billberrylite/data/models/restaurant/db/attendance_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
+import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
+import 'package:billberrylite/data/models/restaurant/db/cartmodel_308.dart';
 import '../start order/startorder.dart';
-import 'package:unipos/domain/services/restaurant/data_clear_service.dart';
-import 'package:unipos/domain/services/restaurant/day_management_service.dart';
-import 'package:unipos/domain/services/restaurant/eod_service.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
-import 'package:unipos/domain/services/restaurant/esc_pos_receipt_builder.dart';
-import 'package:unipos/domain/services/restaurant/inventory_service.dart';
-import 'package:unipos/presentation/screens/restaurant/welcome_Admin.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
-import 'package:unipos/core/routes/routes_name.dart';
+import 'package:billberrylite/domain/services/restaurant/data_clear_service.dart';
+import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
+import 'package:billberrylite/domain/services/restaurant/eod_service.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/domain/services/restaurant/esc_pos_receipt_builder.dart';
+import 'package:billberrylite/domain/services/restaurant/inventory_service.dart';
+import 'package:billberrylite/presentation/screens/restaurant/welcome_Admin.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/core/routes/routes_name.dart';
 import '../../../widget/restaurant/opening_balance_dialog.dart';
 
 class EndDayDrawer extends StatefulWidget {
@@ -215,34 +216,18 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
             openAttendance.every((r) => r.staffName == currentName);
 
         if (!onlySelf) {
-        final hInset = !AppResponsive.isMobile(context)
-            ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-            : 24.0;
-        final confirmedAttendance = await showDialog<bool>(
+        final confirmedAttendance = await showAppConfirmDialog(
           context: context,
-          builder: (ctx) => AlertDialog(
-            insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            title: Text('Staff Still Clocked In', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-            content: Text('${openAttendance.length} staff member(s) are still clocked in. Do you want to automatically clock them out now?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: Text('Cancel EOD', style: GoogleFonts.poppins(color: Colors.grey.shade700)),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: () => Navigator.pop(ctx, true),
-                child: Text('Clock Out All', style: GoogleFonts.poppins(color: Colors.white)),
-              ),
-            ],
-          ),
+          title: 'Staff Still Clocked In',
+          message:
+              '${openAttendance.length} staff member(s) are still clocked in. Do you want to automatically clock them out now?',
+          confirmLabel: 'Clock Out All',
+          cancelLabel: 'Cancel EOD',
+          accent: Colors.orange,
+          icon: Icons.people_alt_rounded,
         );
 
-        if (confirmedAttendance != true) return;
+        if (!confirmedAttendance) return;
         
         }
 
@@ -689,19 +674,16 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
   }
 
   Future<void> _showPendingEODOrdersDialog(List<dynamic> activeOrders) async {
-    final pendingHInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
     await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => PopScope(
         canPop: false,
-        child: AlertDialog(
-          insetPadding: EdgeInsets.symmetric(horizontal: pendingHInset, vertical: 24),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          title: Text('Previous Day - ${activeOrders.length} Pending Order(s)', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600)),
-          content: Column(
+        child: AppDialogShell(
+          title: 'Previous Day · ${activeOrders.length} Pending Order(s)',
+          accent: Colors.orange,
+          icon: Icons.receipt_long_rounded,
+          body: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -727,15 +709,15 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey)),
-            ),
-            TextButton(
+            appDialogCancelButton(ctx),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: 'Void All',
+              color: Colors.red,
               onPressed: () async {
                 // Get current session ID
                 final currentSessionId = await DayManagementService.getCurrentSessionId();
-                
+
                 // Void all stale orders
                 for (final order in activeOrders) {
                   final voidRecord = PastOrderModel(
@@ -776,7 +758,6 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                 if (ctx.mounted) Navigator.of(ctx).pop();
                 NotificationService.instance.showSuccess('${activeOrders.length} order(s) voided');
               },
-              child: Text('Void All', style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.w500)),
             ),
           ],
         ),
@@ -810,14 +791,11 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        final activeHInset = !AppResponsive.isMobile(context)
-            ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-            : 24.0;
-        return AlertDialog(
-          insetPadding: EdgeInsets.symmetric(horizontal: activeHInset, vertical: 24),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          title: Text('$count Active Order(s)', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
-          content: Column(
+        return AppDialogShell(
+          title: '$count Active Order(s)',
+          accent: AppColors.primary,
+          icon: Icons.receipt_long_rounded,
+          body: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -842,22 +820,14 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Later', style: GoogleFonts.poppins(color: Colors.grey)),
-            ),
-            ElevatedButton(
+            appDialogCancelButton(context, label: 'Later'),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: 'Go to Orders',
               onPressed: () {
                 Navigator.of(context).pop();
                 Navigator.pushNamed(context, RouteNames.restaurantActiveOrders);
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              child: Text('Go to Orders', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
             ),
           ],
         );

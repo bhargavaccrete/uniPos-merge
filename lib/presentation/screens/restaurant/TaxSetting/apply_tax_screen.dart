@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
@@ -12,7 +12,7 @@ import '../../../../util/common/currency_helper.dart';
 import '../../../../util/restaurant/staticswitch.dart';
 import '../../../widget/componets/common/primary_app_bar.dart';
 import '../../../widget/componets/common/app_text_field.dart';
-import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
 
 class ApplyTaxScreen extends StatefulWidget {
   final Tax taxToApply;

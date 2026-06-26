@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
-import 'package:unipos/util/common/currency_helper.dart';
-import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
@@ -18,9 +18,10 @@ import '../../../../util/restaurant/staticswitch.dart';
 import '../../../../domain/services/restaurant/stock_adjust_service.dart';
 import 'low_stock_screen.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'stock_history_screen.dart';
 
 
@@ -110,42 +111,144 @@ class _ManageInventoryState extends State<ManageInventory> {
 
   /// Ask for a reason (+ optional note) before adjusting stock.
   /// Returns null if the user cancels.
-  Future<({String reason, String? note})?> _promptReason({required bool isAdd}) async {
+  Future<({String reason, String? note})?> _promptReason({
+    required bool isAdd,
+    required String itemName,
+    required double quantity,
+    required double newBalance,
+    required String unit,
+    required bool isWeightBased,
+  }) async {
     final reasons = isAdd ? _addReasons : _removeReasons;
     String selectedReason = reasons.first;
     final noteController = TextEditingController();
 
+    // Intent-driven accent: green for adding, red for removing.
+    final Color accent = isAdd ? const Color(0xFF2E7D32) : const Color(0xFFC62828);
+    final IconData headerIcon = isAdd ? Icons.add_circle_rounded : Icons.remove_circle_rounded;
+
     final result = await showDialog<({String reason, String? note})>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(
-            isAdd ? 'Reason for Adding Stock' : 'Reason for Removing Stock',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16),
-          ),
-          content: Column(
+        builder: (ctx, setLocal) => AppDialogShell(
+          title: isAdd ? 'Add Stock' : 'Remove Stock',
+          subtitle: itemName,
+          accent: accent,
+          icon: headerIcon,
+          body: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              DropdownButtonFormField<String>(
-                initialValue: selectedReason,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              // Summary: what changes and the resulting balance.
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: accent.withValues(alpha: 0.25)),
                 ),
-                items: reasons
-                    .map((r) => DropdownMenuItem(
-                          value: r,
-                          child: Text(r, style: GoogleFonts.poppins(fontSize: 14)),
-                        ))
-                    .toList(),
-                onChanged: (v) => setLocal(() => selectedReason = v ?? reasons.first),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(isAdd ? 'Adding' : 'Removing',
+                            style: GoogleFonts.poppins(
+                                fontSize: 11, color: AppColors.textSecondary)),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${isAdd ? '+' : '−'}${_formatStock(quantity, unit, isWeightBased)}',
+                          style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: accent),
+                        ),
+                      ],
+                    ),
+                    Icon(Icons.arrow_forward_rounded,
+                        size: 18, color: AppColors.textSecondary),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text('New balance',
+                            style: GoogleFonts.poppins(
+                                fontSize: 11, color: AppColors.textSecondary)),
+                        const SizedBox(height: 2),
+                        Text(
+                          _formatStock(newBalance, unit, isWeightBased),
+                          style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 18),
+              Text('Reason',
+                  style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary)),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: reasons.map((r) {
+                  final selected = r == selectedReason;
+                  return InkWell(
+                    onTap: () => setLocal(() => selectedReason = r),
+                    borderRadius: BorderRadius.circular(9),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? accent.withValues(alpha: 0.12)
+                            : AppColors.surfaceLight,
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(
+                          color: selected ? accent : AppColors.divider,
+                          width: selected ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (selected) ...[
+                            Icon(Icons.check_rounded, size: 15, color: accent),
+                            const SizedBox(width: 5),
+                          ],
+                          Text(
+                            r,
+                            style: GoogleFonts.poppins(
+                              fontSize: 12.5,
+                              fontWeight: selected
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                              color: selected ? accent : AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+              Text('Note (optional)',
+                  style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary)),
+              const SizedBox(height: 8),
               AppTextField(
                 controller: noteController,
-                hint: 'Note (optional)',
+                hint: 'Add a note…',
                 icon: Icons.notes_outlined,
                 maxLines: 2,
                 minLines: 1,
@@ -153,20 +256,20 @@ class _ManageInventoryState extends State<ManageInventory> {
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            appDialogCancelButton(ctx),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: isAdd ? 'Add Stock' : 'Remove Stock',
+              color: accent,
               onPressed: () => Navigator.pop(
                 ctx,
                 (
                   reason: selectedReason,
-                  note: noteController.text.trim().isEmpty ? null : noteController.text.trim(),
+                  note: noteController.text.trim().isEmpty
+                      ? null
+                      : noteController.text.trim(),
                 ),
               ),
-              child: Text('Confirm', style: GoogleFonts.poppins(color: Colors.white)),
             ),
           ],
         ),
@@ -328,11 +431,20 @@ class _ManageInventoryState extends State<ManageInventory> {
       return;
     }
 
-    // Capture WHY before changing stock (for the audit log).
-    final reasonData = await _promptReason(isAdd: true);
-    if (reasonData == null) return;
-
     final newBalance = (variant != null ? (variant.stockQuantity ?? 0) : item.stockQuantity) + stockToAdd;
+
+    // Capture WHY before changing stock (for the audit log).
+    final reasonData = await _promptReason(
+      isAdd: true,
+      itemName: variant != null
+          ? '${item.name} (${_getVariantName(variant.variantId)})'
+          : item.name,
+      quantity: stockToAdd,
+      newBalance: newBalance,
+      unit: unit,
+      isWeightBased: isWeightBased,
+    );
+    if (reasonData == null) return;
 
     setState(() => _busyKeys.add(key));
     try {
@@ -436,11 +548,20 @@ class _ManageInventoryState extends State<ManageInventory> {
       return;
     }
 
-    // Capture WHY before changing stock (for the audit log).
-    final reasonData = await _promptReason(isAdd: false);
-    if (reasonData == null) return;
-
     final newBalance = currentStock - stockToRemove;
+
+    // Capture WHY before changing stock (for the audit log).
+    final reasonData = await _promptReason(
+      isAdd: false,
+      itemName: variant != null
+          ? '${item.name} (${_getVariantName(variant.variantId)})'
+          : item.name,
+      quantity: stockToRemove,
+      newBalance: newBalance,
+      unit: unit,
+      isWeightBased: isWeightBased,
+    );
+    if (reasonData == null) return;
 
     setState(() => _busyKeys.add(key));
     try {

@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
-import 'package:unipos/stores/setup_wizard_store.dart';
-import 'package:unipos/presentation/screens/onboarding/storeDetailsScreen.dart';
-import 'package:unipos/presentation/screens/onboarding/taxSetupStep.dart';
-import 'package:unipos/presentation/screens/onboarding/paymentSetupStep.dart';
-import 'package:unipos/presentation/screens/onboarding/staffSetupStep.dart';
-import 'package:unipos/presentation/screens/onboarding/securitySetupStep.dart';
-import 'package:unipos/presentation/screens/onboarding/license_email_step.dart';
-import 'package:unipos/presentation/screens/onboarding/businessTypeScreen.dart';
-import 'package:unipos/presentation/screens/onboarding/add_product_screen.dart';
-import 'package:unipos/presentation/screens/restaurant/auth/setup_add_item_screen.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/stores/setup_wizard_store.dart';
+import 'package:billberrylite/presentation/screens/onboarding/storeDetailsScreen.dart';
+import 'package:billberrylite/presentation/screens/onboarding/taxSetupStep.dart';
+import 'package:billberrylite/presentation/screens/onboarding/paymentSetupStep.dart';
+import 'package:billberrylite/presentation/screens/onboarding/staffSetupStep.dart';
+import 'package:billberrylite/presentation/screens/onboarding/securitySetupStep.dart';
+import 'package:billberrylite/presentation/screens/onboarding/license_email_step.dart';
+import 'package:billberrylite/presentation/screens/onboarding/businessTypeScreen.dart';
+import 'package:billberrylite/presentation/screens/onboarding/add_product_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/auth/setup_add_item_screen.dart';
 
 import '../../../util/color.dart';
 import '../../../util/common/app_responsive.dart';
@@ -434,7 +434,7 @@ class _DemoSidebar extends StatelessWidget {
               const SizedBox(height: 30),
               Icon(Icons.store, size: 40, color: Colors.white),
               const SizedBox(height: 10),
-              Text('UniPOS Setup — Demo',
+              Text('Bill Berry Lite Setup — Demo',
                   style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,

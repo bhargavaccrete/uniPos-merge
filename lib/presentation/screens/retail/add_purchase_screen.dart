@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import '../../../core/di/service_locator.dart';
-import 'package:unipos/data/models/retail/hive_model/purchase_model_207.dart';
-import 'package:unipos/data/models/retail/hive_model/purchase_Item_model_206.dart';
-import 'package:unipos/data/models/retail/hive_model/supplier_model_205.dart';
-import 'package:unipos/data/models/retail/hive_model/variante_model_201.dart';
+import 'package:billberrylite/data/models/retail/hive_model/purchase_model_207.dart';
+import 'package:billberrylite/data/models/retail/hive_model/purchase_Item_model_206.dart';
+import 'package:billberrylite/data/models/retail/hive_model/supplier_model_205.dart';
+import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
 
 class AddPurchaseScreen extends StatefulWidget {
   final PurchaseModel? purchase;

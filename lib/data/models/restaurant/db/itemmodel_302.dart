@@ -2,8 +2,8 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:hive/hive.dart';
-import 'package:unipos/core/constants/hive_type_ids.dart';
-import 'package:unipos/util/restaurant/staticswitch.dart';
+import 'package:billberrylite/core/constants/hive_type_ids.dart';
+import 'package:billberrylite/util/restaurant/staticswitch.dart';
 import 'itemvariantemodel_312.dart';
 
 part 'itemmodel_302.g.dart';

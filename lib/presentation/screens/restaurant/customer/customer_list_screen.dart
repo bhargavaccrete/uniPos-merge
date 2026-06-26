@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/models/restaurant/db/customer_model_125.dart';
 import 'add_edit_customer_screen.dart';
 import 'customer_detail_screen.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 
 class CustomerListScreen extends StatefulWidget {
   const CustomerListScreen({super.key});
@@ -104,24 +105,16 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   }
 
   void _deleteCustomer(RestaurantCustomer customer) async {
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    final confirm = await showDialog<bool>(
+    final confirm = await showAppConfirmDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: Text('Delete "${customer.name ?? 'Customer'}"?', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
-        content: Text('This action cannot be undone.', style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary))),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Delete', style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.w500))),
-        ],
-      ),
+      title: 'Delete "${customer.name ?? 'Customer'}"?',
+      message: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      accent: AppColors.danger,
+      icon: Icons.delete_outline,
     );
 
-    if (confirm == true) {
+    if (confirm) {
       final success = await restaurantCustomerStore.deleteCustomer(customer.customerId);
       if (mounted && success) {
         NotificationService.instance.showSuccess('Customer deleted successfully');
@@ -148,6 +141,9 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
           PopupMenuButton<String>(
             icon: Icon(Icons.sort_rounded),
             tooltip: 'Sort by',
+            color: AppColors.white,
+            surfaceTintColor: AppColors.white,
+            elevation: 4,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -434,14 +430,35 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
               ),
               PopupMenuButton<String>(
                 icon: Icon(Icons.more_vert_rounded, color: AppColors.textSecondary, size: 20),
+                color: AppColors.white,
+                surfaceTintColor: AppColors.white,
+                elevation: 4,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 onSelected: (value) {
                   if (value == 'edit') _navigateToEditCustomer(customer);
                   if (value == 'delete') _deleteCustomer(customer);
                 },
                 itemBuilder: (_) => [
-                  PopupMenuItem(value: 'edit', child: Text('Edit', style: GoogleFonts.poppins(fontSize: 13))),
-                  PopupMenuItem(value: 'delete', child: Text('Delete', style: GoogleFonts.poppins(fontSize: 13, color: Colors.red))),
+                  PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit_outlined, size: 18, color: AppColors.primary),
+                        const SizedBox(width: 10),
+                        Text('Edit', style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textPrimary)),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_outline, size: 18, color: AppColors.danger),
+                        const SizedBox(width: 10),
+                        Text('Delete', style: GoogleFonts.poppins(fontSize: 13, color: AppColors.danger)),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ],

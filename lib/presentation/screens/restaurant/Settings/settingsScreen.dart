@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/core/routes/routes_name.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/core/routes/routes_name.dart';
+import 'package:billberrylite/util/color.dart';
 
 import '../../../../domain/services/common/auto_backup_service.dart';
 import '../../../../domain/services/common/device_id_service.dart';
@@ -11,10 +11,10 @@ import '../../../../util/common/currency_helper.dart';
 import '../../../../util/restaurant/staticswitch.dart';
 import '../../../../util/common/decimal_settings.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
-import '../../../widget/componets/restaurant/componets/filterButton.dart';
 import '../../../../util/restaurant/restaurant_session.dart';
 import '../../../widget/componets/common/app_text_field.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import '../../../widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import '../../../../util/common/app_responsive.dart';
 import '../../../widget/componets/common/primary_app_bar.dart';
 
@@ -30,6 +30,7 @@ class _settingsScreenState extends State<Settingsscreen> {
   bool _isRefundWindowExpanded = false;
   bool _isTimeoutExpanded = false;
   bool _isLowStockExpanded = false;
+  bool _showCustomThreshold = false;
   final TextEditingController _customThresholdController = TextEditingController();
 
   bool _backupEnabled = false;
@@ -70,15 +71,12 @@ class _settingsScreenState extends State<Settingsscreen> {
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDlgState) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          title: Text(
-            isChange ? 'Change Backup Password' : 'Set Backup Password',
-            style: GoogleFonts.poppins(
-                fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-          content: Column(
+        builder: (ctx, setDlgState) => AppDialogShell(
+          title: isChange ? 'Change Backup Password' : 'Set Backup Password',
+          subtitle: 'Encrypts and protects your backups',
+          accent: AppColors.primary,
+          icon: Icons.lock_outline_rounded,
+          body: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -112,42 +110,67 @@ class _settingsScreenState extends State<Settingsscreen> {
                 maxLength: 6,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Icon(Icons.info_outline_rounded,
-                      size: 15, color: Colors.orange.shade700),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      "Backups can't be recovered without this password.",
-                      style: GoogleFonts.poppins(
-                          fontSize: 11.5, color: Colors.orange.shade800),
+              const SizedBox(height: 14),
+              // Warning callout
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border:
+                      Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.warning_amber_rounded,
+                        size: 18, color: Colors.orange.shade700),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "Backups can't be recovered without this password. Keep it safe.",
+                        style: GoogleFonts.poppins(
+                            fontSize: 11.5,
+                            color: Colors.orange.shade800,
+                            height: 1.4),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               if (error != null) ...[
-                const SizedBox(height: 8),
-                Text(error!,
-                    style:
-                        GoogleFonts.poppins(color: Colors.red, fontSize: 12)),
+                const SizedBox(height: 10),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border:
+                        Border.all(color: Colors.red.withValues(alpha: 0.25)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline_rounded,
+                          size: 16, color: Colors.red.shade700),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(error!,
+                            style: GoogleFonts.poppins(
+                                color: Colors.red.shade700, fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel',
-                  style: GoogleFonts.poppins(color: AppColors.textSecondary)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-              ),
+            appDialogCancelButton(ctx),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: isChange ? 'Update' : 'Confirm',
               onPressed: () async {
                 final pwd = pwdController.text.trim();
                 final err = BackupEncryptionService.validatePassword(
@@ -160,14 +183,13 @@ class _settingsScreenState extends State<Settingsscreen> {
                 if (ctx.mounted) Navigator.pop(ctx);
                 setState(() => _hasBackupPassword = true);
               },
-              child: Text(isChange ? 'Update' : 'Confirm',
-                  style: GoogleFonts.poppins(
-                      color: Colors.white, fontWeight: FontWeight.w600)),
             ),
           ],
         ),
       ),
     );
+    pwdController.dispose();
+    confirmController.dispose();
   }
 
   String _getTimeoutLabel(int minutes) {
@@ -367,6 +389,52 @@ class _settingsScreenState extends State<Settingsscreen> {
   Widget _tileDivider() =>
       Divider(height: 1, color: AppColors.divider, indent: 56);
 
+  /// Modern selectable chip used by the Display/Orders/Staff option pickers.
+  /// Filled in primary when selected, outlined otherwise.
+  Widget _optionChip({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+    IconData? icon,
+  }) {
+    return Material(
+      color: selected ? AppColors.primary : AppColors.surfaceLight,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: selected ? AppColors.primary : AppColors.divider,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon,
+                    size: 15,
+                    color: selected ? Colors.white : AppColors.textSecondary),
+                const SizedBox(width: 5),
+              ],
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  color: selected ? Colors.white : AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
@@ -465,8 +533,18 @@ class _settingsScreenState extends State<Settingsscreen> {
                     SizedBox(width: AppResponsive.smallSpacing(context) * 0.5),
                     InkWell(
                       onTap: () async {
+                        final confirm = await showAppConfirmDialog(
+                          context: context,
+                          title: 'Remove Backup Password?',
+                          message:
+                              'Backups will no longer be password-protected. Existing encrypted backups still need their original password to restore.',
+                          confirmLabel: 'Remove',
+                          accent: Colors.red,
+                          icon: Icons.lock_open_rounded,
+                        );
+                        if (!confirm) return;
                         await BackupEncryptionService.clearPassword();
-                        setState(() => _hasBackupPassword = false);
+                        if (mounted) setState(() => _hasBackupPassword = false);
                       },
                       borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                       child: Container(
@@ -502,18 +580,15 @@ class _settingsScreenState extends State<Settingsscreen> {
                   onTap: () => setState(
                       () => _isCurrencyExpanded = !_isCurrencyExpanded),
                   expandedChild: Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
+                    spacing: 8,
+                    runSpacing: 8,
                     children: CurrencyHelper.currencies.entries.map((e) {
                       final info = e.value;
-                      final btn = '${info.symbol} ${info.code}';
-                      final sel =
-                          '${CurrencyHelper.currentSymbol} ${CurrencyHelper.currentCurrencyCode}';
-                      return Filterbutton(
-                        title: btn,
-                        selectedFilter: sel,
-                        onpressed: () =>
-                            CurrencyHelper.setCurrency(info.code),
+                      return _optionChip(
+                        label: '${info.symbol} ${info.code}',
+                        selected:
+                            info.code == CurrencyHelper.currentCurrencyCode,
+                        onTap: () => CurrencyHelper.setCurrency(info.code),
                       );
                     }).toList(),
                   ),
@@ -533,29 +608,25 @@ class _settingsScreenState extends State<Settingsscreen> {
                   onTap: () => setState(
                       () => _isDecimalExpanded = !_isDecimalExpanded),
                   expandedChild: Wrap(
-                    spacing: 4,
-                    runSpacing: 4,
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      Filterbutton(
-                          title: 'None',
-                          selectedFilter: _getDecimalFilter(prec),
-                          onpressed: () =>
-                              DecimalSettings.updatePrecision(0)),
-                      Filterbutton(
-                          title: '0.0',
-                          selectedFilter: _getDecimalFilter(prec),
-                          onpressed: () =>
-                              DecimalSettings.updatePrecision(1)),
-                      Filterbutton(
-                          title: '0.00',
-                          selectedFilter: _getDecimalFilter(prec),
-                          onpressed: () =>
-                              DecimalSettings.updatePrecision(2)),
-                      Filterbutton(
-                          title: '0.000',
-                          selectedFilter: _getDecimalFilter(prec),
-                          onpressed: () =>
-                              DecimalSettings.updatePrecision(3)),
+                      _optionChip(
+                          label: 'None',
+                          selected: prec == 0,
+                          onTap: () => DecimalSettings.updatePrecision(0)),
+                      _optionChip(
+                          label: '0.0',
+                          selected: prec == 1,
+                          onTap: () => DecimalSettings.updatePrecision(1)),
+                      _optionChip(
+                          label: '0.00',
+                          selected: prec == 2,
+                          onTap: () => DecimalSettings.updatePrecision(2)),
+                      _optionChip(
+                          label: '0.000',
+                          selected: prec == 3,
+                          onTap: () => DecimalSettings.updatePrecision(3)),
                     ],
                   ),
                 ),
@@ -641,45 +712,24 @@ class _settingsScreenState extends State<Settingsscreen> {
                                 _isRefundWindowExpanded =
                                     !_isRefundWindowExpanded),
                             expandedChild: Wrap(
-                              spacing: 4,
-                              runSpacing: 4,
-                              children: [
-                                Filterbutton(
-                                    title: '30 min',
-                                    selectedFilter: _getRefundWindowLabel(win),
-                                    onpressed: () =>
-                                        AppSettings.updateRefundWindow(30)),
-                                Filterbutton(
-                                    title: '1 hr',
-                                    selectedFilter: _getRefundWindowLabel(win),
-                                    onpressed: () =>
-                                        AppSettings.updateRefundWindow(60)),
-                                Filterbutton(
-                                    title: '2 hr',
-                                    selectedFilter: _getRefundWindowLabel(win),
-                                    onpressed: () =>
-                                        AppSettings.updateRefundWindow(120)),
-                                Filterbutton(
-                                    title: '4 hr',
-                                    selectedFilter: _getRefundWindowLabel(win),
-                                    onpressed: () =>
-                                        AppSettings.updateRefundWindow(240)),
-                                Filterbutton(
-                                    title: '8 hr',
-                                    selectedFilter: _getRefundWindowLabel(win),
-                                    onpressed: () =>
-                                        AppSettings.updateRefundWindow(480)),
-                                Filterbutton(
-                                    title: '24 hr',
-                                    selectedFilter: _getRefundWindowLabel(win),
-                                    onpressed: () =>
-                                        AppSettings.updateRefundWindow(1440)),
-                                Filterbutton(
-                                    title: 'No Limit',
-                                    selectedFilter: _getRefundWindowLabel(win),
-                                    onpressed: () =>
-                                        AppSettings.updateRefundWindow(0)),
-                              ],
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: const <(int, String)>[
+                                (30, '30 min'),
+                                (60, '1 hr'),
+                                (120, '2 hr'),
+                                (240, '4 hr'),
+                                (480, '8 hr'),
+                                (1440, '24 hr'),
+                                (0, 'No Limit'),
+                              ]
+                                  .map((o) => _optionChip(
+                                        label: o.$2,
+                                        selected: win == o.$1,
+                                        onTap: () => AppSettings
+                                            .updateRefundWindow(o.$1),
+                                      ))
+                                  .toList(),
                             ),
                           ),
                         ),
@@ -704,70 +754,96 @@ class _settingsScreenState extends State<Settingsscreen> {
                     isExpanded: _isLowStockExpanded,
                     onTap: () => setState(
                         () => _isLowStockExpanded = !_isLowStockExpanded),
-                    expandedChild: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Wrap(
-                          spacing: 4,
-                          runSpacing: 4,
-                          children: [3, 5, 10, 15, 20, 25]
-                              .map((n) => Filterbutton(
-                                    title: '$n',
-                                    selectedFilter: label,
-                                    onpressed: () => AppSettings
-                                        .updateLowStockThreshold(n.toDouble()),
-                                  ))
-                              .toList(),
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
+                    expandedChild: Builder(
+                      builder: (context) {
+                        const presets = <double>[3, 5, 10, 15, 20, 25];
+                        final isCustomValue = !presets.contains(threshold);
+                        final showCustom = _showCustomThreshold || isCustomValue;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: AppTextField(
-                                controller: _customThresholdController,
-                                hint: 'Custom value',
-                                keyboardType: const TextInputType.numberWithOptions(
-                                    decimal: true),
-                              ),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                ...presets.map((n) => _optionChip(
+                                      label: n.toStringAsFixed(0),
+                                      selected: !showCustom && threshold == n,
+                                      onTap: () {
+                                        setState(() =>
+                                            _showCustomThreshold = false);
+                                        AppSettings
+                                            .updateLowStockThreshold(n);
+                                      },
+                                    )),
+                                _optionChip(
+                                  label: 'Custom',
+                                  icon: Icons.tune_rounded,
+                                  selected: showCustom,
+                                  onTap: () => setState(
+                                      () => _showCustomThreshold = true),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 8),
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 18, vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10)),
+                            // Custom field appears only after tapping "Custom"
+                            // (or when the saved value isn't one of the presets).
+                            if (showCustom) ...[
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: AppTextField(
+                                      controller: _customThresholdController,
+                                      hint: 'Custom value',
+                                      keyboardType:
+                                          const TextInputType.numberWithOptions(
+                                              decimal: true),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primary,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 18, vertical: 14),
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(10)),
+                                    ),
+                                    onPressed: () {
+                                      final v = double.tryParse(
+                                          _customThresholdController.text
+                                              .trim());
+                                      if (v == null || v <= 0) {
+                                        NotificationService.instance
+                                            .showError('Enter a valid number');
+                                        return;
+                                      }
+                                      AppSettings.updateLowStockThreshold(v);
+                                      _customThresholdController.clear();
+                                      FocusScope.of(context).unfocus();
+                                    },
+                                    child: Text('Set',
+                                        style: GoogleFonts.poppins(
+                                            fontWeight: FontWeight.w600)),
+                                  ),
+                                ],
                               ),
-                              onPressed: () {
-                                final v = double.tryParse(
-                                    _customThresholdController.text.trim());
-                                if (v == null || v <= 0) {
-                                  NotificationService.instance
-                                      .showError('Enter a valid number');
-                                  return;
-                                }
-                                AppSettings.updateLowStockThreshold(v);
-                                _customThresholdController.clear();
-                                FocusScope.of(context).unfocus();
-                              },
-                              child: Text('Set',
-                                  style: GoogleFonts.poppins(
-                                      fontWeight: FontWeight.w600)),
+                            ],
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                'Tip: weight-based items (kg/gm) should set their own '
+                                'threshold on the item — this default suits count-based items.',
+                                style: GoogleFonts.poppins(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary),
+                              ),
                             ),
                           ],
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            'Tip: weight-based items (kg/gm) should set their own '
-                            'threshold on the item — this default suits count-based items.',
-                            style: GoogleFonts.poppins(
-                                fontSize: 11, color: AppColors.textSecondary),
-                          ),
-                        ),
-                      ],
+                        );
+                      },
                     ),
                   );
                 },
@@ -792,13 +868,13 @@ class _settingsScreenState extends State<Settingsscreen> {
                   onTap: () => setState(
                       () => _isTimeoutExpanded = !_isTimeoutExpanded),
                   expandedChild: Wrap(
-                    spacing: 4,
-                    runSpacing: 4,
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [5, 10, 15, 30, 60].map((min) {
-                      return Filterbutton(
-                        title: min < 60 ? '$min min' : '1 hr',
-                        selectedFilter: _getTimeoutLabel(minutes),
-                        onpressed: () =>
+                      return _optionChip(
+                        label: min < 60 ? '$min min' : '1 hr',
+                        selected: minutes == min,
+                        onTap: () =>
                             RestaurantSession.setTimeoutMinutes(min),
                       );
                     }).toList(),
@@ -893,6 +969,16 @@ class _settingsScreenState extends State<Settingsscreen> {
                 Colors.purple,
                 () => Navigator.pushNamed(
                     context, RouteNames.restaurantDataGenratorScreen),
+              ),
+              _tileDivider(),
+              _navTile(
+                context,
+                'Animated Splash Preview',
+                'Preview the animated logo splash screen',
+                Icons.animation_rounded,
+                Colors.deepPurple,
+                () => Navigator.pushNamed(
+                    context, RouteNames.restaurantSplashPreview),
               ),
             ]),
             SizedBox(height: AppResponsive.mediumSpacing(context)),

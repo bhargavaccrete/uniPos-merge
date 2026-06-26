@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:unipos/core/init/hive_init.dart';
+import 'package:billberrylite/core/init/hive_init.dart';
 
 /// Temporary screen to fix "bad element" attribute errors
 /// Navigate here if you're getting "bad state bad element" errors

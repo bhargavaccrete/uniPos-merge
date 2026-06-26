@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:unipos/domain/services/retail/gst_service.dart';
-import 'package:unipos/util/responsive.dart';
+import 'package:billberrylite/domain/services/retail/gst_service.dart';
+import 'package:billberrylite/util/responsive.dart';
 
 import 'package:uuid/uuid.dart';
 

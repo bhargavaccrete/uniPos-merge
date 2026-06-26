@@ -2,20 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
-import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
-import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/edit_item.dart' show EdititemScreen;
-import 'package:unipos/presentation/widget/componets/restaurant/componets/bottomsheet.dart';
-import 'package:unipos/util/common/decimal_settings.dart';
-import 'package:unipos/util/images.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
+import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
+import 'package:billberrylite/presentation/screens/restaurant/manage%20menu/tab/edit_item.dart' show EdititemScreen;
+import 'package:billberrylite/presentation/widget/componets/restaurant/componets/bottomsheet.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
+import 'package:billberrylite/util/images.dart';
 import '../../../../../util/restaurant/audit_trail_helper.dart';
 import '../../../../../util/restaurant/restaurant_session.dart';
 import '../../../../../util/common/app_responsive.dart';
-import 'package:unipos/util/common/currency_helper.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 
 class ItemsTab extends StatefulWidget {
   final String? selectedCategory;
@@ -56,43 +57,16 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
   }
 
   void _deleteItem(String id) async {
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppConfirmDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
-            SizedBox(width: 12),
-            Text('Delete Item', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-          ],
-        ),
-        content: Text(
-          'Are you sure you want to delete this item?',
-          style: GoogleFonts.poppins(fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('Delete', style: GoogleFonts.poppins(color: Colors.white)),
-          ),
-        ],
-      ),
+      title: 'Delete Item',
+      message: 'Are you sure you want to delete this item?',
+      confirmLabel: 'Delete',
+      accent: AppColors.danger,
+      icon: Icons.delete_outline,
     );
 
-    if (confirmed == true) {
+    if (confirmed) {
       await itemStore.deleteItem(id);
     }
   }

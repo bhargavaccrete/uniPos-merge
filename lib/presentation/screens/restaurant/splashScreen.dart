@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/images.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/images.dart';
 
 import '../../../constants/restaurant/color.dart';
 import 'AuthSelectionScreen.dart';

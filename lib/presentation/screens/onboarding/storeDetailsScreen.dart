@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/stores/setup_wizard_store.dart';
+import 'package:billberrylite/stores/setup_wizard_store.dart';
 import '../../../presentation/widget/componets/common/app_text_field.dart';
 import '../../../util/color.dart';
 import '../../../util/common/app_responsive.dart';

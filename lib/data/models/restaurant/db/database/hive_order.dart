@@ -1,6 +1,6 @@
 
 import 'package:hive/hive.dart';
-import 'package:unipos/server/websocket.dart' as ws;
+import 'package:billberrylite/server/websocket.dart' as ws;
 
 import '../ordermodel_309.dart';
 import '../cartmodel_308.dart';

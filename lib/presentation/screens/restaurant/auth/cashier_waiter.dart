@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/presentation/screens/restaurant/auth/admin_login.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/manuListViewWithNavigation.dart';
-import 'package:unipos/util/images.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/screens/restaurant/auth/admin_login.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/componets/manuListViewWithNavigation.dart';
+import 'package:billberrylite/util/images.dart';
 
 import '../../../../util/color.dart';
 

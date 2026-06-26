@@ -3,16 +3,15 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:uuid/uuid.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/retail/hive_model/customer_model_208.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
-import 'package:unipos/util/common/currency_helper.dart';
-import 'package:unipos/util/common/decimal_settings.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/models/retail/hive_model/customer_model_208.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 
 class ManageCustomersScreen extends StatefulWidget {
   const ManageCustomersScreen({super.key});
@@ -316,94 +315,84 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
     final notesController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        title: Text(
-          'Add New Customer',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-        ),
-        content: SingleChildScrollView(
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppTextField(
-                  controller: nameController,
-                  hint: 'Customer Name',
-                  icon: Icons.person,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Name is required';
+      builder: (ctx) => AppDialogShell(
+        title: 'Add New Customer',
+        accent: AppColors.primary,
+        icon: Icons.person_add_rounded,
+        body: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppTextField(
+                controller: nameController,
+                hint: 'Customer Name',
+                icon: Icons.person,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Name is required';
+                  }
+                  return null;
+                },
+              ),
+              SizedBox(height: 15),
+              AppTextField(
+                controller: phoneController,
+                hint: 'Phone Number',
+                icon: Icons.phone,
+                keyboardType: TextInputType.phone,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                validator: (value) {
+                  if (value != null && value.trim().isNotEmpty) {
+                    if (!RegExp(r'^\d{10}$').hasMatch(value.trim())) {
+                      return 'Enter a valid 10-digit phone number';
                     }
-                    return null;
-                  },
-                ),
-                SizedBox(height: 15),
-                AppTextField(
-                  controller: phoneController,
-                  hint: 'Phone Number',
-                  icon: Icons.phone,
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  validator: (value) {
-                    if (value != null && value.trim().isNotEmpty) {
-                      if (!RegExp(r'^\d{10}$').hasMatch(value.trim())) {
-                        return 'Enter a valid 10-digit phone number';
-                      }
+                  }
+                  return null;
+                },
+              ),
+              SizedBox(height: 15),
+              AppTextField(
+                controller: emailController,
+                hint: 'Email (Optional)',
+                icon: Icons.email,
+                keyboardType: TextInputType.emailAddress,
+                // FIX 6: Validate email format when provided.
+                validator: (v) {
+                  if (v != null && v.trim().isNotEmpty) {
+                    if (!RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$').hasMatch(v.trim())) {
+                      return 'Enter a valid email';
                     }
-                    return null;
-                  },
-                ),
-                SizedBox(height: 15),
-                AppTextField(
-                  controller: emailController,
-                  hint: 'Email (Optional)',
-                  icon: Icons.email,
-                  keyboardType: TextInputType.emailAddress,
-                  // FIX 6: Validate email format when provided.
-                  validator: (v) {
-                    if (v != null && v.trim().isNotEmpty) {
-                      if (!RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$').hasMatch(v.trim())) {
-                        return 'Enter a valid email';
-                      }
-                    }
-                    return null;
-                  },
-                ),
-                SizedBox(height: 15),
-                AppTextField(
-                  controller: addressController,
-                  hint: 'Address (Optional)',
-                  icon: Icons.location_on,
-                  maxLines: 2,
-                ),
-                SizedBox(height: 15),
-                AppTextField(
-                  controller: notesController,
-                  hint: 'Notes (Optional)',
-                  icon: Icons.note,
-                  maxLines: 2,
-                ),
-              ],
-            ),
+                  }
+                  return null;
+                },
+              ),
+              SizedBox(height: 15),
+              AppTextField(
+                controller: addressController,
+                hint: 'Address (Optional)',
+                icon: Icons.location_on,
+                maxLines: 2,
+              ),
+              SizedBox(height: 15),
+              AppTextField(
+                controller: notesController,
+                hint: 'Notes (Optional)',
+                icon: Icons.note,
+                maxLines: 2,
+              ),
+            ],
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.poppins(color: Colors.grey),
-            ),
-          ),
-          CommonButton(
-            onTap: () async {
+          appDialogCancelButton(ctx),
+          const SizedBox(width: 12),
+          appDialogPrimaryButton(
+            label: 'Add',
+            onPressed: () async {
               if (formKey.currentState!.validate()) {
                 // FIX 8: Duplicate phone check before adding.
                 final phone = phoneController.text.trim();
@@ -423,15 +412,11 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   addressController.text.trim(),
                   notesController.text.trim(),
                 );
-                if (context.mounted) {
-                  Navigator.pop(context);
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
                 }
               }
             },
-            child: Text('Add', style: GoogleFonts.poppins(color: Colors.white)),
-            height: 40,
-            width: 80,
-            bgcolor: AppColors.primary,
           ),
         ],
       ),
@@ -452,93 +437,83 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
     final notesController = TextEditingController(text: customer.notes);
     final formKey = GlobalKey<FormState>();
 
-    final dialogHInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: dialogHInset, vertical: 24),
-        title: Text(
-          'Edit Customer',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-        ),
-        content: SingleChildScrollView(
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppTextField(
-                  controller: nameController,
-                  hint: 'Customer Name',
-                  icon: Icons.person,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Name is required';
+      builder: (ctx) => AppDialogShell(
+        title: 'Edit Customer',
+        accent: AppColors.primary,
+        icon: Icons.edit_rounded,
+        body: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppTextField(
+                controller: nameController,
+                hint: 'Customer Name',
+                icon: Icons.person,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Name is required';
+                  }
+                  return null;
+                },
+              ),
+              SizedBox(height: 15),
+              AppTextField(
+                controller: phoneController,
+                hint: 'Phone Number',
+                icon: Icons.phone,
+                keyboardType: TextInputType.phone,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                validator: (value) {
+                  if (value != null && value.trim().isNotEmpty) {
+                    if (!RegExp(r'^\d{10}$').hasMatch(value.trim())) {
+                      return 'Enter a valid 10-digit phone number';
                     }
-                    return null;
-                  },
-                ),
-                SizedBox(height: 15),
-                AppTextField(
-                  controller: phoneController,
-                  hint: 'Phone Number',
-                  icon: Icons.phone,
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  validator: (value) {
-                    if (value != null && value.trim().isNotEmpty) {
-                      if (!RegExp(r'^\d{10}$').hasMatch(value.trim())) {
-                        return 'Enter a valid 10-digit phone number';
-                      }
+                  }
+                  return null;
+                },
+              ),
+              SizedBox(height: 15),
+              AppTextField(
+                controller: emailController,
+                hint: 'Email (Optional)',
+                icon: Icons.email,
+                keyboardType: TextInputType.emailAddress,
+                validator: (v) {
+                  if (v != null && v.trim().isNotEmpty) {
+                    if (!RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$').hasMatch(v.trim())) {
+                      return 'Enter a valid email';
                     }
-                    return null;
-                  },
-                ),
-                SizedBox(height: 15),
-                AppTextField(
-                  controller: emailController,
-                  hint: 'Email (Optional)',
-                  icon: Icons.email,
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (v) {
-                    if (v != null && v.trim().isNotEmpty) {
-                      if (!RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$').hasMatch(v.trim())) {
-                        return 'Enter a valid email';
-                      }
-                    }
-                    return null;
-                  },
-                ),
-                SizedBox(height: 15),
-                AppTextField(
-                  controller: addressController,
-                  hint: 'Address (Optional)',
-                  icon: Icons.location_on,
-                  maxLines: 2,
-                ),
-                SizedBox(height: 15),
-                AppTextField(
-                  controller: notesController,
-                  hint: 'Notes (Optional)',
-                  icon: Icons.note,
-                  maxLines: 2,
-                ),
-              ],
-            ),
+                  }
+                  return null;
+                },
+              ),
+              SizedBox(height: 15),
+              AppTextField(
+                controller: addressController,
+                hint: 'Address (Optional)',
+                icon: Icons.location_on,
+                maxLines: 2,
+              ),
+              SizedBox(height: 15),
+              AppTextField(
+                controller: notesController,
+                hint: 'Notes (Optional)',
+                icon: Icons.note,
+                maxLines: 2,
+              ),
+            ],
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.poppins(color: Colors.grey),
-            ),
-          ),
-          CommonButton(
-            onTap: () async {
+          appDialogCancelButton(ctx),
+          const SizedBox(width: 12),
+          appDialogPrimaryButton(
+            label: 'Update',
+            onPressed: () async {
               if (formKey.currentState!.validate()) {
                 await _updateCustomer(
                   customer,
@@ -548,15 +523,11 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                   addressController.text.trim(),
                   notesController.text.trim(),
                 );
-                if (context.mounted) {
-                  Navigator.pop(context);
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
                 }
               }
             },
-            child: Text('Update', style: GoogleFonts.poppins(color: Colors.white)),
-            height: 40,
-            width: 80,
-            bgcolor: AppColors.primary,
           ),
         ],
       ),
@@ -570,76 +541,35 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
   }
 
   void _showCustomerDetailsDialog(BuildContext context, CustomerModel customer) {
-    final detailsHInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: detailsHInset, vertical: 24),
-        title: Row(
+      builder: (context) => AppDialogShell(
+        title: customer.name ?? 'Unknown',
+        accent: AppColors.primary,
+        icon: Icons.person,
+        body: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: 25,
-              backgroundColor: AppColors.primary.withValues(alpha: 0.2),
-              child: Text(
-                customer.name?.isNotEmpty == true
-                    ? customer.name![0].toUpperCase()
-                    : '?',
-                style: GoogleFonts.poppins(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
-                ),
-              ),
-            ),
-            SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                customer.name ?? 'Unknown',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-              ),
-            ),
+            if (customer.phone?.isNotEmpty == true)
+              _buildDetailRow(Icons.phone, 'Phone', customer.phone!),
+            if (customer.email?.isNotEmpty == true)
+              _buildDetailRow(Icons.email, 'Email', customer.email!),
+            if (customer.address?.isNotEmpty == true)
+              _buildDetailRow(Icons.location_on, 'Address', customer.address!),
+            if (customer.notes?.isNotEmpty == true)
+              _buildDetailRow(Icons.note, 'Notes', customer.notes!),
+            if (customer.visitCount != null && customer.visitCount! > 0)
+              _buildDetailRow(Icons.shopping_bag, 'Visits', '${customer.visitCount}'),
+            if (customer.totalPurchaseAmount != null && customer.totalPurchaseAmount! > 0)
+              _buildDetailRow(Icons.attach_money, 'Total Purchases',
+                  '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(customer.totalPurchaseAmount!)}'),
           ],
         ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (customer.phone?.isNotEmpty == true)
-                _buildDetailRow(Icons.phone, 'Phone', customer.phone!),
-              if (customer.email?.isNotEmpty == true)
-                _buildDetailRow(Icons.email, 'Email', customer.email!),
-              if (customer.address?.isNotEmpty == true)
-                _buildDetailRow(Icons.location_on, 'Address', customer.address!),
-              if (customer.notes?.isNotEmpty == true)
-                _buildDetailRow(Icons.note, 'Notes', customer.notes!),
-              if (customer.visitCount != null && customer.visitCount! > 0)
-                _buildDetailRow(Icons.shopping_bag, 'Visits', '${customer.visitCount}'),
-              if (customer.totalPurchaseAmount != null && customer.totalPurchaseAmount! > 0)
-                _buildDetailRow(Icons.attach_money, 'Total Purchases',
-                    '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(customer.totalPurchaseAmount!)}'),
-            ],
-          ),
-        ),
         actions: [
-          TextButton(
+          appDialogPrimaryButton(
+            label: 'Close',
             onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Close',
-              style: GoogleFonts.poppins(color: AppColors.primary),
-            ),
-          ),
-          CommonButton(
-            onTap: () {
-              Navigator.pop(context);
-              _showEditCustomerDialog(context, customer);
-            },
-            child: Text('Edit', style: GoogleFonts.poppins(color: Colors.white)),
-            height: 40,
-            width: 80,
-            bgcolor: AppColors.primary,
           ),
         ],
       ),
@@ -682,45 +612,18 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
     );
   }
 
-  void _confirmDeleteCustomer(BuildContext context, CustomerModel customer) {
-    final deleteHInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    showDialog(
+  Future<void> _confirmDeleteCustomer(BuildContext context, CustomerModel customer) async {
+    final ok = await showAppConfirmDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: deleteHInset, vertical: 24),
-        title: Text(
-          'Delete Customer',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-        ),
-        content: Text(
-          'Are you sure you want to delete ${customer.name}?',
-          style: GoogleFonts.poppins(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.poppins(color: Colors.grey),
-            ),
-          ),
-          TextButton(
-            onPressed: () async {
-              await _deleteCustomer(customer);
-              if (context.mounted) {
-                Navigator.pop(context);
-              }
-            },
-            child: Text(
-              'Delete',
-              style: GoogleFonts.poppins(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
+      title: 'Delete Customer',
+      message: 'Are you sure you want to delete ${customer.name}?',
+      confirmLabel: 'Delete',
+      accent: Colors.red,
+      icon: Icons.delete_rounded,
     );
+    if (ok) {
+      await _deleteCustomer(customer);
+    }
   }
 
   Future<void> _addCustomer(String name, String phone, String email, String address, String notes) async {

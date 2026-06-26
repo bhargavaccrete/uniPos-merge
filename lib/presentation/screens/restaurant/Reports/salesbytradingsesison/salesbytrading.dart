@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbytradingsesison/daywisebytrading.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbytradingsesison/monthwisebytrading.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbytradingsesison/thisweekbytrading.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbytradingsesison/todaybytrading.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbytradingsesison/yearwisebytrading.dart';
-import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/salesbytradingsesison/daywisebytrading.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/salesbytradingsesison/monthwisebytrading.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/salesbytradingsesison/thisweekbytrading.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/salesbytradingsesison/todaybytrading.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/salesbytradingsesison/yearwisebytrading.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 
 class Salesbytrading extends StatefulWidget {
   const Salesbytrading({super.key});

@@ -1,6 +1,6 @@
 import 'package:hive/hive.dart';
-import 'package:unipos/core/constants/hive_box_names.dart';
-import 'package:unipos/data/models/restaurant/db/app_notification_model.dart';
+import 'package:billberrylite/core/constants/hive_box_names.dart';
+import 'package:billberrylite/data/models/restaurant/db/app_notification_model.dart';
 
 class NotificationRepository {
   Box<AppNotificationModel> get _box =>

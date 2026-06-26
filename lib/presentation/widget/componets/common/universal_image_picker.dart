@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:unipos/util/common/image_picker_service.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/util/common/image_picker_service.dart';
+import 'package:billberrylite/util/color.dart';
 
 /// Universal image picker widget that works on web and mobile
 /// Replaces the old File-based approach with Uint8List

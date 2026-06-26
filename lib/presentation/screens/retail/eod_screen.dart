@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
-import 'package:unipos/domain/services/restaurant/day_management_service.dart';
-import 'package:unipos/domain/services/restaurant/eod_service.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
+import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
+import 'package:billberrylite/domain/services/restaurant/eod_service.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 
 class RetailEODScreen extends StatefulWidget {
   const RetailEODScreen({super.key});

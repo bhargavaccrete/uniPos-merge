@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/images.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/images.dart';
 
 
 import '../../../../constants/restaurant/color.dart';

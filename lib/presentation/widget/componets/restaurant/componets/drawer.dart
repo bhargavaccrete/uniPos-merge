@@ -1,22 +1,39 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Textform.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/core/routes/routes_name.dart';
-import 'package:unipos/domain/services/common/unified_backup_service.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
-import 'package:unipos/util/common/app_responsive.dart';
-import 'package:unipos/main.dart' as main_app;
+import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Textform.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
+import 'package:billberrylite/util/restaurant/restaurant_auth_helper.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/routes/routes_name.dart';
+import 'package:billberrylite/domain/services/common/unified_backup_service.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/main.dart' as main_app;
 
 import '../../../../../util/images.dart';
 
 class Drawerr extends StatefulWidget {
-  const Drawerr({super.key});
+  // Order-screen-only action; hidden on the Dashboard.
+  final bool showClearCart;
+  // Items the Dashboard already shows as grid cards (Reports/Expenses/End Day).
+  final bool showGridDuplicates;
+  // Change PIN is shown on the Dashboard for staff.
+  final bool showChangePin;
+
+  const Drawerr({
+    super.key,
+    this.showClearCart = true,
+    this.showGridDuplicates = true,
+    this.showChangePin = false,
+  });
 
   @override
   State<Drawerr> createState() => _DrawerrState();
@@ -79,7 +96,7 @@ class _DrawerrState extends State<Drawerr> {
                   ),
                   AppResponsive.verticalSpace(context, size: SpacingSize.medium),
                   Text(
-                    'UniPOS',
+                    'Bill Berry Lite',
                     style: GoogleFonts.poppins(
                       fontSize: AppResponsive.getValue(context, mobile: 22, tablet: 24),
                       fontWeight: FontWeight.bold,
@@ -118,18 +135,20 @@ class _DrawerrState extends State<Drawerr> {
                     isTablet: isTablet,
                   ),
 
-                  _buildDrawerItem(
-                    context: context,
-                    icon: Icons.cleaning_services_rounded,
-                    title: 'Clear Cart',
-                    onTap: () {
-                      Navigator.pop(context);
-                      _showClearCartDialog(context);
-                    },
-                    isTablet: isTablet,
-                  ),
+                  if (widget.showClearCart)
+                    _buildDrawerItem(
+                      context: context,
+                      icon: Icons.cleaning_services_rounded,
+                      title: 'Clear Cart',
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showClearCartDialog(context);
+                      },
+                      isTablet: isTablet,
+                    ),
 
-                  // Printer Settings Expandable
+                  // Printer Settings Expandable (store config — admin/manager only)
+                  if (RestaurantSession.canAccess('settings'))
                   _buildExpandableSection(
                     context: context,
                     icon: Icons.print_rounded,
@@ -172,6 +191,7 @@ class _DrawerrState extends State<Drawerr> {
                     isTablet: isTablet,
                   ),
 
+                  if (RestaurantSession.canAccess('settings'))
                   _buildDrawerItem(
                     context: context,
                     icon: Icons.dashboard_customize_rounded,
@@ -183,39 +203,45 @@ class _DrawerrState extends State<Drawerr> {
                     isTablet: isTablet,
                   ),
 
-                  _buildDrawerItem(
-                    context: context,
-                    icon: Icons.bar_chart_rounded,
-                    title: 'Reports',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, RouteNames.restaurantReports);
-                    },
-                    isTablet: isTablet,
-                  ),
+                  if (widget.showGridDuplicates) ...[
+                    if (RestaurantSession.canAccess('reports'))
+                    _buildDrawerItem(
+                      context: context,
+                      icon: Icons.bar_chart_rounded,
+                      title: 'Reports',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.pushNamed(context, RouteNames.restaurantReports);
+                      },
+                      isTablet: isTablet,
+                    ),
 
-                  _buildDrawerItem(
-                    context: context,
-                    icon: Icons.account_balance_wallet_rounded,
-                    title: 'Expenses',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, RouteNames.restaurantExpenses);
-                    },
-                    isTablet: isTablet,
-                  ),
+                    if (RestaurantSession.canAccess('expenses'))
+                    _buildDrawerItem(
+                      context: context,
+                      icon: Icons.account_balance_wallet_rounded,
+                      title: 'Expenses',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.pushNamed(context, RouteNames.restaurantExpenses);
+                      },
+                      isTablet: isTablet,
+                    ),
 
-                  _buildDrawerItem(
-                    context: context,
-                    icon: Icons.sunny_snowing,
-                    title: 'End Day',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, RouteNames.restaurantEndDay);
-                    },
-                    isTablet: isTablet,
-                  ),
+                    if (RestaurantSession.canAccess('cashDrawer'))
+                    _buildDrawerItem(
+                      context: context,
+                      icon: Icons.sunny_snowing,
+                      title: 'End Day',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.pushNamed(context, RouteNames.restaurantEndDay);
+                      },
+                      isTablet: isTablet,
+                    ),
+                  ],
 
+                  if (RestaurantSession.canAccess('settings'))
                   _buildDrawerItem(
                     context: context,
                     icon: Icons.import_export_rounded,
@@ -227,6 +253,7 @@ class _DrawerrState extends State<Drawerr> {
                     isTablet: isTablet,
                   ),
 
+                  if (RestaurantSession.canAccess('settings'))
                   _buildDrawerItem(
                     context: context,
                     icon: Icons.data_object_rounded,
@@ -250,13 +277,22 @@ class _DrawerrState extends State<Drawerr> {
                     isTablet: isTablet,
                   ),
 
-                  _buildDrawerItem(
-                    context: context,
-                    icon: Icons.language_rounded,
-                    title: 'Language',
-                    onTap: () {},
-                    isTablet: isTablet,
-                  ),
+                  // Change PIN (non-admin staff, excluding Cashier — admin
+                  // resets cashier PINs in Manage Staff)
+                  if (widget.showChangePin &&
+                      !RestaurantSession.isAdmin &&
+                      RestaurantSession.staffRole != 'Cashier')
+                    _buildDrawerItem(
+                      context: context,
+                      icon: Icons.lock_reset_rounded,
+                      title: 'Change PIN',
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showChangePinDialog(context);
+                      },
+                      isTablet: isTablet,
+                    ),
+
                 ],
               ),
             ),
@@ -547,6 +583,113 @@ class _DrawerrState extends State<Drawerr> {
     );
   }
 
+  void _showChangePinDialog(BuildContext context) {
+    final currentPinCtrl = TextEditingController();
+    final newPinCtrl = TextEditingController();
+    final confirmPinCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    String? errorMsg;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AppDialogShell(
+          title: 'Change PIN',
+          accent: Colors.teal,
+          icon: Icons.lock_reset_rounded,
+          body: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (errorMsg != null)
+                  Container(
+                    margin: EdgeInsets.only(bottom: 12),
+                    padding: EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Text(errorMsg!,
+                        style: GoogleFonts.poppins(fontSize: 13, color: Colors.red.shade700)),
+                  ),
+                AppTextField(
+                  controller: currentPinCtrl,
+                  label: 'Current PIN',
+                  icon: Icons.lock_outline,
+                  obscureText: true,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (v) => (v == null || v.isEmpty) ? 'Enter current PIN' : null,
+                ),
+                SizedBox(height: 12),
+                AppTextField(
+                  controller: newPinCtrl,
+                  label: 'New PIN (4–6 digits)',
+                  icon: Icons.lock_outline,
+                  obscureText: true,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Enter new PIN';
+                    if (!RegExp(r'^\d{4,6}$').hasMatch(v)) return 'PIN must be 4–6 digits';
+                    return null;
+                  },
+                ),
+                SizedBox(height: 12),
+                AppTextField(
+                  controller: confirmPinCtrl,
+                  label: 'Confirm New PIN',
+                  icon: Icons.lock_outline,
+                  obscureText: true,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Confirm your new PIN';
+                    if (v != newPinCtrl.text) return 'PINs do not match';
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            appDialogCancelButton(ctx),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: 'Update PIN',
+              color: Colors.teal,
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                await staffStore.loadStaff();
+                final staff = staffStore.staff.where(
+                  (s) => s.isActive && RestaurantAuthHelper.verifyPassword(currentPinCtrl.text.trim(), s.pinNo.trim()),
+                ).firstOrNull;
+                if (staff == null) {
+                  setState(() => errorMsg = 'Current PIN is incorrect');
+                  return;
+                }
+                final updated = staff.copyWith(pinNo: RestaurantAuthHelper.hashPassword(newPinCtrl.text.trim()));
+                await staffStore.updateStaff(updated);
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('PIN changed successfully',
+                          style: GoogleFonts.poppins()),
+                      backgroundColor: Colors.teal,
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showSyncDialog(BuildContext context) {
     Timer(
       Duration(seconds: 5),
@@ -794,7 +937,7 @@ class _DrawerrState extends State<Drawerr> {
 
                         await Share.shareXFiles(
                           [XFile(filePath)],
-                          subject: 'UniPOS Backup',
+                          subject: 'Bill Berry Lite Backup',
                         );
                       },
                     ),
@@ -842,46 +985,16 @@ class _DrawerrState extends State<Drawerr> {
                             final globalContext =
                                 main_app.navigatorKey.currentContext;
                             if (globalContext != null) {
-                              final importDoneHInset = !AppResponsive.isMobile(globalContext)
-                                ? ((AppResponsive.screenWidth(globalContext) - AppResponsive.dialogWidth(globalContext)) / 2).clamp(40.0, 200.0)
-                                : 24.0;
-                            showDialog(
+                              await showAppInfoDialog(
                                 context: globalContext,
-                                barrierDismissible: false,
-                                builder: (BuildContext dialogContext) {
-                                  return AlertDialog(
-                                    insetPadding: EdgeInsets.symmetric(horizontal: importDoneHInset, vertical: 24),
-                                    title: Text(
-                                      'Import Completed',
-                                      style: GoogleFonts.poppins(),
-                                    ),
-                                    content: Text(
-                                      'Data imported successfully!\n\nPlease close and restart the app.',
-                                      style: GoogleFonts.poppins(),
-                                    ),
-                                    actions: [
-                                      ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: AppColors.primary,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                          ),
-                                        ),
-                                        onPressed: () {
-                                          exit(0);
-                                        },
-                                        child: Text(
-                                          'Close App',
-                                          style: GoogleFonts.poppins(
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                },
+                                title: 'Import Completed',
+                                message:
+                                    'Data imported successfully!\n\nPlease close and restart the app.',
+                                buttonLabel: 'Close App',
+                                accent: AppColors.success,
+                                icon: Icons.check_circle_rounded,
                               );
+                              exit(0);
                             }
                           }
                       },

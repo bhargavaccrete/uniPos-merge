@@ -2,18 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:lottie/lottie.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/data/models/restaurant/db/toppingmodel_304.dart';
-import 'package:unipos/util/common/decimal_settings.dart';
-import 'package:unipos/util/images.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/data/models/restaurant/db/toppingmodel_304.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
+import 'package:billberrylite/util/images.dart';
 import '../../../../../data/models/restaurant/db/variantmodel_305.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/restaurant/restaurant_session.dart';
 import 'package:uuid/uuid.dart';
-import 'package:unipos/util/common/currency_helper.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
 import '../../../../../data/models/restaurant/db/extramodel_303.dart';
 
 class ExtraTab extends StatefulWidget {
@@ -881,7 +882,10 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
 
   Future<void> _addOrEditExtra() async {
     final trimmedName = _extrasController.text.trim();
-    if (trimmedName.isEmpty) return;
+    if (trimmedName.isEmpty) {
+      NotificationService.instance.showError('Extra name is required');
+      return;
+    }
 
     try {
       if (editingId != null) {
@@ -914,7 +918,10 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
   }
 
   Future<void> _saveTopping(Extramodel extra) async {
-    if (_toppingController.text.trim().isEmpty) return;
+    if (_toppingController.text.trim().isEmpty) {
+      NotificationService.instance.showError('Topping name is required');
+      return;
+    }
 
     Map<String, double>? variantPrices;
     double basePrice = 0.0;
@@ -954,45 +961,29 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
 
   Future<void> _deleteTopping(Extramodel extra, int toppingIndex) async {
     final topping = extra.topping![toppingIndex];
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppConfirmDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: Text('Delete "${topping.name}"?', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16)),
-        content: Text('This topping will be removed from ${extra.Ename}.', style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey))),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Delete', style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.w500))),
-        ],
-      ),
+      title: 'Delete "${topping.name}"?',
+      message: 'This topping will be removed from ${extra.Ename}.',
+      confirmLabel: 'Delete',
+      accent: AppColors.danger,
+      icon: Icons.delete_outline,
     );
-    if (confirmed == true) {
+    if (confirmed) {
       try { await extraStore.removeTopping(extra.Id, toppingIndex); } catch (e) { NotificationService.instance.showError('Error: $e'); }
     }
   }
 
   Future<void> _deleteExtra(Extramodel extra) async {
-    final deleteHInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppConfirmDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: deleteHInset, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: Text('Delete "${extra.Ename}"?', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 16)),
-        content: Text('This extra and its ${extra.topping?.length ?? 0} toppings will be removed.', style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey))),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Delete', style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.w500))),
-        ],
-      ),
+      title: 'Delete "${extra.Ename}"?',
+      message: 'This extra and its ${extra.topping?.length ?? 0} toppings will be removed.',
+      confirmLabel: 'Delete',
+      accent: AppColors.danger,
+      icon: Icons.delete_outline,
     );
-    if (confirmed == true) {
+    if (confirmed) {
       try { await extraStore.deleteExtra(extra.Id); } catch (e) { NotificationService.instance.showError('Error deleting extra: $e'); }
     }
   }

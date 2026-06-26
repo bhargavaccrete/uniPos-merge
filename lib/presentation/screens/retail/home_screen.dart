@@ -1,27 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/presentation/screens/retail/ex/posscreen.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/responsive.dart';
-import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/presentation/screens/retail/ex/posscreen.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/responsive.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 
-import 'package:unipos/presentation/screens/retail/pos_screen.dart';
-import 'package:unipos/presentation/screens/retail/inventory_screen.dart';
-import 'package:unipos/presentation/screens/retail/customer_list_screen.dart';
-import 'package:unipos/presentation/screens/retail/reports_screen.dart';
-import 'package:unipos/presentation/screens/retail/stock_alerts_screen.dart';
-import 'package:unipos/presentation/screens/retail/supplier_list_screen.dart';
-import 'package:unipos/presentation/screens/retail/purchase_history_screen.dart';
-import 'package:unipos/presentation/screens/retail/purchase_order_list_screen.dart';
-import 'package:unipos/presentation/screens/retail/sales_history_screen.dart';
-import 'package:unipos/presentation/screens/retail/cash_drawer_screen.dart';
-import 'package:unipos/presentation/screens/retail/settings_screen.dart';
-import 'package:unipos/presentation/screens/retail/category_management_screen.dart';
-import 'package:unipos/presentation/screens/retail/login_screen.dart';
-import 'package:unipos/presentation/screens/retail/change_password_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/pos_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/inventory_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/customer_list_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/reports_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/stock_alerts_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/supplier_list_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/purchase_history_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/purchase_order_list_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/sales_history_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/cash_drawer_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/settings_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/category_management_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/login_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/change_password_screen.dart';
 
-import 'package:unipos/data/models/retail/hive_model/sale_model_203.dart';
+import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -35,7 +35,7 @@ class HomeScreen extends StatelessWidget {
       appBar: Responsive.isDesktop(context)
           ? null
           : buildPrimaryAppBar(
-              title: 'UniPOS Dashboard',
+              title: 'Bill Berry Lite Dashboard',
               automaticallyImplyLeading: false,
               actions: _buildDashboardAppBarActions(context),
             ),
@@ -213,7 +213,7 @@ class HomeScreen extends StatelessWidget {
                 const SizedBox(width: 12),
                 const Expanded(
                   child: Text(
-                    'UniPOS',
+                    'Bill Berry Lite',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -280,7 +280,7 @@ class HomeScreen extends StatelessWidget {
                 const Divider(color: Colors.white24, height: 1),
                 const SizedBox(height: 16),
                 Text(
-                  '© 2025 UniPOS',
+                  '© 2025 Bill Berry Lite',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.5),
                     fontSize: 12,

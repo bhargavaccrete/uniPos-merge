@@ -1,5 +1,5 @@
 import 'package:mobx/mobx.dart';
-import 'package:unipos/core/di/service_locator.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
 import '../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../data/repositories/restaurant/order_repository.dart';

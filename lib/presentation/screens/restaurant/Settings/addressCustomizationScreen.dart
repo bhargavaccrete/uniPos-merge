@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/drag&droplist.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/componets/drag&droplist.dart';
 
 class AddressCustomizationScreen extends StatefulWidget {
   @override

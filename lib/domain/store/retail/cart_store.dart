@@ -1,8 +1,8 @@
 import 'package:hive/hive.dart';
 import 'package:mobx/mobx.dart';
-import 'package:unipos/data/models/retail/hive_model/category_model_215.dart';
-import 'package:unipos/data/models/retail/hive_model/product_model_200.dart';
-import 'package:unipos/data/models/retail/hive_model/variante_model_201.dart';
+import 'package:billberrylite/data/models/retail/hive_model/category_model_215.dart';
+import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
+import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/di/service_locator.dart';

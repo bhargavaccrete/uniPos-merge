@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/table_Model_311.dart';
@@ -11,10 +12,10 @@ import '../../../../domain/services/restaurant/notification_service.dart';
 import '../start order/cart/cart.dart';
 import '../start order/startorder.dart';
 import '../../../../util/common/currency_helper.dart';
-import 'package:unipos/util/common/decimal_settings.dart';
-import 'package:unipos/util/common/app_responsive.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 
 class TableScreen extends StatefulWidget {
   final bool? isfromcart;
@@ -35,47 +36,29 @@ class _TableScreenState extends State<TableScreen> {
 
   void _addTable() {
     final controller = TextEditingController();
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Add New Table',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
-        ),
-        content: SizedBox(
-          width: 300,
-          child: AppTextField(
-            controller: controller,
-            hint: 'Enter Table Name',
-            icon: Icons.table_restaurant_outlined,
-          ),
+      builder: (ctx) => AppDialogShell(
+        title: 'Add New Table',
+        subtitle: 'Create a table for dine-in orders',
+        accent: AppColors.primary,
+        icon: Icons.table_restaurant_rounded,
+        body: AppTextField(
+          controller: controller,
+          hint: 'Enter Table Name',
+          icon: Icons.table_restaurant_outlined,
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
+          appDialogCancelButton(ctx),
+          const SizedBox(width: 12),
+          appDialogPrimaryButton(
+            label: 'Add',
             onPressed: () async {
               final name = controller.text.trim();
               if (name.isEmpty) return;
               await tableStore.addTable(TableModel(id: name));
-              Navigator.pop(ctx);
+              if (ctx.mounted) Navigator.pop(ctx);
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-            child: Text(
-              'Add',
-              style: GoogleFonts.poppins(color: AppColors.white, fontWeight: FontWeight.w600),
-            ),
           ),
         ],
       ),
@@ -216,29 +199,23 @@ class _TableScreenState extends State<TableScreen> {
 
   void _renameTable(TableModel table) {
     final controller = TextEditingController(text: table.id);
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Rename Table', style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
-        content: SizedBox(
-          width: 300,
-          child: AppTextField(
-            controller: controller,
-            hint: 'Enter new table name',
-            icon: Icons.table_restaurant_outlined,
-          ),
+      builder: (ctx) => AppDialogShell(
+        title: 'Rename Table',
+        subtitle: 'Currently "${table.id}"',
+        accent: AppColors.primary,
+        icon: Icons.drive_file_rename_outline_rounded,
+        body: AppTextField(
+          controller: controller,
+          hint: 'Enter new table name',
+          icon: Icons.table_restaurant_outlined,
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
+          appDialogCancelButton(ctx),
+          const SizedBox(width: 12),
+          appDialogPrimaryButton(
+            label: 'Rename',
             onPressed: () async {
               final newName = controller.text.trim();
               if (newName.isEmpty || newName == table.id) {
@@ -264,15 +241,6 @@ class _TableScreenState extends State<TableScreen> {
               if (ctx.mounted) Navigator.pop(ctx);
               NotificationService.instance.showSuccess('Table renamed to "$newName"');
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-            child: Text(
-              'Rename',
-              style: GoogleFonts.poppins(color: AppColors.white, fontWeight: FontWeight.w600),
-            ),
           ),
         ],
       ),
@@ -281,47 +249,19 @@ class _TableScreenState extends State<TableScreen> {
 
   // ── Delete ──────────────────────────────────────────────────────────────────
 
-  void _deleteTable(TableModel table) {
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    showDialog(
+  Future<void> _deleteTable(TableModel table) async {
+    final ok = await showAppConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Delete Table',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w700, color: AppColors.danger),
-        ),
-        content: Text(
-          'Delete "${table.id}"? This action cannot be undone.',
-          style: GoogleFonts.poppins(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              await tableStore.deleteTable(table.id);
-              if (ctx.mounted) Navigator.pop(ctx);
-              NotificationService.instance.showSuccess('Table "${table.id}" deleted.');
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.danger,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-            child: Text(
-              'Delete',
-              style: GoogleFonts.poppins(color: AppColors.white, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
+      title: 'Delete Table',
+      message: 'Delete "${table.id}"? This action cannot be undone.',
+      confirmLabel: 'Delete',
+      accent: AppColors.danger,
+      icon: Icons.delete_rounded,
     );
+    if (ok) {
+      await tableStore.deleteTable(table.id);
+      NotificationService.instance.showSuccess('Table "${table.id}" deleted.');
+    }
   }
 
   // ── Build ───────────────────────────────────────────────────────────────────

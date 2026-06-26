@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/attendance_model.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
-import 'package:unipos/util/restaurant/restaurant_session.dart';
-import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/models/restaurant/db/attendance_model.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:uuid/uuid.dart';
 
 class StaffAttendanceDetailScreen extends StatefulWidget {
@@ -56,13 +57,12 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) {
-          final hInset = !AppResponsive.isMobile(ctx)
-              ? ((AppResponsive.screenWidth(ctx) - AppResponsive.dialogWidth(ctx)) / 2).clamp(40.0, 200.0)
-              : 24.0;
-          return AlertDialog(
-          insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-          title: Text('Add Missing Shift\n${_fullDayLabel(day)}', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0), fontWeight: FontWeight.w600)),
-          content: Column(
+          return AppDialogShell(
+          title: 'Add Missing Shift',
+          subtitle: _fullDayLabel(day),
+          accent: AppColors.primary,
+          icon: Icons.more_time_rounded,
+          body: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
@@ -86,15 +86,13 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            appDialogCancelButton(ctx),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: 'Add Shift',
               onPressed: () async {
                 final clockIn = DateTime(day.year, day.month, day.day, inTime.hour, inTime.minute);                DateTime clockOut = DateTime(day.year, day.month, day.day, outTime.hour, outTime.minute);
-                
+
                 if (clockOut.isBefore(clockIn)) {
                   clockOut = clockOut.add(const Duration(days: 1)); // Overnight shift
                 }
@@ -113,7 +111,6 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
                 Navigator.pop(ctx);
                 _refreshRecords();
               },
-              child: Text('Add Shift', style: GoogleFonts.poppins(color: Colors.white)),
             ),
           ],
         );
@@ -130,13 +127,11 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) {
-          final hInset = !AppResponsive.isMobile(ctx)
-              ? ((AppResponsive.screenWidth(ctx) - AppResponsive.dialogWidth(ctx)) / 2).clamp(40.0, 200.0)
-              : 24.0;
-          return AlertDialog(
-          insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-          title: Text('Edit Timesheet', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-          content: Column(
+          return AppDialogShell(
+          title: 'Edit Timesheet',
+          accent: AppColors.primary,
+          icon: Icons.edit_calendar_rounded,
+          body: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
@@ -157,69 +152,58 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
                   if (t != null) setState(() => newOutTime = t);
                 },
               ),
+              const SizedBox(height: 4),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  onPressed: () async {
+                    final confirm = await showAppConfirmDialog(
+                      context: context,
+                      title: 'Delete Record?',
+                      message: 'This action cannot be undone.',
+                      confirmLabel: 'Delete',
+                      accent: Colors.red,
+                      icon: Icons.delete_rounded,
+                    );
+                    if (confirm == true) {
+                      await attendanceStore.deleteRecord(record.id);
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      _refreshRecords();
+                    }
+                  },
+                  icon: Icon(Icons.delete, color: Colors.red, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
+                  label: const Text('Delete', style: TextStyle(color: Colors.red)),
+                ),
+              ),
             ],
           ),
-          actionsAlignment: MainAxisAlignment.spaceBetween,
           actions: [
-            TextButton.icon(
+            appDialogCancelButton(ctx),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: 'Save',
               onPressed: () async {
-                final deleteHInset = !AppResponsive.isMobile(context)
-                    ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-                    : 24.0;
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (c) => AlertDialog(
-                    insetPadding: EdgeInsets.symmetric(horizontal: deleteHInset, vertical: 24),
-                    title: const Text('Delete Record?'),
-                    content: const Text('This action cannot be undone.'),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-                      TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
-                    ],
-                  ),
-                );
-                if (confirm == true) {
-                  await attendanceStore.deleteRecord(record.id);
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  _refreshRecords();
-                }
-              },
-              icon: Icon(Icons.delete, color: Colors.red, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
-              label: const Text('Delete', style: TextStyle(color: Colors.red)),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    final baseDate = record.clockIn;
-                    final newClockIn = DateTime(baseDate.year, baseDate.month, baseDate.day, newInTime!.hour, newInTime!.minute);
-                    
-                    DateTime? newClockOut;
-                    if (newOutTime != null) {
-                      newClockOut = DateTime(baseDate.year, baseDate.month, baseDate.day, newOutTime!.hour, newOutTime!.minute);
-                      // Handle overnight shifts if outTime is earlier than inTime
-                      if (newClockOut.isBefore(newClockIn)) {
-                        newClockOut = newClockOut.add(const Duration(days: 1));
-                      }
-                    }
+                final baseDate = record.clockIn;
+                final newClockIn = DateTime(baseDate.year, baseDate.month, baseDate.day, newInTime!.hour, newInTime!.minute);
 
-                    await attendanceStore.updateRecord(
-                      recordId: record.id,
-                      newClockIn: newClockIn,
-                      newClockOut: newClockOut,
-                    );
-                    
-                    Navigator.pop(ctx);
-                    _refreshRecords();
-                  },
-                  child: const Text('Save'),
-                ),
-              ],
+                DateTime? newClockOut;
+                if (newOutTime != null) {
+                  newClockOut = DateTime(baseDate.year, baseDate.month, baseDate.day, newOutTime!.hour, newOutTime!.minute);
+                  // Handle overnight shifts if outTime is earlier than inTime
+                  if (newClockOut.isBefore(newClockIn)) {
+                    newClockOut = newClockOut.add(const Duration(days: 1));
+                  }
+                }
+
+                await attendanceStore.updateRecord(
+                  recordId: record.id,
+                  newClockIn: newClockIn,
+                  newClockOut: newClockOut,
+                );
+
+                Navigator.pop(ctx);
+                _refreshRecords();
+              },
             ),
           ],
         );

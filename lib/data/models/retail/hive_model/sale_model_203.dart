@@ -2,7 +2,7 @@
 
 import 'dart:convert';
 import 'package:hive/hive.dart';
-import 'package:unipos/core/constants/hive_type_ids.dart';
+import 'package:billberrylite/core/constants/hive_type_ids.dart';
 
 part 'sale_model_203.g.dart';
 

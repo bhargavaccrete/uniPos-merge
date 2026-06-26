@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/util/color.dart';
 
 import '../../../../data/models/restaurant/db/stock_movement_model.dart';
 import '../../../../data/repositories/restaurant/stock_movement_repository.dart';

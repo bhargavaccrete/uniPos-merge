@@ -1,6 +1,6 @@
 
 import 'package:hive/hive.dart';
-import 'package:unipos/data/models/restaurant/db/companymodel_301.dart';
+import 'package:billberrylite/data/models/restaurant/db/companymodel_301.dart';
 
 class CompanyBox {
   static const String _boxName = 'companyBox';

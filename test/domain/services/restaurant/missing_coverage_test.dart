@@ -1,11 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:unipos/data/models/restaurant/db/cartmodel_308.dart';
-import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
-import 'package:unipos/data/models/restaurant/db/itemvariantemodel_312.dart';
-import 'package:unipos/data/models/restaurant/db/ordermodel_309.dart';
-import 'package:unipos/data/models/restaurant/db/toppingmodel_304.dart';
-import 'package:unipos/domain/services/restaurant/cart_calculation_service.dart';
-import 'package:unipos/presentation/screens/restaurant/start%20order/cart/customerdetails.dart';
+import 'package:billberrylite/data/models/restaurant/db/cartmodel_308.dart';
+import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
+import 'package:billberrylite/data/models/restaurant/db/itemvariantemodel_312.dart';
+import 'package:billberrylite/data/models/restaurant/db/ordermodel_309.dart';
+import 'package:billberrylite/data/models/restaurant/db/toppingmodel_304.dart';
+import 'package:billberrylite/domain/services/restaurant/cart_calculation_service.dart';
+import 'package:billberrylite/presentation/screens/restaurant/start%20order/cart/customerdetails.dart';
 import '../../../helpers/test_helpers.dart';
 
 /// Tests for gaps identified in coverage analysis.

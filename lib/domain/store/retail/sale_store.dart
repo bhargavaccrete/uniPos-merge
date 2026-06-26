@@ -1,6 +1,6 @@
 import 'package:mobx/mobx.dart';
 
-import 'package:unipos/data/models/retail/hive_model/sale_model_203.dart';
+import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 
 import '../../../data/repositories/retail/sale_repository.dart';
 

@@ -1,6 +1,6 @@
 
 import 'package:hive/hive.dart';
-import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
+import 'package:billberrylite/data/models/restaurant/db/variantmodel_305.dart';
 
 class HiveVariante{
   static const _boxName = 'variante';

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-/// WebSocket client service for UniPOS to receive real-time updates from server
+/// WebSocket client service for Bill Berry Lite to receive real-time updates from server
 class WebSocketClientService {
   static final WebSocketClientService _instance = WebSocketClientService._internal();
   factory WebSocketClientService() => _instance;

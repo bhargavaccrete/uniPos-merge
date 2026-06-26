@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/data/models/restaurant/db/extramodel_303.dart';
-import 'package:unipos/data/models/restaurant/db/toppingmodel_304.dart';
-import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
+import 'package:billberrylite/data/models/restaurant/db/extramodel_303.dart';
+import 'package:billberrylite/data/models/restaurant/db/toppingmodel_304.dart';
 import 'package:uuid/uuid.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/currency_helper.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Button.dart';
 import '../../../../util/common/app_responsive.dart';
 import '../../../widget/componets/common/app_text_field.dart';
 import '../../../widget/componets/common/primary_app_bar.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 
 class ExtraSelectionScreen extends StatefulWidget {
   final List<String> selectedExtraIds;
@@ -407,48 +407,12 @@ class _AddExtraDialogState extends State<_AddExtraDialog> {
   @override
   Widget build(BuildContext context) {
     void setDialogState(VoidCallback fn) => setState(fn);
-    final hInset = !AppResponsive.isMobile(context)
-                ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-                : 24.0;
-            return AlertDialog(
-              insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-              contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              title: Row(
-                children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(Icons.add_circle_outline,
-                        color: AppColors.primary, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Add Extra Category',
-                            style: GoogleFonts.poppins(
-                                fontSize: 16.5, fontWeight: FontWeight.w700)),
-                        Text('Group toppings customers can add',
-                            style: GoogleFonts.poppins(
-                                fontSize: 11.5,
-                                color: AppColors.textSecondary)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              actionsAlignment: MainAxisAlignment.center,
-              content: SingleChildScrollView(
-                child: Column(
+            return AppDialogShell(
+              title: 'Add Extra Category',
+              subtitle: 'Group toppings customers can add',
+              accent: AppColors.primary,
+              icon: Icons.add_circle_outline,
+              body: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -694,17 +658,12 @@ class _AddExtraDialogState extends State<_AddExtraDialog> {
                     ),
                   ],
                 ),
-              ),
               actions: [
-                TextButton(
-                  // Controllers are disposed in [dispose]; just close here.
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(
-                    'Cancel',
-                    style: GoogleFonts.poppins(color: AppColors.textSecondary),
-                  ),
-                ),
-                ElevatedButton(
+                // Controllers are disposed in [dispose]; just close here.
+                appDialogCancelButton(context),
+                const SizedBox(width: 12),
+                appDialogPrimaryButton(
+                  label: 'Save',
                   onPressed: () async {
                     if (extraNameController.text.trim().isEmpty) {
                       NotificationService.instance.showError('Please enter an extra category name');
@@ -768,20 +727,6 @@ class _AddExtraDialogState extends State<_AddExtraDialog> {
 
                     NotificationService.instance.showSuccess('Extra "${newExtra.Ename}" added with ${toppings.length} toppings');
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 22, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: Text(
-                    'Save',
-                    style: GoogleFonts.poppins(
-                        color: Colors.white, fontWeight: FontWeight.w600),
-                  ),
                 ),
               ],
             );

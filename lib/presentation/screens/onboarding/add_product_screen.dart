@@ -3,8 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:unipos/data/models/retail/hive_model/product_model_200.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
+import 'package:billberrylite/util/color.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:io';
 
@@ -18,13 +18,13 @@ import '../../../domain/store/common/add_product_form_store.dart';
 import '../../../domain/store/retail/product_store.dart';
 import '../../../domain/store/retail/attribute_store.dart';
 import '../../../util/responsive.dart';
-import 'package:unipos/presentation/screens/retail/import_product/bulk_import_screen.dart';
-import 'package:unipos/presentation/screens/restaurant/import/restaurant_bulk_import_service.dart';
-import 'package:unipos/presentation/screens/restaurant/import/bulk_import_screen.dart';
-import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/category_selector_sheet.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
-import 'package:unipos/domain/services/common/notification_service.dart';
+import 'package:billberrylite/presentation/screens/retail/import_product/bulk_import_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/import/restaurant_bulk_import_service.dart';
+import 'package:billberrylite/presentation/screens/restaurant/import/bulk_import_screen.dart';
+import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/category_selector_sheet.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
+import 'package:billberrylite/domain/services/common/notification_service.dart';
 
 class AddProductScreen extends StatefulWidget {
   final VoidCallback? onNext;

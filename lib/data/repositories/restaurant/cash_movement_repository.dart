@@ -1,5 +1,5 @@
 import 'package:hive/hive.dart';
-import 'package:unipos/core/constants/hive_box_names.dart';
+import 'package:billberrylite/core/constants/hive_box_names.dart';
 import '../../models/restaurant/db/cash_movement_model.dart';
 
 /// Data access layer for [CashMovementModel].

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:unipos/core/routes/routes_name.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
-import 'package:unipos/util/restaurant/restaurant_session.dart';
+import 'package:billberrylite/core/routes/routes_name.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 
 class Logout extends StatelessWidget {
   const Logout({super.key});

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:unipos/data/models/retail/hive_model/category_model_215.dart';
-import 'package:unipos/data/models/retail/hive_model/product_model_200.dart';
-import 'package:unipos/data/models/retail/hive_model/variante_model_201.dart';
-import 'package:unipos/domain/services/retail/variant_generator_service.dart';
-import 'package:unipos/presentation/screens/retail/category_management_screen.dart';
-import 'package:unipos/presentation/screens/retail/scanner_screen.dart';
-import 'package:unipos/presentation/widget/retail/product_attribute_selector.dart';
+import 'package:billberrylite/data/models/retail/hive_model/category_model_215.dart';
+import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
+import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
+import 'package:billberrylite/domain/services/retail/variant_generator_service.dart';
+import 'package:billberrylite/presentation/screens/retail/category_management_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/scanner_screen.dart';
+import 'package:billberrylite/presentation/widget/retail/product_attribute_selector.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/di/service_locator.dart';

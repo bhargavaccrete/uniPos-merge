@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/util/color.dart';
 import '../../../core/routes/routes_name.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../domain/services/common/notification_service.dart';
@@ -13,7 +13,7 @@ import '../../../domain/services/restaurant/stock_adjust_service.dart';
 import '../../../domain/services/retail/store_settings_service.dart';
 import '../../../domain/store/restaurant/license_store.dart';
 import '../../../util/restaurant/restaurant_session.dart';
-import '../../widget/componets/restaurant/componets/drawermanage.dart';
+import '../../widget/componets/restaurant/componets/drawer.dart';
 import '../../widget/componets/common/primary_app_bar.dart';
 import '../../widget/restaurant/opening_balance_dialog.dart';
 import '../../../util/common/app_responsive.dart';
@@ -179,7 +179,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
       },
       child: Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      drawer: DrawerManage(islogout: true, isDelete: false, issync: false),
+      drawer: const Drawerr(showClearCart: false, showGridDuplicates: false, showChangePin: true),
       appBar: buildPrimaryAppBar(
         titleWidget: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

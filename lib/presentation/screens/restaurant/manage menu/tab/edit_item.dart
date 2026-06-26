@@ -1,23 +1,24 @@
 import 'dart:typed_data';
-import 'package:unipos/util/restaurant/restaurant_session.dart';
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/core/constants/item_units.dart';
-import 'package:unipos/util/restaurant/staticswitch.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
-import 'package:unipos/data/models/restaurant/db/itemvariantemodel_312.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/filterButton.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
-import 'package:unipos/util/restaurant/audit_trail_helper.dart';
-import 'package:unipos/domain/services/restaurant/stock_adjust_service.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/bottom_sheets/tax_selector_sheet.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/core/constants/item_units.dart';
+import 'package:billberrylite/util/restaurant/staticswitch.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
+import 'package:billberrylite/data/models/restaurant/db/itemvariantemodel_312.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/componets/filterButton.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/util/restaurant/audit_trail_helper.dart';
+import 'package:billberrylite/domain/services/restaurant/stock_adjust_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/tax_selector_sheet.dart';
 import '../../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../../data/models/restaurant/db/extramodel_303.dart';
 import '../../item/default_choice_picker.dart';
@@ -27,7 +28,6 @@ import '../../item/extra_selection_screen.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../data/models/restaurant/db/variantmodel_305.dart';
 import 'edit_category.dart';
-import 'package:unipos/util/common/app_responsive.dart';
 
 enum SellingMethod { byUnit, byWeight }
 
@@ -61,6 +61,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
   late TextEditingController _itemPriceController;
   late TextEditingController _descController;
   late TextEditingController _lowStockController;
+  late TextEditingController _stockController;
   late TextEditingController _itemCodeController;
   late String selectedCategoryId;
   late String selectedIMGCategory;
@@ -88,15 +89,20 @@ class _EdititemScreenState extends State<EdititemScreen> {
 
   // For managing variant selections
   late List<bool> _variantCheckedList;
+  // Variants section starts collapsed; auto-expands when the item already has
+  // variants selected (set in initState).
+  bool _variantsExpanded = false;
   late List<TextEditingController> _variantPriceControllers;
   late List<TextEditingController> _variantStockControllers;
 
   // For managing choice selections
   late List<bool> _choiceCheckedList;
+  bool _choicesExpanded = false;
   // Per-item default-selected choice options (pre-ticked in the POS).
   List<String> _defaultChoiceOptionIds = [];
 
   late List<bool> _extraCheckedList;
+  bool _extrasExpanded = false;
   Map<String, Map<String, TextEditingController>> _extraConstraintControllers = {}; // extraId -> {min, max}
   Map<String, bool> _extraHasConstraints = {}; // Track if extra has min/max enabled
 
@@ -112,6 +118,12 @@ class _EdititemScreenState extends State<EdititemScreen> {
     _itemPriceController = TextEditingController(text: widget.items.price?.toString() ?? '');
     _descController = TextEditingController(text: widget.items.description ?? '');
     _itemCodeController = TextEditingController(text: widget.items.itemCode ?? '');
+    final stock = widget.items.stockQuantity;
+    _stockController = TextEditingController(
+      text: stock == 0
+          ? ''
+          : (stock % 1 == 0 ? stock.toStringAsFixed(0) : stock.toString()),
+    );
     final lowStock = widget.items.lowStockThreshold;
     _lowStockController = TextEditingController(
       text: lowStock == null
@@ -156,6 +168,8 @@ class _EdititemScreenState extends State<EdititemScreen> {
     _variantCheckedList = List.generate(allVariants.length, (index) {
       return widget.items.variant?.any((v) => v.variantId == allVariants[index].id) ?? false;
     });
+    // Open the Variants section automatically if any are already selected.
+    _variantsExpanded = _variantCheckedList.contains(true);
 
     _variantPriceControllers = List.generate(allVariants.length, (index) {
       final existingVariant = widget.items.variant?.firstWhere((v) => v.variantId == allVariants[index].id,
@@ -177,12 +191,14 @@ class _EdititemScreenState extends State<EdititemScreen> {
     _choiceCheckedList = List.generate(allChoices.length, (index) {
       return widget.items.choiceIds?.contains(allChoices[index].id) ?? false;
     });
+    _choicesExpanded = _choiceCheckedList.contains(true);
     _defaultChoiceOptionIds =
         List<String>.from(widget.items.defaultChoiceOptionIds ?? const []);
 
     _extraCheckedList = List.generate(allExtra.length, (index){
       return widget.items.extraId?.contains(allExtra[index].Id) ?? false;
     });
+    _extrasExpanded = _extraCheckedList.contains(true);
 
     // Initialize min/max controllers for extras.
     // Per-item constraints take priority; global extra defaults pre-fill when no override exists.
@@ -217,6 +233,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
     _itemPriceController.dispose();
     _descController.dispose();
     _lowStockController.dispose();
+    _stockController.dispose();
     _itemCodeController.dispose();
 
     // Dispose variant price controllers
@@ -272,6 +289,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
 
     // Variant stock changes to log as adjustments after the item is saved.
     final pendingAdjustments = <Map<String, dynamic>>[];
+    Map<String, dynamic>? pendingSimpleAdjustment;
     List<ItemVariante> selectedVariants = [];
     for (int i = 0; i < _allVariants.length; i++) {
       if (_variantCheckedList[i]) {
@@ -379,6 +397,20 @@ class _EdititemScreenState extends State<EdititemScreen> {
     updateItem.lowStockThreshold =
         lowStockOn ? double.tryParse(_lowStockController.text.trim()) : null;
 
+    // Item-level stock for SIMPLE items (no variants). Variant items keep the
+    // item-level quantity at 0 and track stock per-variant instead.
+    if (!_variantCheckedList.contains(true)) {
+      final oldStock = widget.items.stockQuantity;
+      final newStock = selectedFilter.toLowerCase() == 'yes'
+          ? (double.tryParse(_stockController.text.trim()) ?? 0.0)
+          : 0.0;
+      updateItem.stockQuantity = newStock;
+      // Log an adjustment if a tracked item's stock actually changed.
+      if (selectedFilter.toLowerCase() == 'yes' && newStock != oldStock) {
+        pendingSimpleAdjustment = {'old': oldStock, 'new': newStock};
+      }
+    }
+
     AuditTrailHelper.trackEdit(updateItem, editedBy: RestaurantSession.staffName ?? RestaurantSession.effectiveRole);
 
     await itemStore.updateItem(updateItem);
@@ -390,6 +422,15 @@ class _EdititemScreenState extends State<EdititemScreen> {
         variantId: adj['variantId'] as String,
         oldStock: adj['old'] as double,
         newStock: adj['new'] as double,
+      );
+    }
+
+    // Same for a simple (non-variant) item whose stock was edited.
+    if (pendingSimpleAdjustment != null) {
+      await StockAdjustService.logAdjustment(
+        item: updateItem,
+        oldStock: pendingSimpleAdjustment['old'] as double,
+        newStock: pendingSimpleAdjustment['new'] as double,
       );
     }
 
@@ -547,6 +588,9 @@ class _EdititemScreenState extends State<EdititemScreen> {
                   label: 'Item Price',
                   icon: Icons.currency_rupee,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                  ],
                 ),
               ),
               const SizedBox(width: 10),
@@ -736,6 +780,38 @@ class _EdititemScreenState extends State<EdititemScreen> {
                 // Out of Stock Option (shown only when inventory is YES)
                 if (selectedFilter.toLowerCase() == 'yes') ...[
                   SizedBox(height: 12),
+                  // Current Stock — only for SIMPLE items. Variant items track
+                  // stock per-variant in the Variants section below.
+                  if (!_variantCheckedList.contains(true)) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            "Current Stock (${_sellingMethod == SellingMethod.byWeight ? _selectedUnit : 'pcs'})",
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w500,
+                              fontSize: 13,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 10),
+                        SizedBox(
+                          width: 120,
+                          child: AppTextField(
+                            controller: _stockController,
+                            hint: '0',
+                            keyboardType:
+                                const TextInputType.numberWithOptions(decimal: true),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 12),
+                  ],
                   Divider(height: 1, color: Colors.grey.shade300),
                   SizedBox(height: 12),
                   Row(
@@ -844,6 +920,9 @@ class _EdititemScreenState extends State<EdititemScreen> {
                             controller: _lowStockController,
                             hint: 'Default ${AppSettings.lowStockThreshold.toStringAsFixed(0)}',
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                            ],
                           ),
                         ),
                       ],
@@ -1015,6 +1094,8 @@ class _EdititemScreenState extends State<EdititemScreen> {
       _variantCheckedList = checked;
       _variantPriceControllers = prices;
       _variantStockControllers = stocks;
+      // Reveal the list so the newly added (auto-ticked) variant is visible.
+      _variantsExpanded = true;
     });
   }
 
@@ -1033,6 +1114,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
     setState(() {
       _allChoices = fresh;
       _choiceCheckedList = checked;
+      _choicesExpanded = true;
     });
   }
 
@@ -1065,6 +1147,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
     setState(() {
       _allExtra = fresh;
       _extraCheckedList = checked;
+      _extrasExpanded = true;
     });
   }
 
@@ -1083,65 +1166,103 @@ class _EdititemScreenState extends State<EdititemScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.tune, color: AppColors.primary, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  'Variants',
-                  style: GoogleFonts.poppins(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                Expanded(
+                  child: InkWell(
+                    onTap: () => setState(() => _variantsExpanded = !_variantsExpanded),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Icon(Icons.tune, color: AppColors.primary, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Variants',
+                            style: GoogleFonts.poppins(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          AnimatedRotation(
+                            turns: _variantsExpanded ? 0.5 : 0.0,
+                            duration: const Duration(milliseconds: 200),
+                            child: Icon(Icons.keyboard_arrow_down,
+                                color: AppColors.textSecondary, size: 22),
+                          ),
+                          if (!_variantsExpanded &&
+                              _variantCheckedList.contains(true)) ...[
+                            const SizedBox(width: 8),
+                            Text(
+                              '${_variantCheckedList.where((c) => c).length} selected',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-                const Spacer(),
                 _addNewButton(_addNewVariants),
               ],
             ),
-            const Divider(),
-            if (variants.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text('No variants yet. Tap "New" to add one.',
-                    style: GoogleFonts.poppins(
-                        fontSize: 13, color: AppColors.textSecondary)),
-              ),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: variants.length,
-              itemBuilder: (context, index) {
-                final trackOn = selectedFilter.toLowerCase() == 'yes';
-                return Row(
-                  children: [
-                    Checkbox(
-                      value: _variantCheckedList[index],
-                      onChanged: (value) => setState(() => _variantCheckedList[index] = value!),
-                    ),
-                    Expanded(child: Text(variants[index].name)),
-                    SizedBox(
-                      width: trackOn ? 90 : 120,
-                      child: AppTextField(
-                        controller: _variantPriceControllers[index],
-                        hint: 'Price',
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            if (_variantsExpanded) ...[
+              const Divider(),
+              if (variants.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text('No variants yet. Tap "New" to add one.',
+                      style: GoogleFonts.poppins(
+                          fontSize: 13, color: AppColors.textSecondary)),
+                ),
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: variants.length,
+                itemBuilder: (context, index) {
+                  final trackOn = selectedFilter.toLowerCase() == 'yes';
+                  return Row(
+                    children: [
+                      Checkbox(
+                        value: _variantCheckedList[index],
+                        onChanged: (value) => setState(() => _variantCheckedList[index] = value!),
                       ),
-                    ),
-                    // Per-variant stock — only when inventory tracking is on.
-                    if (trackOn && _variantCheckedList[index]) ...[
-                      const SizedBox(width: 8),
+                      Expanded(child: Text(variants[index].name)),
                       SizedBox(
-                        width: 90,
+                        width: trackOn ? 90 : 120,
                         child: AppTextField(
-                          controller: _variantStockControllers[index],
-                          hint: 'Stock',
+                          controller: _variantPriceControllers[index],
+                          hint: 'Price',
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                          ],
                         ),
                       ),
+                      // Per-variant stock — only when inventory tracking is on.
+                      if (trackOn && _variantCheckedList[index]) ...[
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          width: 90,
+                          child: AppTextField(
+                            controller: _variantStockControllers[index],
+                            hint: 'Stock',
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
-                );
-              },
-            ),
+                  );
+                },
+              ),
+            ],
           ],
         ),
       ),
@@ -1229,41 +1350,73 @@ class _EdititemScreenState extends State<EdititemScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.checklist, color: AppColors.primary, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  'Choices',
-                  style: GoogleFonts.poppins(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                Expanded(
+                  child: InkWell(
+                    onTap: () => setState(() => _choicesExpanded = !_choicesExpanded),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Icon(Icons.checklist, color: AppColors.primary, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Choices',
+                            style: GoogleFonts.poppins(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          AnimatedRotation(
+                            turns: _choicesExpanded ? 0.5 : 0.0,
+                            duration: const Duration(milliseconds: 200),
+                            child: Icon(Icons.keyboard_arrow_down,
+                                color: AppColors.textSecondary, size: 22),
+                          ),
+                          if (!_choicesExpanded &&
+                              _choiceCheckedList.contains(true)) ...[
+                            const SizedBox(width: 8),
+                            Text(
+                              '${_choiceCheckedList.where((c) => c).length} selected',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-                const Spacer(),
                 _addNewButton(_addNewChoices),
               ],
             ),
-            const Divider(),
-            if (choices.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text('No choices yet. Tap "New" to add one.',
-                    style: GoogleFonts.poppins(
-                        fontSize: 13, color: AppColors.textSecondary)),
+            if (_choicesExpanded) ...[
+              const Divider(),
+              if (choices.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text('No choices yet. Tap "New" to add one.',
+                      style: GoogleFonts.poppins(
+                          fontSize: 13, color: AppColors.textSecondary)),
+                ),
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: choices.length,
+                itemBuilder: (context, index) {
+                  return CheckboxListTile(
+                    controlAffinity: ListTileControlAffinity.leading,
+                    title: Text(choices[index].name),
+                    value: _choiceCheckedList[index],
+                    onChanged: (value) => setState(() => _choiceCheckedList[index] = value!),
+                  );
+                },
               ),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: choices.length,
-              itemBuilder: (context, index) {
-                return CheckboxListTile(
-                  controlAffinity: ListTileControlAffinity.leading,
-                  title: Text(choices[index].name),
-                  value: _choiceCheckedList[index],
-                  onChanged: (value) => setState(() => _choiceCheckedList[index] = value!),
-                );
-              },
-            ),
+            ],
           ],
         ),
       ),
@@ -1284,29 +1437,60 @@ class _EdititemScreenState extends State<EdititemScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.add_circle_outline, color: AppColors.primary, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  'Extras',
-                  style: GoogleFonts.poppins(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                Expanded(
+                  child: InkWell(
+                    onTap: () => setState(() => _extrasExpanded = !_extrasExpanded),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Icon(Icons.add_circle_outline, color: AppColors.primary, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Extras',
+                            style: GoogleFonts.poppins(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          AnimatedRotation(
+                            turns: _extrasExpanded ? 0.5 : 0.0,
+                            duration: const Duration(milliseconds: 200),
+                            child: Icon(Icons.keyboard_arrow_down,
+                                color: AppColors.textSecondary, size: 22),
+                          ),
+                          if (!_extrasExpanded &&
+                              _extraCheckedList.contains(true)) ...[
+                            const SizedBox(width: 8),
+                            Text(
+                              '${_extraCheckedList.where((c) => c).length} selected',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-                const Spacer(),
                 _addNewButton(_addNewExtras),
               ],
             ),
-            const Divider(),
-            if (extra.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text('No extras yet. Tap "New" to add one.',
-                    style: GoogleFonts.poppins(
-                        fontSize: 13, color: AppColors.textSecondary)),
-              ),
-            ListView.builder(
+            if (_extrasExpanded) ...[
+              const Divider(),
+              if (extra.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text('No extras yet. Tap "New" to add one.',
+                      style: GoogleFonts.poppins(
+                          fontSize: 13, color: AppColors.textSecondary)),
+                ),
+              ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: extra.length,
@@ -1383,6 +1567,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
                 );
               },
             ),
+            ],
           ],
         ),
       ),
@@ -1422,25 +1607,16 @@ class _CategorySelectionSheetState extends State<_CategorySelectionSheet> {
 
   void _deleteCategory(String categoryId) async {
     // Show confirmation dialog
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    final bool? confirmed = await showDialog<bool>(
+    final confirmed = await showAppConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        title: const Text('Are you sure?'),
-        content: const Text('Do you want to delete this category?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('No')),
-          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Yes')),
-        ],
-      ),
-
-
+      title: 'Delete Category?',
+      message: 'Do you want to delete this category?',
+      confirmLabel: 'Delete',
+      accent: AppColors.danger,
+      icon: Icons.delete_outline,
     );
 
-    if (confirmed == true) {
+    if (confirmed) {
       // Unlink items belonging to this category
       final affected = widget.allItems.where((item) => item.categoryOfItem == categoryId).toList();
       for (final item in affected) {

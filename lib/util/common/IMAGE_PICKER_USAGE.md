@@ -21,7 +21,7 @@ This guide shows how to use the universal image picker across retail and restaur
 ### 1. Pick Image (Simple)
 
 ```dart
-import 'package:unipos/util/common/image_picker_service.dart';
+import 'package:billberrylite/util/common/image_picker_service.dart';
 
 // Pick any image
 final Uint8List? imageBytes = await ImagePickerService.pickImageFromGallery();
@@ -37,7 +37,7 @@ if (imageBytes != null) {
 ### 2. Pick Image with Dialog (Recommended)
 
 ```dart
-import 'package:unipos/presentation/widget/componets/common/universal_image_picker.dart';
+import 'package:billberrylite/presentation/widget/componets/common/universal_image_picker.dart';
 
 // Show dialog with options (Gallery/Camera on mobile, Gallery only on web)
 final Uint8List? imageBytes = await UniversalImagePicker.showPicker(
@@ -56,7 +56,7 @@ if (imageBytes != null) {
 ### 3. Display Image Preview
 
 ```dart
-import 'package:unipos/presentation/widget/componets/common/universal_image_picker.dart';
+import 'package:billberrylite/presentation/widget/componets/common/universal_image_picker.dart';
 
 UniversalImageUploader(
   imageBytes: _imageBytes,  // Your Uint8List? variable
@@ -145,7 +145,7 @@ if (bytes != null) {
 
 ```dart
 // In category management
-import 'package:unipos/presentation/widget/componets/common/universal_image_picker.dart';
+import 'package:billberrylite/presentation/widget/componets/common/universal_image_picker.dart';
 
 Uint8List? _categoryImage;
 

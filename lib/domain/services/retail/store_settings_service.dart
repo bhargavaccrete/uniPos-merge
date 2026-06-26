@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:unipos/data/repositories/business_details_repository.dart';
+import 'package:billberrylite/data/repositories/business_details_repository.dart';
 
 /// Service for managing store/business settings
 class StoreSettingsService {

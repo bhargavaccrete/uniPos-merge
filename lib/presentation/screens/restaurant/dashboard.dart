@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:unipos/util/images.dart';
+import 'package:billberrylite/util/images.dart';
 
 import '../../../constants/restaurant/color.dart';
 import '../../../core/routes/routes_name.dart';
@@ -15,7 +15,7 @@ import 'auth/admin_login.dart';
 import 'auth/cashier_waiter.dart';
 import 'auth/login.dart';
 import 'need help/needhelp.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/util/color.dart';
 class Dashboard extends StatelessWidget {
   Dashboard({super.key});
 

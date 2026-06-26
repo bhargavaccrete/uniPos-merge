@@ -1,5 +1,5 @@
 import 'package:hive/hive.dart';
-import 'package:unipos/core/config/app_config.dart';
+import 'package:billberrylite/core/config/app_config.dart';
 import '../../models/restaurant/db/expensemodel_315.dart';
 
 /// Repository layer for Expense Category data access (Restaurant)

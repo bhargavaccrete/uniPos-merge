@@ -1,5 +1,5 @@
 import 'package:hive/hive.dart';
-import 'package:unipos/core/constants/hive_box_names.dart';
+import 'package:billberrylite/core/constants/hive_box_names.dart';
 import '../../models/restaurant/db/cartmodel_308.dart';
 import '../../models/restaurant/db/itemmodel_302.dart';
 import '../../models/restaurant/db/variantmodel_305.dart';

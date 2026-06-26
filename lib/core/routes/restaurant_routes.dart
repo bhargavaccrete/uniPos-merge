@@ -1,108 +1,109 @@
 import 'package:flutter/material.dart';
-import 'package:unipos/core/routes/routes_name.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/Discount%20Order%20Report/dicountOrderReport.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/comparison/comparisonbymonth.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/comparison/comparisonbyweek.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/comparison/comparisonbyyear.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/comparisonbyproduct/comparisonproduct.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/dailyClosingReports/dailyclosing.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/pos%20End%20Day%20Report/posenddayreport.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/refundDetails/refunddetails.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbyCategory/salesbycategory.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/salesbyItem/salesbyitem.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/totalsales/totalsales.dart';
-import 'package:unipos/presentation/screens/restaurant/Settings/data_generator_screen.dart';
-import 'package:unipos/presentation/screens/restaurant/Settings/license_email_flow_demo_screen.dart';
-import 'package:unipos/presentation/screens/onboarding/setup_wizard_email_flow_screen.dart';
-import 'package:unipos/presentation/screens/restaurant/attendance/staff_attendance_screen.dart';
-import 'package:unipos/presentation/screens/restaurant/attendance/attendance_report_screen.dart';
-import 'package:unipos/presentation/screens/restaurant/import/bulk_import_screen.dart';
-import 'package:unipos/presentation/screens/restaurant/tabbar/order.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/import/test_data_screen.dart';
+import 'package:billberrylite/core/routes/routes_name.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/Discount%20Order%20Report/dicountOrderReport.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/comparison/comparisonbymonth.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/comparison/comparisonbyweek.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/comparison/comparisonbyyear.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/comparisonbyproduct/comparisonproduct.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/dailyClosingReports/dailyclosing.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/pos%20End%20Day%20Report/posenddayreport.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/refundDetails/refunddetails.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/salesbyCategory/salesbycategory.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/salesbyItem/salesbyitem.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/totalsales/totalsales.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Settings/data_generator_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Settings/license_email_flow_demo_screen.dart';
+import 'package:billberrylite/presentation/screens/onboarding/setup_wizard_email_flow_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/attendance/staff_attendance_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/attendance/attendance_report_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/import/bulk_import_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/tabbar/order.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/componets/import/test_data_screen.dart';
 
 // Core Screens
-import 'package:unipos/presentation/screens/onboarding/splashScreen.dart';
-import 'package:unipos/presentation/screens/onboarding/walkthroughScreen.dart';
-import 'package:unipos/presentation/screens/onboarding/userSelectionScreen.dart';
-import 'package:unipos/presentation/screens/onboarding/existingUserRestoreScreen.dart';
-import 'package:unipos/presentation/screens/onboarding/license_key_entry_screen.dart';
-import 'package:unipos/presentation/screens/onboarding/setupWizardScreen.dart';
+import 'package:billberrylite/presentation/screens/onboarding/splashScreen.dart';
+import 'package:billberrylite/presentation/screens/onboarding/animated_splash_screen.dart';
+import 'package:billberrylite/presentation/screens/onboarding/walkthroughScreen.dart';
+import 'package:billberrylite/presentation/screens/onboarding/userSelectionScreen.dart';
+import 'package:billberrylite/presentation/screens/onboarding/existingUserRestoreScreen.dart';
+import 'package:billberrylite/presentation/screens/onboarding/license_key_entry_screen.dart';
+import 'package:billberrylite/presentation/screens/onboarding/setupWizardScreen.dart';
 
 // Restaurant - Auth
-import 'package:unipos/presentation/screens/restaurant/auth/restaurant_login.dart';
-import 'package:unipos/presentation/screens/restaurant/auth/admin_login.dart';
-import 'package:unipos/presentation/screens/restaurant/auth/restaurant_guard.dart';
+import 'package:billberrylite/presentation/screens/restaurant/auth/restaurant_login.dart';
+import 'package:billberrylite/presentation/screens/restaurant/auth/admin_login.dart';
+import 'package:billberrylite/presentation/screens/restaurant/auth/restaurant_guard.dart';
 
 // Restaurant - Home & Dashboard
-import 'package:unipos/presentation/screens/restaurant/welcome_Admin.dart';
-import 'package:unipos/presentation/screens/restaurant/notifications/notifications_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/welcome_Admin.dart';
+import 'package:billberrylite/presentation/screens/restaurant/notifications/notifications_screen.dart';
 
 // Restaurant - Orders
-import 'package:unipos/presentation/screens/restaurant/start%20order/startorder.dart';
-import 'package:unipos/presentation/screens/restaurant/tabbar/activeorder.dart';
-import 'package:unipos/presentation/screens/restaurant/tabbar/pastorder.dart';
-import 'package:unipos/presentation/screens/restaurant/tabbar/orderDetails.dart';
+import 'package:billberrylite/presentation/screens/restaurant/start%20order/startorder.dart';
+import 'package:billberrylite/presentation/screens/restaurant/tabbar/activeorder.dart';
+import 'package:billberrylite/presentation/screens/restaurant/tabbar/pastorder.dart';
+import 'package:billberrylite/presentation/screens/restaurant/tabbar/orderDetails.dart';
 
 // Restaurant - Tables
-import 'package:unipos/presentation/screens/restaurant/tabbar/table.dart';
+import 'package:billberrylite/presentation/screens/restaurant/tabbar/table.dart';
 
 // Restaurant - Menu
-import 'package:unipos/presentation/screens/restaurant/tabbar/menu.dart';
-import 'package:unipos/presentation/screens/restaurant/manage%20menu/manage_menu_screen.dart';
-import 'package:unipos/presentation/screens/restaurant/auth/setup_add_item_screen.dart';
-import 'package:unipos/presentation/screens/restaurant/auth/category_management_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/tabbar/menu.dart';
+import 'package:billberrylite/presentation/screens/restaurant/manage%20menu/manage_menu_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/auth/setup_add_item_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/auth/category_management_screen.dart';
 
 // Restaurant - Customers
-import 'package:unipos/presentation/screens/restaurant/customer/customer_list_screen.dart';
-import 'package:unipos/presentation/screens/restaurant/customer/manage_customers_screen.dart';
-import 'package:unipos/presentation/screens/restaurant/customer/add_edit_customer_screen.dart';
-import 'package:unipos/presentation/screens/restaurant/customer/customer_detail_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/customer/customer_list_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/customer/manage_customers_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/customer/add_edit_customer_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/customer/customer_detail_screen.dart';
 
 // Restaurant - Online Orders
-import 'package:unipos/presentation/screens/restaurant/online%20Order/online.dart';
-import 'package:unipos/presentation/screens/restaurant/online%20Order/inProgress.dart';
-import 'package:unipos/presentation/screens/restaurant/online%20Order/Completed.dart';
-import 'package:unipos/presentation/screens/restaurant/online%20Order/missed.dart';
+import 'package:billberrylite/presentation/screens/restaurant/online%20Order/online.dart';
+import 'package:billberrylite/presentation/screens/restaurant/online%20Order/inProgress.dart';
+import 'package:billberrylite/presentation/screens/restaurant/online%20Order/Completed.dart';
+import 'package:billberrylite/presentation/screens/restaurant/online%20Order/missed.dart';
 
 // Restaurant - Inventory
-import 'package:unipos/presentation/screens/restaurant/inventory/manage_Inventory.dart';
+import 'package:billberrylite/presentation/screens/restaurant/inventory/manage_Inventory.dart';
 
 // Restaurant - Staff
-import 'package:unipos/presentation/screens/restaurant/ManageStaff/manageStaff.dart';
+import 'package:billberrylite/presentation/screens/restaurant/ManageStaff/manageStaff.dart';
 
 // Restaurant - Expenses
-import 'package:unipos/presentation/screens/restaurant/Expense/Expense.dart';
-import 'package:unipos/presentation/screens/restaurant/Expense/addexpence.dart';
-import 'package:unipos/presentation/screens/restaurant/Expense/viewexpense.dart';
-import 'package:unipos/presentation/screens/restaurant/Expense/managecategory.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Expense/Expense.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Expense/addexpence.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Expense/viewexpense.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Expense/managecategory.dart';
 
 // Restaurant - Reports
-import 'package:unipos/presentation/screens/restaurant/Reports/reports.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/filterOrders.dart';
-import 'package:unipos/presentation/screens/restaurant/Reports/performance_statistics_report.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/reports.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/filterOrders.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/performance_statistics_report.dart';
 
 // Restaurant - Settings
-import 'package:unipos/presentation/screens/restaurant/Settings/settingsScreen.dart';
-import 'package:unipos/presentation/screens/restaurant/Settings/orderSettings.dart';
-import 'package:unipos/presentation/screens/restaurant/Settings/paymentsMethods.dart';
-import 'package:unipos/presentation/screens/restaurant/Settings/changePassword.dart';
-import 'package:unipos/presentation/screens/restaurant/Settings/licensing_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Settings/settingsScreen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Settings/orderSettings.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Settings/paymentsMethods.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Settings/changePassword.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Settings/licensing_screen.dart';
 
 // Restaurant - Tax
-import 'package:unipos/presentation/screens/restaurant/TaxSetting/taxSettings.dart';
-import 'package:unipos/presentation/screens/restaurant/TaxSetting/apply_tax_screen.dart';
-import 'package:unipos/presentation/screens/restaurant/TaxSetting/addMultipleTax.dart';
+import 'package:billberrylite/presentation/screens/restaurant/TaxSetting/taxSettings.dart';
+import 'package:billberrylite/presentation/screens/restaurant/TaxSetting/apply_tax_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/TaxSetting/addMultipleTax.dart';
 
 // Restaurant - Printer
-import 'package:unipos/presentation/screens/restaurant/printerSetting/printersetting.dart';
-import 'package:unipos/presentation/screens/restaurant/printerSetting/customization.dart';
+import 'package:billberrylite/presentation/screens/restaurant/printerSetting/printersetting.dart';
+import 'package:billberrylite/presentation/screens/restaurant/printerSetting/customization.dart';
 
 // Restaurant - End Day
-import 'package:unipos/presentation/screens/restaurant/end%20day/endday.dart';
+import 'package:billberrylite/presentation/screens/restaurant/end%20day/endday.dart';
 
 // Restaurant - Other
-import 'package:unipos/presentation/screens/restaurant/need%20help/needhelp.dart';
-import 'package:unipos/presentation/screens/restaurant/customiztion/customization_drawer.dart';
+import 'package:billberrylite/presentation/screens/restaurant/need%20help/needhelp.dart';
+import 'package:billberrylite/presentation/screens/restaurant/customiztion/customization_drawer.dart';
 
 import '../../presentation/screens/restaurant/Reports/comparison/comparison.dart';
 import '../../presentation/screens/restaurant/Reports/customer list by revenue/customerlistbyrevenue.dart';
@@ -237,6 +238,7 @@ class RestaurantRoutes {
     RouteNames.restaurantTestData: _guard(const TestDataScreen(), 'settings'),
     RouteNames.restaurantBulkImport: _guard(const RestaurantBulkImportScreen(), 'settings'),
     RouteNames.restaurantDataGenratorScreen: _guard(const DataGeneratorScreen(), 'settings'),
+    RouteNames.restaurantSplashPreview: _guard(const AnimatedSplashScreen(), 'settings'),
     RouteNames.restaurantLicenseEmailDemo: _guard(const LicenseEmailFlowDemoScreen(), 'settings'),
     RouteNames.restaurantEmailSetupDemo: _guard(const SetupWizardEmailFlowScreen(), 'settings'),
 

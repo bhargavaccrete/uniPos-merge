@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../domain/services/restaurant/notification_service.dart';
-import 'package:unipos/data/models/retail/hive_model/sale_model_203.dart';
-import 'package:unipos/data/models/retail/hive_model/sale_item_model_204.dart';
-import 'package:unipos/data/models/retail/hive_model/customer_model_208.dart';
-import 'package:unipos/presentation/screens/retail/sale_return_screen.dart';
-import 'package:unipos/domain/services/retail/print_service.dart';
-import 'package:unipos/domain/services/retail/store_settings_service.dart';
+import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
+import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
+import 'package:billberrylite/data/models/retail/hive_model/customer_model_208.dart';
+import 'package:billberrylite/presentation/screens/retail/sale_return_screen.dart';
+import 'package:billberrylite/domain/services/retail/print_service.dart';
+import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 class SaleDetailScreen extends StatefulWidget {
   final String saleId;
 

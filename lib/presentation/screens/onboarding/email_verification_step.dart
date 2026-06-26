@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/domain/store/restaurant/license_store.dart';
-import 'package:unipos/stores/setup_wizard_store.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/domain/store/restaurant/license_store.dart';
+import 'package:billberrylite/stores/setup_wizard_store.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 /// Self-signup step: verify email via OTP, then enter the emailed license key.
 ///   email → otp (verify) → enter key → onNext
@@ -155,24 +155,6 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
     });
   }
 
-  // Temporary bypass: skip OTP send/verify and go straight to key entry.
-  void _skipToKey() {
-    _ticker?.cancel();
-    setState(() {
-      _submittedEmail = _emailController.text.trim();
-      _errorMsg = null;
-      _phase = _Phase.enterKey;
-    });
-  }
-
-  // Temporary bypass: skip license validation/activation and continue setup.
-  // Sets the persisted bypass flag so the license guard won't lock the app.
-  Future<void> _skip() async {
-    setState(() => _loading = true);
-    await _license.skipLicense();
-    if (!mounted) return;
-    widget.onNext();
-  }
 
   Future<void> _submitKey() async {
     final key = _keyController.text.trim();
@@ -249,14 +231,6 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
         SizedBox(height: AppResponsive.mediumSpacing(context)),
         _primaryButton(context,
             label: 'Send Verification Code', onPressed: _sendOtp),
-        SizedBox(height: AppResponsive.smallSpacing(context)),
-        TextButton(
-          onPressed: _loading ? null : _skipToKey,
-          child: Text('Skip for now',
-              style: TextStyle(
-                  fontSize: AppResponsive.smallFontSize(context),
-                  color: Colors.grey[500])),
-        ),
         _backButton(context, onPressed: widget.onPrevious),
       ],
     );
@@ -322,7 +296,7 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
         AppTextField(
           controller: _keyController,
           label: 'License Key',
-          hint: 'e.g. UNIPOS-XXXXXXXXXXXX',
+          hint: 'Paste your license key',
           icon: Icons.vpn_key_rounded,
           required: true,
           enableSuggestions: false,
@@ -331,14 +305,6 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
         if (_errorMsg != null) _errorText(_errorMsg!),
         SizedBox(height: AppResponsive.mediumSpacing(context)),
         _primaryButton(context, label: 'Continue', onPressed: _submitKey),
-        SizedBox(height: AppResponsive.smallSpacing(context)),
-        TextButton(
-          onPressed: _loading ? null : _skip,
-          child: Text('Skip for now',
-              style: TextStyle(
-                  fontSize: AppResponsive.smallFontSize(context),
-                  color: Colors.grey[500])),
-        ),
         _backButton(context,
             onPressed: () => setState(() {
                   _errorMsg = null;

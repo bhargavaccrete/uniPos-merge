@@ -5,19 +5,20 @@ import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/cash_handover_model.dart';
-import 'package:unipos/data/repositories/restaurant/cash_handover_repository.dart';
-import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
-import 'package:unipos/data/models/restaurant/db/expensel_316.dart';
-import 'package:unipos/domain/services/restaurant/day_management_service.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
-import 'package:unipos/util/common/currency_helper.dart';
-import 'package:unipos/util/common/decimal_settings.dart';
-import 'package:unipos/util/restaurant/restaurant_session.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/models/restaurant/db/cash_handover_model.dart';
+import 'package:billberrylite/data/repositories/restaurant/cash_handover_repository.dart';
+import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
+import 'package:billberrylite/data/models/restaurant/db/expensel_316.dart';
+import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 
 // ─── Entry type for the merged activity log ───────────────────────────────────
 
@@ -352,9 +353,6 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     final noteCtrl = TextEditingController();
 
     final isCashIn = type == 'in';
-    final _hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
     // Separate reason lists for Cash In vs Cash Out
     const cashInReasons = [
       'Owner deposit',
@@ -375,225 +373,140 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     final reasons = isCashIn ? cashInReasons : cashOutReasons;
     String selectedReason = reasons.first;
 
+    final accent = isCashIn ? Colors.green : Colors.red;
+
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDs) => AlertDialog(
-          insetPadding: EdgeInsets.symmetric(horizontal: _hInset, vertical: 24),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          contentPadding: EdgeInsets.zero,
-          content: Column(
+        builder: (ctx, setDs) => AppDialogShell(
+          title: isCashIn ? 'Cash In' : 'Cash Out',
+          accent: accent,
+          icon: isCashIn
+              ? Icons.add_circle_outline
+              : Icons.remove_circle_outline,
+          body: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Dialog header
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: isCashIn
-                      ? Colors.green.withValues(alpha: 0.08)
-                      : Colors.red.withValues(alpha: 0.08),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                ),
-                child: Row(children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: (isCashIn ? Colors.green : Colors.red)
-                          .withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      isCashIn ? Icons.add_circle_outline : Icons.remove_circle_outline,
-                      color: isCashIn ? Colors.green : Colors.red,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    isCashIn ? 'Cash In' : 'Cash Out',
+              // Amount
+              AppTextField(
+                controller: amountCtrl,
+                label: 'Amount',
+                hint: '0.00',
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
+                ],
+                prefixWidget: Padding(
+                  padding: const EdgeInsets.only(left: 14, right: 8),
+                  child: Text(
+                    CurrencyHelper.currentSymbol,
                     style: GoogleFonts.poppins(
-                        fontSize: 18, fontWeight: FontWeight.w700),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary),
                   ),
-                ]),
-              ),
-
-              // Form fields
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Amount
-                    AppTextField(
-                      controller: amountCtrl,
-                      label: 'Amount',
-                      hint: '0.00',
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
-                      ],
-                      prefixWidget: Padding(
-                        padding: const EdgeInsets.only(left: 14, right: 8),
-                        child: Text(
-                          CurrencyHelper.currentSymbol,
-                          style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.primary),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Reason dropdown
-                    DropdownButtonFormField<String>(
-                      value: selectedReason,
-                      style: GoogleFonts.poppins(
-                          fontSize: 14, color: AppColors.textPrimary),
-                      decoration: InputDecoration(
-                        labelText: 'Reason',
-                        labelStyle: GoogleFonts.poppins(
-                            fontSize: 13, color: AppColors.textSecondary),
-                        prefixIcon: const Icon(Icons.list_alt_rounded,
-                            color: AppColors.primary, size: 20),
-                        filled: true,
-                        fillColor: AppColors.surfaceLight,
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide:
-                                const BorderSide(color: AppColors.divider)),
-                        enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide:
-                                const BorderSide(color: AppColors.divider)),
-                        focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                                color: AppColors.primary, width: 1.5)),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 14),
-                      ),
-                      items: reasons
-                          .map((r) => DropdownMenuItem(
-                              value: r,
-                              child: Text(r,
-                                  style: GoogleFonts.poppins(fontSize: 14))))
-                          .toList(),
-                      onChanged: (v) =>
-                          setDs(() => selectedReason = v ?? reasons.first),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Optional note
-                    AppTextField(
-                      controller: noteCtrl,
-                      label: 'Note',
-                      hint: 'Add extra details... (optional)',
-                      icon: Icons.notes_rounded,
-                    ),
-                  ],
                 ),
               ),
+              const SizedBox(height: 16),
 
-              // Action buttons
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                child: Row(children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: Text('Cancel',
-                          style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final amount =
-                            double.tryParse(amountCtrl.text.trim()) ?? 0;
-                        if (amount <= 0) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            const SnackBar(
-                                content: Text('Enter a valid amount')),
-                          );
-                          return;
-                        }
-                        // Guard: warn if Cash Out would make the drawer go negative.
-                        if (type == 'out' && amount > _balance) {
-                          final proceed = await showDialog<bool>(
-                            context: ctx,
-                            builder: (warnCtx) {
-                              final wHInset = !AppResponsive.isMobile(warnCtx)
-                                  ? ((AppResponsive.screenWidth(warnCtx) - AppResponsive.dialogWidth(warnCtx)) / 2).clamp(40.0, 200.0)
-                                  : 24.0;
-                              return AlertDialog(
-                              insetPadding: EdgeInsets.symmetric(horizontal: wHInset, vertical: 24),
-                              title: Row(children: [
-                                Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700),
-                                const SizedBox(width: 8),
-                                const Text('Balance Warning'),
-                              ]),
-                              content: Text(
-                                'This withdrawal (${CurrencyHelper.currentSymbol} ${amount.toStringAsFixed(DecimalSettings.precision)}) '
-                                'exceeds the estimated drawer balance '
-                                '(${CurrencyHelper.currentSymbol} ${_balance.toStringAsFixed(DecimalSettings.precision)}).\n\n'
-                                'The drawer balance would go negative. '
-                                'Proceed only if you have physically verified the cash.',
-                              ),
-                              actions: [
-                                TextButton(
-                                    onPressed: () => Navigator.pop(warnCtx, false),
-                                    child: const Text('Cancel')),
-                                ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.orange.shade700),
-                                    onPressed: () => Navigator.pop(warnCtx, true),
-                                    child: const Text('Proceed Anyway',
-                                        style: TextStyle(color: Colors.white))),
-                              ],
-                            );
-                            },
-                          );
-                          if (proceed != true) return;
-                        }
-                        Navigator.pop(ctx);
-                        final ok = await cashMovementStore.addMovement(
-                          type: type,
-                          amount: amount,
-                          reason: selectedReason,
-                          note: noteCtrl.text.trim().isEmpty
-                              ? null
-                              : noteCtrl.text.trim(),
-                        );
-                        if (ok) {
-                          // Rebuild the log to include the new entry
-                          await _loadAll();
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isCashIn ? Colors.green : Colors.red,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: Text(
-                        isCashIn ? 'Add Cash In' : 'Add Cash Out',
-                        style: GoogleFonts.poppins(
-                            color: Colors.white, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ),
-                ]),
+              // Reason dropdown
+              DropdownButtonFormField<String>(
+                value: selectedReason,
+                style: GoogleFonts.poppins(
+                    fontSize: 14, color: AppColors.textPrimary),
+                decoration: InputDecoration(
+                  labelText: 'Reason',
+                  labelStyle: GoogleFonts.poppins(
+                      fontSize: 13, color: AppColors.textSecondary),
+                  prefixIcon: const Icon(Icons.list_alt_rounded,
+                      color: AppColors.primary, size: 20),
+                  filled: true,
+                  fillColor: AppColors.surfaceLight,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide:
+                          const BorderSide(color: AppColors.divider)),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide:
+                          const BorderSide(color: AppColors.divider)),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                          color: AppColors.primary, width: 1.5)),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 14),
+                ),
+                items: reasons
+                    .map((r) => DropdownMenuItem(
+                        value: r,
+                        child: Text(r,
+                            style: GoogleFonts.poppins(fontSize: 14))))
+                    .toList(),
+                onChanged: (v) =>
+                    setDs(() => selectedReason = v ?? reasons.first),
+              ),
+              const SizedBox(height: 16),
+
+              // Optional note
+              AppTextField(
+                controller: noteCtrl,
+                label: 'Note',
+                hint: 'Add extra details... (optional)',
+                icon: Icons.notes_rounded,
               ),
             ],
           ),
+          actions: [
+            appDialogCancelButton(ctx),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: isCashIn ? 'Add Cash In' : 'Add Cash Out',
+              color: accent,
+              onPressed: () async {
+                final amount =
+                    double.tryParse(amountCtrl.text.trim()) ?? 0;
+                if (amount <= 0) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(
+                        content: Text('Enter a valid amount')),
+                  );
+                  return;
+                }
+                // Guard: warn if Cash Out would make the drawer go negative.
+                if (type == 'out' && amount > _balance) {
+                  final proceed = await showAppConfirmDialog(
+                    context: ctx,
+                    title: 'Balance Warning',
+                    message:
+                        'This withdrawal (${CurrencyHelper.currentSymbol} ${amount.toStringAsFixed(DecimalSettings.precision)}) '
+                        'exceeds the estimated drawer balance '
+                        '(${CurrencyHelper.currentSymbol} ${_balance.toStringAsFixed(DecimalSettings.precision)}).\n\n'
+                        'The drawer balance would go negative. '
+                        'Proceed only if you have physically verified the cash.',
+                    confirmLabel: 'Proceed Anyway',
+                    accent: Colors.orange.shade700,
+                    icon: Icons.warning_amber_rounded,
+                  );
+                  if (proceed != true) return;
+                }
+                Navigator.pop(ctx);
+                final ok = await cashMovementStore.addMovement(
+                  type: type,
+                  amount: amount,
+                  reason: selectedReason,
+                  note: noteCtrl.text.trim().isEmpty
+                      ? null
+                      : noteCtrl.text.trim(),
+                );
+                if (ok) {
+                  // Rebuild the log to include the new entry
+                  await _loadAll();
+                }
+              },
+            ),
+          ],
         ),
       ),
     );

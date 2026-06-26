@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:unipos/domain/services/retail/store_settings_service.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
+import 'package:billberrylite/util/color.dart';
 
 class StoreInfoSettingsScreen extends StatefulWidget {
   const StoreInfoSettingsScreen({Key? key}) : super(key: key);

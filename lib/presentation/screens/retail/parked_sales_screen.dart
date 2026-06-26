@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:unipos/data/models/retail/hive_model/hold_sale_model_209.dart';
+import 'package:billberrylite/data/models/retail/hive_model/hold_sale_model_209.dart';
 import '../../../core/di/service_locator.dart';
 
 class ParkedSalesScreen extends StatefulWidget {

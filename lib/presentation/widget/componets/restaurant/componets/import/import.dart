@@ -14,9 +14,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:unipos/core/init/hive_init.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/data/models/restaurant/db/choiceoptionmodel_307.dart';
+import 'package:billberrylite/core/init/hive_init.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/data/models/restaurant/db/choiceoptionmodel_307.dart';
 
 // Conditional import for web file download
 import 'web_file_saver_stub.dart' if (dart.library.html) 'web_file_saver.dart';
@@ -290,7 +290,7 @@ class CategoryImportExport {
         downloadsDir.createSync(recursive: true);
       }
 
-      final outputFile = File('$downloadsPath/BillBerry_backup_$timestamp.zip');
+      final outputFile = File('$downloadsPath/BillBerryLite_backup_$timestamp.zip');
       await outputFile.writeAsBytes(zipData);
 
       debugPrint("✅ Backup saved to Downloads: ${outputFile.path}");
@@ -670,7 +670,7 @@ class CategoryImportExport {
 
       // 4️⃣ Save unencrypted ZIP file (easy to verify and share)
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19);
-      final zipFile = File('${backupDir.path}/BillBerry_backup_$timestamp.zip');
+      final zipFile = File('${backupDir.path}/BillBerryLite_backup_$timestamp.zip');
 
       // Write raw ZIP bytes to file
       await zipFile.writeAsBytes(zipData);

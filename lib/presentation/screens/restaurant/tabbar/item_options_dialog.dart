@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/util/color.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../constants/restaurant/color.dart';
@@ -21,7 +21,7 @@ import '../../../../domain/store/restaurant/variant_store.dart';
 import '../../../../domain/store/restaurant/choice_store.dart';
 import '../../../../domain/store/restaurant/extra_store.dart';
 import '../../../../util/common/currency_helper.dart';
-import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
 class DisplayVariant {
   final String id;
   final String name;

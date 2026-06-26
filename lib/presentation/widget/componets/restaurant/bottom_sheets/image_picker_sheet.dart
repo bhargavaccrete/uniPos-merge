@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/util/color.dart';
 import '../../../../../util/common/app_responsive.dart';
 
 /// Bottom sheet for selecting image source (Gallery)

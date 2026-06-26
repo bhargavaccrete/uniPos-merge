@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/domain/store/retail/credit_store.dart';
+import 'package:billberrylite/domain/store/retail/credit_store.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/retail/hive_model/customer_model_208.dart';

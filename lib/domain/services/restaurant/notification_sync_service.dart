@@ -1,10 +1,10 @@
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/core/routes/routes_name.dart';
-import 'package:unipos/data/models/restaurant/notification_presenter.dart';
-import 'package:unipos/domain/services/common/auto_backup_service.dart';
-import 'package:unipos/domain/services/common/local_notification_service.dart';
-import 'package:unipos/domain/services/restaurant/day_management_service.dart';
-import 'package:unipos/domain/store/restaurant/license_store.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/routes/routes_name.dart';
+import 'package:billberrylite/data/models/restaurant/notification_presenter.dart';
+import 'package:billberrylite/domain/services/common/auto_backup_service.dart';
+import 'package:billberrylite/domain/services/common/local_notification_service.dart';
+import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
+import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 
 /// Raises app-level notifications and (re)schedules offline reminders so they
 /// fire even when the app is fully closed. Reconciled on every launch.

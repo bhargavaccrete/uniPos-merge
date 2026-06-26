@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import '../../../core/di/service_locator.dart';
-import 'package:unipos/data/models/retail/hive_model/purchase_model_207.dart';
-import 'package:unipos/presentation/screens/retail/add_purchase_screen.dart';
+import 'package:billberrylite/data/models/retail/hive_model/purchase_model_207.dart';
+import 'package:billberrylite/presentation/screens/retail/add_purchase_screen.dart';
 
 class PurchaseHistoryScreen extends StatefulWidget {
   const PurchaseHistoryScreen({super.key});

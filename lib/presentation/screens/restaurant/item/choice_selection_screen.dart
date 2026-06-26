@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../data/models/restaurant/db/choiceoptionmodel_307.dart';
 import '../../../../util/common/app_responsive.dart';
 import '../../../widget/componets/common/app_text_field.dart';
 import '../../../widget/componets/common/primary_app_bar.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 
 
 class ChoiceSelectionScreen extends StatefulWidget {
@@ -355,144 +356,131 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            final hInset = !AppResponsive.isMobile(context)
-                ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-                : 24.0;
-            return AlertDialog(
-              insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-              title: Text(
-                'Add New Choice',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Enter choice name and options',
-                      style: GoogleFonts.poppins(
-                          fontSize: 13, color: AppColors.textSecondary),
-                    ),
-                    const SizedBox(height: 15),
+            return AppDialogShell(
+              title: 'Add New Choice',
+              accent: AppColors.primary,
+              icon: Icons.checklist_rounded,
+              body: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Enter choice name and options',
+                    style: GoogleFonts.poppins(
+                        fontSize: 13, color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 15),
 
-                    // Choice name
-                    AppTextField(
-                      controller: choiceNameController,
-                      label: 'Choice Name',
-                      hint: 'e.g. Spice Level',
-                      icon: Icons.checklist_rounded,
-                    ),
-                    const SizedBox(height: 16),
+                  // Choice name
+                  AppTextField(
+                    controller: choiceNameController,
+                    label: 'Choice Name',
+                    hint: 'e.g. Spice Level',
+                    icon: Icons.checklist_rounded,
+                  ),
+                  const SizedBox(height: 16),
 
-                    // Single / Multiple toggle
-                    Text(
-                      'Selection Type',
-                      style: GoogleFonts.poppins(
-                          fontSize: 14, fontWeight: FontWeight.w500),
+                  // Single / Multiple toggle
+                  Text(
+                    'Selection Type',
+                    style: GoogleFonts.poppins(
+                        fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceLight,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.divider),
                     ),
-                    const SizedBox(height: 8),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceLight,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.divider),
-                      ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _selectionChip(
+                            label: 'Single',
+                            subtitle: 'Pick one',
+                            icon: Icons.radio_button_checked_rounded,
+                            isSelected: !allowMultipleSelection,
+                            onTap: () => setDialogState(
+                                () => allowMultipleSelection = false),
+                            isLeft: true,
+                          ),
+                        ),
+                        Container(
+                            width: 1, height: 56, color: AppColors.divider),
+                        Expanded(
+                          child: _selectionChip(
+                            label: 'Multiple',
+                            subtitle: 'Pick many',
+                            icon: Icons.check_box_rounded,
+                            isSelected: allowMultipleSelection,
+                            onTap: () => setDialogState(
+                                () => allowMultipleSelection = true),
+                            isLeft: false,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Options
+                  Text(
+                    'Options:',
+                    style: GoogleFonts.poppins(
+                        fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 10),
+                  ...List.generate(optionControllers.length, (index) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
                       child: Row(
                         children: [
                           Expanded(
-                            child: _selectionChip(
-                              label: 'Single',
-                              subtitle: 'Pick one',
-                              icon: Icons.radio_button_checked_rounded,
-                              isSelected: !allowMultipleSelection,
-                              onTap: () => setDialogState(
-                                  () => allowMultipleSelection = false),
-                              isLeft: true,
+                            child: AppTextField(
+                              controller: optionControllers[index],
+                              label: 'Option ${index + 1}',
+                              hint: 'Enter option',
                             ),
                           ),
-                          Container(
-                              width: 1, height: 56, color: AppColors.divider),
-                          Expanded(
-                            child: _selectionChip(
-                              label: 'Multiple',
-                              subtitle: 'Pick many',
-                              icon: Icons.check_box_rounded,
-                              isSelected: allowMultipleSelection,
-                              onTap: () => setDialogState(
-                                  () => allowMultipleSelection = true),
-                              isLeft: false,
+                          if (optionControllers.length > 1) ...[
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: const Icon(Icons.remove_circle,
+                                  color: Colors.red),
+                              onPressed: () {
+                                setDialogState(() {
+                                  optionControllers[index].dispose();
+                                  optionControllers.removeAt(index);
+                                });
+                              },
                             ),
-                          ),
+                          ],
                         ],
                       ),
+                    );
+                  }),
+                  const SizedBox(height: 10),
+                  TextButton.icon(
+                    onPressed: () {
+                      setDialogState(() {
+                        optionControllers.add(TextEditingController());
+                      });
+                    },
+                    icon: const Icon(Icons.add_circle_outline,
+                        color: AppColors.primary),
+                    label: Text(
+                      'Add Option',
+                      style: GoogleFonts.poppins(color: AppColors.primary),
                     ),
-                    const SizedBox(height: 20),
-
-                    // Options
-                    Text(
-                      'Options:',
-                      style: GoogleFonts.poppins(
-                          fontSize: 14, fontWeight: FontWeight.w500),
-                    ),
-                    const SizedBox(height: 10),
-                    ...List.generate(optionControllers.length, (index) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: AppTextField(
-                                controller: optionControllers[index],
-                                label: 'Option ${index + 1}',
-                                hint: 'Enter option',
-                              ),
-                            ),
-                            if (optionControllers.length > 1) ...[
-                              const SizedBox(width: 8),
-                              IconButton(
-                                icon: const Icon(Icons.remove_circle,
-                                    color: Colors.red),
-                                onPressed: () {
-                                  setDialogState(() {
-                                    optionControllers[index].dispose();
-                                    optionControllers.removeAt(index);
-                                  });
-                                },
-                              ),
-                            ],
-                          ],
-                        ),
-                      );
-                    }),
-                    const SizedBox(height: 10),
-                    TextButton.icon(
-                      onPressed: () {
-                        setDialogState(() {
-                          optionControllers.add(TextEditingController());
-                        });
-                      },
-                      icon: const Icon(Icons.add_circle_outline,
-                          color: AppColors.primary),
-                      label: Text(
-                        'Add Option',
-                        style: GoogleFonts.poppins(color: AppColors.primary),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
               actions: [
-                TextButton(
-                  onPressed: () {
-                    for (var c in optionControllers) c.dispose();
-                    choiceNameController.dispose();
-                    Navigator.pop(context);
-                  },
-                  child: Text('Cancel',
-                      style: GoogleFonts.poppins(color: AppColors.textSecondary)),
-                ),
-                ElevatedButton(
+                appDialogCancelButton(context),
+                const SizedBox(width: 12),
+                appDialogPrimaryButton(
+                  label: 'Add',
                   onPressed: () async {
                     if (choiceNameController.text.trim().isEmpty) {
                       NotificationService.instance
@@ -535,10 +523,6 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
                     NotificationService.instance.showSuccess(
                         'Choice "${newChoice.name}" added with ${options.length} options');
                   },
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary),
-                  child: Text('Add',
-                      style: GoogleFonts.poppins(color: Colors.white)),
                 ),
               ],
             );

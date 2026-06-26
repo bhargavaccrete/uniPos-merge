@@ -15,8 +15,8 @@ import '../../../core/config/app_config.dart';
 import '../../../core/di/service_locator.dart' show taxStore;
 import '../../../util/restaurant/staticswitch.dart';
 import '../restaurant/tax_breakdown.dart';
-import 'package:unipos/util/common/currency_helper.dart';
-import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'retail_printer_settings_service.dart';
 
 /// Data class to hold all receipt information
@@ -109,7 +109,7 @@ class ReceiptData {
 /// Service for generating PDF receipts and invoices
 class ReceiptPdfService {
   /// Default store info - can be customized via settings
-  static const String defaultStoreName = 'UniPos Store';
+  static const String defaultStoreName = 'My Store';
   static const String defaultStoreAddress = 'Your Store Address';
   static const String defaultStorePhone = '+91 1234567890';
 

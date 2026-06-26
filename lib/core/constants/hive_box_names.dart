@@ -5,7 +5,7 @@
 ///
 /// Usage:
 /// ```dart
-/// import 'package:unipos/core/constants/hive_box_names.dart';
+/// import 'package:billberrylite/core/constants/hive_box_names.dart';
 ///
 /// // Instead of: Hive.box('products')
 /// // Use: Hive.box(HiveBoxNames.products)

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:unipos/stores/setup_wizard_store.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
+import 'package:billberrylite/stores/setup_wizard_store.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 /// ─────────────────────────────────────────────────────────────────────────
 /// DEMO / MOCK — License step for the email-flow setup wizard (Model A).

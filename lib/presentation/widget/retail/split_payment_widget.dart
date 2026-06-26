@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:uuid/uuid.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/stores/payment_method_store.dart';
-import 'package:unipos/util/common/currency_helper.dart';
-import 'package:unipos/util/common/decimal_settings.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/stores/payment_method_store.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 
 /// Payment entry for split payment
 class PaymentEntry {

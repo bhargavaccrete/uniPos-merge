@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import '../../../core/di/service_locator.dart';
-import 'package:unipos/presentation/screens/retail/backup_screen.dart';
-import 'package:unipos/presentation/screens/retail/gst_settings_screen.dart';
-import 'package:unipos/presentation/screens/retail/gst_report_screen.dart';
-import 'package:unipos/presentation/screens/retail/attributes_screen.dart';
-import 'package:unipos/presentation/screens/retail/store_info_settings_screen.dart';
-import 'package:unipos/presentation/screens/retail/settings/printer_settings_screen.dart';
-import 'package:unipos/presentation/screens/retail/start_day_screen.dart';
-import 'package:unipos/presentation/screens/retail/eod_screen.dart';
-import 'package:unipos/presentation/screens/retail/eod_reports_list_screen.dart';
-import 'package:unipos/presentation/screens/retail/payment_methods_screen.dart';
-import 'package:unipos/domain/services/restaurant/day_management_service.dart';
-import 'package:unipos/util/common/currency_helper.dart';
-import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:billberrylite/presentation/screens/retail/backup_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/gst_settings_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/gst_report_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/attributes_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/store_info_settings_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/settings/printer_settings_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/start_day_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/eod_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/eod_reports_list_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/payment_methods_screen.dart';
+import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});

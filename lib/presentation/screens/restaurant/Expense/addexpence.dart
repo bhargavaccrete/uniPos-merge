@@ -3,13 +3,13 @@ import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/core/routes/routes_name.dart';
-import 'package:unipos/data/models/restaurant/db/expensel_316.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/routes/routes_name.dart';
+import 'package:billberrylite/data/models/restaurant/db/expensel_316.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../domain/services/restaurant/day_management_service.dart';
@@ -35,6 +35,9 @@ class _AddexpenceState extends State<Addexpence> {
   void initState() {
     super.initState();
     expenseCategoryStore.loadCategories();
+    // Default the date to today so the user doesn't have to pick it.
+    _dateselect = DateTime.now();
+    _dateController.text = DateFormat('dd/MM/yyyy').format(_dateselect!);
   }
 
   @override
@@ -120,14 +123,15 @@ class _AddexpenceState extends State<Addexpence> {
   }
 
   void _clearForm() {
+    final today = DateTime.now();
     setState(() {
-      _dateselect = null;
+      _dateselect = today;
       selectedCategoryId = null;
       Dropvalue2 = 'Cash';
       _categoryError = null;
     });
     _formKey.currentState?.reset();
-    _dateController.clear();
+    _dateController.text = DateFormat('dd/MM/yyyy').format(today);
     _amountController.clear();
     _reasonController.clear();
   }
@@ -136,6 +140,114 @@ class _AddexpenceState extends State<Addexpence> {
 
 
 
+
+  // ── Category selector (styled dropdown) ──────────────────────────────────
+  Widget _categorySection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Category',
+            style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary)),
+        SizedBox(height: 10),
+        Observer(
+          builder: (context) {
+            final categories = expenseCategoryStore.enabledCategories;
+            return Container(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceLight,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: _categoryError != null
+                        ? AppColors.danger
+                        : AppColors.divider),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  isExpanded: true,
+                  value: selectedCategoryId,
+                  borderRadius: BorderRadius.circular(12),
+                  dropdownColor: AppColors.white,
+                  icon: Icon(Icons.keyboard_arrow_down_rounded,
+                      color: AppColors.textSecondary),
+                  hint: Text('Select Category',
+                      style: GoogleFonts.poppins(
+                          fontSize: 14, color: AppColors.textSecondary)),
+                  items: categories
+                      .map((category) => DropdownMenuItem<String>(
+                            value: category.id,
+                            child: Text(category.name,
+                                style: GoogleFonts.poppins(
+                                    fontSize: 15, fontWeight: FontWeight.w500)),
+                          ))
+                      .toList(),
+                  onChanged: (String? value) {
+                    setState(() {
+                      selectedCategoryId = value;
+                      _categoryError = null;
+                    });
+                  },
+                ),
+              ),
+            );
+          },
+        ),
+        if (_categoryError != null)
+          Padding(
+            padding: EdgeInsets.only(left: 12, top: 6),
+            child: Text(_categoryError!,
+                style: GoogleFonts.poppins(
+                    fontSize: 12, color: AppColors.danger)),
+          ),
+      ],
+    );
+  }
+
+  // ── Payment type selector (styled dropdown) ──────────────────────────────
+  Widget _paymentTypeSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Payment Type',
+            style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary)),
+        SizedBox(height: 10),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceLight,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.divider),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              isExpanded: true,
+              value: Dropvalue2,
+              borderRadius: BorderRadius.circular(12),
+              dropdownColor: AppColors.white,
+              icon: Icon(Icons.keyboard_arrow_down_rounded,
+                  color: AppColors.textSecondary),
+              items: items2
+                  .map((String itemm) => DropdownMenuItem<String>(
+                        value: itemm,
+                        child: Text(itemm,
+                            style: GoogleFonts.poppins(
+                                fontSize: 15, fontWeight: FontWeight.w500)),
+                      ))
+                  .toList(),
+              onChanged: (String? value) =>
+                  setState(() => Dropvalue2 = value!),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -223,7 +335,7 @@ class _AddexpenceState extends State<Addexpence> {
                                 icon: Icons.attach_money_rounded,
                                 keyboardType: TextInputType.numberWithOptions(decimal: true),
                                 inputFormatters: [
-                                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
                                 ],
                                 validator: (value) {
                                   if (value == null || value.trim().isEmpty) return 'Please enter amount';
@@ -243,143 +355,15 @@ class _AddexpenceState extends State<Addexpence> {
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Category', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                                    SizedBox(height: 10),
-                                    Observer(
-                                      builder: (context) {
-                                        final categories = expenseCategoryStore.enabledCategories;
-                                        return Container(
-                                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.surfaceLight,
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(color: AppColors.divider),
-                                          ),
-                                          child: DropdownButtonHideUnderline(
-                                            child: DropdownButton<String>(
-                                              isExpanded: true,
-                                              value: selectedCategoryId,
-                                              hint: Text('Select Category', style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textSecondary)),
-                                              items: categories.map((category) => DropdownMenuItem<String>(
-                                                value: category.id,
-                                                child: Text(category.name, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w500)),
-                                              )).toList(),
-                                              onChanged: (String? value) {
-                                                setState(() {
-                                                  selectedCategoryId = value;
-                                                  _categoryError = null;
-                                                });
-                                              },
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                    if (_categoryError != null)
-                                      Padding(
-                                        padding: EdgeInsets.only(left: 12, top: 6),
-                                        child: Text(_categoryError!, style: GoogleFonts.poppins(fontSize: 12, color: Colors.red)),
-                                      ),
-                                  ],
-                                ),
-                              ),
+                              Expanded(child: _categorySection()),
                               SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Payment Type', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                                    SizedBox(height: 10),
-                                    Container(
-                                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.surfaceLight,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(color: AppColors.divider),
-                                      ),
-                                      child: DropdownButtonHideUnderline(
-                                        child: DropdownButton<String>(
-                                          isExpanded: true,
-                                          value: Dropvalue2,
-                                          items: items2.map((String itemm) => DropdownMenuItem<String>(
-                                            value: itemm,
-                                            child: Text(itemm, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w500)),
-                                          )).toList(),
-                                          onChanged: (String? value) => setState(() { Dropvalue2 = value!; }),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                              Expanded(child: _paymentTypeSection()),
                             ],
                           )
                         else ...[
-                          // Mobile: Category single column
-                          Text('Category', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                          SizedBox(height: 10),
-                          Observer(
-                            builder: (context) {
-                              final categories = expenseCategoryStore.enabledCategories;
-                              return Container(
-                                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: AppColors.surfaceLight,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: AppColors.divider),
-                                ),
-                                child: DropdownButtonHideUnderline(
-                                  child: DropdownButton<String>(
-                                    isExpanded: true,
-                                    value: selectedCategoryId,
-                                    hint: Text('Select Category', style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textSecondary)),
-                                    items: categories.map((category) => DropdownMenuItem<String>(
-                                      value: category.id,
-                                      child: Text(category.name, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w500)),
-                                    )).toList(),
-                                    onChanged: (String? value) {
-                                      setState(() {
-                                        selectedCategoryId = value;
-                                        _categoryError = null;
-                                      });
-                                    },
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                          if (_categoryError != null)
-                            Padding(
-                              padding: EdgeInsets.only(left: 12, top: 6),
-                              child: Text(_categoryError!, style: GoogleFonts.poppins(fontSize: 12, color: Colors.red)),
-                            ),
+                          _categorySection(),
                           SizedBox(height: 20),
-                          // Mobile: Payment Type single column
-                          Text('Payment Type', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                          SizedBox(height: 10),
-                          Container(
-                            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceLight,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppColors.divider),
-                            ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                isExpanded: true,
-                                value: Dropvalue2,
-                                items: items2.map((String itemm) => DropdownMenuItem<String>(
-                                  value: itemm,
-                                  child: Text(itemm, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w500)),
-                                )).toList(),
-                                onChanged: (String? value) => setState(() { Dropvalue2 = value!; }),
-                              ),
-                            ),
-                          ),
+                          _paymentTypeSection(),
                         ],
 
                         SizedBox(height: 20),

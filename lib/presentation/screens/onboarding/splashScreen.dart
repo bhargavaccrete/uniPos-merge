@@ -2,9 +2,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:unipos/util/images.dart';
-import 'package:unipos/core/config/app_config.dart';
-import 'package:unipos/domain/services/common/device_id_service.dart';
+import 'package:billberrylite/util/images.dart';
+import 'package:billberrylite/core/config/app_config.dart';
+import 'package:billberrylite/domain/services/common/device_id_service.dart';
 import '../../../util/color.dart';
 import '../../../util/responsive.dart';
 
@@ -254,7 +254,7 @@ class _SplashScreenState extends State<SplashScreen>
                                   ],
                                 ).createShader(bounds),
                                 child: Text(
-                                  'UniPOS',
+                                  'Bill Berry Lite',
                                   style: TextStyle(
                                     fontSize: Responsive.isMobile(context) ? 42 : 54,
                                     fontWeight: FontWeight.bold,
@@ -316,10 +316,16 @@ class _SplashScreenState extends State<SplashScreen>
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.store, color: Colors.white70, size: 20),
+                            Icon(
+                              AppConfig.retailEnabled ? Icons.store : Icons.restaurant,
+                              color: Colors.white70,
+                              size: 20,
+                            ),
                             const SizedBox(width: 8),
                             Text(
-                              'Retail • Restaurant • Services',
+                              AppConfig.retailEnabled
+                                  ? 'Retail • Restaurant • Services'
+                                  : 'Restaurant POS',
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: Responsive.isMobile(context) ? 14 : 16,

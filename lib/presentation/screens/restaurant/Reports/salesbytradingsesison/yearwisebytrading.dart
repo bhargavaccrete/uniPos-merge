@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart' show CommonButton;
-import 'package:unipos/util/common/currency_helper.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Button.dart' show CommonButton;
+import 'package:billberrylite/util/common/currency_helper.dart';
 
 class YearWisebytrading extends StatefulWidget {
   const YearWisebytrading({super.key});

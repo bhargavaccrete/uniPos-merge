@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/data/models/restaurant/db/taxmodel_314.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:uuid/uuid.dart';
-import 'package:unipos/core/di/service_locator.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
 
 import '../../../../util/common/app_responsive.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import '../../../widget/componets/common/app_text_field.dart';
 import '../../../widget/componets/common/primary_app_bar.dart';
 class TaxSelectionScreen extends StatefulWidget {
@@ -263,51 +264,37 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
     final nameController = TextEditingController();
     final percentageController = TextEditingController();
 
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        title: Text(
-          'Add New Tax',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppTextField(
-                controller: nameController,
-                label: 'Tax Name',
-                hint: 'e.g. GST, VAT, Sales Tax',
-                icon: Icons.receipt_outlined,
-              ),
-              const SizedBox(height: 15),
-              AppTextField(
-                controller: percentageController,
-                label: 'Tax Percentage (%)',
-                hint: 'e.g. 18',
-                icon: Icons.percent_rounded,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              ),
-            ],
-          ),
+      builder: (context) => AppDialogShell(
+        title: 'Add New Tax',
+        accent: AppColors.primary,
+        icon: Icons.receipt_long_rounded,
+        body: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppTextField(
+              controller: nameController,
+              label: 'Tax Name',
+              hint: 'e.g. GST, VAT, Sales Tax',
+              icon: Icons.receipt_outlined,
+            ),
+            const SizedBox(height: 15),
+            AppTextField(
+              controller: percentageController,
+              label: 'Tax Percentage (%)',
+              hint: 'e.g. 18',
+              icon: Icons.percent_rounded,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            ),
+          ],
         ),
         actions: [
-          TextButton(
-            onPressed: () {
-              nameController.dispose();
-              percentageController.dispose();
-              Navigator.pop(context);
-            },
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.poppins(color: AppColors.textSecondary),
-            ),
-          ),
-          ElevatedButton(
+          appDialogCancelButton(context),
+          const SizedBox(width: 12),
+          appDialogPrimaryButton(
+            label: 'Add Tax',
             onPressed: () async {
               final name = nameController.text.trim();
               final percentage = double.tryParse(percentageController.text.trim());
@@ -353,13 +340,6 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
                 NotificationService.instance.showSuccess('$name added and selected successfully');
               }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-            ),
-            child: Text(
-              'Add Tax',
-              style: GoogleFonts.poppins(color: Colors.white),
-            ),
           ),
         ],
       ),
@@ -367,39 +347,14 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
   }
 
   Future<void> _deleteTax(String taxId) async {
-    final deleteHInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    final confirm = await showDialog<bool>(
+    final confirm = await showAppConfirmDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: deleteHInset, vertical: 24),
-        title: Text(
-          'Delete Tax?',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-        ),
-        content: Text(
-          'Are you sure you want to delete this tax?',
-          style: GoogleFonts.poppins(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(
-              'No',
-              style: GoogleFonts.poppins(color: AppColors.textSecondary),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: Text(
-              'Yes, Delete',
-              style: GoogleFonts.poppins(color: Colors.white),
-            ),
-          ),
-        ],
-      ),
+      title: 'Delete Tax?',
+      message: 'Are you sure you want to delete this tax?',
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'No',
+      accent: Colors.red,
+      icon: Icons.delete_rounded,
     );
 
     if (confirm == true) {

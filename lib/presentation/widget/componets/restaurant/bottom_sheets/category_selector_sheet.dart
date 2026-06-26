@@ -5,8 +5,8 @@ import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../presentation/screens/restaurant/manage%20menu/tab/edit_category.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 
 /// Result from category selection
 class CategorySelectionResult {

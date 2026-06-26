@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/all_tab.dart';
-import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/categories_tab.dart';
-import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/choice_tab.dart';
-import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/extra_tab.dart';
-import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/items_tab.dart';
-import 'package:unipos/presentation/screens/restaurant/manage%20menu/tab/variant_tab.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
-import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/presentation/screens/restaurant/manage%20menu/tab/all_tab.dart';
+import 'package:billberrylite/presentation/screens/restaurant/manage%20menu/tab/categories_tab.dart';
+import 'package:billberrylite/presentation/screens/restaurant/manage%20menu/tab/choice_tab.dart';
+import 'package:billberrylite/presentation/screens/restaurant/manage%20menu/tab/extra_tab.dart';
+import 'package:billberrylite/presentation/screens/restaurant/manage%20menu/tab/items_tab.dart';
+import 'package:billberrylite/presentation/screens/restaurant/manage%20menu/tab/variant_tab.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 import '../import/bulk_import_screen.dart';
 

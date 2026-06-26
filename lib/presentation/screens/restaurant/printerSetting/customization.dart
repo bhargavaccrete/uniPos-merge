@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../util/restaurant/print_settings.dart';
 import '../../../../util/common/app_responsive.dart';
@@ -43,57 +44,21 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
       {'key': 'UPI QR', 'icon': Icons.qr_code_2, 'description': 'Show UPI Scan & Pay QR on unpaid bills'},
     ],
     'Additional Options': [
-      {'key': 'Powered By', 'icon': Icons.info_outline, 'description': 'Show "Powered by UniPOS" footer'},
+      {'key': 'Powered By', 'icon': Icons.info_outline, 'description': 'Show "Powered by Bill Berry Lite" footer'},
       {'key': 'Custom Field', 'icon': Icons.edit_note, 'description': 'Show custom field if configured'},
       {'key': 'Extra Info', 'icon': Icons.add_circle_outline, 'description': 'Show additional information'},
     ],
   };
 
   Future<void> _resetSettings() async {
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppConfirmDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.warning.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(Icons.refresh, color: AppColors.warning),
-            ),
-            SizedBox(width: 12),
-            Text(
-              'Reset Settings?',
-              style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-        content: Text(
+      title: 'Reset Settings?',
+      message:
           'This will restore all print settings to their default values. Are you sure?',
-          style: GoogleFonts.poppins(fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.warning,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: Text('Reset', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
+      confirmLabel: 'Reset',
+      accent: AppColors.danger,
+      icon: Icons.refresh_rounded,
     );
 
     if (confirmed == true) {

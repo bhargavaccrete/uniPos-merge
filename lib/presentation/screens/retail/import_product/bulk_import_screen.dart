@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/retail/hive_model/product_model_200.dart';
-import 'package:unipos/domain/store/retail/product_store.dart';
-import 'package:unipos/stores/import_product/bulk_import_store.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
+import 'package:billberrylite/domain/store/retail/product_store.dart';
+import 'package:billberrylite/stores/import_product/bulk_import_store.dart';
+import 'package:billberrylite/util/color.dart';
 
 class BulkImportScreen extends StatefulWidget {
   const BulkImportScreen({Key? key}) : super(key: key);

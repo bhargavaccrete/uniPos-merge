@@ -1,15 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
-import 'package:unipos/core/config/app_config.dart';
+import 'package:billberrylite/core/config/app_config.dart';
 
 // Unified backup service (works for both modes)
-import 'package:unipos/domain/services/common/unified_backup_service.dart';
-import 'package:unipos/domain/services/common/backup_encryption_service.dart';
+import 'package:billberrylite/domain/services/common/unified_backup_service.dart';
+import 'package:billberrylite/domain/services/common/backup_encryption_service.dart';
 
 // Legacy backup implementations (kept for backward compatibility, not actively used)
-// import 'package:unipos/domain/services/retail/backup_service.dart';
-// import 'package:unipos/presentation/widget/componets/restaurant/componets/import/import.dart';
+// import 'package:billberrylite/domain/services/retail/backup_service.dart';
+// import 'package:billberrylite/presentation/widget/componets/restaurant/componets/import/import.dart';
 
 /// Auto Backup Service - Mode-Aware
 /// Works with both Restaurant and Retail modes

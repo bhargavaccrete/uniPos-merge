@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:unipos/presentation/screens/retail/payment_setup_screen.dart';
-import 'package:unipos/presentation/screens/retail/staff_setup_screen.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/presentation/screens/retail/payment_setup_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/staff_setup_screen.dart';
+import 'package:billberrylite/util/color.dart';
 
 /// Navigation screen that handles Payment Setup → Staff Setup flow
 /// Both screens can be skipped (Setup Later option)

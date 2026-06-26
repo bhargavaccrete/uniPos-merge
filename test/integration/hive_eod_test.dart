@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
-import 'package:unipos/core/init/hive_init.dart';
-import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
+import 'package:billberrylite/core/init/hive_init.dart';
+import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
 
 /// HIVE TESTS FOR END-OF-DAY (EOD) MODEL
 ///

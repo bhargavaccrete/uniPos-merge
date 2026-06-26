@@ -119,8 +119,8 @@ class BackupEncryptionService {
   // Binary blob encryption (whole-file lock — nothing is browsable)
   // ---------------------------------------------------------------------------
 
-  /// Magic header marking a UniPOS encrypted backup blob.
-  static final List<int> _blobMagic = utf8.encode('UPOSENC1'); // 8 bytes
+  /// Magic header marking a Bill Berry Lite encrypted backup blob.
+  static final List<int> _blobMagic = utf8.encode('BBLTENC1'); // 8 bytes
 
   /// Encrypts arbitrary bytes (e.g. a whole zip) into a self-contained opaque
   /// blob: [magic][saltLen][salt][ivLen][iv][AES-CBC ciphertext]. The result
@@ -165,7 +165,7 @@ class BackupEncryptionService {
     }
   }
 
-  /// True if [bytes] begins with the UniPOS encrypted-backup magic header.
+  /// True if [bytes] begins with the Bill Berry Lite encrypted-backup magic header.
   static bool isEncryptedBlob(List<int> bytes) {
     if (bytes.length < _blobMagic.length) return false;
     for (var i = 0; i < _blobMagic.length; i++) {

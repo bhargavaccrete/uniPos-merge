@@ -1,8 +1,8 @@
 import 'package:mobx/mobx.dart';
-import 'package:unipos/data/models/retail/hive_model/credit_payment_model_218.dart';
-import 'package:unipos/data/repositories/retail/credit_payment_repository.dart';
-import 'package:unipos/data/repositories/retail/customer_repository.dart';
-import 'package:unipos/data/repositories/retail/sale_repository.dart';
+import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model_218.dart';
+import 'package:billberrylite/data/repositories/retail/credit_payment_repository.dart';
+import 'package:billberrylite/data/repositories/retail/customer_repository.dart';
+import 'package:billberrylite/data/repositories/retail/sale_repository.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../data/models/retail/hive_model/sale_model_203.dart';

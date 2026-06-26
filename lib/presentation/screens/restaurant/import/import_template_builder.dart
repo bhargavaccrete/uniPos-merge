@@ -1,5 +1,5 @@
 import 'package:syncfusion_flutter_xlsio/xlsio.dart';
-import 'package:unipos/core/constants/item_units.dart';
+import 'package:billberrylite/core/constants/item_units.dart';
 
 /// Builds the bulk-import Excel template using Syncfusion xlsio so we can add
 /// real Data Validation dropdowns + input-prompt tooltips (the `excel` package
@@ -165,7 +165,7 @@ class ImportTemplateBuilder {
   // ── Instructions ─────────────────────────────────────────────────────────────
 
   void _buildInstructions(Worksheet s, Style title, Style section) {
-    s.getRangeByIndex(1, 1).setText('UniPOS Restaurant Bulk Import');
+    s.getRangeByIndex(1, 1).setText('Bill Berry Lite Restaurant Bulk Import');
     s.getRangeByIndex(1, 1).cellStyle = title;
 
     int r = 3;
@@ -179,7 +179,7 @@ class ImportTemplateBuilder {
     line('1. Add your categories in the "Categories" sheet.');
     line('2. Fill the "Items" sheet — use the dropdowns for Category, Veg Type, Unit and Yes/No fields.');
     line('3. (Optional) Add sizes in "ItemVariants", and extras/choices in their sheets.');
-    line('4. Save this file and import it back into UniPOS.');
+    line('4. Save this file and import it back into Bill Berry Lite.');
     r++;
     line('TIPS', style: section);
     line('• Cells with a dropdown show a small arrow — click it to pick a value.');

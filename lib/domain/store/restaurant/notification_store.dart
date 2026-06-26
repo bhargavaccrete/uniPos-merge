@@ -2,11 +2,11 @@ import 'dart:convert';
 
 import 'package:mobx/mobx.dart';
 import 'package:uuid/uuid.dart';
-import 'package:unipos/data/models/restaurant/dashboard_alert.dart';
-import 'package:unipos/data/models/restaurant/db/app_notification_model.dart';
-import 'package:unipos/data/models/restaurant/notification_presenter.dart';
-import 'package:unipos/data/repositories/restaurant/notification_repository.dart';
-import 'package:unipos/domain/services/common/local_notification_service.dart';
+import 'package:billberrylite/data/models/restaurant/dashboard_alert.dart';
+import 'package:billberrylite/data/models/restaurant/db/app_notification_model.dart';
+import 'package:billberrylite/data/models/restaurant/notification_presenter.dart';
+import 'package:billberrylite/data/repositories/restaurant/notification_repository.dart';
+import 'package:billberrylite/domain/services/common/local_notification_service.dart';
 
 part 'notification_store.g.dart';
 

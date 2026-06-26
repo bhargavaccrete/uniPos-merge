@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
+import 'package:billberrylite/data/models/restaurant/db/variantmodel_305.dart';
 import 'package:uuid/uuid.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/currency_helper.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Button.dart';
 import '../../../../util/common/app_responsive.dart';
 import '../../../widget/componets/common/app_text_field.dart';
 import '../../../widget/componets/common/primary_app_bar.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 
 class VariantSelectionScreen extends StatefulWidget {
   final List<Map<String, dynamic>> selectedVariants;
@@ -72,37 +73,14 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
 
   /// Confirm and remove a variant from the catalog.
   Future<void> _confirmDeleteVariant(VariantModel variant) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Remove "${variant.name}"?',
-          style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w700),
-        ),
-        content: Text(
+      title: 'Remove "${variant.name}"?',
+      message:
           'This variant will be removed from the list. Items already saved with it are not affected.',
-          style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel',
-                style: GoogleFonts.poppins(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.danger,
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: Text('Remove',
-                style: GoogleFonts.poppins(
-                    color: Colors.white, fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
+      confirmLabel: 'Remove',
+      accent: AppColors.danger,
+      icon: Icons.delete_rounded,
     );
 
     if (confirmed == true) {
@@ -530,83 +508,70 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
   void _showAddVariantDialog() {
     final variantNameController = TextEditingController();
 
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-          title: Text(
-            'Add New Variant',
-            style: GoogleFonts.poppins(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Enter variant name (e.g., Small, Medium, Large)',
-                  style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                  ),
+        return AppDialogShell(
+          title: 'Add New Variant',
+          accent: AppColors.primary,
+          icon: Icons.tune_rounded,
+          body: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Enter variant name (e.g., Small, Medium, Large)',
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
                 ),
-                SizedBox(height: 15),
-                AppTextField(
-                  controller: variantNameController,
-                  label: 'Variant Name',
-                  hint: 'e.g. Small, Medium, Large',
-                  icon: Icons.tune_rounded,
+              ),
+              SizedBox(height: 15),
+              AppTextField(
+                controller: variantNameController,
+                label: 'Variant Name',
+                hint: 'e.g. Small, Medium, Large',
+                icon: Icons.tune_rounded,
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Suggestions',
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
                 ),
-                const SizedBox(height: 20),
-                Text(
-                  'Suggestions',
-                  style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _presets.entries.map((e) {
-                    return OutlinedButton(
-                      onPressed: () {
-                        Navigator.pop(dialogContext);
-                        _applyPreset(e.value);
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: Text(
-                        e.key,
-                        style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _presets.entries.map((e) {
+                  return OutlinedButton(
+                    onPressed: () {
+                      Navigator.pop(dialogContext);
+                      _applyPreset(e.value);
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text(
+                      e.key,
+                      style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(
-                'Cancel',
-                style: GoogleFonts.poppins(color: AppColors.textSecondary),
-              ),
-            ),
-            ElevatedButton(
+            appDialogCancelButton(dialogContext),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: 'Add',
               onPressed: () async {
                 final String name = variantNameController.text.trim();
 
@@ -631,13 +596,6 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
                   Navigator.of(dialogContext).pop(name);
                 }
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-              ),
-              child: Text(
-                'Add',
-                style: GoogleFonts.poppins(color: Colors.white),
-              ),
             ),
           ],
         );

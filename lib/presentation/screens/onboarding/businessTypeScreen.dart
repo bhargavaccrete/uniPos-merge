@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/stores/setup_wizard_store.dart';
+import 'package:billberrylite/stores/setup_wizard_store.dart';
 import '../../../util/color.dart';
 import '../../../util/common/app_responsive.dart';
 
@@ -106,7 +106,7 @@ class BusinessTypeStep extends StatelessWidget {
 
   Widget _buildHint(BuildContext context) {
     return Text(
-      'Pick one — UniPOS will adapt its layout, workflows, and features for you.',
+      'Pick one — Bill Berry Lite will adapt its layout, workflows, and features for you.',
       style: GoogleFonts.poppins(
         fontSize: AppResponsive.getValue<double>(context, mobile: 13, tablet: 14, desktop: 15),
         color: AppColors.textSecondary,

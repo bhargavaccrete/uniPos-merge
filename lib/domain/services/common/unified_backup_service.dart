@@ -11,74 +11,74 @@ import 'package:hive/hive.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:unipos/core/config/app_config.dart';
-import 'package:unipos/main.dart' show navigatorKey;
-import 'package:unipos/domain/services/common/backup_encryption_service.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/core/constants/hive_box_names.dart';
-import 'package:unipos/core/init/hive_init.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/data/models/common/business_type.dart';
-import 'package:unipos/data/models/common/business_details.dart';
-import 'package:unipos/models/tax_details.dart';
-import 'package:unipos/models/payment_method.dart' as pm;
+import 'package:billberrylite/core/config/app_config.dart';
+import 'package:billberrylite/main.dart' show navigatorKey;
+import 'package:billberrylite/domain/services/common/backup_encryption_service.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/constants/hive_box_names.dart';
+import 'package:billberrylite/core/init/hive_init.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/data/models/common/business_type.dart';
+import 'package:billberrylite/data/models/common/business_details.dart';
+import 'package:billberrylite/models/tax_details.dart';
+import 'package:billberrylite/models/payment_method.dart' as pm;
 
 // Restaurant models
-import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
-import 'package:unipos/data/models/restaurant/db/choicemodel_306.dart';
-import 'package:unipos/data/models/restaurant/db/companymodel_301.dart';
-import 'package:unipos/data/models/restaurant/db/extramodel_303.dart';
-import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
-import 'package:unipos/data/models/restaurant/db/ordermodel_309.dart';
-import 'package:unipos/data/models/restaurant/db/pastordermodel_313.dart';
-import 'package:unipos/data/models/restaurant/db/staffModel_310.dart';
-import 'package:unipos/data/models/restaurant/db/table_Model_311.dart';
-import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
-import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
+import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
+import 'package:billberrylite/data/models/restaurant/db/choicemodel_306.dart';
+import 'package:billberrylite/data/models/restaurant/db/companymodel_301.dart';
+import 'package:billberrylite/data/models/restaurant/db/extramodel_303.dart';
+import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
+import 'package:billberrylite/data/models/restaurant/db/ordermodel_309.dart';
+import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
+import 'package:billberrylite/data/models/restaurant/db/staffModel_310.dart';
+import 'package:billberrylite/data/models/restaurant/db/table_Model_311.dart';
+import 'package:billberrylite/data/models/restaurant/db/taxmodel_314.dart';
+import 'package:billberrylite/data/models/restaurant/db/variantmodel_305.dart';
 
-import 'package:unipos/data/models/restaurant/db/cartmodel_308.dart';
-import 'package:unipos/data/models/restaurant/db/testbillmodel_318.dart';
-import 'package:unipos/data/models/restaurant/db/shift_model.dart';
-import 'package:unipos/data/models/restaurant/db/cash_movement_model.dart';
-import 'package:unipos/data/models/restaurant/db/cash_handover_model.dart';
-import 'package:unipos/data/models/restaurant/db/customer_model_125.dart';
-import 'package:unipos/data/models/restaurant/db/saved_printer_model.dart';
-import 'package:unipos/data/models/restaurant/db/session_model.dart';
-import 'package:unipos/data/models/restaurant/db/attendance_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/cartmodel_308.dart';
+import 'package:billberrylite/data/models/restaurant/db/testbillmodel_318.dart';
+import 'package:billberrylite/data/models/restaurant/db/shift_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/cash_movement_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/cash_handover_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/customer_model_125.dart';
+import 'package:billberrylite/data/models/restaurant/db/saved_printer_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/session_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/attendance_model.dart';
 
 // Shared models
-import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
-import 'package:unipos/data/models/restaurant/db/expensel_316.dart';
-import 'package:unipos/data/models/restaurant/db/expensemodel_315.dart';
+import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
+import 'package:billberrylite/data/models/restaurant/db/expensel_316.dart';
+import 'package:billberrylite/data/models/restaurant/db/expensemodel_315.dart';
 
 // Helper classes
-import 'package:unipos/data/models/restaurant/db/database/hive_expensecategory.dart';
+import 'package:billberrylite/data/models/restaurant/db/database/hive_expensecategory.dart';
 
 // Retail models
-import 'package:unipos/data/models/retail/hive_model/product_model_200.dart';
-import 'package:unipos/data/models/retail/hive_model/variante_model_201.dart';
-import 'package:unipos/data/models/retail/hive_model/cart_model_202.dart';
-import 'package:unipos/data/models/retail/hive_model/sale_model_203.dart';
-import 'package:unipos/data/models/retail/hive_model/sale_item_model_204.dart';
-import 'package:unipos/data/models/retail/hive_model/customer_model_208.dart';
-import 'package:unipos/data/models/retail/hive_model/supplier_model_205.dart';
-import 'package:unipos/data/models/retail/hive_model/purchase_model_207.dart';
-import 'package:unipos/data/models/retail/hive_model/purchase_Item_model_206.dart';
-import 'package:unipos/data/models/retail/hive_model/hold_sale_model_209.dart';
-import 'package:unipos/data/models/retail/hive_model/hold_sale_item_model_210.dart';
-import 'package:unipos/data/models/retail/hive_model/purchase_order_model_211.dart';
-import 'package:unipos/data/models/retail/hive_model/purchase_order_item_model_212.dart';
-import 'package:unipos/data/models/retail/hive_model/grn_model_213.dart';
-import 'package:unipos/data/models/retail/hive_model/grn_item_model_214.dart';
-import 'package:unipos/data/models/retail/hive_model/category_model_215.dart';
-import 'package:unipos/data/models/retail/hive_model/payment_entry_model_216.dart';
-import 'package:unipos/data/models/retail/hive_model/admin_model_217.dart';
-import 'package:unipos/data/models/retail/hive_model/credit_payment_model_218.dart';
-import 'package:unipos/data/models/retail/hive_model/attribute_model_219.dart';
-import 'package:unipos/data/models/retail/hive_model/attribute_value_model_220.dart';
-import 'package:unipos/data/models/retail/hive_model/product_attribute_model_221.dart';
-import 'package:unipos/data/models/retail/hive_model/staff_model_222.dart';
-import 'package:unipos/data/models/retail/hive_model/billing_tab_model_173.dart';
+import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
+import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
+import 'package:billberrylite/data/models/retail/hive_model/cart_model_202.dart';
+import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
+import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
+import 'package:billberrylite/data/models/retail/hive_model/customer_model_208.dart';
+import 'package:billberrylite/data/models/retail/hive_model/supplier_model_205.dart';
+import 'package:billberrylite/data/models/retail/hive_model/purchase_model_207.dart';
+import 'package:billberrylite/data/models/retail/hive_model/purchase_Item_model_206.dart';
+import 'package:billberrylite/data/models/retail/hive_model/hold_sale_model_209.dart';
+import 'package:billberrylite/data/models/retail/hive_model/hold_sale_item_model_210.dart';
+import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model_211.dart';
+import 'package:billberrylite/data/models/retail/hive_model/purchase_order_item_model_212.dart';
+import 'package:billberrylite/data/models/retail/hive_model/grn_model_213.dart';
+import 'package:billberrylite/data/models/retail/hive_model/grn_item_model_214.dart';
+import 'package:billberrylite/data/models/retail/hive_model/category_model_215.dart';
+import 'package:billberrylite/data/models/retail/hive_model/payment_entry_model_216.dart';
+import 'package:billberrylite/data/models/retail/hive_model/admin_model_217.dart';
+import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model_218.dart';
+import 'package:billberrylite/data/models/retail/hive_model/attribute_model_219.dart';
+import 'package:billberrylite/data/models/retail/hive_model/attribute_value_model_220.dart';
+import 'package:billberrylite/data/models/retail/hive_model/product_attribute_model_221.dart';
+import 'package:billberrylite/data/models/retail/hive_model/staff_model_222.dart';
+import 'package:billberrylite/data/models/retail/hive_model/billing_tab_model_173.dart';
 
 /// Unified Backup Service - Works for both Restaurant and Retail modes
 ///
@@ -120,7 +120,7 @@ Uint8List? _encodeArchiveInIsolate((List<Map<String, dynamic>>, String?) args) {
 }
 
 class UnifiedBackupService {
-  static const String _backupDirectoryName = 'UniPOS_Backups';
+  static const String _backupDirectoryName = 'BillBerryLite_Backups';
 
   /// Shown when an import is rejected for not being encrypted.
   static const String _unencryptedMsg =
@@ -234,7 +234,7 @@ class UnifiedBackupService {
 
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19);
       final suffix = isEncrypted ? 'encrypted' : 'backup';
-      final fileName = 'UniPOS_${suffix}_$timestamp.zip';
+      final fileName = 'BillBerryLite_${suffix}_$timestamp.zip';
 
       final blob = html.Blob([protectedZipData]);
       final url = html.Url.createObjectUrlFromBlob(blob);
@@ -1375,7 +1375,7 @@ class UnifiedBackupService {
       // 6️⃣ Save ZIP to destination
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19);
       final suffix = isEncrypted ? 'encrypted' : 'backup';
-      final fileName = 'UniPOS_${suffix}_$timestamp.zip';
+      final fileName = 'BillBerryLite_${suffix}_$timestamp.zip';
 
       File outputFile;
 

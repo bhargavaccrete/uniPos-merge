@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/util/color.dart';
 
 class CustomCategory extends StatefulWidget {
   final String title;

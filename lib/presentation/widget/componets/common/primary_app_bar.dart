@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/util/color.dart';
 
 /// App-wide AppBar. Every screen uses this so the top bar is identical:
 /// flat [AppColors.primary] background, white title/icons, light status-bar

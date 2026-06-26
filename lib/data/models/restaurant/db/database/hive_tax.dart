@@ -1,6 +1,6 @@
 
 import 'package:hive/hive.dart';
-import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
+import 'package:billberrylite/data/models/restaurant/db/taxmodel_314.dart';
 
 class TaxBox{
   static const _boxName = 'restaurant_taxes';

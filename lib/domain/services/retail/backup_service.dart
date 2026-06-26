@@ -17,8 +17,8 @@ import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
 import '../../../data/models/retail/hive_model/sale_model_203.dart';
 import '../../../data/models/retail/hive_model/supplier_model_205.dart';
 import '../../../data/models/retail/hive_model/variante_model_201.dart';
-import 'package:unipos/domain/services/retail/store_settings_service.dart';
-import 'package:unipos/data/repositories/business_details_repository.dart';
+import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
+import 'package:billberrylite/data/repositories/business_details_repository.dart';
 
 /// Service for managing database backups
 /// Handles export, import, and automatic daily backups

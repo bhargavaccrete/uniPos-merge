@@ -3,7 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 
 import '../../../../core/di/service_locator.dart';
 import '../../../../util/restaurant/restaurant_session.dart';
@@ -16,7 +17,7 @@ import '../start order/cart/cart.dart';
 import '../../../../services/websocket_client_service.dart';
 import '../../../../server/websocket.dart' as ws;
 import '../util/restaurant_print_helper.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import '../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../util/common/app_responsive.dart';
@@ -1036,33 +1037,17 @@ class _ActiveorderState extends State<Activeorder> {
     required BuildContext dialogContext,
   }) async {
     final item = order.items[itemIndexInOrder];
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text('Cancel Item?', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-        content: Text(
+      title: 'Cancel Item?',
+      message:
           'Remove ${item.quantity}× ${item.title}${item.variantName != null ? ' (${item.variantName})' : ''} from KOT #${order.kotNumbers[kotIndex]}?',
-          style: GoogleFonts.poppins(fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Keep', style: GoogleFonts.poppins()),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger, foregroundColor: Colors.white),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Cancel Item', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
+      confirmLabel: 'Cancel Item',
+      cancelLabel: 'Keep',
+      accent: AppColors.danger,
+      icon: Icons.warning_amber_rounded,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
 
     // 1. Remove item from the list
     final updatedItems = List<CartItem>.from(order.items)..removeAt(itemIndexInOrder);

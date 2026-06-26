@@ -7,7 +7,7 @@ import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../util/color.dart';
 import '../../../../util/common/currency_helper.dart';
-import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
 
 // Enum to manage which mode is currently active
 enum EditMode { amount, quantity, price }

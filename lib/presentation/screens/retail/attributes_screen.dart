@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 
-import 'package:unipos/data/models/retail/hive_model/attribute_model_219.dart';
-import 'package:unipos/data/models/retail/hive_model/attribute_value_model_220.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/data/models/retail/hive_model/attribute_model_219.dart';
+import 'package:billberrylite/data/models/retail/hive_model/attribute_value_model_220.dart';
+import 'package:billberrylite/util/color.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../domain/store/retail/attribute_store.dart';

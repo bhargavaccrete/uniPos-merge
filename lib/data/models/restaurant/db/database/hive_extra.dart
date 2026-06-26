@@ -1,7 +1,7 @@
 
 import 'package:hive/hive.dart';
-import 'package:unipos/data/models/restaurant/db/extramodel_303.dart';
-import 'package:unipos/data/models/restaurant/db/toppingmodel_304.dart';
+import 'package:billberrylite/data/models/restaurant/db/extramodel_303.dart';
+import 'package:billberrylite/data/models/restaurant/db/toppingmodel_304.dart';
 
 class HiveExtra {
   static const _boxName = 'extra';

@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/stores/setup_wizard_store.dart';
-import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
-import 'package:unipos/data/models/restaurant/db/database/hive_tax.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
-import 'package:unipos/models/tax_details.dart';
+import 'package:billberrylite/stores/setup_wizard_store.dart';
+import 'package:billberrylite/data/models/restaurant/db/taxmodel_314.dart';
+import 'package:billberrylite/data/models/restaurant/db/database/hive_tax.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/models/tax_details.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../../../util/color.dart';
+import '../../widget/componets/common/app_dialog.dart';
 import '../../../util/common/app_responsive.dart';
 import '../../../presentation/widget/componets/common/app_text_field.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/di/service_locator.dart';
-import 'package:unipos/util/restaurant/staticswitch.dart';
+import 'package:billberrylite/util/restaurant/staticswitch.dart';
 
 class TaxSetupStep extends StatefulWidget {
   final SetupWizardStore store;
@@ -509,16 +510,14 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
     _taxRateController.clear();
     await showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Create Custom Tax',
-          style: GoogleFonts.poppins(
-              fontSize: 18, fontWeight: FontWeight.w700),
-        ),
-        content: Column(
+      builder: (ctx) => AppDialogShell(
+        title: 'Create Custom Tax',
+        subtitle: 'Add a tax rate for your menu',
+        accent: AppColors.primary,
+        icon: Icons.receipt_long_rounded,
+        body: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             AppTextField(
               controller: _taxNameController,
@@ -537,14 +536,10 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.poppins(color: AppColors.textSecondary),
-            ),
-          ),
-          ElevatedButton(
+          appDialogCancelButton(ctx),
+          const SizedBox(width: 12),
+          appDialogPrimaryButton(
+            label: 'Add',
             onPressed: () {
               final name = _taxNameController.text.trim();
               final rate = double.tryParse(_taxRateController.text.trim());
@@ -552,15 +547,6 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
               _addTax();
               Navigator.pop(ctx);
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            child: Text('Add',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
           ),
         ],
       ),

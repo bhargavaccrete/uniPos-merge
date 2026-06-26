@@ -1,7 +1,7 @@
 // androidPOS/lib/componets/multipleListView.dart
 import 'package:flutter/material.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/Button.dart';
-import 'package:unipos/presentation/widget/componets/restaurant/componets/inputTextFields.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/componets/inputTextFields.dart';
 
 const CommonTextSize = 10.0;
 

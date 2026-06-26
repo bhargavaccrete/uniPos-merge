@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/presentation/widget/componets/common/primary_app_bar.dart';
-import 'package:unipos/presentation/screens/restaurant/printerSetting/addprinter/Blutooth.dart';
-import 'package:unipos/presentation/screens/restaurant/printerSetting/addprinter/usb.dart';
-import 'package:unipos/presentation/screens/restaurant/printerSetting/addprinter/wifi.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/screens/restaurant/printerSetting/addprinter/Blutooth.dart';
+import 'package:billberrylite/presentation/screens/restaurant/printerSetting/addprinter/usb.dart';
+import 'package:billberrylite/presentation/screens/restaurant/printerSetting/addprinter/wifi.dart';
 class AddPrinter extends StatefulWidget {
   const AddPrinter({super.key});
 

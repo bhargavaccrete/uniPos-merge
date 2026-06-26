@@ -4,7 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/restaurant/db/eodmodel_317.dart';
 import '../../../data/models/restaurant/db/pastordermodel_313.dart';
-import 'package:unipos/domain/services/restaurant/day_management_service.dart';
+import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
 import '../../../core/constants/hive_box_names.dart';
 import '../../../data/models/restaurant/db/cash_movement_model.dart';
 import 'package:hive/hive.dart';

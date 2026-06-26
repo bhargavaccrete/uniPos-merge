@@ -272,7 +272,7 @@ class _StartorderState extends State<Startorder>
         titleWidget: Row(
           children: [
             Text(
-              'UniPOS',
+              'Bill Berry Lite',
               style: GoogleFonts.poppins(
                 fontSize: AppResponsive.getValue<double>(context, mobile: 18, tablet: 20, desktop: 22),
                 fontWeight: FontWeight.w600,

@@ -1,7 +1,7 @@
 
 import 'package:hive/hive.dart';
-import 'package:unipos/core/config/app_config.dart';
-import 'package:unipos/data/models/restaurant/db/eodmodel_317.dart';
+import 'package:billberrylite/core/config/app_config.dart';
+import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
 
 class HiveEOD {
   static Box<EndOfDayReport>? _box;

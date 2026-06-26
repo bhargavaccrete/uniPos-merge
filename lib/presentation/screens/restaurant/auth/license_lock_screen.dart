@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/license_model.dart';
-import 'package:unipos/domain/store/restaurant/license_store.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/models/restaurant/license_model.dart';
+import 'package:billberrylite/domain/store/restaurant/license_store.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 /// Full-screen license gate. Shown when:
 ///   • No license has been activated on this device, OR
@@ -135,7 +135,7 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
 
   Widget _subtext(bool isTablet) {
     final msg = _isExpired
-        ? 'Your license has expired. Enter a new key to continue using UniPOS.'
+        ? 'Your license has expired. Enter a new key to continue using Bill Berry Lite.'
         : 'This device is not licensed. Enter your license key to unlock the app.';
     return Text(
       msg,

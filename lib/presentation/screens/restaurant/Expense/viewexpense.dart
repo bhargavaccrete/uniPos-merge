@@ -3,14 +3,15 @@ import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
-import 'package:unipos/util/common/currency_helper.dart';
-import 'package:unipos/util/common/decimal_settings.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/expensel_316.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 class ViewExpense extends StatefulWidget {
   const ViewExpense({super.key});
 
@@ -154,7 +155,7 @@ class _ViewExpenseState extends State<ViewExpense> {
             hint: 'Enter amount',
             icon: Icons.attach_money,
             keyboardType: TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))],
           ),
           SizedBox(height: 16),
           Text('Category',
@@ -174,6 +175,9 @@ class _ViewExpenseState extends State<ViewExpense> {
                   child: DropdownButton<String>(
                     isExpanded: true,
                     value: selectedCategoryId,
+                    borderRadius: BorderRadius.circular(12),
+                    dropdownColor: AppColors.white,
+                    icon: Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary),
                     hint: Text('Select Category', style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey.shade400)),
                     items: categories.map((category) => DropdownMenuItem<String>(
                       value: category.id,
@@ -209,6 +213,9 @@ class _ViewExpenseState extends State<ViewExpense> {
               child: DropdownButton<String>(
                 isExpanded: true,
                 value: selectedPaymentType,
+                borderRadius: BorderRadius.circular(12),
+                dropdownColor: AppColors.white,
+                icon: Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary),
                 items: ['Cash', 'Card/Online', 'Other'].map((String item) => DropdownMenuItem<String>(
                   value: item,
                   child: Text(item, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w500)),
@@ -224,23 +231,15 @@ class _ViewExpenseState extends State<ViewExpense> {
                 child: ElevatedButton(
                   onPressed: () async {
                     if (_isSubmitting) return;
-                    final hInset = !AppResponsive.isMobile(context)
-                        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-                        : 24.0;
-                    final confirm = await showDialog<bool>(
+                    final confirm = await showAppConfirmDialog(
                       context: context,
-                      builder: (_) => AlertDialog(
-                        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        title: Text('Delete this expense?', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
-                        content: Text('This action cannot be undone.', style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700)),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey))),
-                          TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Delete', style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.w500))),
-                        ],
-                      ),
+                      title: 'Delete this expense?',
+                      message: 'This action cannot be undone.',
+                      confirmLabel: 'Delete',
+                      accent: AppColors.danger,
+                      icon: Icons.delete_outline,
                     );
-                    if (confirm == true) {
+                    if (confirm) {
                       setState(() => _isSubmitting = true);
                       try {
                         await expenseStore.deleteExpense(expense.id);
@@ -317,13 +316,193 @@ class _ViewExpenseState extends State<ViewExpense> {
       showDialog(
         context: context,
         builder: (context) => StatefulBuilder(
-          builder: (context, setModalState) => Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            insetPadding: EdgeInsets.symmetric(horizontal: 80, vertical: 40),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: buildContent(setModalState),
+          builder: (context, setModalState) => AppDialogShell(
+            title: 'Edit Expense',
+            accent: AppColors.primary,
+            icon: Icons.edit_note_rounded,
+            body: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Date',
+                  style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                ),
+                SizedBox(height: 10),
+                GestureDetector(
+                  onTap: () async {
+                    DateTime? pickedDate = await showDatePicker(
+                      context: context,
+                      initialDate: selectedDate,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (pickedDate != null) {
+                      setModalState(() { selectedDate = pickedDate; });
+                    }
+                  },
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceLight,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.primary, width: 2),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.calendar_today, size: 18, color: AppColors.primary),
+                        SizedBox(width: 12),
+                        Text(
+                          DateFormat('dd MMM yyyy').format(selectedDate),
+                          style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(height: 16),
+                Text('Amount (${CurrencyHelper.currentSymbol})',
+                    style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                SizedBox(height: 10),
+                AppTextField(
+                  controller: amountController,
+                  hint: 'Enter amount',
+                  icon: Icons.attach_money,
+                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))],
+                ),
+                SizedBox(height: 16),
+                Text('Category',
+                    style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                SizedBox(height: 10),
+                Observer(
+                  builder: (context) {
+                    final categories = expenseCategoryStore.enabledCategories;
+                    return Container(
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceLight,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.divider),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          isExpanded: true,
+                          value: selectedCategoryId,
+                          borderRadius: BorderRadius.circular(12),
+                          dropdownColor: AppColors.white,
+                          icon: Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary),
+                          hint: Text('Select Category', style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey.shade400)),
+                          items: categories.map((category) => DropdownMenuItem<String>(
+                            value: category.id,
+                            child: Text(category.name, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w500)),
+                          )).toList(),
+                          onChanged: (String? value) => setModalState(() { selectedCategoryId = value; }),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                SizedBox(height: 16),
+                Text('Reason',
+                    style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                SizedBox(height: 10),
+                AppTextField(
+                  controller: reasonController,
+                  hint: 'Enter reason (optional)',
+                  icon: Icons.note_alt_outlined,
+                ),
+                SizedBox(height: 16),
+                Text('Payment Type',
+                    style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                SizedBox(height: 10),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.divider),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: selectedPaymentType,
+                      borderRadius: BorderRadius.circular(12),
+                      dropdownColor: AppColors.white,
+                      icon: Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary),
+                      items: ['Cash', 'Card/Online', 'Other'].map((String item) => DropdownMenuItem<String>(
+                        value: item,
+                        child: Text(item, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w500)),
+                      )).toList(),
+                      onChanged: (String? value) => setModalState(() { selectedPaymentType = value!; }),
+                    ),
+                  ),
+                ),
+              ],
             ),
+            actions: [
+              appDialogPrimaryButton(
+                label: 'Delete',
+                color: Colors.red,
+                onPressed: () async {
+                  if (_isSubmitting) return;
+                  final confirm = await showAppConfirmDialog(
+                    context: context,
+                    title: 'Delete this expense?',
+                    message: 'This action cannot be undone.',
+                    confirmLabel: 'Delete',
+                    accent: AppColors.danger,
+                    icon: Icons.delete_outline,
+                  );
+                  if (confirm) {
+                    setState(() => _isSubmitting = true);
+                    try {
+                      await expenseStore.deleteExpense(expense.id);
+                      Navigator.pop(context);
+                      _loadExpenses();
+                      NotificationService.instance.showSuccess('Expense deleted successfully');
+                    } finally {
+                      if (mounted) setState(() => _isSubmitting = false);
+                    }
+                  }
+                },
+              ),
+              const SizedBox(width: 12),
+              appDialogPrimaryButton(
+                label: 'Update Expense',
+                onPressed: () async {
+                  if (_isSubmitting) return;
+                  final amount = double.tryParse(amountController.text.trim());
+                  if (amount == null || amount <= 0) {
+                    NotificationService.instance.showError('Please enter a valid amount greater than 0');
+                    return;
+                  }
+                  setState(() => _isSubmitting = true);
+                  try {
+                    final now = DateTime.now();
+                    final expenseDateTime = DateTime(
+                      selectedDate.year, selectedDate.month, selectedDate.day,
+                      now.hour, now.minute, now.second, now.millisecond,
+                    );
+                    final updatedExpense = expense.copyWith(
+                      dateandTime: expenseDateTime,
+                      amount: amount,
+                      categoryOfExpense: selectedCategoryId,
+                      reason: reasonController.text.trim().isEmpty ? null : reasonController.text.trim(),
+                      paymentType: selectedPaymentType,
+                    );
+                    await expenseStore.updateExpense(updatedExpense);
+                    Navigator.pop(context);
+                    _loadExpenses();
+                    NotificationService.instance.showSuccess('Expense updated successfully');
+                  } catch (e) {
+                    NotificationService.instance.showError('Failed to update expense. Please try again.');
+                  } finally {
+                    if (mounted) setState(() => _isSubmitting = false);
+                  }
+                },
+              ),
+            ],
           ),
         ),
       ).then((_) {

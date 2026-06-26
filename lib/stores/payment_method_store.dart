@@ -1,6 +1,6 @@
 import 'package:mobx/mobx.dart';
-import 'package:unipos/data/repositories/payment_method_repository.dart';
-import 'package:unipos/models/payment_method.dart';
+import 'package:billberrylite/data/repositories/payment_method_repository.dart';
+import 'package:billberrylite/models/payment_method.dart';
 import 'package:uuid/uuid.dart';
 
 part 'payment_method_store.g.dart';

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 // Import your utilities
+import 'package:billberrylite/core/config/app_config.dart';
 import '../../../util/color.dart';
 import '../../../util/common/app_responsive.dart';
 import '../../../util/responsive.dart';
@@ -26,10 +27,14 @@ class _WalkthroughScreenState extends State<WalkthroughScreen>
   final List<WalkthroughItem> _walkthroughItems = [
     WalkthroughItem(
       title: 'All-in-One POS',
-      description: 'Manage sales, billing, and products from a single unified platform designed for retail and restaurants',
+      description: AppConfig.retailEnabled
+          ? 'Manage sales, billing, and products from a single unified platform designed for retail and restaurants'
+          : 'Manage sales, billing, and products from a single unified platform built for your restaurant',
       icon: Icons.dashboard_customize,
       color: AppColors.primary,
-      features: ['Restaurant Mode', 'Retail Mode'],
+      features: AppConfig.retailEnabled
+          ? ['Restaurant Mode', 'Retail Mode']
+          : ['Dine-In', 'Takeaway'],
     ),
     WalkthroughItem(
       title: 'Smart Product Management',

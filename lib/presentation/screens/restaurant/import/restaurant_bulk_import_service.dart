@@ -5,18 +5,18 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/categorymodel_300.dart';
-import 'package:unipos/data/models/restaurant/db/choicemodel_306.dart';
-import 'package:unipos/data/models/restaurant/db/choiceoptionmodel_307.dart';
-import 'package:unipos/data/models/restaurant/db/extramodel_303.dart';
-import 'package:unipos/data/models/restaurant/db/itemmodel_302.dart';
-import 'package:unipos/data/models/restaurant/db/itemvariantemodel_312.dart';
-import 'package:unipos/data/models/restaurant/db/toppingmodel_304.dart';
-import 'package:unipos/data/models/restaurant/db/variantmodel_305.dart';
-import 'package:unipos/data/models/restaurant/db/taxmodel_314.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
+import 'package:billberrylite/data/models/restaurant/db/choicemodel_306.dart';
+import 'package:billberrylite/data/models/restaurant/db/choiceoptionmodel_307.dart';
+import 'package:billberrylite/data/models/restaurant/db/extramodel_303.dart';
+import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
+import 'package:billberrylite/data/models/restaurant/db/itemvariantemodel_312.dart';
+import 'package:billberrylite/data/models/restaurant/db/toppingmodel_304.dart';
+import 'package:billberrylite/data/models/restaurant/db/variantmodel_305.dart';
+import 'package:billberrylite/data/models/restaurant/db/taxmodel_314.dart';
 import 'package:uuid/uuid.dart';
-import 'package:unipos/core/constants/item_units.dart';
+import 'package:billberrylite/core/constants/item_units.dart';
 import 'import_template_builder.dart';
 
 /// Restaurant bulk import service.
@@ -58,7 +58,7 @@ class RestaurantBulkImportService {
   Future<String> downloadTemplate() async {
     try {
       final bytes = ImportTemplateBuilder().build();
-      return await _saveBytes(bytes, 'unipos_restaurant_import_template_v4.xlsx');
+      return await _saveBytes(bytes, 'billberrylite_restaurant_import_template_v4.xlsx');
     } catch (e) {
       return 'Error downloading template: $e';
     }

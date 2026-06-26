@@ -3,15 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:unipos/core/config/app_config.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/retail/hive_model/staff_model_222.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
-import 'package:unipos/util/restaurant/restaurant_auth_helper.dart';
-import 'package:unipos/domain/services/common/backup_encryption_service.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/stores/setup_wizard_store.dart';
+import 'package:billberrylite/core/config/app_config.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/models/retail/hive_model/staff_model_222.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/restaurant/restaurant_auth_helper.dart';
+import 'package:billberrylite/domain/services/common/backup_encryption_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/stores/setup_wizard_store.dart';
 
 /// Onboarding "Security" step — sets the admin login PIN and the backup
 /// password up-front so backups are always encrypted and admin login is never

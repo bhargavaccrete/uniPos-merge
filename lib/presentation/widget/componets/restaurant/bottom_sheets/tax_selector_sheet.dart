@@ -5,8 +5,8 @@ import 'package:uuid/uuid.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../data/models/restaurant/db/taxmodel_314.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 
 /// Result from tax selection. Multiple taxes can be applied; [rate] is the
 /// SUMMED decimal rate (0.17 for 5% + 12%). Empty [ids] / rate 0 means "No Tax".

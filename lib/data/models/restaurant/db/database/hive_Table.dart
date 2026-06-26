@@ -1,7 +1,7 @@
 // lib/database/hive_tables.dart
 
 import 'package:hive/hive.dart';
-import 'package:unipos/data/models/restaurant/db/table_Model_311.dart';
+import 'package:billberrylite/data/models/restaurant/db/table_Model_311.dart';
 
 class HiveTables {
   static const String _boxName = 'tablesBox';

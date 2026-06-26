@@ -2,10 +2,10 @@ import 'package:hive/hive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
-import 'package:unipos/core/constants/hive_box_names.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/restaurant/db/cash_movement_model.dart';
-import 'package:unipos/data/models/restaurant/db/session_model.dart';
+import 'package:billberrylite/core/constants/hive_box_names.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/models/restaurant/db/cash_movement_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/session_model.dart';
 
 class DayManagementService {
   static const String _boxName = 'dayManagementBox';

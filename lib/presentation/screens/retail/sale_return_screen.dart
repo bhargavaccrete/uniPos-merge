@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'package:unipos/data/models/retail/hive_model/sale_model_203.dart';
-import 'package:unipos/data/models/retail/hive_model/sale_item_model_204.dart';
+import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
+import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../domain/services/retail/return_service.dart';
 

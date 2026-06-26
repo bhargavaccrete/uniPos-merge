@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
-import 'package:unipos/domain/services/restaurant/thermal_printer_service.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/domain/services/restaurant/thermal_printer_service.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 
 /// Bluetooth Printer discovery and setup screen.
 ///
@@ -353,76 +353,71 @@ class _BluthoothhState extends State<Bluthooth> {
     // Role is assigned later by the slot on the Printer Management screen.
     const String role = 'receipt';
 
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         // StatefulBuilder lets us call setState inside the dialog
         // to update radio buttons without rebuilding the whole screen
-        builder: (ctx, setDialogState) => AlertDialog(
-          insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-          title: Text('Save Printer', style: GoogleFonts.poppins()),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Device address (read-only, for reference)
-                Text(
-                  device.address ?? 'Unknown address',
+        builder: (ctx, setDialogState) => AppDialogShell(
+          title: 'Save Printer',
+          accent: AppColors.primary,
+          icon: Icons.bluetooth,
+          body: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Device address (read-only, for reference)
+              Text(
+                device.address ?? 'Unknown address',
+                style: GoogleFonts.poppins(
+                    fontSize: 12, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 12),
+
+              // Printer name — editable, defaults to BLE advertised name
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(
+                  labelText: 'Printer Name',
+                  labelStyle: GoogleFonts.poppins(fontSize: 13),
+                  border: const OutlineInputBorder(),
+                ),
+                style: GoogleFonts.poppins(fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+
+              // Paper size
+              Text('Paper Size',
                   style: GoogleFonts.poppins(
-                      fontSize: 12, color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: 12),
-
-                // Printer name — editable, defaults to BLE advertised name
-                TextField(
-                  controller: nameController,
-                  decoration: InputDecoration(
-                    labelText: 'Printer Name',
-                    labelStyle: GoogleFonts.poppins(fontSize: 13),
-                    border: const OutlineInputBorder(),
+                      fontSize: 13, fontWeight: FontWeight.w500)),
+              Row(
+                children: [
+                  Radio<int>(
+                    value: 58,
+                    groupValue: paperSize,
+                    onChanged: (v) =>
+                        setDialogState(() => paperSize = v!),
+                    activeColor: AppColors.primary,
                   ),
-                  style: GoogleFonts.poppins(fontSize: 14),
-                ),
-                const SizedBox(height: 16),
-
-                // Paper size
-                Text('Paper Size',
-                    style: GoogleFonts.poppins(
-                        fontSize: 13, fontWeight: FontWeight.w500)),
-                Row(
-                  children: [
-                    Radio<int>(
-                      value: 58,
-                      groupValue: paperSize,
-                      onChanged: (v) =>
-                          setDialogState(() => paperSize = v!),
-                      activeColor: AppColors.primary,
-                    ),
-                    Text('58mm', style: GoogleFonts.poppins(fontSize: 13)),
-                    const SizedBox(width: 16),
-                    Radio<int>(
-                      value: 80,
-                      groupValue: paperSize,
-                      onChanged: (v) =>
-                          setDialogState(() => paperSize = v!),
-                      activeColor: AppColors.primary,
-                    ),
-                    Text('80mm', style: GoogleFonts.poppins(fontSize: 13)),
-                  ],
-                ),
-              ],
-            ),
+                  Text('58mm', style: GoogleFonts.poppins(fontSize: 13)),
+                  const SizedBox(width: 16),
+                  Radio<int>(
+                    value: 80,
+                    groupValue: paperSize,
+                    onChanged: (v) =>
+                        setDialogState(() => paperSize = v!),
+                    activeColor: AppColors.primary,
+                  ),
+                  Text('80mm', style: GoogleFonts.poppins(fontSize: 13)),
+                ],
+              ),
+            ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
+            appDialogCancelButton(ctx),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: 'Save',
               onPressed: () async {
                 await printerStore.saveBluetoothPrinter(
                   device: device,
@@ -436,13 +431,6 @@ class _BluthoothhState extends State<Bluthooth> {
                       'Printer "${nameController.text.trim()}" saved');
                 }
               },
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10))),
-              child: Text('Save',
-                  style: GoogleFonts.poppins(color: Colors.white)),
             ),
           ],
         ),
@@ -454,28 +442,13 @@ class _BluthoothhState extends State<Bluthooth> {
 
   /// Delete with confirmation
   Future<void> _confirmDelete(String id, String name) async {
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        title: Text('Delete Printer', style: GoogleFonts.poppins()),
-        content: Text('Remove "$name" from saved printers?',
-            style: GoogleFonts.poppins()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete',
-                style: TextStyle(color: AppColors.danger)),
-          ),
-        ],
-      ),
+      title: 'Delete Printer',
+      message: 'Remove "$name" from saved printers?',
+      confirmLabel: 'Delete',
+      accent: AppColors.danger,
+      icon: Icons.delete_rounded,
     );
 
     if (confirmed == true) {

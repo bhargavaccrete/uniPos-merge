@@ -1,5 +1,5 @@
 import 'package:hive/hive.dart';
-import 'package:unipos/data/models/restaurant/db/testbillmodel_318.dart';
+import 'package:billberrylite/data/models/restaurant/db/testbillmodel_318.dart';
 
 
 class HiveTestBill {

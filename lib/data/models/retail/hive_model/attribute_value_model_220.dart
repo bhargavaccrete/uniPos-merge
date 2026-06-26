@@ -1,5 +1,5 @@
 import 'package:hive/hive.dart';
-import 'package:unipos/core/constants/hive_type_ids.dart';
+import 'package:billberrylite/core/constants/hive_type_ids.dart';
 
 part 'attribute_value_model_220.g.dart';
 

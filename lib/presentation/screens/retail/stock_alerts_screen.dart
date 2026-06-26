@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:unipos/domain/store/retail/stock_alert_store.dart';
+import 'package:billberrylite/domain/store/retail/stock_alert_store.dart';
 
 import '../../../core/di/service_locator.dart';
 

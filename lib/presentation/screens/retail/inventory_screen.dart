@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/util/responsive.dart';
-import 'package:unipos/util/common/currency_helper.dart';
-import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/util/responsive.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
 
-import 'package:unipos/data/models/retail/hive_model/product_model_200.dart';
-import 'package:unipos/data/models/retail/hive_model/variante_model_201.dart';
-import 'package:unipos/presentation/screens/retail/scanner_screen.dart';
-import 'package:unipos/presentation/screens/retail/add_product_screen.dart';
-import 'package:unipos/presentation/screens/retail/variant_management_screen.dart';
+import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
+import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
+import 'package:billberrylite/presentation/screens/retail/scanner_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/add_product_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/variant_management_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});

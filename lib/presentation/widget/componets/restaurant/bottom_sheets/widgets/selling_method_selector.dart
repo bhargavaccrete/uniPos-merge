@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/core/constants/item_units.dart';
+import 'package:billberrylite/core/constants/item_units.dart';
 import '../../../../../../util/color.dart';
 import '../add_item_form_state.dart';
 

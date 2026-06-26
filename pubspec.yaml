@@ -1,5 +1,5 @@
-name: unipos
-description: "UniPOS - Universal POS for all platforms"
+name: billberrylite
+description: "Bill Berry Lite - Restaurant POS"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -108,6 +108,7 @@ dependencies:
   flutter_local_notifications: ^17.2.3 # <- local/OS notifications (offline)
   timezone: ^0.9.4 # <- zoned scheduling for closed-app reminders
   flutter_timezone: ^3.0.1 # <- resolves device local timezone
+  url_launcher: ^6.3.0 # <- launch phone/email/chat from Need Help
 
 
 
@@ -127,6 +128,24 @@ dev_dependencies:
   hive_generator: ^2.0.1
   build_runner: ^2.4.7
   mobx_codegen: ^2.6.0
+  flutter_launcher_icons: ^0.14.1
+
+# App launcher icon — generated from the Bill Berry Lite logo.
+# Run: dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/images/billberrylite.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/billberrylite.png"
+  web:
+    generate: true
+    image_path: "assets/images/billberrylite.png"
+  windows:
+    generate: true
+    image_path: "assets/images/billberrylite.png"
+    icon_size: 48
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

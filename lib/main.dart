@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/core/config/app_config.dart';
-import 'package:unipos/core/init/hive_init.dart';
-import 'package:unipos/core/routes/app_routes.dart';
-import 'package:unipos/core/routes/routes_name.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/config/app_config.dart';
+import 'package:billberrylite/core/init/hive_init.dart';
+import 'package:billberrylite/core/routes/app_routes.dart';
+import 'package:billberrylite/core/routes/routes_name.dart';
 
-import 'package:unipos/server/server.dart';
-import 'package:unipos/util/common/currency_helper.dart';
+import 'package:billberrylite/server/server.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
 
 import 'domain/store/restaurant/appStore.dart';
 import 'domain/store/restaurant/license_store.dart';
@@ -52,7 +52,7 @@ void main() async {
       return;
     }
 
-    runApp(const UniPOSApp());
+    runApp(const BillBerryApp());
 
     // Ask for notification permission once the UI is up. The Android 13+
     // POST_NOTIFICATIONS prompt is ignored if requested before the activity
@@ -161,9 +161,9 @@ Future<void> _initializeApp() async {
     // so it must bind before anything slower (notifications) runs. Fire-and-forget.
     print('🌐 Starting local server (background)...');
     startServer().then((_) {
-      print('   ✅ UniPOS Local Server Started Successfully');
+      print('   ✅ Bill Berry Lite Local Server Started Successfully');
     }).catchError((e) {
-      print('   ⚠️  Failed to start UniPOS Local Server: $e');
+      print('   ⚠️  Failed to start Bill Berry Lite Local Server: $e');
     });
 
     // Local notifications: init OS plugin, seed history + schedule reminders.
@@ -264,15 +264,15 @@ class ErrorApp extends StatelessWidget {
   }
 }
 
-class UniPOSApp extends StatelessWidget {
-  const UniPOSApp({Key? key}) : super(key: key);
+class BillBerryApp extends StatelessWidget {
+  const BillBerryApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navigatorKey,
       scaffoldMessengerKey: rootScaffoldMessengerKey,
-      title: 'UniPOS',
+      title: 'Bill Berry Lite',
       debugShowCheckedModeBanner: false,
 
       // Wrap all routes with NotificationOverlay + app-wide inactivity handling.

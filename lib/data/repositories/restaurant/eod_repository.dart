@@ -1,5 +1,5 @@
 import 'package:hive/hive.dart';
-import 'package:unipos/core/config/app_config.dart';
+import 'package:billberrylite/core/config/app_config.dart';
 import '../../models/restaurant/db/eodmodel_317.dart';
 
 /// Repository layer for End of Day (EOD) data access (Restaurant)

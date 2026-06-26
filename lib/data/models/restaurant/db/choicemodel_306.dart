@@ -1,7 +1,7 @@
 
 import 'package:hive/hive.dart';
-import 'package:unipos/core/constants/hive_type_ids.dart';
-import 'package:unipos/data/models/restaurant/db/choiceoptionmodel_307.dart';
+import 'package:billberrylite/core/constants/hive_type_ids.dart';
+import 'package:billberrylite/data/models/restaurant/db/choiceoptionmodel_307.dart';
 part 'choicemodel_306.g.dart';
 
 @HiveType(typeId:HiveTypeIds.restaurantChoice)

@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:unipos/util/restaurant/restaurant_auth_helper.dart';
-import 'package:unipos/data/models/restaurant/db/saved_printer_model.dart';
+import 'package:billberrylite/util/restaurant/restaurant_auth_helper.dart';
+import 'package:billberrylite/data/models/restaurant/db/saved_printer_model.dart';
 
 /// Unit tests for:
 /// 1. RestaurantAuthHelper — password hashing, verification, migration

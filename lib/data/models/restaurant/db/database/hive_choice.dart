@@ -1,8 +1,8 @@
 
 
 import 'package:hive/hive.dart';
-import 'package:unipos/data/models/restaurant/db/choicemodel_306.dart';
-import 'package:unipos/data/models/restaurant/db/choiceoptionmodel_307.dart';
+import 'package:billberrylite/data/models/restaurant/db/choicemodel_306.dart';
+import 'package:billberrylite/data/models/restaurant/db/choiceoptionmodel_307.dart';
 
 class HiveChoice{
   static const _boxName = 'choice';

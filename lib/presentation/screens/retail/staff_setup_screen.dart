@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/util/color.dart';
 
 /// Staff Setup Screen - Optional setup step for adding staff members
 /// Can be skipped and accessed later from settings

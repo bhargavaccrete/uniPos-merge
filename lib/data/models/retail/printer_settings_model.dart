@@ -148,7 +148,7 @@ class RetailPrinterSettings {
     this.showFooter = true,
     this.footerText = 'Visit Again!',
     this.showPoweredBy = false,
-    this.poweredByText = 'Powered by UniPOS',
+    this.poweredByText = 'Powered by Bill Berry Lite',
 
     // Print Behavior
     this.autoPrintAfterSale = false,
@@ -269,7 +269,7 @@ class RetailPrinterSettings {
       showFooter: json['showFooter'] ?? true,
       footerText: json['footerText'] ?? 'Visit Again!',
       showPoweredBy: json['showPoweredBy'] ?? false,
-      poweredByText: json['poweredByText'] ?? 'Powered by UniPOS',
+      poweredByText: json['poweredByText'] ?? 'Powered by Bill Berry Lite',
       autoPrintAfterSale: json['autoPrintAfterSale'] ?? false,
       numberOfCopies: json['numberOfCopies'] ?? 1,
       showPrintDialog: json['showPrintDialog'] ?? true,

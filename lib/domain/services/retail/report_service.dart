@@ -2,9 +2,9 @@
 
 
 
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/data/models/retail/hive_model/purchase_model_207.dart';
-import 'package:unipos/data/models/retail/hive_model/sale_model_203.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/models/retail/hive_model/purchase_model_207.dart';
+import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 
 import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
 

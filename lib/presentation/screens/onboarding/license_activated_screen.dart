@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/domain/store/restaurant/license_store.dart';
-import 'package:unipos/presentation/screens/restaurant/welcome_Admin.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/app_responsive.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/domain/store/restaurant/license_store.dart';
+import 'package:billberrylite/presentation/screens/restaurant/welcome_Admin.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 /// Handles the activate API call and shows the result before the user
 /// proceeds to the dashboard.
@@ -180,7 +180,7 @@ class _LicenseActivatedScreenState extends State<LicenseActivatedScreen> {
                     borderRadius: BorderRadius.circular(12)),
               ),
               child: Text(
-                'Start Using UniPOS',
+                'Start Using Bill Berry Lite',
                 style: GoogleFonts.poppins(
                   fontSize: isTablet ? 16 : 15,
                   fontWeight: FontWeight.w600,

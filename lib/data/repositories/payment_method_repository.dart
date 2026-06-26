@@ -1,5 +1,5 @@
 import 'package:hive/hive.dart';
-import 'package:unipos/models/payment_method.dart';
+import 'package:billberrylite/models/payment_method.dart';
 import 'package:uuid/uuid.dart';
 
 class PaymentMethodRepository {

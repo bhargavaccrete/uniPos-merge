@@ -3,14 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/domain/services/retail/store_settings_service.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 import '../../../util/common/app_responsive.dart';
 import '../../../util/common/upi_qr_helper.dart';
-import 'package:unipos/models/payment_method.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/stores/payment_method_store.dart';
+import 'package:billberrylite/models/payment_method.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/stores/payment_method_store.dart';
 import '../../../util/color.dart';
+import '../../widget/componets/common/app_dialog.dart';
 import '../../../util/common/currency_helper.dart';
 
 /// Payment Setup Step — Setup Wizard
@@ -130,218 +131,145 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
 
     if (!mounted) return;
     
-    final editHInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    
-    showDialog(
+    final isUpi = method.value == 'upi';
+    await showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          insetPadding: EdgeInsets.symmetric(horizontal: editHInset, vertical: 24),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          contentPadding: EdgeInsets.zero,
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Header
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.edit_rounded,
-                          size: 24,
-                          color: Colors.blue,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Edit Payment Method',
-                          style: GoogleFonts.poppins(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1, color: AppColors.divider),
-                
-                // Content
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      AppTextField(
-                        controller: nameController,
-                        label: 'Method Name',
-                        hint: 'Enter method name',
-                        icon: Icons.payment_rounded,
-                        required: true,
-                      ),
-                      if (method.value == 'upi') ...[
-                        const SizedBox(height: 16),
-                        AppTextField(
-                          controller: _upiIdController,
-                          label: 'Merchant UPI ID (VPA)',
-                          hint: 'e.g., merchant@okhdfc',
-                          icon: Icons.alternate_email_rounded,
-                          onChanged: (_) => _scheduleUpiPreview(),
-                        ),
-                        const SizedBox(height: 16),
-                        AppTextField(
-                          controller: _upiPayeeController,
-                          label: 'Payee Name (Optional)',
-                          hint: 'Falls back to Store Name',
-                          icon: Icons.person_outline_rounded,
-                          onChanged: (_) => _scheduleUpiPreview(),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Payment QR Preview',
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        ValueListenableBuilder<String>(
-                          valueListenable: _upiQrData,
-                          builder: (context, qrData, _) => Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceLight,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppColors.divider),
-                            ),
-                            child: qrData.isEmpty
-                                ? Column(
-                                    children: [
-                                      Icon(Icons.qr_code_2,
-                                          size: 48,
-                                          color: AppColors.textSecondary
-                                              .withValues(alpha: 0.5)),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'Enter a UPI ID to generate the QR code',
-                                        textAlign: TextAlign.center,
-                                        style: GoogleFonts.poppins(
-                                            fontSize: 12,
-                                            color: AppColors.textSecondary),
-                                      ),
-                                    ],
-                                  )
-                                : Column(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(10),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                          border: Border.all(
-                                              color: AppColors.divider),
-                                        ),
-                                        child: SizedBox(
-                                          width: 160,
-                                          height: 160,
-                                          child: QrImageView(
-                                            data: qrData,
-                                            version: QrVersions.auto,
-                                            size: 160,
-                                            gapless: true,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 10),
-                                      Text(
-                                        'Auto-generated from the UPI ID above',
-                                        style: GoogleFonts.poppins(
-                                            fontSize: 11,
-                                            color: AppColors.textSecondary),
-                                      ),
-                                    ],
-                                  ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
+      builder: (context) => AppDialogShell(
+        title: isUpi ? 'UPI Setup' : 'Edit Payment Method',
+        subtitle:
+            isUpi ? 'Set your merchant UPI ID & QR' : 'Update payment details',
+        accent: AppColors.primary,
+        icon: isUpi ? Icons.qr_code_2_rounded : Icons.edit_rounded,
+        body: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppTextField(
+              controller: nameController,
+              label: 'Method Name',
+              hint: 'Enter method name',
+              icon: Icons.payment_rounded,
+              required: true,
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                nameController.dispose();
-                Navigator.pop(context);
-              },
-              child: Text(
-                'Cancel',
+            if (isUpi) ...[
+              const SizedBox(height: 16),
+              AppTextField(
+                controller: _upiIdController,
+                label: 'Merchant UPI ID (VPA)',
+                hint: 'e.g., merchant@okhdfc',
+                icon: Icons.alternate_email_rounded,
+                onChanged: (_) => _scheduleUpiPreview(),
+              ),
+              const SizedBox(height: 16),
+              AppTextField(
+                controller: _upiPayeeController,
+                label: 'Payee Name (Optional)',
+                hint: 'Falls back to Store Name',
+                icon: Icons.person_outline_rounded,
+                onChanged: (_) => _scheduleUpiPreview(),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Payment QR Preview',
                 style: GoogleFonts.poppins(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
                 ),
               ),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (nameController.text.isNotEmpty) {
-                  final updatedMethod = method.copyWith(
-                    name: nameController.text,
-                    value: nameController.text.toLowerCase().replaceAll(' ', '_'),
-                  );
-                  await _store.updatePaymentMethod(updatedMethod);
-                  if (method.value == 'upi') {
-                    await _storeSettings.setUpiId(_upiIdController.text);
-                    await _storeSettings.setUpiPayeeName(_upiPayeeController.text);
-                    // Generate the QR from the UPI ID and store it so receipts
-                    // keep printing the same merchant QR.
-                    final qrBytes = await UpiQrHelper.generateQrBytes(
-                      _upiIdController.text,
-                      payee: _upiPayeeController.text,
-                    );
-                    await _storeSettings.setUpiQrImage(qrBytes);
-                  }
-                  nameController.dispose();
-                  if (mounted) {
-                    Navigator.pop(context);
-                  }
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+              const SizedBox(height: 8),
+              ValueListenableBuilder<String>(
+                valueListenable: _upiQrData,
+                builder: (context, qrData, _) => Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.divider),
+                  ),
+                  child: qrData.isEmpty
+                      ? Column(
+                          children: [
+                            Icon(Icons.qr_code_2,
+                                size: 48,
+                                color: AppColors.textSecondary
+                                    .withValues(alpha: 0.5)),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Enter a UPI ID to generate the QR code',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AppColors.divider),
+                              ),
+                              child: SizedBox(
+                                width: 160,
+                                height: 160,
+                                child: QrImageView(
+                                  data: qrData,
+                                  version: QrVersions.auto,
+                                  size: 160,
+                                  gapless: true,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              'Auto-generated from the UPI ID above',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
                 ),
               ),
-              child: Text(
-                'Update',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-              ),
-            ),
+            ],
           ],
         ),
+        actions: [
+          appDialogCancelButton(context),
+          const SizedBox(width: 12),
+          appDialogPrimaryButton(
+            label: 'Update',
+            onPressed: () async {
+              if (nameController.text.isNotEmpty) {
+                final updatedMethod = method.copyWith(
+                  name: nameController.text,
+                  value: nameController.text.toLowerCase().replaceAll(' ', '_'),
+                );
+                await _store.updatePaymentMethod(updatedMethod);
+                if (isUpi) {
+                  await _storeSettings.setUpiId(_upiIdController.text);
+                  await _storeSettings.setUpiPayeeName(_upiPayeeController.text);
+                  // Generate the QR from the UPI ID and store it so receipts
+                  // keep printing the same merchant QR.
+                  final qrBytes = await UpiQrHelper.generateQrBytes(
+                    _upiIdController.text,
+                    payee: _upiPayeeController.text,
+                  );
+                  await _storeSettings.setUpiQrImage(qrBytes);
+                }
+                if (mounted) Navigator.pop(context);
+              }
+            },
+          ),
+        ],
       ),
     );
+    nameController.dispose();
   }
 
   Future<void> _initializeStore() async {
@@ -455,292 +383,169 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => Dialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Title ──
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
+        builder: (ctx, setDialogState) => AppDialogShell(
+          title: 'Add Payment Method',
+          subtitle: 'Create a custom payment option',
+          accent: AppColors.primary,
+          icon: Icons.add_card,
+          body: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Name field ──
+              Text('Display Name',
+                  style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: nameController,
+                textCapitalization: TextCapitalization.words,
+                style: GoogleFonts.poppins(
+                    fontSize: 14, color: AppColors.textPrimary),
+                onChanged: (_) {
+                  if (errorText != null) {
+                    setDialogState(() => errorText = null);
+                  }
+                },
+                decoration: InputDecoration(
+                  hintText: 'e.g., PayTM, GPay, Sodexo',
+                  hintStyle: GoogleFonts.poppins(
+                      fontSize: 13, color: AppColors.textSecondary),
+                  errorText: errorText,
+                  errorStyle: GoogleFonts.poppins(fontSize: 11),
+                  filled: true,
+                  fillColor: AppColors.surfaceLight,
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.divider),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.divider),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                        color: AppColors.primary, width: 1.5),
+                  ),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.danger),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // ── Icon picker ──
+              Text('Icon',
+                  style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _availableIcons.entries.map((e) {
+                  final selected = selectedIcon == e.key;
+                  return InkWell(
+                    onTap: () => setDialogState(() => selectedIcon = e.key),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 9),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
+                        color: selected
+                            ? AppColors.primary.withValues(alpha: 0.12)
+                            : AppColors.surfaceLight,
                         borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: selected ? AppColors.primary : AppColors.divider,
+                          width: selected ? 1.5 : 1,
+                        ),
                       ),
-                      child: const Icon(Icons.add_card,
-                          color: AppColors.primary, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    Text('Add Payment Method',
-                        style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary)),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // ── Name field ──
-                Text('Display Name',
-                    style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary)),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: nameController,
-                  textCapitalization: TextCapitalization.words,
-                  style: GoogleFonts.poppins(
-                      fontSize: 14, color: AppColors.textPrimary),
-                  onChanged: (_) {
-                    if (errorText != null) {
-                      setDialogState(() => errorText = null);
-                    }
-                  },
-                  decoration: InputDecoration(
-                    hintText: 'e.g., PayTM, GPay, Sodexo',
-                    hintStyle: GoogleFonts.poppins(
-                        fontSize: 13, color: AppColors.textSecondary),
-                    errorText: errorText,
-                    errorStyle: GoogleFonts.poppins(fontSize: 11),
-                    filled: true,
-                    fillColor: AppColors.surfaceLight,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: AppColors.divider),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: AppColors.divider),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                          color: AppColors.primary, width: 1.5),
-                    ),
-                    errorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: AppColors.danger),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // ── Icon picker ──
-                Text('Icon',
-                    style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary)),
-                const SizedBox(height: 6),
-                DropdownButtonFormField<String>(
-                  value: selectedIcon,
-                  style: GoogleFonts.poppins(
-                      fontSize: 13, color: AppColors.textPrimary),
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: AppColors.surfaceLight,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: AppColors.divider),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: AppColors.divider),
-                    ),
-                  ),
-                  items: _availableIcons.entries.map((e) {
-                    return DropdownMenuItem(
-                      value: e.key,
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(e.value,
-                              size: 18, color: AppColors.primary),
-                          const SizedBox(width: 8),
-                          Text(_iconLabels[e.key] ?? e.key,
-                              style: GoogleFonts.poppins(fontSize: 13)),
+                              size: 16,
+                              color: selected
+                                  ? AppColors.primary
+                                  : AppColors.textSecondary),
+                          const SizedBox(width: 6),
+                          Text(
+                            _iconLabels[e.key] ?? e.key,
+                            style: GoogleFonts.poppins(
+                              fontSize: 12.5,
+                              fontWeight:
+                                  selected ? FontWeight.w600 : FontWeight.w500,
+                              color: selected
+                                  ? AppColors.primary
+                                  : AppColors.textPrimary,
+                            ),
+                          ),
                         ],
                       ),
-                    );
-                  }).toList(),
-                  onChanged: (v) =>
-                      setDialogState(() => selectedIcon = v!),
-                ),
-                const SizedBox(height: 24),
-
-                // ── Actions ──
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(
-                              color: AppColors.divider),
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: Text('Cancel',
-                            style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                color: AppColors.textSecondary)),
-                      ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                          elevation: 0,
-                        ),
-                        onPressed: () async {
-                          final name = nameController.text.trim();
-
-                          // Validation: empty name
-                          if (name.isEmpty) {
-                            setDialogState(
-                                () => errorText = 'Name is required');
-                            return;
-                          }
-
-                          // Validation: duplicate name
-                          final exists = _store.paymentMethods.any((m) =>
-                              m.name.toLowerCase() ==
-                              name.toLowerCase());
-                          if (exists) {
-                            setDialogState(() => errorText =
-                                '"$name" already exists');
-                            return;
-                          }
-
-                          await _store.addPaymentMethod(
-                            name: name,
-                            value: name
-                                .toLowerCase()
-                                .replaceAll(RegExp(r'[^a-z0-9]'), '_'),
-                            iconName: selectedIcon,
-                          );
-                          if (mounted) Navigator.pop(ctx);
-                        },
-                        child: Text('Add',
-                            style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.white)),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                  );
+                }).toList(),
+              ),
+            ],
           ),
+          actions: [
+            appDialogCancelButton(ctx),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: 'Add',
+              onPressed: () async {
+                final name = nameController.text.trim();
+
+                // Validation: empty name
+                if (name.isEmpty) {
+                  setDialogState(() => errorText = 'Name is required');
+                  return;
+                }
+
+                // Validation: duplicate name
+                final exists = _store.paymentMethods.any(
+                    (m) => m.name.toLowerCase() == name.toLowerCase());
+                if (exists) {
+                  setDialogState(() => errorText = '"$name" already exists');
+                  return;
+                }
+
+                await _store.addPaymentMethod(
+                  name: name,
+                  value: name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_'),
+                  iconName: selectedIcon,
+                );
+                if (mounted) Navigator.pop(ctx);
+              },
+            ),
+          ],
         ),
       ),
     );
+    nameController.dispose();
   }
 
   // ── Delete confirm ──────────────────────────────────────────────────────────
 
   Future<void> _deleteMethod(String id, String name) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppConfirmDialog(
       context: context,
-      builder: (ctx) => Dialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.danger.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.delete_outline,
-                    color: AppColors.danger, size: 28),
-              ),
-              const SizedBox(height: 16),
-              Text('Delete "$name"?',
-                  style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary)),
-              const SizedBox(height: 8),
-              Text('This payment method will be permanently removed.',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.poppins(
-                      fontSize: 13, color: AppColors.textSecondary)),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      style: OutlinedButton.styleFrom(
-                        side:
-                            const BorderSide(color: AppColors.divider),
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: Text('Cancel',
-                          style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              color: AppColors.textSecondary)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(ctx, true),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.danger,
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        elevation: 0,
-                      ),
-                      child: Text('Delete',
-                          style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.white)),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
+      title: 'Delete "$name"?',
+      message: 'This payment method will be permanently removed.',
+      confirmLabel: 'Delete',
+      accent: AppColors.danger,
+      icon: Icons.delete_outline,
     );
 
-    if (confirmed == true) {
+    if (confirmed) {
       await _store.deletePaymentMethod(id);
     }
   }
@@ -827,32 +632,6 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
             ],
           ),
           const SizedBox(height: 20),
-
-          // ── Info banner ──
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.info.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: AppColors.info.withValues(alpha: 0.25)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline,
-                    color: AppColors.info, size: 18),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Default methods are pre-configured. Toggle any on or off, and add custom methods if needed.',
-                    style: GoogleFonts.poppins(
-                        fontSize: 12, color: AppColors.textSecondary),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
 
           // ── Currency selector ──
           Text('Currency',

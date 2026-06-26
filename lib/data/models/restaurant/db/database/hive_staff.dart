@@ -1,6 +1,6 @@
 
 import 'package:hive/hive.dart';
-import 'package:unipos/data/models/restaurant/db/staffModel_310.dart';
+import 'package:billberrylite/data/models/restaurant/db/staffModel_310.dart';
 
 /// A repository class to manage all database operations for StaffModel.
 /// This ensures that all interactions with the Hive box are centralized and consistent.

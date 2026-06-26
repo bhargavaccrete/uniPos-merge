@@ -1,15 +1,15 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:unipos/data/models/restaurant/db/cartmodel_308.dart';
-import 'package:unipos/data/models/restaurant/db/cash_handover_model.dart';
-import 'package:unipos/data/models/restaurant/db/cash_movement_model.dart';
-import 'package:unipos/data/models/restaurant/db/itemvariantemodel_312.dart';
-import 'package:unipos/data/models/restaurant/db/ordermodel_309.dart';
-import 'package:unipos/domain/services/restaurant/cart_calculation_service.dart';
-import 'package:unipos/domain/services/restaurant/esc_pos_receipt_builder.dart';
-import 'package:unipos/domain/services/retail/receipt_pdf_service.dart';
-import 'package:unipos/data/models/retail/hive_model/sale_model_203.dart';
-import 'package:unipos/presentation/screens/restaurant/start%20order/cart/customerdetails.dart';
+import 'package:billberrylite/data/models/restaurant/db/cartmodel_308.dart';
+import 'package:billberrylite/data/models/restaurant/db/cash_handover_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/cash_movement_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/itemvariantemodel_312.dart';
+import 'package:billberrylite/data/models/restaurant/db/ordermodel_309.dart';
+import 'package:billberrylite/domain/services/restaurant/cart_calculation_service.dart';
+import 'package:billberrylite/domain/services/restaurant/esc_pos_receipt_builder.dart';
+import 'package:billberrylite/domain/services/retail/receipt_pdf_service.dart';
+import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
+import 'package:billberrylite/presentation/screens/restaurant/start%20order/cart/customerdetails.dart';
 import '../../../helpers/test_helpers.dart';
 
 /// Final coverage tests — fills ALL remaining gaps.
@@ -577,12 +577,12 @@ void main() {
       expect(bytes[len - 1], equals(0x01)); // 1 (partial cut)
     });
 
-    test('test ticket contains UniPOS text', () {
+    test('test ticket contains Bill Berry Lite text', () {
       final bytes = EscPosReceiptBuilder.buildTestTicket(80);
       // Convert to string to check text content
       final text = String.fromCharCodes(
           bytes.where((b) => b >= 32 && b < 127)); // printable ASCII only
-      expect(text.contains('UniPOS'), isTrue);
+      expect(text.contains('Bill Berry Lite'), isTrue);
       expect(text.contains('Test'), isTrue);
     });
 

@@ -1,7 +1,7 @@
 
 
 import 'package:hive/hive.dart';
-import 'package:unipos/core/constants/hive_type_ids.dart';
+import 'package:billberrylite/core/constants/hive_type_ids.dart';
 
 part'eodmodel_317.g.dart';
 @HiveType(typeId: HiveTypeIds.restaurantEod)

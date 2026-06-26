@@ -40,7 +40,10 @@ class _BackupScreenState extends State<BackupScreen> {
             .whereType<File>()
             .where((file) =>
                 file.path.endsWith('.zip') &&
-                file.path.contains('UniPOS_backup'))
+                // Match current and all legacy backup prefixes so older
+                // backups still appear: UniPOS_*, BillBerry_*, BillBerryLite_*.
+                (file.path.contains('UniPOS_') ||
+                    file.path.contains('BillBerry')))
             .toList();
 
         // Sort by modified date (newest first)

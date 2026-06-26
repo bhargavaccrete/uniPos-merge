@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/domain/services/restaurant/notification_service.dart';
-import 'package:unipos/domain/store/restaurant/license_store.dart';
-import 'package:unipos/stores/setup_wizard_store.dart';
-import 'package:unipos/presentation/screens/onboarding/storeDetailsScreen.dart';
-import 'package:unipos/presentation/screens/onboarding/email_verification_step.dart';
-import 'package:unipos/presentation/screens/onboarding/taxSetupStep.dart';
-import 'package:unipos/presentation/screens/onboarding/paymentSetupStep.dart';
-import 'package:unipos/presentation/screens/onboarding/staffSetupStep.dart';
-import 'package:unipos/presentation/screens/onboarding/securitySetupStep.dart';
-import 'package:unipos/presentation/screens/onboarding/license_activated_screen.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/domain/store/restaurant/license_store.dart';
+import 'package:billberrylite/stores/setup_wizard_store.dart';
+import 'package:billberrylite/presentation/screens/onboarding/storeDetailsScreen.dart';
+import 'package:billberrylite/presentation/screens/onboarding/email_verification_step.dart';
+import 'package:billberrylite/presentation/screens/onboarding/taxSetupStep.dart';
+import 'package:billberrylite/presentation/screens/onboarding/paymentSetupStep.dart';
+import 'package:billberrylite/presentation/screens/onboarding/staffSetupStep.dart';
+import 'package:billberrylite/presentation/screens/onboarding/securitySetupStep.dart';
+import 'package:billberrylite/presentation/screens/onboarding/license_activated_screen.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 
 import '../../../util/restaurant/restaurant_session.dart';
 import '../../../util/color.dart';
@@ -167,97 +168,36 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
   }
 
   void _showHelpDialog() {
-    showDialog(
+    showAppInfoDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Need Help?'),
-        content: const Text('Contact support for assistance with setup.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
+      title: 'Need Help?',
+      message: 'Contact support for assistance with setup.',
+      icon: Icons.support_agent_rounded,
     );
   }
 
-  void _showExitDialog() {
+  void _showExitDialog() async {
     final progress = ((_store.currentStep + 1) / _totalSteps * 100).round();
 
-    showDialog(
+    final shouldExit = await showAppConfirmDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: Row(
-          children: [
-            Icon(Icons.exit_to_app, color: AppColors.warning),
-            const SizedBox(width: 12),
-            const Text('Exit Setup?'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Your progress will be automatically saved.',
-              style: TextStyle(fontSize: 15, color: AppColors.darkNeutral),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.info.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.info.withOpacity(0.3)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.check_circle, color: AppColors.info, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Setup Progress: $progress% complete',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.info,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'You can resume setup anytime from where you left off.',
-              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Continue Setup'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context); // close dialog
-              if (Navigator.canPop(context)) {
-                Navigator.pop(context); // exit setup
-              }
-              NotificationService.instance.showSuccess('Progress saved ($progress% complete)');
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.warning,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Save & Exit'),
-          ),
-        ],
-      ),
+      title: 'Exit Setup?',
+      message:
+          'Your progress will be automatically saved ($progress% complete). '
+          'You can resume anytime from where you left off.',
+      confirmLabel: 'Save & Exit',
+      cancelLabel: 'Continue Setup',
+      accent: AppColors.warning,
+      icon: Icons.exit_to_app,
     );
+
+    if (!mounted || !shouldExit) return;
+
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context); // exit setup
+    }
+    NotificationService.instance
+        .showSuccess('Progress saved ($progress% complete)');
   }
 
   @override
@@ -499,18 +439,20 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         ),
       ),
 
-      // Step 1: Business Type - uses store
-      SlideTransition(
-        position: _slideAnimation,
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: BusinessTypeStep(
-            store: _store,
-            onNext: _nextStep,
-            onPrevious: _previousStep,
+      // Step 1: Business Type — only when retail is enabled (otherwise there's
+      // a single business type, auto-selected in the store, so we skip it).
+      if (AppConfig.retailEnabled)
+        SlideTransition(
+          position: _slideAnimation,
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: BusinessTypeStep(
+              store: _store,
+              onNext: _nextStep,
+              onPrevious: _previousStep,
+            ),
           ),
         ),
-      ),
 
       // Step 2: Store Details - uses store
       SlideTransition(
@@ -699,7 +641,7 @@ class SetupSidebar extends StatelessWidget {
           ),
           const SizedBox(height: 15),
           const Text(
-            'UniPOS Setup',
+            'Bill Berry Lite Setup',
             style: TextStyle(
               color: Colors.white,
               fontSize: 22,
@@ -945,12 +887,14 @@ class SetupStep {
         description: "Let's get your store up and running",
         estimatedTime: '30s',
       ),
-      const SetupStep(
-        title: 'Business Type',
-        icon: Icons.business,
-        description: 'Choose the type that best describes your business',
-        estimatedTime: '1 min',
-      ),
+      // Retail is hidden, so there's only one business type — skip the step.
+      if (AppConfig.retailEnabled)
+        const SetupStep(
+          title: 'Business Type',
+          icon: Icons.business,
+          description: 'Choose the type that best describes your business',
+          estimatedTime: '1 min',
+        ),
       const SetupStep(
         title: 'Store Details',
         icon: Icons.store,
@@ -1088,7 +1032,7 @@ class WelcomeStep extends StatelessWidget {
 
                   // Title
                   Text(
-                    'Welcome to UniPOS Setup',
+                    'Welcome to Bill Berry Lite Setup',
                     style: TextStyle(
                       fontSize: AppResponsive.getValue(context, mobile: 22.0, tablet: 26.0, desktop: 30.0),
                       fontWeight: FontWeight.bold,

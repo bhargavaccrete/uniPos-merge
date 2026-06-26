@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:unipos/domain/services/restaurant/cart_calculation_service.dart';
-import 'package:unipos/presentation/screens/restaurant/start%20order/cart/customerdetails.dart';
+import 'package:billberrylite/domain/services/restaurant/cart_calculation_service.dart';
+import 'package:billberrylite/presentation/screens/restaurant/start%20order/cart/customerdetails.dart';
 import '../../../helpers/test_helpers.dart';
 
 /// Unit tests for CartCalculationService — the financial engine of the app.

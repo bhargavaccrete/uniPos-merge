@@ -2,8 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:unipos/presentation/screens/restaurant/start%20order/cart/cart.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/presentation/screens/restaurant/start%20order/cart/cart.dart';
+import 'package:billberrylite/util/color.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../domain/services/restaurant/day_management_service.dart';
@@ -19,7 +19,7 @@ import 'WeightItemDialog.dart';
 import 'item_options_dialog.dart';
 import '../../../../util/common/app_responsive.dart';
 import '../../../../util/common/currency_helper.dart';
-import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
 
 enum StockStatus { inStock, orderAvailable, outOfStock, notTracked }
 
@@ -953,24 +953,23 @@ class _MenuScreenState extends State<MenuScreen> {
               color: isDisabled
                   ? AppColors.surfaceMedium.withOpacity(0.5)
                   : inCart
-                      ? AppColors.primary.withOpacity(0.12)
+                      ? AppColors.primary.withOpacity(0.04)
                       : AppColors.white,
               borderRadius: BorderRadius.circular(16),
-              // In-cart items get a bold primary border + glow so they stand out.
+              // In-cart items stay calm: a thin accent border + the small green
+              // "in cart" pill mark them, instead of a heavy fill/glow.
               border: Border.all(
                 color: inCart
-                    ? AppColors.primary
+                    ? AppColors.primary.withOpacity(0.45)
                     : (isDisabled
                         ? AppColors.divider
                         : AppColors.divider.withOpacity(0.5)),
-                width: inCart ? 2 : 1,
+                width: 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: inCart
-                      ? AppColors.primary.withOpacity(0.25)
-                      : Colors.black.withOpacity(0.05),
-                  blurRadius: inCart ? 10 : 8,
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
               ],
@@ -1090,13 +1089,13 @@ class _MenuScreenState extends State<MenuScreen> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
-                      color: AppColors.primary,
+                      color: AppColors.success,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.shopping_cart_rounded,
+                        const Icon(Icons.check_circle_rounded,
                             size: 11, color: Colors.white),
                         const SizedBox(width: 4),
                         Text(
@@ -1382,30 +1381,21 @@ class _ItemListTileState extends State<_ItemListTile> {
                   : isDisabled
                       ? AppColors.surfaceMedium.withOpacity(0.5)
                       : inCart
-                          ? AppColors.primary.withOpacity(0.12)
+                          ? AppColors.primary.withOpacity(0.04)
                           : AppColors.white,
               borderRadius: BorderRadius.circular(14),
-              // Items already in the cart get a bold primary border + soft glow
-              // so they clearly stand out while ordering.
+              // In-cart items stay calm: a thin accent border + the small green
+              // "in cart" chip mark them, instead of a heavy fill/glow.
               border: Border.all(
                 color: _isPressed
                     ? AppColors.primary.withOpacity(0.3)
                     : inCart
-                        ? AppColors.primary
+                        ? AppColors.primary.withOpacity(0.45)
                         : isDisabled
                             ? AppColors.divider
                             : AppColors.divider.withOpacity(0.5),
-                width: (inCart && !_isPressed) ? 2 : 1,
+                width: 1,
               ),
-              boxShadow: (inCart && !_isPressed)
-                  ? [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.22),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
-                      ),
-                    ]
-                  : null,
             ),
             child: Row(
               children: [
@@ -1526,14 +1516,14 @@ class _ItemListTileState extends State<_ItemListTile> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.1),
+        color: AppColors.success.withOpacity(0.12),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.shopping_cart_rounded,
-              size: 12, color: AppColors.primary),
+          const Icon(Icons.check_circle_rounded,
+              size: 13, color: AppColors.success),
           const SizedBox(width: 5),
           Flexible(
             child: Text(
@@ -1543,7 +1533,7 @@ class _ItemListTileState extends State<_ItemListTile> {
               style: GoogleFonts.poppins(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.primary),
+                  color: AppColors.success),
             ),
           ),
         ],

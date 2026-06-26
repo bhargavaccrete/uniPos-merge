@@ -2,20 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/core/routes/routes_name.dart';
-import 'package:unipos/util/color.dart';
-import 'package:unipos/util/common/currency_helper.dart';
-import 'package:unipos/util/restaurant/restaurant_auth_helper.dart';
-import 'package:unipos/util/restaurant/restaurant_session.dart';
-import 'package:unipos/util/restaurant/staticswitch.dart';
-import 'package:unipos/domain/services/restaurant/day_management_service.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/routes/routes_name.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/util/restaurant/restaurant_auth_helper.dart';
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
+import 'package:billberrylite/util/restaurant/staticswitch.dart';
+import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
 import '../../../../screens/restaurant/welcome_Admin.dart';
 import '../../../../screens/restaurant/AuthSelectionScreen.dart';
 import '../../../../screens/restaurant/need help/needhelp.dart';
 import '../../../../screens/retail/reports_screen.dart';
-import 'package:unipos/presentation/widget/componets/common/app_text_field.dart';
-import 'package:unipos/util/common/app_responsive.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 class DrawerManage extends StatelessWidget {
   final bool issync;
@@ -69,7 +70,7 @@ class DrawerManage extends StatelessWidget {
                   ),
                   SizedBox(height: 16),
                   Text(
-                    'UniPOS',
+                    'Bill Berry Lite',
                     style: GoogleFonts.poppins(
                       fontSize: isTablet ? 24 : 22,
                       fontWeight: FontWeight.bold,
@@ -164,8 +165,10 @@ class DrawerManage extends StatelessWidget {
                     isTablet: isTablet,
                   ),
 
-                  // Change PIN (staff only)
-                  if (!RestaurantSession.isAdmin)
+                  // Change PIN (non-admin staff, excluding Cashier — admin
+                  // resets cashier PINs in Manage Staff)
+                  if (!RestaurantSession.isAdmin &&
+                      RestaurantSession.staffRole != 'Cashier')
                     _buildDrawerItem(
                       context: context,
                       icon: Icons.lock_reset_rounded,
@@ -361,9 +364,6 @@ class DrawerManage extends StatelessWidget {
     // NavigatorState outlives the DrawerManage widget, so it's safe to use
     // across async gaps without a mounted check.
     final navigator = Navigator.of(context);
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
 
     final duration = DateTime.now().difference(shift.startTime);
     final hours = duration.inHours;
@@ -401,341 +401,297 @@ class DrawerManage extends StatelessWidget {
             final isShort = diff != null && diff < -1.0;
             final isOver  = diff != null && diff > 1.0;
 
-            return AlertDialog(
-              insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              contentPadding: EdgeInsets.zero,
-              content: SingleChildScrollView(
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  // Header
+            return AppDialogShell(
+              title: 'Shift Cash Count',
+              subtitle: 'Count the cash in the drawer',
+              accent: Colors.orange,
+              icon: Icons.point_of_sale_rounded,
+              body: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Who is ending shift
                   Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFFF3E0),
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceMedium,
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: Row(children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.point_of_sale_rounded, color: Colors.orange, size: 24),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('Shift Cash Count',
-                              style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700)),
-                          Text('Count the cash in the drawer',
-                              style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
-                        ]),
-                      ),
+                      const Icon(Icons.person_outline, size: 18, color: AppColors.textSecondary),
+                      const SizedBox(width: 8),
+                      Text('Shift ended by: ${shift.staffName}',
+                          style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
                     ]),
                   ),
+                  const SizedBox(height: 12),
 
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      // Who is ending shift
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceMedium,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(children: [
-                          const Icon(Icons.person_outline, size: 18, color: AppColors.textSecondary),
-                          const SizedBox(width: 8),
-                          Text('Shift ended by: ${shift.staffName}',
-                              style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
-                        ]),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // POS Expected balance
-                      FutureBuilder<double>(
-                        future: balanceFuture,
-                        builder: (ctx, snap) {
-                          if (snap.connectionState == ConnectionState.waiting) {
-                            return Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.shade50,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Row(children: [
-                                const SizedBox(width: 14, height: 14,
-                                    child: CircularProgressIndicator(strokeWidth: 2)),
-                                const SizedBox(width: 10),
-                                Text('Calculating expected balance...',
-                                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.blue.shade700)),
-                              ]),
-                            );
-                          }
-                          if (snap.hasError || !snap.hasData) return const SizedBox.shrink();
-                          final balance = snap.data!;
-                          resolvedExpected = balance;
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.shade50,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.blue.shade200),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                  Text('POS expects in drawer',
-                                      style: GoogleFonts.poppins(fontSize: 11, color: Colors.blue.shade700)),
-                                  Text('Based on sales, cash in/out',
-                                      style: GoogleFonts.poppins(fontSize: 10, color: Colors.blue.shade400)),
-                                ]),
-                                Text(
-                                  '$currency ${balance.toStringAsFixed(2)}',
-                                  style: GoogleFonts.poppins(
-                                      fontSize: 20, fontWeight: FontWeight.w800, color: Colors.blue.shade800),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-
-                      const SizedBox(height: 16),
-                      Text('Cash you counted',
-                          style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600,
-                              color: AppColors.textSecondary)),
-                      const SizedBox(height: 6),
-                      AppTextField(
-                        controller: amountCtrl,
-                        hint: '0.00',
-                        icon: Icons.attach_money,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
-                      ),
-
-                      // Live difference panel
-                      if (diff != null) ...[
-                        const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  // POS Expected balance
+                  FutureBuilder<double>(
+                    future: balanceFuture,
+                    builder: (ctx, snap) {
+                      if (snap.connectionState == ConnectionState.waiting) {
+                        return Container(
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: isShort
-                                ? Colors.red.shade50
-                                : isOver
-                                    ? Colors.orange.shade50
-                                    : Colors.green.shade50,
+                            color: Colors.blue.shade50,
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
+                          ),
+                          child: Row(children: [
+                            const SizedBox(width: 14, height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2)),
+                            const SizedBox(width: 10),
+                            Text('Calculating expected balance...',
+                                style: GoogleFonts.poppins(fontSize: 12, color: Colors.blue.shade700)),
+                          ]),
+                        );
+                      }
+                      if (snap.hasError || !snap.hasData) return const SizedBox.shrink();
+                      final balance = snap.data!;
+                      resolvedExpected = balance;
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.blue.shade200),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text('POS expects in drawer',
+                                  style: GoogleFonts.poppins(fontSize: 11, color: Colors.blue.shade700)),
+                              Text('Based on sales, cash in/out',
+                                  style: GoogleFonts.poppins(fontSize: 10, color: Colors.blue.shade400)),
+                            ]),
+                            Text(
+                              '$currency ${balance.toStringAsFixed(2)}',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 20, fontWeight: FontWeight.w800, color: Colors.blue.shade800),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 16),
+                  Text('Cash you counted',
+                      style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary)),
+                  const SizedBox(height: 6),
+                  AppTextField(
+                    controller: amountCtrl,
+                    hint: '0.00',
+                    icon: Icons.attach_money,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
+                  ),
+
+                  // Live difference panel
+                  if (diff != null) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isShort
+                            ? Colors.red.shade50
+                            : isOver
+                                ? Colors.orange.shade50
+                                : Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isShort
+                              ? Colors.red.shade200
+                              : isOver
+                                  ? Colors.orange.shade200
+                                  : Colors.green.shade200,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            isShort ? 'Short' : isOver ? 'Over' : 'Matched',
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
                               color: isShort
-                                  ? Colors.red.shade200
+                                  ? Colors.red.shade700
                                   : isOver
-                                      ? Colors.orange.shade200
-                                      : Colors.green.shade200,
+                                      ? Colors.orange.shade700
+                                      : Colors.green.shade700,
                             ),
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                isShort ? 'Short' : isOver ? 'Over' : 'Matched',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: isShort
-                                      ? Colors.red.shade700
-                                      : isOver
-                                          ? Colors.orange.shade700
-                                          : Colors.green.shade700,
-                                ),
-                              ),
-                              Text(
-                                isShort
-                                    ? '-$currency ${diff.abs().toStringAsFixed(2)}'
-                                    : isOver
-                                        ? '+$currency ${diff.toStringAsFixed(2)}'
-                                        : '$currency 0.00',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: isShort
-                                      ? Colors.red.shade700
-                                      : isOver
-                                          ? Colors.orange.shade700
-                                          : Colors.green.shade700,
-                                ),
-                              ),
-                            ],
+                          Text(
+                            isShort
+                                ? '-$currency ${diff.abs().toStringAsFixed(2)}'
+                                : isOver
+                                    ? '+$currency ${diff.toStringAsFixed(2)}'
+                                    : '$currency 0.00',
+                            style: GoogleFonts.poppins(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: isShort
+                                  ? Colors.red.shade700
+                                  : isOver
+                                      ? Colors.orange.shade700
+                                      : Colors.green.shade700,
+                            ),
                           ),
-                        ),
-                      ],
-
-                      const SizedBox(height: 16),
-                      Text('Note (optional)',
-                          style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600,
-                              color: AppColors.textSecondary)),
-                      const SizedBox(height: 6),
-                      AppTextField(
-                        controller: noteCtrl,
-                        hint: 'e.g. "All good" or explain any difference',
-                        icon: Icons.note_alt_outlined,
+                        ],
                       ),
-                    ]),
+                    ),
+                  ],
+
+                  const SizedBox(height: 16),
+                  Text('Note (optional)',
+                      style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary)),
+                  const SizedBox(height: 6),
+                  AppTextField(
+                    controller: noteCtrl,
+                    hint: 'e.g. "All good" or explain any difference',
+                    icon: Icons.note_alt_outlined,
                   ),
-                ]),
+                ],
               ),
               actions: [
-                TextButton(
-                  onPressed: isSaving ? null : () async {
-                    Navigator.pop(ctx);
-                    await _clearLoginState();
-                    navigator.pushNamedAndRemoveUntil(
-                        RouteNames.restaurantLogin, (r) => false);
-                  },
-                  child: Text('Skip', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
-                ),
-                ElevatedButton(
-                  onPressed: isSaving ? null : () async {
-                    final amount = double.tryParse(amountCtrl.text.trim()) ?? 0;
-                    if (amount <= 0) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                          const SnackBar(content: Text('Enter the cash amount you counted')));
-                      return;
-                    }
-                    setS(() => isSaving = true);
-                    final expectedBalance = await (balanceFuture ?? Future.value(0.0));
-                    await cashHandoverStore.recordShiftEnd(
-                      closedBy: shift.staffName,
-                      countedAmount: amount,
-                      expectedAmount: expectedBalance,
-                      note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
-                    );
-                    if (ctx.mounted) Navigator.pop(ctx);
-                    await _clearLoginState();
-                    navigator.pushNamedAndRemoveUntil(
-                        RouteNames.restaurantLogin, (r) => false);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange.shade700,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: isSaving ? null : () async {
+                      Navigator.pop(ctx);
+                      await _clearLoginState();
+                      navigator.pushNamedAndRemoveUntil(
+                          RouteNames.restaurantLogin, (r) => false);
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.textSecondary,
+                      side: BorderSide(color: AppColors.divider),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text('Skip', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
                   ),
-                  child: isSaving
-                      ? const SizedBox(width: 18, height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : Text('Save & End Shift',
-                          style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: isSaving ? null : () async {
+                      final amount = double.tryParse(amountCtrl.text.trim()) ?? 0;
+                      if (amount <= 0) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                            const SnackBar(content: Text('Enter the cash amount you counted')));
+                        return;
+                      }
+                      setS(() => isSaving = true);
+                      final expectedBalance = await (balanceFuture ?? Future.value(0.0));
+                      await cashHandoverStore.recordShiftEnd(
+                        closedBy: shift.staffName,
+                        countedAmount: amount,
+                        expectedAmount: expectedBalance,
+                        note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
+                      );
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      await _clearLoginState();
+                      navigator.pushNamedAndRemoveUntil(
+                          RouteNames.restaurantLogin, (r) => false);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange.shade700,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: isSaving
+                        ? const SizedBox(width: 18, height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : Text('Save & End Shift',
+                            style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                  ),
                 ),
               ],
             );
           }
 
           // ── Phase 1: End Shift confirm ──────────────────────────────
-          return AlertDialog(
-            insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            contentPadding: EdgeInsets.zero,
-            content: Column(
+          return AppDialogShell(
+            title: 'End Shift',
+            accent: Colors.orange,
+            icon: Icons.lock_clock_rounded,
+            body: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _infoRow(Icons.person, 'Staff', shift.staffName),
+                SizedBox(height: 8),
+                _infoRow(Icons.timer, 'Duration', '${hours}h ${minutes}m'),
+                SizedBox(height: 8),
+                _infoRow(Icons.play_arrow, 'Started',
+                    '${shift.startTime.hour.toString().padLeft(2, '0')}:${shift.startTime.minute.toString().padLeft(2, '0')}'),
+                SizedBox(height: 12),
                 Container(
-                  padding: EdgeInsets.all(20),
-                  child: Row(children: [
-                    Container(
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(Icons.lock_clock_rounded, size: 28, color: Colors.orange),
-                    ),
-                    SizedBox(width: 14),
-                    Expanded(
-                      child: Text('End Shift',
-                          style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w700)),
-                    ),
-                  ]),
-                ),
-                Divider(height: 1, color: AppColors.divider),
-                Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _infoRow(Icons.person, 'Staff', shift.staffName),
-                      SizedBox(height: 8),
-                      _infoRow(Icons.timer, 'Duration', '${hours}h ${minutes}m'),
-                      SizedBox(height: 8),
-                      _infoRow(Icons.play_arrow, 'Started',
-                          '${shift.startTime.hour.toString().padLeft(2, '0')}:${shift.startTime.minute.toString().padLeft(2, '0')}'),
-                      SizedBox(height: 12),
-                      Container(
-                        padding: EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withValues(alpha: 0.07),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
-                        ),
-                        child: Text(
-                          'Orders during this shift will be tallied and saved to the Shift Report.',
-                          style: GoogleFonts.poppins(fontSize: 12, color: Colors.orange.shade800),
-                        ),
-                      ),
-                    ],
+                  padding: EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                  ),
+                  child: Text(
+                    'Orders during this shift will be tallied and saved to the Shift Report.',
+                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.orange.shade800),
                   ),
                 ),
               ],
             ),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
-              ),
-              ElevatedButton(
-                onPressed: isClosing
-                    ? null
-                    : () async {
-                        setS(() => isClosing = true);
-                        final closed = await shiftStore.closeShift(shift.id);
-                        if (closed != null) {
-                          await RestaurantSession.clearShiftSession();
-                          if (!AppSettings.shiftHandover) {
-                            // Handover disabled — skip Phase 2, go straight to logout
-                            if (ctx.mounted) Navigator.pop(ctx);
-                            await _clearLoginState();
-                            navigator.pushNamedAndRemoveUntil(
-                                RouteNames.restaurantLogin, (r) => false);
-                            return;
+              appDialogCancelButton(ctx),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: isClosing
+                      ? null
+                      : () async {
+                          setS(() => isClosing = true);
+                          final closed = await shiftStore.closeShift(shift.id);
+                          if (closed != null) {
+                            await RestaurantSession.clearShiftSession();
+                            if (!AppSettings.shiftHandover) {
+                              // Handover disabled — skip Phase 2, go straight to logout
+                              if (ctx.mounted) Navigator.pop(ctx);
+                              await _clearLoginState();
+                              navigator.pushNamedAndRemoveUntil(
+                                  RouteNames.restaurantLogin, (r) => false);
+                              return;
+                            }
+                            // Switch to cash count phase; kick off balance load once
+                            if (ctx.mounted) setS(() {
+                              showCashCount = true;
+                              balanceFuture ??= _loadExpectedBalance();
+                            });
+                          } else {
+                            if (ctx.mounted) {
+                              setS(() => isClosing = false);
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(content: Text('Failed to end shift. Please try again.')),
+                              );
+                            }
                           }
-                          // Switch to cash count phase; kick off balance load once
-                          if (ctx.mounted) setS(() {
-                            showCashCount = true;
-                            balanceFuture ??= _loadExpectedBalance();
-                          });
-                        } else {
-                          if (ctx.mounted) {
-                            setS(() => isClosing = false);
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              const SnackBar(content: Text('Failed to end shift. Please try again.')),
-                            );
-                          }
-                        }
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: isClosing
+                      ? const SizedBox(width: 18, height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : Text('End Shift', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
                 ),
-                child: isClosing
-                    ? const SizedBox(width: 18, height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : Text('End Shift', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
               ),
             ],
           );
@@ -765,22 +721,14 @@ class DrawerManage extends StatelessWidget {
     final formKey = GlobalKey<FormState>();
     String? errorMsg;
 
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
-          insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(children: [
-            Icon(Icons.lock_reset_rounded, color: Colors.teal),
-            SizedBox(width: 10),
-            Text('Change PIN',
-                style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600)),
-          ]),
-          content: Form(
+        builder: (ctx, setState) => AppDialogShell(
+          title: 'Change PIN',
+          accent: Colors.teal,
+          icon: Icons.lock_reset_rounded,
+          body: Form(
             key: formKey,
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -838,17 +786,11 @@ class DrawerManage extends StatelessWidget {
             ),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.teal,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
+            appDialogCancelButton(ctx),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: 'Update PIN',
+              color: Colors.teal,
               onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
                 await staffStore.loadStaff();
@@ -872,7 +814,6 @@ class DrawerManage extends StatelessWidget {
                   );
                 }
               },
-              child: Text('Update PIN', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
             ),
           ],
         ),
@@ -880,201 +821,37 @@ class DrawerManage extends StatelessWidget {
     );
   }
 
-  void _showDeleteAccountDialog(BuildContext context) {
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    showDialog(
+  void _showDeleteAccountDialog(BuildContext context) async {
+    final ok = await showAppConfirmDialog(
       context: context,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.warning_rounded, color: Colors.red, size: 24),
-            ),
-            SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Delete Account',
-                style: GoogleFonts.poppins(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-        content: Text(
+      title: 'Delete Account',
+      message:
           'This action cannot be undone. All your data will be permanently deleted.',
-          style: GoogleFonts.poppins(fontSize: 14),
-        ),
-        actions: <Widget>[
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                ),
-                child: Text(
-                  "Cancel",
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(dialogContext).pop();
-                  // Add delete account logic here
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  elevation: 0,
-                ),
-                child: Text(
-                  "Delete",
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+      confirmLabel: 'Delete',
+      accent: Colors.red,
+      icon: Icons.warning_rounded,
     );
+    if (!ok) return;
+    // Add delete account logic here
   }
 
-  void _showLogoutDialog(BuildContext context) {
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    showDialog(
+  void _showLogoutDialog(BuildContext context) async {
+    // Capture navigator before the await — context may unmount after.
+    final navigator = Navigator.of(context);
+    final ok = await showAppConfirmDialog(
       context: context,
+      title: 'Logout',
+      message: 'Are you sure you want to logout?',
+      confirmLabel: 'Logout',
+      accent: Colors.red,
+      icon: Icons.logout_rounded,
       barrierDismissible: false,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        contentPadding: EdgeInsets.zero,
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header
-            Container(
-              padding: EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.logout_rounded,
-                      color: Colors.red,
-                      size: 28,
-                    ),
-                  ),
-                  SizedBox(width: 14),
-                  Expanded(
-                    child: Text(
-                      'Logout',
-                      style: GoogleFonts.poppins(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Divider(height: 1, color: AppColors.divider),
-
-            // Content
-            Padding(
-              padding: EdgeInsets.all(20),
-              child: Text(
-                'Are you sure you want to logout?',
-                style: GoogleFonts.poppins(
-                  fontSize: 15,
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            style: TextButton.styleFrom(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            ),
-            child: Text(
-              "Cancel",
-              style: GoogleFonts.poppins(
-                fontSize: 15,
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          SizedBox(width: 8),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.of(dialogContext).pop();
-              await _clearLoginState();
-              if (context.mounted) {
-                Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  RouteNames.restaurantLogin,
-                      (route) => false,
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              elevation: 0,
-            ),
-            child: Text(
-              "Logout",
-              style: GoogleFonts.poppins(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
+    );
+    if (!ok) return;
+    await _clearLoginState();
+    navigator.pushNamedAndRemoveUntil(
+      RouteNames.restaurantLogin,
+      (route) => false,
     );
   }
 

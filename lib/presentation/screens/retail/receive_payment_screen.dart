@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../domain/services/restaurant/notification_service.dart';
-import 'package:unipos/data/models/retail/hive_model/customer_model_208.dart';
-import 'package:unipos/data/models/retail/hive_model/sale_model_203.dart';
+import 'package:billberrylite/data/models/retail/hive_model/customer_model_208.dart';
+import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 
 /// Receive Payment Screen - Collect due payments from customers
 class ReceivePaymentScreen extends StatefulWidget {

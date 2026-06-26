@@ -1,6 +1,6 @@
 /*
-import 'package:unipos/util/common/currency_helper.dart';
-import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
 
 /// Retail Price Formatter
 /// Uses shared currency and decimal settings to format prices

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:unipos/core/di/service_locator.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
 
 import 'home_screen.dart';
 

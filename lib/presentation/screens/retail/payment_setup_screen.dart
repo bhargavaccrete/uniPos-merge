@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:unipos/core/di/service_locator.dart';
-import 'package:unipos/stores/payment_method_store.dart';
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/stores/payment_method_store.dart';
+import 'package:billberrylite/util/color.dart';
 
 class PaymentSetupScreen extends StatefulWidget {
   final VoidCallback? onComplete;

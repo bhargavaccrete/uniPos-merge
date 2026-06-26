@@ -10,10 +10,11 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
-import 'package:unipos/util/common/currency_helper.dart';
-import 'package:unipos/util/common/decimal_settings.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:universal_html/html.dart' as html;
-import 'package:unipos/util/color.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 // ═══════════════════════════════════════════════════════════════════════
 // TOP-LEVEL ISOLATE FUNCTIONS
@@ -557,78 +558,177 @@ class ReportExportService {
   }) async {
     final parentContext = context;
 
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) -
+                    AppResponsive.dialogWidth(context)) /
+                2)
+            .clamp(40.0, 200.0)
+        : 24.0;
+
     await showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => Dialog(
+        backgroundColor: AppColors.white,
+        clipBehavior: Clip.antiAlias,
+        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.file_download_outlined, color: AppColors.primary),
-            const SizedBox(width: 8),
-            Text(
-              'Export Report',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-        content: Column(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Choose export format:',
-              style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary),
+            // Header — accent badge + title
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.06),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.file_download_outlined,
+                        color: AppColors.primary, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text('Export Report',
+                        style: GoogleFonts.poppins(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary)),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: const Icon(Icons.table_chart, color: Colors.green),
-              title: Text('Export to Excel',
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
-              subtitle: Text('Best for data analysis',
-                  style: GoogleFonts.poppins(fontSize: 12)),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-              onTap: () async {
-                Navigator.pop(dialogContext);
-                await exportToExcel(
-                  fileName: fileName,
-                  sheetName: reportTitle,
-                  headers: headers,
-                  data: data,
-                  context: parentContext,
-                  title: reportTitle,
-                  summary: summary,
-                );
-              },
+            // Body — format option cards
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Choose export format',
+                      style: GoogleFonts.poppins(
+                          fontSize: 13, color: AppColors.textSecondary)),
+                  const SizedBox(height: 14),
+                  _exportOptionTile(
+                    color: const Color(0xFF1D6F42),
+                    icon: Icons.table_chart_rounded,
+                    title: 'Export to Excel',
+                    subtitle: 'Best for data analysis',
+                    onTap: () async {
+                      Navigator.pop(dialogContext);
+                      await exportToExcel(
+                        fileName: fileName,
+                        sheetName: reportTitle,
+                        headers: headers,
+                        data: data,
+                        context: parentContext,
+                        title: reportTitle,
+                        summary: summary,
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  _exportOptionTile(
+                    color: const Color(0xFFD32F2F),
+                    icon: Icons.picture_as_pdf_rounded,
+                    title: 'Export to PDF',
+                    subtitle: 'Best for printing & sharing',
+                    onTap: () async {
+                      Navigator.pop(dialogContext);
+                      await exportToPDF(
+                        fileName: fileName,
+                        title: reportTitle,
+                        headers: headers,
+                        data: data,
+                        context: parentContext,
+                        summary: summary,
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
-              title: Text('Export to PDF',
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
-              subtitle: Text('Best for printing & sharing',
-                  style: GoogleFonts.poppins(fontSize: 12)),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-              onTap: () async {
-                Navigator.pop(dialogContext);
-                await exportToPDF(
-                  fileName: fileName,
-                  title: reportTitle,
-                  headers: headers,
-                  data: data,
-                  context: parentContext,
-                  summary: summary,
-                );
-              },
+            // Cancel — full-width outlined
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.textSecondary,
+                    side: BorderSide(color: AppColors.divider),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: Text('Cancel',
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                ),
+              ),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text('Cancel', style: GoogleFonts.poppins()),
-          ),
-        ],
+      ),
+    );
+  }
+
+  /// A tappable export-format card (Excel / PDF) for [showExportDialog].
+  static Widget _exportOptionTile({
+    required Color color,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: color.withValues(alpha: 0.05),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary)),
+                  const SizedBox(height: 2),
+                  Text(subtitle,
+                      style: GoogleFonts.poppins(
+                          fontSize: 12, color: AppColors.textSecondary)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded,
+                color: AppColors.textSecondary, size: 20),
+          ],
+        ),
       ),
     );
   }

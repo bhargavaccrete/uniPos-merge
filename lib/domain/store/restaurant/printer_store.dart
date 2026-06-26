@@ -347,7 +347,7 @@ abstract class _PrinterStore with Store {
       0x1B, 0x40,
       0x1B, 0x61, 0x01,
       0x1B, 0x21, 0x30,
-      ...'UniPOS\n'.codeUnits,
+      ...'Bill Berry Lite\n'.codeUnits,
       0x1B, 0x21, 0x00,
       ...'Test Print\n'.codeUnits,
       ...'-'.padRight(32, '-').codeUnits,

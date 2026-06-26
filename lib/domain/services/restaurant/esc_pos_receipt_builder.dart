@@ -1,10 +1,10 @@
 import 'package:intl/intl.dart';
-import 'package:unipos/domain/services/retail/receipt_pdf_service.dart';
-import 'package:unipos/util/common/currency_helper.dart';
-import 'package:unipos/util/common/decimal_settings.dart';
-import 'package:unipos/util/restaurant/print_settings.dart';
-import 'package:unipos/domain/services/restaurant/tax_breakdown.dart';
-import 'package:unipos/core/di/service_locator.dart' show taxStore;
+import 'package:billberrylite/domain/services/retail/receipt_pdf_service.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
+import 'package:billberrylite/util/restaurant/print_settings.dart';
+import 'package:billberrylite/domain/services/restaurant/tax_breakdown.dart';
+import 'package:billberrylite/core/di/service_locator.dart' show taxStore;
 
 /// Builds raw ESC/POS byte arrays for thermal printers.
 ///
@@ -470,7 +470,7 @@ class EscPosReceiptBuilder {
     }
     bytes.addAll(_text('Visit us again!'));
     if (PrintSettings.showPoweredBy) {
-      bytes.addAll(_text('Powered by UniPOS'));
+      bytes.addAll(_text('Powered by Bill Berry Lite'));
     }
 
     // Feed paper and cut
@@ -624,7 +624,7 @@ class EscPosReceiptBuilder {
     bytes.addAll(_init);
     bytes.addAll(_alignCenter);
     bytes.addAll(_sizeDouble);
-    bytes.addAll(_text('UniPOS'));
+    bytes.addAll(_text('Bill Berry Lite'));
     bytes.addAll(_sizeNormal);
     bytes.addAll(_text('Printer Test'));
     bytes.addAll(_alignLeft);
