@@ -6,6 +6,8 @@ import 'package:billberrylite/core/config/app_config.dart';
 // Unified backup service (works for both modes)
 import 'package:billberrylite/domain/services/common/unified_backup_service.dart';
 import 'package:billberrylite/domain/services/common/backup_encryption_service.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
 
 // Legacy backup implementations (kept for backward compatibility, not actively used)
 // import 'package:billberrylite/domain/services/retail/backup_service.dart';
@@ -103,6 +105,11 @@ class AutoBackupService {
   /// Check if backup is needed and perform it
   static Future<void> _checkAndBackup() async {
     try {
+      // Plan gate — backup (incl. auto-backup) requires the data_backup module.
+      if (!PlanEnforce.allows(EntKeys.dataBackup)) {
+        debugPrint('⏭️  data_backup not licensed, skipping auto backup');
+        return;
+      }
       // Check if auto backup is enabled
       final isEnabled = await isAutoBackupEnabled();
       if (!isEnabled) {

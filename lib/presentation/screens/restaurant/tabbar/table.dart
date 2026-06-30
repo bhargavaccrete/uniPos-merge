@@ -471,7 +471,7 @@ class _TableScreenState extends State<TableScreen> {
                       crossAxisCount: crossAxisCount,
                       crossAxisSpacing: AppResponsive.gridSpacing(context),
                       mainAxisSpacing: AppResponsive.gridSpacing(context),
-                      childAspectRatio: AppResponsive.getValue(context, mobile: 1.1, tablet: 1.0, desktop: 1.0),
+                      childAspectRatio: AppResponsive.getValue(context, mobile: 1.0, tablet: 1.0, desktop: 1.0),
                     ),
                     itemCount: allTables.length,
                     itemBuilder: (context, index) {
@@ -688,16 +688,31 @@ class TableCard extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    table.id,
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.getValue(context, mobile: 28, tablet: 32),
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: AppResponsive.getValue(context, mobile: 32, tablet: 36),
+                      child: Center(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            table.id,
+                            maxLines: 1,
+                            softWrap: false,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.getValue(context, mobile: 20, tablet: 24),
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                   if (table.status != 'Available') ...[
-                    AppResponsive.verticalSpace(context, size: SpacingSize.medium),
+                    SizedBox(height: AppResponsive.getValue(context, mobile: 8.0, tablet: 12.0)),
                     Text(
                       '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(table.currentOrderTotal ?? 0.0)}',
                       style: GoogleFonts.poppins(
@@ -706,7 +721,7 @@ class TableCard extends StatelessWidget {
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    AppResponsive.verticalSpace(context, size: SpacingSize.small),
+                    SizedBox(height: AppResponsive.getValue(context, mobile: 4.0, tablet: 8.0)),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -728,7 +743,7 @@ class TableCard extends StatelessWidget {
                       ],
                     ),
                     if (table.timeStamp != null && table.timeStamp!.isNotEmpty) ...[
-                      AppResponsive.verticalSpace(context, size: SpacingSize.small),
+                      SizedBox(height: AppResponsive.getValue(context, mobile: 4.0, tablet: 8.0)),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [

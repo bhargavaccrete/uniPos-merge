@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobx/mobx.dart';
+import '../../../core/plan/entitlement_keys.dart';
+import '../../../core/plan/plan_enforcement.dart';
 import '../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../data/repositories/restaurant/item_repository.dart';
 
@@ -150,6 +152,17 @@ abstract class _ItemStore with Store {
       isLoading = true;
       errorMessage = null;
 
+      // Plan gate — action permission + item cap (also covers bulk import).
+      if (!PlanEnforce.allows(EntKeys.manageMenuItemsAdd)) {
+        errorMessage = 'Adding items isn’t available on your current plan.';
+        return false;
+      }
+      if (!PlanEnforce.withinLimit(EntKeys.manageMenuItemsMax, items.length)) {
+        final max = PlanEnforce.limit(EntKeys.manageMenuItemsMax);
+        errorMessage = 'Item limit reached (max $max). Upgrade to add more.';
+        return false;
+      }
+
       // Duplicate name guard — case-insensitive check within the same category
       final duplicate = items.any((i) =>
           i.name.trim().toLowerCase() == item.name.trim().toLowerCase() &&
@@ -189,6 +202,12 @@ abstract class _ItemStore with Store {
       isLoading = true;
       errorMessage = null;
 
+      // Plan gate — edit permission.
+      if (!PlanEnforce.allows(EntKeys.manageMenuItemsEdit)) {
+        errorMessage = 'Editing items isn’t available on your current plan.';
+        return false;
+      }
+
       // Duplicate item code guard for update
       if (item.itemCode != null && item.itemCode!.isNotEmpty) {
         final duplicateCode = items.any((i) => i.itemCode == item.itemCode && i.id != item.id);
@@ -219,6 +238,12 @@ abstract class _ItemStore with Store {
     try {
       isLoading = true;
       errorMessage = null;
+
+      // Plan gate — delete permission.
+      if (!PlanEnforce.allows(EntKeys.manageMenuItemsDelete)) {
+        errorMessage = 'Deleting items isn’t available on your current plan.';
+        return false;
+      }
 
       await _repository.deleteItem(itemId);
 

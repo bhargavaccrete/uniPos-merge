@@ -6,6 +6,8 @@ import 'package:billberrylite/presentation/screens/restaurant/Reports/expenseRep
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
 import '../../../../core/routes/routes_name.dart';
 
 class ReportsScreen extends StatefulWidget {
@@ -22,9 +24,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
     required VoidCallback onTap,
     required Color iconColor,
     required bool isTablet,
+    String? entitlementKey,
   }) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        // Entitlement denied → upgrade blocker instead of opening the report.
+        if (entitlementKey != null &&
+            !PlanGuard.allowedOr(context, entitlementKey, featureName: title)) {
+          return;
+        }
+        onTap();
+      },
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.white,
@@ -85,12 +95,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     mainAxisSpacing: AppResponsive.gridSpacing(context),
                     childAspectRatio: AppResponsive.gridAspectRatio(context),
                     children: [
+                      // All report tiles are shown; tapping a tile not in the plan
+                      // shows the upgrade blocker (handled in _buildReportCard).
                       _buildReportCard(
                         icon: Icons.shopping_bag_outlined,
                         title: 'Total Sale',
                         onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsTotalSales),
                         iconColor: AppColors.primary,
                         isTablet: isTablet,
+                        entitlementKey: EntKeys.reportsTotalSale,
                       ),
                       _buildReportCard(
                         icon: Icons.fastfood,
@@ -98,6 +111,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsSalesBYItem),
                         iconColor: Colors.deepOrangeAccent,
                         isTablet: isTablet,
+                        entitlementKey: EntKeys.reportsSaleByItem,
                       ),
                       _buildReportCard(
                         icon: Icons.category,
@@ -105,6 +119,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsSalesByCategory),
                         iconColor: Colors.deepOrangeAccent,
                         isTablet: isTablet,
+                        entitlementKey: EntKeys.reportsSaleByCategory,
                       ),
                       _buildReportCard(
                         icon: Icons.auto_graph,
@@ -112,6 +127,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsDailyClosingReport),
                         iconColor: Colors.deepOrangeAccent,
                         isTablet: isTablet,
+                        entitlementKey: EntKeys.reportsDailyClosing,
                       ),
                       _buildReportCard(
                         icon: Icons.list_alt,
@@ -119,6 +135,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsCustomerList),
                         iconColor: AppColors.primary,
                         isTablet: isTablet,
+                        entitlementKey: EntKeys.reportsCustomerList,
                       ),
                       _buildReportCard(
                         icon: Icons.view_week,
@@ -126,6 +143,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsComparisionByWeek),
                         iconColor: AppColors.primary,
                         isTablet: isTablet,
+                        entitlementKey: EntKeys.reportsComparisonWeek,
                       ),
                       _buildReportCard(
                         icon: Icons.calendar_month,
@@ -133,6 +151,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsComparisionByMonth),
                         iconColor: AppColors.primary,
                         isTablet: isTablet,
+                        entitlementKey: EntKeys.reportsComparisonMonth,
                       ),
                       _buildReportCard(
                         icon: Icons.calendar_today,
@@ -140,6 +159,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsComparisionByYear),
                         iconColor: AppColors.primary,
                         isTablet: isTablet,
+                        entitlementKey: EntKeys.reportsComparisonYear,
                       ),
                       _buildReportCard(
                         icon: Icons.inventory_2_outlined,
@@ -147,6 +167,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsComparisionByProduct),
                         iconColor: AppColors.primary,
                         isTablet: isTablet,
+                        entitlementKey: EntKeys.reportsComparisonProduct,
                       ),
                       _buildReportCard(
                         icon: Icons.backspace_outlined,
@@ -154,6 +175,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsRefundDetails),
                         iconColor: AppColors.primary,
                         isTablet: isTablet,
+                        entitlementKey: EntKeys.reportsRefundDetails,
                       ),
                       _buildReportCard(
                         icon: Icons.cancel_outlined,
@@ -161,6 +183,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsVoidOrderReport),
                         iconColor: AppColors.primary,
                         isTablet: isTablet,
+                        entitlementKey: EntKeys.reportsVoidOrders,
                       ),
                       _buildReportCard(
                         icon: Icons.remove_circle_outline,
@@ -168,6 +191,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsItemCancellation),
                         iconColor: Colors.red,
                         isTablet: isTablet,
+                        entitlementKey: EntKeys.reportsItemCancellation,
                       ),
                       _buildReportCard(
                         icon: Icons.note_alt_outlined,
@@ -175,6 +199,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsDiscountOrderReport),
                         iconColor: Colors.deepOrangeAccent,
                         isTablet: isTablet,
+                        entitlementKey: EntKeys.reportsDiscountOrders,
                       ),
                       _buildReportCard(
                         icon: Icons.event_available,
@@ -182,6 +207,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => Posenddayreport())),
                         iconColor: AppColors.primary,
                         isTablet: isTablet,
+                        entitlementKey: EntKeys.reportsPosEndDay,
                       ),
                       _buildReportCard(
                         icon: Icons.monetization_on_outlined,
@@ -189,6 +215,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => CustomerListByRevenue())),
                         iconColor: Colors.deepOrangeAccent,
                         isTablet: isTablet,
+                        entitlementKey: EntKeys.reportsCustomerRevenue,
                       ),
                       _buildReportCard(
                         icon: Icons.receipt_long,
@@ -196,6 +223,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ExpenseReport())),
                         iconColor: Colors.red,
                         isTablet: isTablet,
+                        entitlementKey: EntKeys.reportsExpense,
                       ),
                       _buildReportCard(
                         icon: Icons.analytics,
@@ -203,6 +231,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         onTap: () => Navigator.pushNamed(context, RouteNames.restaurantPerformanceStats),
                         iconColor: Colors.purple,
                         isTablet: isTablet,
+                        entitlementKey: EntKeys.reportsPerformanceStatistics,
                       ),
                       _buildReportCard(
                         icon: Icons.badge_outlined,
@@ -210,6 +239,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         onTap: () => Navigator.pushNamed(context, RouteNames.restaurantShiftReport),
                         iconColor: Colors.teal,
                         isTablet: isTablet,
+                        entitlementKey: EntKeys.reportsShift,
                       ),
                       _buildReportCard(
                         icon: Icons.leaderboard_rounded,
@@ -217,6 +247,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         onTap: () => Navigator.pushNamed(context, RouteNames.restaurantStaffPerformance),
                         iconColor: Colors.deepPurple,
                         isTablet: isTablet,
+                        entitlementKey: EntKeys.reportsStaffPerformance,
                       ),
                       _buildReportCard(
                         icon: Icons.account_balance_wallet_outlined,
@@ -224,6 +255,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         onTap: () => Navigator.pushNamed(context, RouteNames.restaurantCashDrawerHistory),
                         iconColor: Colors.teal,
                         isTablet: isTablet,
+                        entitlementKey: EntKeys.reportsCashDrawerHistory,
                       ),
                       _buildReportCard(
                         icon: Icons.access_time_rounded,
@@ -231,6 +263,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         onTap: () => Navigator.pushNamed(context, RouteNames.restaurantAttendanceReport),
                         iconColor: Colors.deepPurple,
                         isTablet: isTablet,
+                        entitlementKey: EntKeys.reportsAttendance,
                       ),
                     ],
                   ),

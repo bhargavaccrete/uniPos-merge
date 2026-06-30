@@ -1076,6 +1076,12 @@ class RestaurantBulkImportService {
           result.itemsImported++;
           // Keep cache fresh so later rows in this batch see the latest version
           _itemByNameCache[item.name.toLowerCase().trim()] = item;
+        } else {
+          // addItem/updateItem refused without throwing (plan limit hit, or the
+          // add/edit action isn't allowed on this plan). Surface the reason so
+          // these rows aren't silently dropped from the import.
+          result.errors.add(
+              'Row ${i + 1}: "${item.name}" skipped — ${itemStore.errorMessage ?? 'not allowed on your current plan'}');
         }
 
         // Progress update

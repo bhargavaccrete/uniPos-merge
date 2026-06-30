@@ -8,6 +8,11 @@ import 'package:path_provider/path_provider.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:uuid/uuid.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/entitlements.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemvariantemodel_312.dart';
@@ -381,6 +386,16 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   Future<void> _saveItem() async {
     if (_isSaving) return; // double-tap guard
 
+    // Plan limit — menu-items module + count cap. Enforced once the manifest is
+    // live (activation now happens at the Verify Email step, before this one).
+    // Only enforce once a manifest is live (don't block first-run setup before
+    // activation). The blocker (Contact Bill Berry) replaces the old toast.
+    final lic = locator<LicenseStore>();
+    if (!lic.licenseBypassed && Entitlements.instance.hasManifest) {
+      if (!PlanGuard.allowedOr(context, EntKeys.manageMenuItems, featureName: 'Menu Items')) return;
+      if (!PlanGuard.withinLimitOr(context, EntKeys.manageMenuItemsMax, itemStore.items.length, unit: 'items')) return;
+    }
+
     // Validate all fields
     final errors = _validateForm();
     if (errors.isNotEmpty) {
@@ -613,10 +628,13 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
             const SizedBox(height: 15),
             _buildSellingMethodSection(),
             const SizedBox(height: 25),
-            _buildSectionHeader('Inventory Management', Icons.inventory_2_outlined),
-            const SizedBox(height: 15),
-            _buildInventorySection(),
-            const SizedBox(height: 25),
+            // Stock module — only when `inventory` is in the plan.
+            if (PlanEnforce.allows(EntKeys.inventory)) ...[
+              _buildSectionHeader('Inventory Management', Icons.inventory_2_outlined),
+              const SizedBox(height: 15),
+              _buildInventorySection(),
+              const SizedBox(height: 25),
+            ],
             _buildSectionHeader('Tax Selection', Icons.receipt_long),
             const SizedBox(height: 15),
             _buildTaxSection(),

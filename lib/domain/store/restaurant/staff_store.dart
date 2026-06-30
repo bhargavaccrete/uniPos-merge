@@ -1,4 +1,6 @@
 import 'package:mobx/mobx.dart';
+import '../../../core/plan/entitlement_keys.dart';
+import '../../../core/plan/plan_enforcement.dart';
 import '../../../data/models/restaurant/db/staffModel_310.dart';
 import '../../../data/repositories/restaurant/staff_repository.dart';
 
@@ -90,6 +92,19 @@ abstract class _StaffStore with Store {
   @action
   Future<bool> addStaff(StaffModel newStaff) async {
     try {
+      // Plan gate — staff module + user cap.
+      if (!PlanEnforce.allows(EntKeys.users)) {
+        errorMessage = 'Your plan doesn’t include staff management.';
+        return false;
+      }
+      // TODO(backend): confirm whether users.max INCLUDES the admin/owner. We
+      // currently cap the staff list at users.max (admin not counted). If the
+      // backend spec counts the admin, subtract 1 here. Left as-is until confirmed.
+      if (!PlanEnforce.withinLimit(EntKeys.usersMax, staff.length)) {
+        final max = PlanEnforce.limit(EntKeys.usersMax);
+        errorMessage = 'Staff limit reached (max $max). Upgrade to add more.';
+        return false;
+      }
       await _repository.addStaff(newStaff);
       staff.add(newStaff);
       return true;

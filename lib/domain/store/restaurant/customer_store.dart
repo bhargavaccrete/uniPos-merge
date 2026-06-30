@@ -1,4 +1,6 @@
 import 'package:mobx/mobx.dart';
+import '../../../core/plan/entitlement_keys.dart';
+import '../../../core/plan/plan_enforcement.dart';
 import '../../../data/models/restaurant/db/customer_model_125.dart';
 import '../../../data/repositories/restaurant/customer_repository.dart';
 
@@ -75,6 +77,17 @@ abstract class _CustomerStore with Store {
   @action
   Future<bool> addCustomer(RestaurantCustomer customer) async {
     try {
+      // Plan gate — customer module + cap (also covers on-the-fly creation at
+      // checkout). Availability = module flag; the cap only bites when positive.
+      if (!PlanEnforce.allows(EntKeys.customers)) {
+        errorMessage = 'Your plan doesn’t include saved customers.';
+        return false;
+      }
+      if (!PlanEnforce.withinLimit(EntKeys.customersMax, customers.length)) {
+        final max = PlanEnforce.limit(EntKeys.customersMax);
+        errorMessage = 'Customer limit reached (max $max). Upgrade to add more.';
+        return false;
+      }
       await _repository.addCustomer(customer);
       customers.add(customer);
       return true;

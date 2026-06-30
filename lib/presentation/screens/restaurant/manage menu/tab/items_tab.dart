@@ -5,6 +5,8 @@ import 'package:lottie/lottie.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
@@ -40,6 +42,14 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
   /// Cashier can only toggle item enabled/disabled.
   bool get _canEdit => RestaurantSession.isAdmin || RestaurantSession.staffRole == 'Manager';
 
+  // Action entitlements layered on top of the role check (plan can withhold add/
+  // edit/delete even for an admin). The store also enforces these for non-UI callers.
+  // Visibility = role only; plan entitlement is enforced on the action (add via
+  // the add-item screen, edit/delete below) so denied actions show the blocker.
+  bool get _canAddItem => _canEdit;
+  bool get _canEditItem => _canEdit;
+  bool get _canDeleteItem => _canEdit;
+
   @override
   void initState() {
     super.initState();
@@ -57,6 +67,7 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
   }
 
   void _deleteItem(String id) async {
+    if (!PlanGuard.allowedOr(context, EntKeys.manageMenuItemsDelete, featureName: 'Delete Items')) return;
     final confirmed = await showAppConfirmDialog(
       context: context,
       title: 'Delete Item',
@@ -72,6 +83,7 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
   }
 
   void editItems(Items itemToEdit) async {
+    if (!PlanGuard.allowedOr(context, EntKeys.manageMenuItemsEdit, featureName: 'Edit Items')) return;
     // CRITICAL: Fetch fresh item from store instead of using cached object
     // This ensures we always have the latest data from Hive
     final freshItem = itemStore.getItemById(itemToEdit.id);
@@ -127,8 +139,8 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
             child: isTablet ? _buildTabletLayout(size) : _buildMobileLayout(size),
           ),
 
-          // Bottom Sheet Menu — only shown to Admin and Manager
-          if (_canEdit)
+          // Bottom Sheet Menu — Add Item bar (admin/manager + add entitlement).
+          if (_canAddItem)
             BottomsheetMenu(
               onCategorySelected: (category) {
                 setState(() {});
@@ -277,16 +289,16 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
                                 ),
                               ),
                               // Actions: edit & delete (Admin/Manager only), switch (all roles)
-                              if (_canEdit) ...[
+                              if (_canEditItem)
                                 InkWell(
                                   onTap: () => editItems(item),
                                   child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: AppResponsive.smallIconSize(context), color: AppColors.primary)),
                                 ),
+                              if (_canDeleteItem)
                                 InkWell(
                                   onTap: () => _deleteItem(item.id),
                                   child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: AppResponsive.smallIconSize(context), color: Colors.red)),
                                 ),
-                              ],
                               Transform.scale(
                                 scale: 0.8,
                                 child: Switch(
@@ -471,10 +483,10 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (_canEdit) ...[
+                      if (_canEditItem)
                         InkWell(onTap: () => editItems(item), child: Padding(padding: const EdgeInsets.all(4), child: Icon(Icons.edit_outlined, size: AppResponsive.smallIconSize(context), color: AppColors.primary))),
+                      if (_canDeleteItem)
                         InkWell(onTap: () => _deleteItem(item.id), child: Padding(padding: const EdgeInsets.all(4), child: Icon(Icons.delete_outline, size: AppResponsive.smallIconSize(context), color: Colors.red))),
-                      ],
                     ],
                   ),
                 ],

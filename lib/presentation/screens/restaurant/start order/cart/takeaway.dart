@@ -38,6 +38,7 @@ class Takeaway extends StatefulWidget {
   final bool isDineIn;
   final List<CartItemStatus> cartItems;
   final String? tableid;
+  final VoidCallback? onAddItems;
   final Function(CartItem) onAddtoCart;
   final Function(CartItem) onIncreseQty;
   final Function(CartItem) onDecreseQty;
@@ -55,6 +56,7 @@ class Takeaway extends StatefulWidget {
         required this.isexisting,
         required this.isdelivery,
         required this.cartItems,
+        this.onAddItems,
         required this.onAddtoCart,
         required this.onIncreseQty,
         required this.onDecreseQty,
@@ -492,6 +494,12 @@ class _TakeawayState extends State<Takeaway> {
     int cancelQty = 1;
     final reasonController = TextEditingController();
     String? reasonError;
+    final quickReasons = [
+      'Wrong Selection',
+      'Change of Mind',
+      'Kitchen Delayed',
+      'Out of Stock'
+    ];
     final hInset = !AppResponsive.isMobile(context)
         ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
         : 24.0;
@@ -506,101 +514,158 @@ class _TakeawayState extends State<Takeaway> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Header — danger accent badge + title
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-                    decoration: BoxDecoration(
-                      color: AppColors.danger.withValues(alpha: 0.06),
-                      borderRadius:
-                          const BorderRadius.vertical(top: Radius.circular(16)),
-                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
                     child: Row(
                       children: [
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: AppColors.danger.withValues(alpha: 0.12),
+                            color: AppColors.primary.withValues(alpha: 0.08),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(Icons.warning_amber_rounded,
-                              color: AppColors.danger, size: 24),
+                          child: Icon(
+                            Icons.delete_sweep_rounded,
+                            color: AppColors.primary,
+                            size: 22,
+                          ),
                         ),
                         const SizedBox(width: 12),
-                        Expanded(
-                          child: Text('Cancel Item',
-                              style: GoogleFonts.poppins(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textPrimary)),
+                        Text(
+                          'Cancel Item',
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  // Body
+                  const Divider(height: 1),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
                     child: Column(
-                      mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text('How many "${item.title}" do you want to cancel?',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.poppins(
-                                fontSize: 14, color: AppColors.textSecondary)),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceLight,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.divider),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  item.title,
+                                  style: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              if (item.quantity == 1)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'Qty: 1',
+                                    style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
                         const SizedBox(height: 16),
-                        if (item.quantity > 1)
+                        if (item.quantity > 1) ...[
+                          Text(
+                            'Select quantity to cancel:',
+                            style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
                           Center(
                             child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 8),
                               decoration: BoxDecoration(
                                 color: AppColors.surfaceMedium,
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   IconButton(
-                                    onPressed: cancelQty > 1
-                                        ? () => setState(() => cancelQty--)
-                                        : null,
-                                    icon: Icon(Icons.remove_circle_outline,
-                                        color: cancelQty > 1
-                                            ? AppColors.primary
-                                            : AppColors.textSecondary),
+                                    onPressed: cancelQty > 1 ? () => setState(() => cancelQty--) : null,
+                                    icon: Icon(Icons.remove, size: 20),
                                   ),
                                   Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 16),
-                                    child: Text('$cancelQty',
-                                        style: GoogleFonts.poppins(
-                                            fontSize: 22,
-                                            fontWeight: FontWeight.bold)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    child: Text(
+                                      '$cancelQty',
+                                      style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold),
+                                    ),
                                   ),
                                   IconButton(
-                                    onPressed: cancelQty < item.quantity
-                                        ? () => setState(() => cancelQty++)
-                                        : null,
-                                    icon: Icon(Icons.add_circle_outline,
-                                        color: cancelQty < item.quantity
-                                            ? AppColors.primary
-                                            : AppColors.textSecondary),
+                                    onPressed: cancelQty < item.quantity ? () => setState(() => cancelQty++) : null,
+                                    icon: Icon(Icons.add, size: 20),
                                   ),
                                 ],
                               ),
                             ),
-                          )
-                        else
-                          Text('Cancel 1x ${item.title}?',
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 15,
-                                  color: AppColors.danger)),
-                        const SizedBox(height: 16),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        Text(
+                          'Select or enter cancellation reason:',
+                          style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: quickReasons.map((reason) {
+                            final isSelected = reasonController.text == reason;
+                            return InkWell(
+                              onTap: () {
+                                setState(() {
+                                  reasonController.text = reason;
+                                  reasonError = null;
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : Colors.transparent,
+                                  border: Border.all(
+                                    color: isSelected ? AppColors.primary : AppColors.divider,
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  reason,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 11,
+                                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                    color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 12),
                         TextField(
                           controller: reasonController,
                           minLines: 1,
@@ -608,12 +673,20 @@ class _TakeawayState extends State<Takeaway> {
                           textCapitalization: TextCapitalization.sentences,
                           style: GoogleFonts.poppins(fontSize: 14),
                           decoration: InputDecoration(
-                            labelText: 'Reason for cancellation',
-                            labelStyle: GoogleFonts.poppins(fontSize: 13),
-                            hintText: 'e.g. Customer changed mind',
+                            hintText: 'Or enter custom reason...',
+                            hintStyle: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary.withValues(alpha: 0.6)),
                             errorText: reasonError,
+                            filled: true,
+                            fillColor: AppColors.surfaceLight,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                             border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10)),
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: AppColors.divider),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: AppColors.divider),
+                            ),
                           ),
                           onChanged: (_) {
                             if (reasonError != null) {
@@ -621,69 +694,72 @@ class _TakeawayState extends State<Takeaway> {
                             }
                           },
                         ),
-                        const SizedBox(height: 10),
-                        Text('This will print a Cancel KOT for the kitchen.',
-                            style: GoogleFonts.poppins(
-                                fontSize: 12,
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.print_outlined, size: 14, color: AppColors.textSecondary),
+                            const SizedBox(width: 6),
+                            Text(
+                              'This will print a Cancel KOT for the kitchen.',
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
                                 color: AppColors.textSecondary,
-                                fontStyle: FontStyle.italic),
-                            textAlign: TextAlign.center),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
-                  // Actions — balanced full-width buttons
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                    child: IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.textSecondary,
-                                side: BorderSide(color: AppColors.divider),
-                                padding: const EdgeInsets.symmetric(vertical: 13),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10)),
-                              ),
-                              child: Text('Keep Item',
-                                  style: GoogleFonts.poppins(
-                                      fontWeight: FontWeight.w600)),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.textSecondary,
+                              side: BorderSide(color: AppColors.divider),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            child: Text(
+                              'Keep Item',
+                              style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.danger,
-                                foregroundColor: AppColors.white,
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(vertical: 13),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10)),
-                              ),
-                              onPressed: () {
-                                final reason = reasonController.text.trim();
-                                if (reason.isEmpty) {
-                                  setState(() => reasonError = 'Reason is required');
-                                  return;
-                                }
-                                _cancelReasons[item.id] = reason;
-                                Navigator.pop(ctx);
-                                for (int i = 0; i < cancelQty; i++) {
-                                  widget.onDecreseQty(item);
-                                }
-                              },
-                              child: Text('Confirm Cancel',
-                                  textAlign: TextAlign.center,
-                                  style: GoogleFonts.poppins(
-                                      fontWeight: FontWeight.w600)),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.danger,
+                              foregroundColor: AppColors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onPressed: () {
+                              final reason = reasonController.text.trim();
+                              if (reason.isEmpty) {
+                                setState(() => reasonError = 'Reason is required');
+                                return;
+                              }
+                              _cancelReasons[item.id] = reason;
+                              Navigator.pop(ctx);
+                              for (int i = 0; i < cancelQty; i++) {
+                                widget.onDecreseQty(item);
+                              }
+                            },
+                            child: Text(
+                              'Confirm Cancel',
+                              style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14),
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ],

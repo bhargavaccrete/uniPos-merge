@@ -11,7 +11,7 @@ import 'package:billberrylite/util/common/app_responsive.dart';
 import '../../../../util/restaurant/restaurant_auth_helper.dart';
 import '../../../../util/restaurant/restaurant_session.dart';
 import '../../../../core/di/service_locator.dart';
-import '../welcome_Admin.dart';
+import '../../../../domain/store/restaurant/license_store.dart';
 
 class AdminLogin extends StatefulWidget {
   const AdminLogin({super.key});
@@ -61,10 +61,7 @@ class _AdminLoginState extends State<AdminLogin> {
         await RestaurantSession.saveAdminSession();
         try { await attendanceStore.clockIn(staffName: 'Admin', staffRole: 'Admin'); } catch (_) {}
         if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const AdminWelcome()),
-          );
+          LicenseStore.navigateToNextScreen(context);
         }
       } else {
         _failedAttempts++;

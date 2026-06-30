@@ -15,6 +15,8 @@ import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/restaurant/restaurant_session.dart';
 import 'package:uuid/uuid.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import '../../../../../data/models/restaurant/db/extramodel_303.dart';
 
 class ExtraTab extends StatefulWidget {
@@ -31,6 +33,12 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
   int? editingToppingIndex;
 
   bool get _canEdit => RestaurantSession.isAdmin || RestaurantSession.staffRole == 'Manager';
+  // Plan entitlements layered on the role check (manage_menu.extras.*).
+  // Topping operations are edits to the parent extra, so they use extras.edit.
+  // Visibility = role only; entitlement enforced on action (handlers below).
+  bool get _canAddExtra => _canEdit;
+  bool get _canEditExtra => _canEdit;
+  bool get _canDeleteExtra => _canEdit;
 
   final _extrasController = TextEditingController();
   final _toppingController = TextEditingController();
@@ -73,6 +81,14 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
   }
 
   void _openExtraBottomSheet({Extramodel? extra}) {
+    if (!PlanGuard.allowedOr(
+        context,
+        extra == null
+            ? EntKeys.manageMenuExtrasAdd
+            : EntKeys.manageMenuExtrasEdit,
+        featureName: extra == null ? 'Add Extras' : 'Edit Extras')) {
+      return;
+    }
     if (extra != null) {
       _extrasController.text = extra.Ename;
       _minimumController.text = extra.minimum?.toString() ?? '';
@@ -303,6 +319,8 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
   }
 
   void _openToppingBottomSheet({required Extramodel extra, int? toppingIndex}) {
+    // Toppings are part of an extra → gated by the extras "edit" entitlement.
+    if (!PlanGuard.allowedOr(context, EntKeys.manageMenuExtrasEdit, featureName: 'Edit Extras')) return;
     _loadAvailableVariants(); // Always refresh before opening
     if (toppingIndex != null) {
       final topping = extra.topping![toppingIndex];
@@ -960,6 +978,7 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
   }
 
   Future<void> _deleteTopping(Extramodel extra, int toppingIndex) async {
+    if (!PlanGuard.allowedOr(context, EntKeys.manageMenuExtrasEdit, featureName: 'Edit Extras')) return;
     final topping = extra.topping![toppingIndex];
     final confirmed = await showAppConfirmDialog(
       context: context,
@@ -975,6 +994,7 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
   }
 
   Future<void> _deleteExtra(Extramodel extra) async {
+    if (!PlanGuard.allowedOr(context, EntKeys.manageMenuExtrasDelete, featureName: 'Delete Extras')) return;
     final confirmed = await showAppConfirmDialog(
       context: context,
       title: 'Delete "${extra.Ename}"?',
@@ -1023,7 +1043,7 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
             child: isTablet ? _buildTabletLayout(size) : _buildMobileLayout(size),
           ),
 
-          if (_canEdit) _buildAddButton(),
+          if (_canAddExtra) _buildAddButton(),
         ],
       ),
     );
@@ -1168,10 +1188,10 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
                     ],
                   ),
                 ),
-                if (_canEdit) ...[
+                if (_canEditExtra)
                   InkWell(onTap: () => _openExtraBottomSheet(extra: extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: AppResponsive.smallIconSize(context), color: AppColors.primary))),
+                if (_canDeleteExtra)
                   InkWell(onTap: () => _deleteExtra(extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: AppResponsive.smallIconSize(context), color: Colors.red))),
-                ],
               ],
             ),
           ),
@@ -1188,7 +1208,7 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
                     SizedBox(width: 10),
                     Expanded(child: Text(topping.name, style: GoogleFonts.poppins(fontSize: 13))),
                     Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(topping.price)}', style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
-                    if (_canEdit) ...[
+                    if (_canEditExtra) ...[
                       InkWell(onTap: () => _openToppingBottomSheet(extra: extra, toppingIndex: toppingIndex), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 14, color: AppColors.primary))),
                       InkWell(onTap: () => _deleteTopping(extra, toppingIndex), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.close, size: 14, color: Colors.red))),
                     ],
@@ -1197,7 +1217,7 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
               );
             }),
           // Add topping — Admin/Manager only
-          if (_canEdit)
+          if (_canEditExtra)
             InkWell(
               onTap: () => _openToppingBottomSheet(extra: extra),
               child: Padding(
@@ -1253,10 +1273,12 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
               maxLines: 1, overflow: TextOverflow.ellipsis),
           subtitle: Text('${extra.topping?.length ?? 0} toppings',
               style: GoogleFonts.poppins(fontSize: AppResponsive.smallFontSize(context), color: AppColors.textSecondary)),
-          trailing: _canEdit
+          trailing: (_canEditExtra || _canDeleteExtra)
               ? Row(mainAxisSize: MainAxisSize.min, children: [
-                  InkWell(onTap: () => _openExtraBottomSheet(extra: extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: AppResponsive.smallIconSize(context), color: AppColors.primary))),
-                  InkWell(onTap: () => _deleteExtra(extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: AppResponsive.smallIconSize(context), color: Colors.red))),
+                  if (_canEditExtra)
+                    InkWell(onTap: () => _openExtraBottomSheet(extra: extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: AppResponsive.smallIconSize(context), color: AppColors.primary))),
+                  if (_canDeleteExtra)
+                    InkWell(onTap: () => _deleteExtra(extra), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: AppResponsive.smallIconSize(context), color: Colors.red))),
                 ])
               : null,
           children: [
@@ -1277,7 +1299,7 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
                       SizedBox(width: 10),
                       Expanded(child: Text(topping.name, style: GoogleFonts.poppins(fontSize: 13))),
                       Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(topping.price)}', style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
-                      if (_canEdit) ...[
+                      if (_canEditExtra) ...[
                         InkWell(onTap: () => _openToppingBottomSheet(extra: extra, toppingIndex: toppingIndex), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: 14, color: AppColors.primary))),
                         InkWell(onTap: () => _deleteTopping(extra, toppingIndex), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.close, size: 14, color: Colors.red))),
                       ],
@@ -1285,7 +1307,7 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
                   ),
                 );
               }),
-            if (_canEdit)
+            if (_canEditExtra)
               InkWell(
                 onTap: () => _openToppingBottomSheet(extra: extra),
                 child: Padding(

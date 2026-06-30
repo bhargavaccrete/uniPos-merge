@@ -166,6 +166,23 @@ mixin _$LicenseStore on _LicenseStore, Store {
     });
   }
 
+  late final _$clearAllLicenseStateAsyncAction =
+      AsyncAction('_LicenseStore.clearAllLicenseState', context: context);
+
+  @override
+  Future<void> clearAllLicenseState() {
+    return _$clearAllLicenseStateAsyncAction
+        .run(() => super.clearAllLicenseState());
+  }
+
+  late final _$syncEntitlementsAsyncAction =
+      AsyncAction('_LicenseStore.syncEntitlements', context: context);
+
+  @override
+  Future<void> syncEntitlements() {
+    return _$syncEntitlementsAsyncAction.run(() => super.syncEntitlements());
+  }
+
   late final _$loadBypassFlagAsyncAction =
       AsyncAction('_LicenseStore.loadBypassFlag', context: context);
 

@@ -89,6 +89,88 @@ class _CartScreenState extends State<CartScreen>
     // When the user returns, re-initialize the cart to show the new items
     _initializeCart();
   }
+
+  Future<bool> _handleBackPress() async {
+    if (_newlyAddedList.isNotEmpty) {
+      final result = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AppDialogShell(
+          title: 'Unplaced Items',
+          subtitle: 'Pending changes in order',
+          accent: AppColors.warning,
+          icon: Icons.warning_amber_rounded,
+          body: Text(
+            'You have added new items to the cart but haven\'t placed the order yet.\n\nWhat would you like to do?',
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              height: 1.5,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          actions: [
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, 'menu'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text(
+                      'Add More Items',
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(ctx, 'discard'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.danger,
+                      side: BorderSide(color: AppColors.danger.withValues(alpha: 0.2)),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text(
+                      'Discard & Go Back',
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, 'stay'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.textSecondary,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                    child: Text(
+                      'Cancel',
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w500, fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+
+      if (result == 'discard') {
+        await restaurantCartStore.clearCart();
+        return true;
+      } else if (result == 'menu') {
+        _navigateAndAddMoreItems();
+        return false;
+      }
+      return false;
+    }
+    return true;
+  }
   /// ------------------- CART INITIALIZATION ------------------- ///
   Future<void> _initializeCart() async {
     // Priority 1: If widget has existing order — items are already in memory
@@ -199,6 +281,7 @@ class _CartScreenState extends State<CartScreen>
       isDineIn: isDineIn,
       isdelivery: isDelivery,
       cartItems: _combinedList,
+      onAddItems: isExistingOrder ? _navigateAndAddMoreItems : null,
       originalActiveItems: _originalActiveList,
       originalQuantities: _originalQuantities,
       currentKotBoundaries: _currentKotBoundaries,
@@ -369,167 +452,185 @@ class _CartScreenState extends State<CartScreen>
   @override
   Widget build(BuildContext context) {
     final isTablet = !AppResponsive.isMobile(context);
-    return Scaffold(
-      backgroundColor: AppColors.surfaceLight,
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        elevation: 0,
-        systemOverlayStyle: SystemUiOverlayStyle.light,
-        title: Text(
-          isExistingOrder ? 'Update Order' : 'Cart (${_combinedList.length} ${_combinedList.length == 1 ? 'item' : 'items'})',
-          style: GoogleFonts.poppins(
-            color: Colors.white,
-            fontSize: AppResponsive.getValue(context, mobile: 17, tablet: 19),
-            fontWeight: FontWeight.w500,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldPop = await _handleBackPress();
+        if (shouldPop && mounted) {
+          Navigator.pop(context);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.surfaceLight,
+        appBar: AppBar(
+          backgroundColor: AppColors.primary,
+          elevation: 0,
+          systemOverlayStyle: SystemUiOverlayStyle.light,
+          title: Text(
+            isExistingOrder ? 'Update Order' : 'Cart (${_combinedList.length} ${_combinedList.length == 1 ? 'item' : 'items'})',
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontSize: AppResponsive.getValue(context, mobile: 17, tablet: 19),
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.delete_outline, color: Colors.white, size: 22),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
             onPressed: () async {
-              final confirmed = await showAppConfirmDialog(
-                context: context,
-                title: 'Clear Cart',
-                message: 'Remove all items from cart?',
-                confirmLabel: 'Clear',
-                accent: AppColors.danger,
-                icon: Icons.remove_shopping_cart_outlined,
-              );
-              if (confirmed) clearCart();
+              final shouldPop = await _handleBackPress();
+              if (shouldPop && mounted) {
+                Navigator.pop(context);
+              }
             },
           ),
-          SizedBox(width: 4),
-        ],
-      ),
-
-      body: _combinedList.isEmpty
-          ? _buildEmptyCart()
-          : Stack(
-          children: [
-            Column(
-              children: [
-                // Order type tabs
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  padding: EdgeInsets.symmetric(horizontal: isTablet ? 16 : 12, vertical: isTablet ? 10 : 8),
-                  child: Row(
-                    children: [
-                      _buildTabChip('Take Away', Icons.shopping_bag_outlined, selectedFilter == "Take Away",
-                        () => setState(() => selectedFilter = "Take Away")),
-                      if (OrderSettings.enableDineIn)
-                        _buildTabChip('Dine In', Icons.restaurant, selectedFilter == "Dine In",
-                          () async {
-                            final result = await Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => const TableScreen(isfromcart: true)));
-                            if (result is String) setState(() { selectedFilter = "Dine In"; _selectedTableNoForUI = result; });
-                          }),
-                      if (OrderSettings.enableDelivery)
-                        _buildTabChip('Delivery', Icons.delivery_dining, selectedFilter == "Delivery",
-                          () => setState(() => selectedFilter = "Delivery")),
-                    ],
-                  ),
-                ),
-                // Existing order info (KOT + table)
-                if (isExistingOrder && widget.existingOrder != null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+          actions: [
+            IconButton(
+              icon: Icon(Icons.delete_outline, color: Colors.white, size: 22),
+              onPressed: () async {
+                final confirmed = await showAppConfirmDialog(
+                  context: context,
+                  title: 'Clear Cart',
+                  message: 'Remove all items from cart?',
+                  confirmLabel: 'Clear',
+                  accent: AppColors.danger,
+                  icon: Icons.remove_shopping_cart_outlined,
+                );
+                if (confirmed) clearCart();
+              },
+            ),
+            SizedBox(width: 4),
+          ],
+        ),
+  
+        body: _combinedList.isEmpty
+            ? _buildEmptyCart()
+            : Stack(
+            children: [
+              Column(
+                children: [
+                  // Order type tabs
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    padding: EdgeInsets.symmetric(horizontal: isTablet ? 16 : 12, vertical: isTablet ? 10 : 8),
                     child: Row(
                       children: [
-                        Icon(Icons.receipt_long, color: AppColors.textSecondary, size: 14),
-                        SizedBox(width: 4),
-                        Expanded(
-                          child: Wrap(
-                            spacing: 4,
-                            runSpacing: 4,
-                            children: (widget.existingOrder!.kotNumbers ??
-                                (widget.existingOrder!.kotNumber != null ? [widget.existingOrder!.kotNumber!] : []))
-                                .map((kotNum) => Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text('#$kotNum', style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w500, color: AppColors.primary)),
-                                )).toList(),
-                          ),
-                        ),
-                        if (widget.existingOrder!.orderType == 'Dine In' && widget.existingOrder!.tableNo != null && widget.existingOrder!.tableNo!.isNotEmpty) ...[
-                          Container(height: 16, width: 1, color: AppColors.divider, margin: EdgeInsets.symmetric(horizontal: 8)),
-                          Text(tableNo ?? widget.existingOrder!.tableNo!, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
-                          SizedBox(width: 6),
-                          InkWell(
-                            onTap: () async {
-                              final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const TableScreen(isfromcart: true)));
-                              if (result is String && result != widget.existingOrder!.tableNo) {
-                                try {
-                                  final oldTableNo = widget.existingOrder!.tableNo;
-                                  final updatedOrder = widget.existingOrder!.copyWith(tableNo: result);
-                                  // Order write is source of truth — crash here leaves state consistent.
-                                  await orderStore.updateOrder(updatedOrder);
-                                  // Batch both table updates into one yield point to halve the crash window.
-                                  await Future.wait([
-                                    tableStore.updateTableStatus(result, 'Cooking', total: updatedOrder.totalPrice, orderId: updatedOrder.id, orderTime: updatedOrder.timeStamp),
-                                    if (oldTableNo != null && oldTableNo.isNotEmpty)
-                                      tableStore.updateTableStatus(oldTableNo, 'Available'),
-                                  ]);
-                                  setState(() { _selectedTableNoForUI = result; tableNo = result; });
-                                  NotificationService.instance.showInfo('Table changed to $result');
-                                } catch (e) {
-                                  NotificationService.instance.showError('Failed to change table');
-                                }
-                              }
-                            },
-                            child: Icon(Icons.swap_horiz, size: 20, color: AppColors.primary),
-                          ),
-                          SizedBox(width: 4),
-                          InkWell(
-                            onTap: () => _showMergeTableDialog(),
-                            child: Icon(Icons.merge_type, size: 20, color: Colors.orange.shade700),
-                          ),
-                        ],
+                        _buildTabChip('Take Away', Icons.shopping_bag_outlined, selectedFilter == "Take Away",
+                          () => setState(() => selectedFilter = "Take Away")),
+                        if (OrderSettings.enableDineIn)
+                          _buildTabChip('Dine In', Icons.restaurant, selectedFilter == "Dine In",
+                            () async {
+                              final result = await Navigator.push(context,
+                                MaterialPageRoute(builder: (_) => const TableScreen(isfromcart: true)));
+                              if (result is String) setState(() { selectedFilter = "Dine In"; _selectedTableNoForUI = result; });
+                            }),
+                        if (OrderSettings.enableDelivery)
+                          _buildTabChip('Delivery', Icons.delivery_dining, selectedFilter == "Delivery",
+                            () => setState(() => selectedFilter = "Delivery")),
                       ],
                     ),
                   ),
-                Expanded(child: _getBody()),
-              ],
-            ),
-
-            // Show Add Items button when viewing existing order with no new items
-            if (_activeList.isNotEmpty && _newlyAddedList.isEmpty)
-              Positioned(
-                bottom: 140,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: ElevatedButton.icon(
-                    onPressed: _navigateAndAddMoreItems,
-                    icon: Icon(Icons.add, size: 18),
-                    label: Text('Add Items', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 1,
-                      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  // Existing order info (KOT + table)
+                  if (isExistingOrder && widget.existingOrder != null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                      child: Row(
+                        children: [
+                          Icon(Icons.receipt_long, color: AppColors.textSecondary, size: 14),
+                          SizedBox(width: 4),
+                          Expanded(
+                            child: Wrap(
+                              spacing: 4,
+                              runSpacing: 4,
+                              children: (widget.existingOrder!.kotNumbers ??
+                                  (widget.existingOrder!.kotNumber != null ? [widget.existingOrder!.kotNumber!] : []))
+                                  .map((kotNum) => Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text('#$kotNum', style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w500, color: AppColors.primary)),
+                                  )).toList(),
+                            ),
+                          ),
+                          if (widget.existingOrder!.orderType == 'Dine In' && widget.existingOrder!.tableNo != null && widget.existingOrder!.tableNo!.isNotEmpty) ...[
+                            Container(height: 16, width: 1, color: AppColors.divider, margin: EdgeInsets.symmetric(horizontal: 8)),
+                            Text(tableNo ?? widget.existingOrder!.tableNo!, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
+                            SizedBox(width: 6),
+                            InkWell(
+                              onTap: () async {
+                                final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const TableScreen(isfromcart: true)));
+                                if (result is String && result != widget.existingOrder!.tableNo) {
+                                  try {
+                                    final oldTableNo = widget.existingOrder!.tableNo;
+                                    final updatedOrder = widget.existingOrder!.copyWith(tableNo: result);
+                                    // Order write is source of truth — crash here leaves state consistent.
+                                    await orderStore.updateOrder(updatedOrder);
+                                    // Batch both table updates into one yield point to halve the crash window.
+                                    await Future.wait([
+                                      tableStore.updateTableStatus(result, 'Cooking', total: updatedOrder.totalPrice, orderId: updatedOrder.id, orderTime: updatedOrder.timeStamp),
+                                      if (oldTableNo != null && oldTableNo.isNotEmpty)
+                                        tableStore.updateTableStatus(oldTableNo, 'Available'),
+                                    ]);
+                                    setState(() { _selectedTableNoForUI = result; tableNo = result; });
+                                    NotificationService.instance.showInfo('Table changed to $result');
+                                  } catch (e) {
+                                    NotificationService.instance.showError('Failed to change table');
+                                  }
+                                }
+                              },
+                              child: Icon(Icons.swap_horiz, size: 20, color: AppColors.primary),
+                            ),
+                            SizedBox(width: 4),
+                            InkWell(
+                              onTap: () => _showMergeTableDialog(),
+                              child: Icon(Icons.merge_type, size: 20, color: Colors.orange.shade700),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  Expanded(child: _getBody()),
+                ],
+              ),
+  
+              // Show Add Items button when viewing existing order
+              if (_activeList.isNotEmpty)
+                Positioned(
+                  bottom: 140,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: ElevatedButton.icon(
+                      onPressed: _navigateAndAddMoreItems,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: Text(
+                        'Add Items',
+                        style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 1,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
-      ),
+            ],
+          ),
+        ),
     );
   }
 

@@ -4,9 +4,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/routes/routes_name.dart';
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
+import 'package:billberrylite/core/plan/entitlements.dart';
 import 'package:billberrylite/presentation/screens/restaurant/auth/license_lock_screen.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/util/restaurant/restaurant_session.dart';
+import 'package:billberrylite/util/color.dart';
 
 /// Wraps protected restaurant screens.
 ///
@@ -20,7 +22,13 @@ import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 class RestaurantGuard extends StatefulWidget {
   final Widget child;
   final String? permissionKey;
-  const RestaurantGuard({super.key, required this.child, this.permissionKey});
+  final String? entitlementKey;
+  const RestaurantGuard({
+    super.key,
+    required this.child,
+    this.permissionKey,
+    this.entitlementKey,
+  });
 
   @override
   State<RestaurantGuard> createState() => _RestaurantGuardState();
@@ -59,13 +67,25 @@ class _RestaurantGuardState extends State<RestaurantGuard> {
   @override
   Widget build(BuildContext context) {
     // Observer makes this subtree reactive — rebuilds instantly whenever
-    // licenseStore.isLicensed flips (e.g. expiry, injection, deactivation).
+    // license status, manifest presence, or entitlements change.
     return Observer(
       builder: (_) {
         final licStore = locator<LicenseStore>();
-        if (!licStore.isLicensed) {
+        
+        // Defense-in-depth: check license and manifest validity reactively
+        if (!licStore.isLicensed || !licStore.hasVerifiedManifest) {
           return LicenseLockScreen(onActivated: () {});
         }
+
+        // Defense-in-depth: check fine-grained entitlements reactively
+        if (widget.entitlementKey != null) {
+          final hasEnt = licStore.licenseBypassed || Entitlements.instance.can(widget.entitlementKey!);
+          if (!hasEnt) {
+            // Entitlement (plan) denied → upgrade blocker (vs role-denied below).
+            return const _UpgradeRequiredScreen();
+          }
+        }
+
         if (_state == 'denied') return const _AccessDeniedScreen();
         if (_state != true) {
           return const Scaffold(
@@ -109,6 +129,67 @@ class _AccessDeniedScreen extends StatelessWidget {
                   style: GoogleFonts.poppins(color: Colors.blue)),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown when a route is denied by PLAN ENTITLEMENT (not role). Feature stays
+/// reachable in the UI; this is the hard blocker with the upgrade message.
+class _UpgradeRequiredScreen extends StatelessWidget {
+  const _UpgradeRequiredScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: buildPrimaryAppBar(
+        leading: BackButton(onPressed: () => Navigator.pop(context)),
+      ),
+      backgroundColor: Colors.grey.shade50,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.workspace_premium_rounded,
+                  size: 64, color: AppColors.accent),
+              const SizedBox(height: 16),
+              Text('Not in your plan',
+                  style: GoogleFonts.poppins(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87)),
+              const SizedBox(height: 8),
+              Text(
+                'This feature isn’t included in your current plan.\nPlease contact Bill Berry to upgrade your plan.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                    fontSize: 14, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () =>
+                    Navigator.pushNamed(context, RouteNames.restaurantNeedHelp),
+                icon: const Icon(Icons.support_agent_rounded),
+                label: Text('Contact Bill Berry',
+                    style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Go Back',
+                    style: GoogleFonts.poppins(color: Colors.blue)),
+              ),
+            ],
+          ),
         ),
       ),
     );

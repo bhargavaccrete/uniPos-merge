@@ -7,6 +7,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../../core/di/service_locator.dart';
+import '../../../../../core/plan/entitlement_keys.dart';
+import '../../../../../core/plan/plan_guard.dart';
 import '../../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
@@ -1203,12 +1205,14 @@ class _CustomerdetailsState extends State<Customerdetails> {
     // Generate new KOT if items were added without updating order first
     List<int> finalKotNumbers = List<int>.from(widget.existingModel!.kotNumbers);
     List<int> finalKotBoundaries = List<int>.from(widget.existingModel!.kotBoundaries);
+    Map<int, String> finalKotStatuses = Map<int, String>.from(widget.existingModel!.kotStatuses ?? {});
 
     if (hasNewItems) {
       // Generate a new KOT for the newly added items before settling
       final int newKotNumber = await orderStore.getNextKotNumber();
       finalKotNumbers.add(newKotNumber);
       finalKotBoundaries.add(currentItemCount);
+      finalKotStatuses[newKotNumber] = 'Cooking';
 
 
       // Deduct stock for newly added items
@@ -1239,10 +1243,13 @@ class _CustomerdetailsState extends State<Customerdetails> {
     // Get current session ID
     final currentSessionId = await DayManagementService.getCurrentSessionId();
 
+    final String calculatedStatus = hasNewItems ? 'Cooking' : widget.existingModel!.status;
+
     final OrderModel completedOrder = widget.existingModel!.copyWith(
       items: itemsToSettle, // Use updated items if provided
       kotNumbers: finalKotNumbers, // Include new KOT if generated
       kotBoundaries: finalKotBoundaries, // Update boundaries
+      kotStatuses: finalKotStatuses, // Update KOT status map
       itemCountAtLastKot: currentItemCount, // Update item count
       customerName: _nameController.text.trim(),
       customerNumber: _mobileController.text.trim(),
@@ -1253,7 +1260,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       totalPrice: calculations.grandTotal - pointsUsed, // net payable after points
       paymentMethod: isSplit ? 'Split Payment' : _paymentEntries.first.method,
       completedAt: DateTime.now(),
-      status: 'Cooking',
+      status: calculatedStatus,
       tableNo: widget.tableid,
       isPaid: true,
       paymentStatus: 'Paid',
@@ -1962,6 +1969,17 @@ class _CustomerdetailsState extends State<Customerdetails> {
   }
 
   Future<void> _doSubmitOrder(CartCalculationService calculations) async {
+    // Plan gate — billing.invoice.create + per-day bill cap. Checked first, so a
+    // blocked plan can't even open a day it has no right to bill into.
+    if (!PlanGuard.allowedOr(context, EntKeys.billingInvoiceCreate, featureName: 'Billing')) {
+      return;
+    }
+    final billsToday = (await pastOrderStore.getTodaysPastOrders()).length;
+    if (!mounted) return;
+    if (!PlanGuard.withinLimitOr(context, EntKeys.billingInvoicePerDayMax, billsToday, unit: 'bills per day')) {
+      return;
+    }
+
     // No active day session yet → start the day (opening balance) right here,
     // then continue. The day begins at the first order/settlement.
     final bool sessionOpen = await DayManagementService.isSessionOpen();

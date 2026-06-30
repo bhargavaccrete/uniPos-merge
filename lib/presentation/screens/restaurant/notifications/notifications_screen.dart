@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/entitlements.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/core/routes/routes_name.dart';
+import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 import 'package:billberrylite/domain/services/common/local_notification_service.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_sync_service.dart';
 import 'package:billberrylite/util/color.dart';
@@ -28,6 +33,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Future<void> _refresh() async {
     await notificationStore.load();
     await NotificationSyncService.runStartupChecks();
+  }
+
+  /// Entitlement key a notification's target route requires, or null when the
+  /// route is intentionally ungated (EndDay, Licensing stay reachable). Keeps
+  /// notification taps from landing on AccessDenied for an ungranted module.
+  String? _routeEntitlement(String route) {
+    switch (route) {
+      case RouteNames.restaurantInventory:
+        return EntKeys.inventory;
+      default:
+        return null;
+    }
   }
 
   @override
@@ -207,9 +224,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       borderRadius: BorderRadius.circular(12),
       onTap: () {
         notificationStore.markRead(n.id);
-        if (view.route != null) {
-          Navigator.pushNamed(context, view.route!).then((_) => _refresh());
+        final route = view.route;
+        if (route == null) return;
+        // A notification can fire for a module the plan doesn't include (e.g.
+        // low-stock when `inventory` is off). Don't dump the user on an
+        // AccessDenied screen — tell them and stay put.
+        final entKey = _routeEntitlement(route);
+        if (entKey != null && !PlanGuard.allowedOr(context, entKey)) {
+          return;
         }
+        Navigator.pushNamed(context, route).then((_) => _refresh());
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),

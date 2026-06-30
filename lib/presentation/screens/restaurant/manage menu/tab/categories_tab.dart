@@ -4,6 +4,8 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
 import 'package:billberrylite/util/color.dart';
@@ -60,6 +62,7 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
   }
 
   Future<void> _showAddCategoryBottomSheet() async {
+    if (!PlanGuard.allowedOr(context, EntKeys.manageMenuCategoriesAdd, featureName: 'Add Categories')) return;
     await AddCategoryDialog.show(context);
   }
 
@@ -98,8 +101,9 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
             child: isTablet ? _buildTabletLayout(size) : _buildMobileLayout(size),
           ),
 
-          // Add Category Button — only shown to Admin/Manager
-          if (_canEdit) _buildAddButton(),
+          // Add Category Button — admin/manager (plan enforced on tap).
+          if (_canEdit)
+            _buildAddButton(),
         ],
       ),
     );
@@ -254,17 +258,20 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
                   ],
                 ),
               ),
-              // Actions inline — edit & delete only for Admin/Manager
-              if (_canEdit) ...[
+              // Actions inline — edit & delete: Admin/Manager (plan enforced on tap)
+              if (_canEdit)
                 InkWell(
-                  onTap: () => AddCategoryDialog.show(context, editCategory: category),
+                  onTap: () {
+                    if (!PlanGuard.allowedOr(context, EntKeys.manageMenuCategoriesEdit, featureName: 'Edit Categories')) return;
+                    AddCategoryDialog.show(context, editCategory: category);
+                  },
                   child: Padding(padding: const EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: AppResponsive.smallIconSize(context), color: AppColors.primary)),
                 ),
+              if (_canEdit)
                 InkWell(
                   onTap: () => _showDeleteDialog(category),
                   child: Padding(padding: const EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: AppResponsive.smallIconSize(context), color: Colors.red)),
                 ),
-              ],
               if (items.isNotEmpty)
                 Builder(builder: (_) {
                   final allEnabled = items.every((i) => i.isEnabled);
@@ -309,6 +316,7 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
 
 
   void _showDeleteDialog(Category category) async {
+    if (!PlanGuard.allowedOr(context, EntKeys.manageMenuCategoriesDelete, featureName: 'Delete Categories')) return;
     final itemCount = itemStore.items.where((i) => i.categoryOfItem == category.id).length;
     final confirmed = await showAppConfirmDialog(
       context: context,

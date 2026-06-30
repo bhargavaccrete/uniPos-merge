@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
@@ -217,10 +219,14 @@ class _SalesDataViewState extends State<SalesDataView> {
       endBound = _endDate!.add(const Duration(days: 1));
     }
 
-    // Single pass: date + status filter + accumulate totals
+    // Plan data-scope: clamp the visible history window (reports.history_limit_days).
+    final cutoff = PlanEnforce.windowCutoff(EntKeys.reportsHistoryLimitDays);
+
+    // Single pass: window + date + status filter
     for (final order in pastOrderStore.pastOrders) {
       final orderDate = order.orderAt;
       if (orderDate == null) continue;
+      if (cutoff != null && orderDate.isBefore(cutoff)) continue;
       if (isCustom && !hasCustomRange) continue;
 
       if (orderDate.isBefore(startBound) || !orderDate.isBefore(endBound)) {
@@ -233,15 +239,19 @@ class _SalesDataViewState extends State<SalesDataView> {
       }
 
       results.add(order);
-      sales += order.totalPrice - (order.refundAmount ?? 0.0);
     }
 
     results.sort((a, b) =>
         (b.orderAt ?? DateTime(2000)).compareTo(a.orderAt ?? DateTime(2000)));
 
+    final capped = results;
+    for (final o in capped) {
+      sales += o.totalPrice - (o.refundAmount ?? 0.0);
+    }
+
     setState(() {
-      _filteredOrders = results;
-      _totalOrdersCount = results.length;
+      _filteredOrders = capped;
+      _totalOrdersCount = capped.length;
       _totalSales = sales;
       _currentPage = 0;
       _isLoading = false;

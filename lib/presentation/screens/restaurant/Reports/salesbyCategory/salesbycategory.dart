@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/data/models/restaurant/db/cartmodel_308.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
@@ -252,9 +254,11 @@ class _CategoryDataViewState extends State<CategoryDataView> {
     final Map<String, CategoryReportData> categorySummary = {};
 
     // Single pass over all orders: date + status filter + category aggregation
+    final cutoff = PlanEnforce.windowCutoff(EntKeys.reportsHistoryLimitDays);
     for (final order in pastOrderStore.pastOrders) {
       final orderDate = order.orderAt;
       if (orderDate == null) continue;
+      if (cutoff != null && orderDate.isBefore(cutoff)) continue;
       if (isCustom && !hasCustomRange) continue;
 
       if (orderDate.isBefore(startBound) || !orderDate.isBefore(endBound)) {
@@ -302,8 +306,10 @@ class _CategoryDataViewState extends State<CategoryDataView> {
       }
     }
 
-    final reportData = categorySummary.values.toList()
+    final sorted = categorySummary.values.toList()
       ..sort((a, b) => b.totalRevenue.compareTo(a.totalRevenue));
+
+    final reportData = sorted;
 
     // Compute summary totals once here, not per build
     int totalQty = 0;

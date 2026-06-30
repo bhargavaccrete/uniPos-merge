@@ -11,6 +11,8 @@ import 'package:billberrylite/presentation/screens/onboarding/taxSetupStep.dart'
 import 'package:billberrylite/presentation/screens/onboarding/paymentSetupStep.dart';
 import 'package:billberrylite/presentation/screens/onboarding/staffSetupStep.dart';
 import 'package:billberrylite/presentation/screens/onboarding/securitySetupStep.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/presentation/screens/onboarding/license_activated_screen.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 
@@ -43,7 +45,9 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
-  final int _totalSteps = SetupStep.getSteps().length;
+  // Dynamic: steps for modules the plan doesn't include (Staff/Tax/Payment) are
+  // filtered out once the manifest loads at the Verify Email step.
+  int get _totalSteps => SetupStep.getSteps().length;
 
   @override
   void initState() {
@@ -101,6 +105,18 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
     FocusScope.of(context).unfocus();
 
     if (_store.currentStep > 0) {
+      // Once the license is activated, lock the Verify Email step (and anything
+      // before it): going back would try to re-run email/OTP/activation, which
+      // breaks (the key is consumed and the OTP expired). The activation is
+      // permanent and remembered via LicenseStore.isLicensed.
+      if (locator<LicenseStore>().isLicensed) {
+        final steps = SetupStep.getSteps();
+        final emailIndex =
+            steps.indexWhere((s) => s.title == 'Verify Email');
+        if (emailIndex >= 0 && _store.currentStep - 1 <= emailIndex) {
+          return; // don't step back onto (or before) the activated license step
+        }
+      }
       _store.previousStep();
       _pageController.previousPage(
         duration: const Duration(milliseconds: 300),
@@ -480,18 +496,19 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         ),
       ),
 
-      // Step 4: Tax Setup - uses store
-      SlideTransition(
-        position: _slideAnimation,
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: TaxSetupStep(
-            store: _store,
-            onNext: _nextStep,
-            onPrevious: _previousStep,
+      // Tax Setup — settings module; hidden when the plan excludes it.
+      if (PlanEnforce.allows(EntKeys.settings))
+        SlideTransition(
+          position: _slideAnimation,
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: TaxSetupStep(
+              store: _store,
+              onNext: _nextStep,
+              onPrevious: _previousStep,
+            ),
           ),
         ),
-      ),
 
       // Step 5: Product Setup - Restaurant or Retail specific
       SlideTransition(
@@ -512,30 +529,32 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         ),
       ),
 
-      // Step 6: Payment Methods
-      SlideTransition(
-        position: _slideAnimation,
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: PaymentSetupStep(
-            onNext: _nextStep,
-            onPrevious: _previousStep,
+      // Payment Methods — settings module; hidden when the plan excludes it.
+      if (PlanEnforce.allows(EntKeys.settings))
+        SlideTransition(
+          position: _slideAnimation,
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: PaymentSetupStep(
+              onNext: _nextStep,
+              onPrevious: _previousStep,
+            ),
           ),
         ),
-      ),
 
-      // Step 7: Staff Setup
-      SlideTransition(
-        position: _slideAnimation,
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: StaffSetupStep(
-            store: _store,
-            onNext: _nextStep,
-            onPrevious: _previousStep,
+      // Staff Setup — users module; hidden on single-user plans (users:false).
+      if (PlanEnforce.allows(EntKeys.users))
+        SlideTransition(
+          position: _slideAnimation,
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: StaffSetupStep(
+              store: _store,
+              onNext: _nextStep,
+              onPrevious: _previousStep,
+            ),
           ),
         ),
-      ),
 
       // Step 8: Security - admin PIN + backup password
       SlideTransition(
@@ -907,30 +926,33 @@ class SetupStep {
         description: 'Verify your email and activate your license',
         estimatedTime: '2 min',
       ),
-      const SetupStep(
-        title: 'Tax Setup',
-        icon: Icons.receipt,
-        description: 'Configure tax settings for your region',
-        estimatedTime: '1 min',
-      ),
+      if (PlanEnforce.allows(EntKeys.settings))
+        const SetupStep(
+          title: 'Tax Setup',
+          icon: Icons.receipt,
+          description: 'Configure tax settings for your region',
+          estimatedTime: '1 min',
+        ),
       const SetupStep(
         title: 'Product Setup',
         icon: Icons.production_quantity_limits_outlined,
         description: 'Add your products and categories',
         estimatedTime: '3 min',
       ),
-      const SetupStep(
-        title: 'Payment Methods',
-        icon: Icons.payment,
-        description: 'Setup payment acceptance methods',
-        estimatedTime: '1 min',
-      ),
-      const SetupStep(
-        title: 'Staff Setup',
-        icon: Icons.people,
-        description: 'Add staff members and permissions',
-        estimatedTime: '1 min',
-      ),
+      if (PlanEnforce.allows(EntKeys.settings))
+        const SetupStep(
+          title: 'Payment Methods',
+          icon: Icons.payment,
+          description: 'Setup payment acceptance methods',
+          estimatedTime: '1 min',
+        ),
+      if (PlanEnforce.allows(EntKeys.users))
+        const SetupStep(
+          title: 'Staff Setup',
+          icon: Icons.people,
+          description: 'Add staff members and permissions',
+          estimatedTime: '1 min',
+        ),
       const SetupStep(
         title: 'Security',
         icon: Icons.security_rounded,

@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../../widget/componets/common/report_summary_card.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
 import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:billberrylite/util/color.dart';
@@ -234,12 +236,14 @@ class _ItemsDataViewState extends State<ItemsDataView> {
       endBound = _endDate!.add(const Duration(days: 1));
     }
 
+    final cutoff = PlanEnforce.windowCutoff(EntKeys.reportsHistoryLimitDays);
     final Map<String, ItemReportData> itemSummary = {};
 
     // Single pass over all orders: date + status filter + item aggregation
     for (final order in pastOrderStore.pastOrders) {
       final orderDate = order.orderAt;
       if (orderDate == null) continue;
+      if (cutoff != null && orderDate.isBefore(cutoff)) continue;
       if (isCustom && !hasCustomRange) continue;
 
       if (orderDate.isBefore(startBound) || !orderDate.isBefore(endBound)) {
@@ -299,8 +303,10 @@ class _ItemsDataViewState extends State<ItemsDataView> {
       }
     }
 
-    final reportData = itemSummary.values.toList()
+    final sorted = itemSummary.values.toList()
       ..sort((a, b) => b.totalRevenue.compareTo(a.totalRevenue));
+
+    final reportData = sorted;
 
     // Compute summary totals once here, not per build
     int totalQty = 0;

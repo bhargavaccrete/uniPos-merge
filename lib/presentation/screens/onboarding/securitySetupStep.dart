@@ -5,6 +5,8 @@ import 'package:hive/hive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/data/models/retail/hive_model/staff_model_222.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
@@ -58,16 +60,18 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
   /// Validates the inputs, returning an error to show or null when all valid.
   String? _validate() {
     final pin = _pinController.text.trim();
-    final pwd = _pwdController.text.trim();
     if (pin.length < 4 || pin.length > 6) {
       return 'Admin PIN must be 4–6 digits';
     }
     if (pin != _pinConfirmController.text.trim()) {
       return 'Admin PINs do not match';
     }
+    // Backup password is only collected when the plan includes backups
+    // (settings module). Otherwise skip its policy check entirely.
+    if (!PlanEnforce.allows(EntKeys.settings)) return null;
     // Shared backup-password policy (same rules in Settings + export gate).
     return BackupEncryptionService.validatePassword(
-        pwd, _pwdConfirmController.text.trim());
+        _pwdController.text.trim(), _pwdConfirmController.text.trim());
   }
 
   /// True when [pin] is already assigned to a staff member, so the admin PIN
@@ -110,7 +114,11 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
         _adminPasswordKey, RestaurantAuthHelper.hashPassword(_pinController.text.trim()));
-    await BackupEncryptionService.setPassword(_pwdController.text.trim());
+    // Only set a backup password when the plan includes backups; otherwise it's
+    // collected lazily later (ensureBackupPassword) if the plan is upgraded.
+    if (PlanEnforce.allows(EntKeys.settings)) {
+      await BackupEncryptionService.setPassword(_pwdController.text.trim());
+    }
 
     if (!mounted) return;
     setState(() => _saving = false);
@@ -159,6 +167,8 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             ),
 
+            // Backup Password section — only when the plan includes backups.
+            if (PlanEnforce.allows(EntKeys.settings)) ...[
             SizedBox(height: AppResponsive.largeSpacing(context)),
 
             // ── Backup password ──
@@ -203,6 +213,7 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
                 ),
               ],
             ),
+            ],
 
             if (_error != null) ...[
               SizedBox(height: AppResponsive.mediumSpacing(context)),
@@ -265,7 +276,9 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Set an admin login PIN and a password that encrypts your backups.',
+          PlanEnforce.allows(EntKeys.settings)
+              ? 'Set an admin login PIN and a password that encrypts your backups.'
+              : 'Set an admin login PIN for this device.',
           style: GoogleFonts.poppins(
             fontSize: AppResponsive.smallFontSize(context),
             color: AppColors.textSecondary,

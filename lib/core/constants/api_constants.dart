@@ -18,6 +18,8 @@ class ApiConstants {
   static const String licenseValidatePath = '/api/v1/mobile/license/validate';
   static const String licenseActivatePath = '/api/v1/mobile/license/activate';
   static const String licenseStatusPath = '/api/v1/mobile/license/status';
+  static const String licenseSyncPath = '/api/v1/mobile/license/sync';
+  static const String licensePublicKeyPath = '/api/v1/mobile/license/public-key';
   static const String licenseHeartbeatPath = '/api/v1/mobile/license/heartbeat';
   static const String licenseDeactivatePath = '/api/v1/mobile/license/deactivate';
   static const String licenseRequestOtp = '/api/v1/signup/request-otp';

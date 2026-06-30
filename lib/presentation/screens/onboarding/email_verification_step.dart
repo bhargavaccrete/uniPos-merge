@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
@@ -127,6 +128,9 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
     });
     final ok = await _license.verifyOtp(_submittedEmail, otp);
     if (!mounted) return;
+    // Drop the numeric OTP keyboard before showing the (alphanumeric) key field,
+    // so the soft keyboard re-queries the type instead of staying digits-only.
+    FocusScope.of(context).unfocus();
     setState(() {
       _loading = false;
       if (ok) {
@@ -168,14 +172,30 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
     });
     final valid = await _license.validateKey(key);
     if (!mounted) return;
-    if (valid) {
-      await _license.savePendingKey(key);
-      if (!mounted) return;
+    if (!valid) {
+      setState(() {
+        _loading = false;
+        _errorMsg = _license.errorMessage;
+      });
+      return;
+    }
+
+    // Activate NOW (not at the Review step) so the signed entitlements manifest
+    // is loaded BEFORE Product/Staff setup — only then can those steps enforce
+    // the plan's item/user limits. A successful activation clears the pending
+    // key, so the Review step skips re-activation and goes straight to home.
+    await _license.savePendingKey(key);
+    final activated = await _license.activateWithPendingKey(
+      businessName: widget.store.storeName,
+    );
+    if (!mounted) return;
+    if (activated) {
       widget.onNext();
     } else {
       setState(() {
         _loading = false;
-        _errorMsg = _license.errorMessage;
+        _errorMsg =
+            _license.errorMessage ?? 'Activation failed. Please try again.';
       });
     }
   }
@@ -200,6 +220,12 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
   }
 
   Widget _phaseContent(BuildContext context) {
+    // Once the license is already activated (came back to this step, or the app
+    // resumed setup after a restart), NEVER re-show email/OTP/key entry — the key
+    // is consumed and the OTP expired. Show a completed state with Continue.
+    if (_license.isLicensed) {
+      return _activatedView(context);
+    }
     switch (_phase) {
       case _Phase.email:
         return _emailView(context);
@@ -208,6 +234,18 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
       case _Phase.enterKey:
         return _enterKeyView(context);
     }
+  }
+
+  Widget _activatedView(BuildContext context) {
+    return Column(
+      children: [
+        _hero(context, Icons.verified_rounded, AppColors.success,
+            'License Activated',
+            'Your license is active. Continue setting up your store.'),
+        SizedBox(height: AppResponsive.largeSpacing(context)),
+        _primaryButton(context, label: 'Continue', onPressed: widget.onNext),
+      ],
+    );
   }
 
   Widget _emailView(BuildContext context) {
@@ -282,6 +320,7 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
                   _errorMsg = null;
                   _phase = _Phase.email;
                 })),
+        _devSkipButton(context),
       ],
     );
   }
@@ -299,6 +338,9 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
           hint: 'Paste your license key',
           icon: Icons.vpn_key_rounded,
           required: true,
+          // Keys are alphanumeric (e.g. UNIPOS-12345678901234) — force the full
+          // text keyboard so it never falls back to digits-only.
+          keyboardType: TextInputType.text,
           enableSuggestions: false,
           autocorrect: false,
         ),
@@ -311,7 +353,32 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
                   _phase = _Phase.otp;
                   _startTicker();
                 })),
+        _devSkipButton(context),
       ],
+    );
+  }
+
+  /// DEBUG-ONLY: skip the license (turns on bypass) so the whole app can be
+  /// tested with every feature unlocked and no limits. Stripped from release.
+  Future<void> _skipForTesting() async {
+    await _license.skipLicense();
+    if (mounted) widget.onNext();
+  }
+
+  Widget _devSkipButton(BuildContext context) {
+    if (!kDebugMode) return const SizedBox.shrink();
+    return TextButton.icon(
+      onPressed: _loading ? null : _skipForTesting,
+      icon: const Icon(Icons.skip_next_rounded,
+          size: 18, color: AppColors.textSecondary),
+      label: Text(
+        'Skip for now (test mode)',
+        style: TextStyle(
+          fontSize: AppResponsive.smallFontSize(context),
+          color: AppColors.textSecondary,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
     );
   }
 

@@ -3,17 +3,17 @@ import '../core/routes/routes_name.dart';
 import '../util/color.dart';
 import '../util/common/app_responsive.dart';
 
-/// Shared "Upgrade to Premium" bottom sheet shown whenever a Free user hits a
-/// plan limit (locked feature, count cap, history window, export, etc.).
-/// Centralised so every lock looks and behaves the same.
+/// Shared "upgrade required" blocker shown whenever the active plan does not
+/// include a feature, or a plan limit is reached. Centralised so every block
+/// looks and behaves the same. Upgrades are sales-driven, so the primary action
+/// is "Contact Bill Berry" (→ Need Help screen with phone/email/WhatsApp).
 class UpgradeSheet {
   UpgradeSheet._();
 
-  /// Shows the upgrade prompt. [title] and [message] describe the specific lock.
-  /// The "Upgrade" button routes to the licensing screen.
+  /// Generic blocker. [title] and [message] describe the specific lock.
   static Future<void> show(
     BuildContext context, {
-    String title = 'Premium feature',
+    String title = 'Upgrade required',
     required String message,
   }) {
     return showModalBottomSheet<void>(
@@ -24,6 +24,33 @@ class UpgradeSheet {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (sheetCtx) => _UpgradeSheetBody(title: title, message: message),
+    );
+  }
+
+  /// Feature not included in the current plan.
+  static Future<void> showLocked(BuildContext context, {String? featureName}) {
+    final what = (featureName == null || featureName.trim().isEmpty)
+        ? 'This feature'
+        : featureName.trim();
+    return show(
+      context,
+      title: 'Not in your plan',
+      message:
+          "$what isn't included in your current plan.\nPlease contact Bill Berry to upgrade your plan.",
+    );
+  }
+
+  /// A plan count/usage limit has been reached.
+  static Future<void> showLimit(
+    BuildContext context, {
+    required int max,
+    required String unit,
+  }) {
+    return show(
+      context,
+      title: 'Plan limit reached',
+      message:
+          "You've reached your plan limit of $max $unit.\nPlease contact Bill Berry to upgrade your plan.",
     );
   }
 }
@@ -107,19 +134,22 @@ class _UpgradeSheetBody extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  child: Text('Maybe later',
+                  child: Text('Close',
                       style:
                           TextStyle(fontSize: AppResponsive.buttonFontSize(context))),
                 ),
               ),
               SizedBox(width: AppResponsive.smallSpacing(context)),
               Expanded(
-                child: ElevatedButton(
+                flex: 2,
+                child: ElevatedButton.icon(
                   onPressed: () {
                     Navigator.of(context).pop();
                     Navigator.of(context)
-                        .pushNamed(RouteNames.restaurantLicensing);
+                        .pushNamed(RouteNames.restaurantNeedHelp);
                   },
+                  icon: Icon(Icons.support_agent_rounded,
+                      size: AppResponsive.iconSize(context)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: AppColors.white,
@@ -129,7 +159,7 @@ class _UpgradeSheetBody extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  child: Text('Upgrade',
+                  label: Text('Contact Bill Berry',
                       style: TextStyle(
                           fontSize: AppResponsive.buttonFontSize(context),
                           fontWeight: FontWeight.bold)),

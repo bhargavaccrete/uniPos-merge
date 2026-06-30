@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billberrylite/util/images.dart';
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/domain/services/common/device_id_service.dart';
+import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 import '../../../util/color.dart';
 import '../../../util/responsive.dart';
 
@@ -123,15 +124,7 @@ class _SplashScreenState extends State<SplashScreen>
       if (AppConfig.isRetail) {
         Navigator.pushReplacementNamed(context, '/retail-billing');
       } else if (AppConfig.isRestaurant) {
-        final isLoggedIn = prefs.getBool('restaurant_is_logged_in') ?? false;
-
-        if (isLoggedIn) {
-          // User is logged in - go to admin welcome screen
-          Navigator.pushReplacementNamed(context, '/restaurant-home');
-        } else {
-          // User is not logged in - go to login screen
-          Navigator.pushReplacementNamed(context, '/restaurant-login');
-        }
+        LicenseStore.navigateToNextScreen(context);
       } else {
         // Setup complete but no business mode - navigate to walkthrough
         Navigator.pushReplacementNamed(context, '/walkthrough');

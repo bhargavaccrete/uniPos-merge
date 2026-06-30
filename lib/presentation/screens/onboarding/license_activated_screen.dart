@@ -43,11 +43,7 @@ class _LicenseActivatedScreenState extends State<LicenseActivatedScreen> {
   }
 
   void _goToDashboard() {
-    if (!_store.isLicensed) return; // hard gate — never navigate without active license
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const AdminWelcome()),
-    );
+    LicenseStore.navigateToNextScreen(context);
   }
 
   @override

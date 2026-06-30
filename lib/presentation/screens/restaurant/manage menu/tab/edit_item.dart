@@ -9,6 +9,8 @@ import 'package:billberrylite/presentation/widget/componets/common/app_dialog.da
 import 'package:billberrylite/core/constants/item_units.dart';
 import 'package:billberrylite/util/restaurant/staticswitch.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/componets/filterButton.dart';
@@ -726,10 +728,13 @@ class _EdititemScreenState extends State<EdititemScreen> {
           ),
           const SizedBox(height: 25),
 
-          // Inventory Management Section
-          _buildSectionHeader('Inventory Management', Icons.inventory_2_outlined),
-          const SizedBox(height: 15),
-          Container(
+          // Inventory Management Section — stock module. Hidden when `inventory`
+          // isn't in the plan (a menu item is still fully editable without stock).
+          if (PlanEnforce.allows(EntKeys.inventory))
+            _buildSectionHeader('Inventory Management', Icons.inventory_2_outlined),
+          if (PlanEnforce.allows(EntKeys.inventory)) const SizedBox(height: 15),
+          if (PlanEnforce.allows(EntKeys.inventory))
+            Container(
             padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               border: Border.all(color: Colors.grey.shade400),

@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:uuid/uuid.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/data/models/restaurant/db/customer_model_125.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -120,6 +122,8 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
               : _notesController.text.trim(),
         );
 
+        if (!PlanGuard.allowedOr(context, EntKeys.customers, featureName: 'Customers')) return;
+        if (!PlanGuard.withinLimitOr(context, EntKeys.customersMax, restaurantCustomerStore.customers.length, unit: 'customers')) return;
         final success = await restaurantCustomerStore.addCustomer(newCustomer);
 
         if (mounted) {

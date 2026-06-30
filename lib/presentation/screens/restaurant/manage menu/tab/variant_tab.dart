@@ -11,6 +11,8 @@ import 'package:billberrylite/data/models/restaurant/db/variantmodel_305.dart';
 import 'package:billberrylite/util/images.dart';
 import 'package:uuid/uuid.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import '../../../../../util/restaurant/restaurant_session.dart';
 
 class VariantTab extends StatefulWidget {
@@ -29,6 +31,11 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
   VariantModel? editingVariante;
 
   bool get _canEdit => RestaurantSession.isAdmin || RestaurantSession.staffRole == 'Manager';
+  // Plan entitlements layered on the role check (manage_menu.variants.*).
+  // Visibility = role only; entitlement enforced on action (openBottomSheet/_delete).
+  bool get _canAddVariant => _canEdit;
+  bool get _canEditVariant => _canEdit;
+  bool get _canDeleteVariant => _canEdit;
 
   @override
   void initState() {
@@ -48,6 +55,14 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
   }
 
   void openBottomSheet({VariantModel? variante}) {
+    if (!PlanGuard.allowedOr(
+        context,
+        variante == null
+            ? EntKeys.manageMenuVariantsAdd
+            : EntKeys.manageMenuVariantsEdit,
+        featureName: variante == null ? 'Add Variants' : 'Edit Variants')) {
+      return;
+    }
     if (variante != null) {
       variantController.text = variante.name;
       editingVariante = variante;
@@ -266,6 +281,7 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
   }
 
   Future<void> _delete(String id) async {
+    if (!PlanGuard.allowedOr(context, EntKeys.manageMenuVariantsDelete, featureName: 'Delete Variants')) return;
     final variant = variantStore.variants.firstWhere((v) => v.id == id);
     final confirmed = await showAppConfirmDialog(
       context: context,
@@ -316,7 +332,7 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
             child: isTablet ? _buildTabletLayout(size) : _buildMobileLayout(size),
           ),
 
-          if (_canEdit) _buildAddButton(),
+          if (_canAddVariant) _buildAddButton(),
         ],
       ),
     );
@@ -433,10 +449,10 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
             Icon(Icons.tune, color: AppColors.primary, size: AppResponsive.iconSize(context)),
             SizedBox(width: 8),
             Expanded(child: Text(variante.name, style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis)),
-            if (_canEdit) ...[
+            if (_canEditVariant)
               InkWell(onTap: () => openBottomSheet(variante: variante), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: AppResponsive.smallIconSize(context), color: AppColors.primary))),
+            if (_canDeleteVariant)
               InkWell(onTap: () => _delete(variante.id), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: AppResponsive.smallIconSize(context), color: Colors.red))),
-            ],
           ],
         ),
       );
@@ -469,10 +485,10 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
           ),
           SizedBox(width: 12),
           Expanded(child: Text(variante.name, style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis)),
-          if (_canEdit) ...[
+          if (_canEditVariant)
             InkWell(onTap: () => openBottomSheet(variante: variante), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: AppResponsive.smallIconSize(context), color: AppColors.primary))),
+          if (_canDeleteVariant)
             InkWell(onTap: () => _delete(variante.id), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: AppResponsive.smallIconSize(context), color: Colors.red))),
-          ],
         ],
       ),
     );

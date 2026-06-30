@@ -407,9 +407,7 @@ class _ActiveorderState extends State<Activeorder> {
               for (final k in order.kotNumbers) {
                 setDialogState(() => kotStatuses[k] = newStatus);
               }
-              await Future.wait(
-                order.kotNumbers.map((k) => _updateKotStatus(order, k, newStatus)),
-              );
+              await _updateAllKotStatuses(order, order.kotNumbers, newStatus);
               if (newStatus == 'Served') {
                 final latestOrder = orderStore.orders.firstWhere(
                   (o) => o.id == order.id, orElse: () => order);
@@ -895,9 +893,79 @@ class _ActiveorderState extends State<Activeorder> {
     );
   }
 
-// ACTION 1: Updates KOT status and syncs with KDS
-  Future<void> _updateKotStatus(OrderModel order, int kotNumber, String newStatus) async {
+  Future<void> _updateAllKotStatuses(OrderModel orderParam, List<int> kotNumbers, String newStatus) async {
     try {
+      // Fetch the latest version from the store to prevent stale writes
+      final order = orderStore.orders.firstWhere(
+        (o) => o.id == orderParam.id,
+        orElse: () => orderParam,
+      );
+
+      // Update KOT status map for all KOTs in one go
+      Map<int, String> updatedKotStatuses = Map<int, String>.from(order.kotStatuses ?? {});
+      for (var kotNumber in kotNumbers) {
+        updatedKotStatuses[kotNumber] = newStatus;
+      }
+
+      // Calculate overall order status
+      String overallStatus = _calculateOverallStatus(updatedKotStatuses, order.kotNumbers);
+
+      // Update the order in database in a single atomic write
+      final updatedOrder = order.copyWith(
+        kotStatuses: updatedKotStatuses,
+        status: overallStatus,
+      );
+      await orderStore.updateOrder(updatedOrder);
+
+      // Update table status to match order status
+      if (order.tableNo != null && order.tableNo!.isNotEmpty) {
+        await tableStore.updateTableStatus(
+          order.tableNo!,
+          overallStatus,
+          total: order.totalPrice,
+          orderId: order.id,
+          orderTime: order.timeStamp,
+        );
+      }
+
+      // Broadcast to KDS via WebSocket for each KOT to preserve compatibility
+      try {
+        final kotStatusesJson = updatedKotStatuses.map((key, value) => MapEntry(key.toString(), value));
+        for (var kotNumber in kotNumbers) {
+          ws.broadcastEvent({
+            'type': 'KOT_STATUS_UPDATE',
+            'orderId': order.id,
+            'kotNumber': kotNumber,
+            'kotStatus': newStatus,
+            'overallStatus': overallStatus,
+            'tableNo': order.tableNo,
+            'allKotNumbers': order.kotNumbers,
+            'kotStatuses': kotStatusesJson,
+          });
+        }
+      } catch (e) {
+        // Silently catch WS broadcast errors
+      }
+
+      // Show success message
+      if (mounted) {
+        NotificationService.instance.showSuccess('All KOTs updated to $newStatus');
+      }
+    } catch (e) {
+      if (mounted) {
+        NotificationService.instance.showError('Failed to update status: $e');
+      }
+    }
+  }
+
+// ACTION 1: Updates KOT status and syncs with KDS
+  Future<void> _updateKotStatus(OrderModel orderParam, int kotNumber, String newStatus) async {
+    try {
+      // Fetch the latest version from the store to prevent stale writes
+      final order = orderStore.orders.firstWhere(
+        (o) => o.id == orderParam.id,
+        orElse: () => orderParam,
+      );
 
       // Update KOT status map
       Map<int, String> updatedKotStatuses = Map<int, String>.from(order.kotStatuses ?? {});
@@ -923,7 +991,6 @@ class _ActiveorderState extends State<Activeorder> {
           orderTime: order.timeStamp,
         );
       }
-
 
       // Broadcast to KDS via WebSocket
       try {

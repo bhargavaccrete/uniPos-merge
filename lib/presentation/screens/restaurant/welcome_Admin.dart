@@ -6,6 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billberrylite/util/color.dart';
 import '../../../core/routes/routes_name.dart';
 import '../../../core/di/service_locator.dart';
+import '../../../core/plan/entitlement_keys.dart';
+import '../../../core/plan/plan_enforcement.dart';
+import '../../../core/plan/plan_guard.dart';
 import '../../../domain/services/common/notification_service.dart';
 import '../../../domain/services/common/start_of_day_backup_prompt.dart';
 import '../../../domain/services/restaurant/day_management_service.dart';
@@ -116,6 +119,8 @@ class _AdminWelcomeState extends State<AdminWelcome> {
   }
 
   Future<void> _startShiftIfNeeded() async {
+    // Shifts are a licensed module — skip auto-start when the plan omits it.
+    if (!PlanEnforce.allows(EntKeys.shifts)) return;
     final staffId = RestaurantSession.isAdmin
         ? 'admin'
         : (RestaurantSession.staffName ?? 'staff');
@@ -488,7 +493,8 @@ class _AdminWelcomeState extends State<AdminWelcome> {
 
           // Content
           Expanded(
-            child: LayoutBuilder(
+            child: Observer(
+              builder: (_) => LayoutBuilder(
               builder: (context, constraints) {
                 final cards = _getVisibleCards(context);
                 // Single source of truth for column count (respects AppResponsive breakpoints).
@@ -516,6 +522,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                           title: card.title,
                           color: card.color,
                           onTap: card.onTap,
+                          entitlementKey: card.entitlementKey,
                           isTablet: isTablet,
                         ))
                     .toList();
@@ -552,6 +559,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                 );
               },
             ),
+            ),
           ),
           ],
         ), // Column / body
@@ -564,21 +572,28 @@ class _AdminWelcomeState extends State<AdminWelcome> {
   // Admin and Manager see all cards. Other roles see only what canAccess() permits.
   List<_MenuCardData> _getVisibleCards(BuildContext context) {
     final all = [
-      _MenuCardData('Start Order',   Icons.shopping_cart_rounded,       Colors.blue,           'startOrder',   () => Navigator.pushNamed(context, RouteNames.restaurantStartOrder)),
-      _MenuCardData('Manage Menu',   Icons.restaurant_menu_rounded,     Colors.purple,         'manageMenu',   () => Navigator.pushNamed(context, RouteNames.restaurantManageMenu)),
-      _MenuCardData('Manage Staff',  Icons.people_rounded,              Colors.teal,           'manageStaff',  () => Navigator.pushNamed(context, RouteNames.restaurantStaff)),
-      _MenuCardData('Customers',     Icons.person_outline_rounded,      Colors.indigo,         'customers',    () => Navigator.pushNamed(context, RouteNames.restaurantCustomers)),
-      _MenuCardData('Reports',       Icons.bar_chart_rounded,           Colors.orange,         'reports',      () => Navigator.pushNamed(context, RouteNames.restaurantReports)),
-      _MenuCardData('Tax Settings',  Icons.receipt_long_rounded,        Colors.green,          'taxSettings',  () => Navigator.pushNamed(context, RouteNames.restaurantTaxSettings)),
-      _MenuCardData('Expenses',      Icons.account_balance_wallet_rounded, Colors.red,         'expenses',     () => Navigator.pushNamed(context, RouteNames.restaurantExpenses)),
-      _MenuCardData('Inventory',     Icons.inventory_2_rounded,         Colors.amber,          'inventory',    () => Navigator.pushNamed(context, RouteNames.restaurantInventory)),
-      _MenuCardData('Settings',      Icons.settings_rounded,            Colors.blueGrey,       'settings',     () => Navigator.pushNamed(context, RouteNames.restaurantSettings)),
-      _MenuCardData('Cash Drawer',   Icons.point_of_sale_rounded,       const Color(0xFF00897B), 'cashDrawer', () => Navigator.pushNamed(context, RouteNames.restaurantCashDrawer)),
-      _MenuCardData('End of Day',    Icons.nightlight_round,            Colors.deepOrange,     'cashDrawer',   () => Navigator.pushNamed(context, RouteNames.restaurantEndDay)),
-      _MenuCardData('Attendance',    Icons.access_time_rounded,         Colors.deepPurple,     'startOrder',   () => Navigator.pushNamed(context, RouteNames.restaurantAttendance)),
+      _MenuCardData('Start Order',   Icons.shopping_cart_rounded,       Colors.blue,           'startOrder',   () => Navigator.pushNamed(context, RouteNames.restaurantStartOrder), entitlementKey: EntKeys.billing),
+      _MenuCardData('Manage Menu',   Icons.restaurant_menu_rounded,     Colors.purple,         'manageMenu',   () => Navigator.pushNamed(context, RouteNames.restaurantManageMenu), entitlementKey: EntKeys.manageMenu),
+      _MenuCardData('Manage Staff',  Icons.people_rounded,              Colors.teal,           'manageStaff',  () => Navigator.pushNamed(context, RouteNames.restaurantStaff), entitlementKey: EntKeys.users),
+      _MenuCardData('Customers',     Icons.person_outline_rounded,      Colors.indigo,         'customers',    () => Navigator.pushNamed(context, RouteNames.restaurantCustomers), entitlementKey: EntKeys.customers),
+      _MenuCardData('Reports',       Icons.bar_chart_rounded,           Colors.orange,         'reports',      () => Navigator.pushNamed(context, RouteNames.restaurantReports), entitlementKey: EntKeys.reports),
+      _MenuCardData('Tax Settings',  Icons.receipt_long_rounded,        Colors.green,          'taxSettings',  () => Navigator.pushNamed(context, RouteNames.restaurantTaxSettings), entitlementKey: EntKeys.settings),
+      _MenuCardData('Expenses',      Icons.account_balance_wallet_rounded, Colors.red,         'expenses',     () => Navigator.pushNamed(context, RouteNames.restaurantExpenses), entitlementKey: EntKeys.expenses),
+      _MenuCardData('Inventory',     Icons.inventory_2_rounded,         Colors.amber,          'inventory',    () => Navigator.pushNamed(context, RouteNames.restaurantInventory), entitlementKey: EntKeys.inventory),
+      _MenuCardData('Settings',      Icons.settings_rounded,            Colors.blueGrey,       'settings',     () => Navigator.pushNamed(context, RouteNames.restaurantSettings), entitlementKey: EntKeys.settings),
+      // Day lifecycle follows billing: a day auto-opens on the first bill, so
+      // Cash Drawer + End of Day must be available whenever billing is granted.
+      _MenuCardData('Cash Drawer',   Icons.point_of_sale_rounded,       const Color(0xFF00897B), 'cashDrawer', () => Navigator.pushNamed(context, RouteNames.restaurantCashDrawer), entitlementKey: EntKeys.cashDrawer),
+      _MenuCardData('End of Day',    Icons.nightlight_round,            Colors.deepOrange,     'cashDrawer',   () => Navigator.pushNamed(context, RouteNames.restaurantEndDay), entitlementKey: EntKeys.billing),
+      _MenuCardData('Attendance',    Icons.access_time_rounded,         Colors.deepPurple,     'startOrder',   () => Navigator.pushNamed(context, RouteNames.restaurantAttendance), entitlementKey: EntKeys.attendance),
       _MenuCardData('Logout',        Icons.logout_rounded,              Colors.red.shade700,   'logout',       () => _showLogoutDialog(context)),
     ];
-    return all.where((c) => c.permission == 'logout' || RestaurantSession.canAccess(c.permission)).toList();
+    // Role still hides; entitlement no longer hides — denied cards stay visible
+    // and show the upgrade blocker on tap (see _buildMenuCard).
+    return all
+        .where((c) =>
+            c.permission == 'logout' || RestaurantSession.canAccess(c.permission))
+        .toList();
   }
 
   Widget _buildMenuCard({
@@ -588,11 +603,19 @@ class _AdminWelcomeState extends State<AdminWelcome> {
     required Color color,
     required VoidCallback onTap,
     required bool isTablet,
+    String? entitlementKey,
   }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: () {
+          // Entitlement denied → show upgrade blocker instead of navigating.
+          if (entitlementKey != null &&
+              !PlanGuard.allowedOr(context, entitlementKey, featureName: title)) {
+            return;
+          }
+          onTap();
+        },
         borderRadius: BorderRadius.circular(16),
         child: Container(
           decoration: BoxDecoration(
@@ -864,5 +887,12 @@ class _MenuCardData {
   final String permission;
   final VoidCallback onTap;
 
-  const _MenuCardData(this.title, this.icon, this.color, this.permission, this.onTap);
+  /// Server entitlement key that gates this module. Null = not manifest-gated
+  /// (role gating only). Cards are hidden only when a manifest is loaded AND it
+  /// does not grant this key.
+  final String? entitlementKey;
+
+  const _MenuCardData(this.title, this.icon, this.color, this.permission,
+      this.onTap,
+      {this.entitlementKey});
 }

@@ -15,6 +15,8 @@ import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/main.dart' show navigatorKey;
 import 'package:billberrylite/domain/services/common/backup_encryption_service.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'package:billberrylite/core/constants/hive_box_names.dart';
 import 'package:billberrylite/core/init/hive_init.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -179,6 +181,7 @@ class UnifiedBackupService {
   /// Automatically saves backup to Downloads folder
   /// Returns the file path or null if failed
   static Future<String?> exportToDownloads({bool includeImages = true}) async {
+    if (!PlanEnforce.allows(EntKeys.dataBackup)) return null;
     if (kIsWeb) {
       return await _exportForWeb();
     }
@@ -257,6 +260,7 @@ class UnifiedBackupService {
   /// Saves backup to user-selected folder
   /// Returns the file path or null if failed
   static Future<String?> exportToCustomFolder(String folderPath) async {
+    if (!PlanEnforce.allows(EntKeys.dataBackup)) return null;
     if (kIsWeb) {
       return await _exportForWeb();
     }
@@ -282,6 +286,7 @@ class UnifiedBackupService {
   /// Saves backup to app cache then shares it via the system share sheet.
   /// On web, triggers a browser download instead.
   static Future<String?> exportToShare() async {
+    if (!PlanEnforce.allows(EntKeys.dataBackup)) return null;
     if (kIsWeb) return await _exportForWeb();
     try {
       final data = await _collectAllData();
@@ -301,6 +306,7 @@ class UnifiedBackupService {
   /// Imports backup file and automatically detects mode.
   /// Shows a password dialog if the backup is encrypted.
   static Future<bool> importData(BuildContext context) async {
+    if (!PlanEnforce.allows(EntKeys.dataBackup)) return false;
     try {
       debugPrint("📦 Starting import process...");
 

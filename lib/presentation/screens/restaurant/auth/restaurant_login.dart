@@ -9,7 +9,7 @@ import '../../../../util/restaurant/restaurant_auth_helper.dart';
 import '../../../../util/restaurant/restaurant_session.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../widget/componets/common/app_text_field.dart';
-import '../welcome_Admin.dart';
+import '../../../../domain/store/restaurant/license_store.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 class RestaurantLogin extends StatefulWidget {
   const RestaurantLogin({super.key});
@@ -85,10 +85,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
         await RestaurantSession.saveAdminSession();
         await _autoClockIn('Admin', 'Admin');
         if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const AdminWelcome()),
-          );
+          LicenseStore.navigateToNextScreen(context);
         }
         return;
       }
@@ -106,10 +103,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
         final name = '${match.firstName} ${match.lastName}'.trim();
         await _autoClockIn(name, match.isCashier);
         if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const AdminWelcome()),
-          );
+          LicenseStore.navigateToNextScreen(context);
         }
         return;
       }

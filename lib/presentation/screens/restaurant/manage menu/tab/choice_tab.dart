@@ -11,6 +11,8 @@ import 'package:billberrylite/presentation/widget/componets/common/app_text_fiel
 import 'package:billberrylite/data/models/restaurant/db/choicemodel_306.dart';
 import 'package:billberrylite/data/models/restaurant/db/choiceoptionmodel_307.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'package:billberrylite/util/images.dart';
 import 'package:uuid/uuid.dart';
 
@@ -33,6 +35,11 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
   bool allowMultipleSelection = false; // Track if choice allows multiple selections
 
   bool get _canEdit => RestaurantSession.isAdmin || RestaurantSession.staffRole == 'Manager';
+  // Plan entitlements layered on the role check (manage_menu.choices.*).
+  // Visibility = role only; entitlement enforced on action (openBottomSheet/_delete).
+  bool get _canAddChoice => _canEdit;
+  bool get _canEditChoice => _canEdit;
+  bool get _canDeleteChoice => _canEdit;
 
   @override
   void initState() {
@@ -53,6 +60,14 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
   }
 
   void openBottomSheet({ChoicesModel? choicemodel}) {
+    if (!PlanGuard.allowedOr(
+        context,
+        choicemodel == null
+            ? EntKeys.manageMenuChoicesAdd
+            : EntKeys.manageMenuChoicesEdit,
+        featureName: choicemodel == null ? 'Add Choices' : 'Edit Choices')) {
+      return;
+    }
     setState(() {
       if (choicemodel != null) {
         choiceController.text = choicemodel.name;
@@ -574,6 +589,7 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
   }
 
   Future<void> _delete(ChoicesModel choice) async {
+    if (!PlanGuard.allowedOr(context, EntKeys.manageMenuChoicesDelete, featureName: 'Delete Choices')) return;
     final confirmed = await showAppConfirmDialog(
       context: context,
       title: 'Delete "${choice.name}"?',
@@ -623,7 +639,7 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
             child: isTablet ? _buildTabletLayout(size) : _buildMobileLayout(size),
           ),
 
-          if (_canEdit) _buildAddButton(),
+          if (_canAddChoice) _buildAddButton(),
         ],
       ),
     );
@@ -761,10 +777,10 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (_canEdit) ...[
+              if (_canEditChoice)
                 InkWell(onTap: () => openBottomSheet(choicemodel: choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: AppResponsive.smallIconSize(context), color: AppColors.primary))),
+              if (_canDeleteChoice)
                 InkWell(onTap: () => _delete(choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: AppResponsive.smallIconSize(context), color: Colors.red))),
-              ],
             ],
           ),
           children: choice.choiceOption.isEmpty

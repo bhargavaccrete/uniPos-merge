@@ -7,6 +7,8 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
@@ -133,6 +135,8 @@ class _manageStaffState extends State<manageStaff> {
   }
 
   Future<void> _addStaff() async {
+    if (!PlanGuard.allowedOr(context, EntKeys.users, featureName: 'Staff')) return;
+    if (!PlanGuard.withinLimitOr(context, EntKeys.usersMax, staffStore.staff.length, unit: 'users')) return;
     final newstaff = StaffModel(
       id: Uuid().v4().toString(),
       userName: userNameController.text.trim(),

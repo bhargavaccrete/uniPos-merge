@@ -50,12 +50,16 @@ class DevicePayloadService {
       }
     } catch (_) {}
 
-    // Fallback for unsupported or web platforms
+    // Fallback for unsupported or web platforms. The server only accepts
+    // deviceos in [1,2,3,4] (Android/iOS/Windows/Linux) — it has no Web/macOS
+    // code — so map these to a VALID value (Linux→4, everything else incl. web
+    // → Windows 3) instead of 0, otherwise activation 400s (e.g. on Chrome).
+    final int fallbackOs = (!kIsWeb && Platform.isLinux) ? 4 : 3;
     return {
       'deviceid': deviceId,
       'devicename': kIsWeb ? 'Web Browser' : Platform.localHostname,
       'devicemodel': kIsWeb ? 'Web' : Platform.operatingSystem,
-      'deviceos': 0,
+      'deviceos': fallbackOs,
       'osversion': kIsWeb ? '' : Platform.operatingSystemVersion,
       'appversion': appVersion,
     };

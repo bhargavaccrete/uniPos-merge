@@ -11,6 +11,9 @@ import 'package:billberrylite/domain/services/restaurant/notification_service.da
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/entitlements.dart';
+import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../util/restaurant/restaurant_auth_helper.dart';
 import '../../../util/color.dart';
@@ -234,6 +237,25 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
           .showError('This PIN is already in use. Choose a different one.');
       _pinFocus.requestFocus();
       return;
+    }
+
+    // Plan limit — staff module + user cap. Enforced once the manifest is live
+    // (activation now happens at the Verify Email step, before this one).
+    final lic = locator<LicenseStore>();
+    if (!lic.licenseBypassed && Entitlements.instance.hasManifest) {
+      if (!Entitlements.instance.can(EntKeys.users)) {
+        NotificationService.instance
+            .showError('Your plan does not include staff management.');
+        return;
+      }
+      // TODO(backend): confirm whether users.max INCLUDES the admin/owner.
+      // Currently caps the staff list at users.max (admin not counted).
+      final maxUsers = Entitlements.instance.limit(EntKeys.usersMax);
+      if (maxUsers > 0 && _staffMembers.length >= maxUsers) {
+        NotificationService.instance.showError(
+            'Your plan allows up to $maxUsers staff. Upgrade to add more.');
+        return;
+      }
     }
 
     setState(() => _isSaving = true);

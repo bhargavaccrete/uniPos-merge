@@ -63,6 +63,7 @@ dependencies:
   path_provider: ^2.1.1 # <- for local storage paths
   shared_preferences: ^2.2.2 # <- for storing preferences
   crypto: ^3.0.3 # <- for password hashing
+  cryptography: ^2.7.0 # <- Ed25519 verify for the entitlements manifest
   share_plus: ^12.0.1 # <- for sharing backup files
   file_selector: ^1.0.3 # <- for selecting backup files to import
   pdf: ^3.10.8 # <- for PDF generation

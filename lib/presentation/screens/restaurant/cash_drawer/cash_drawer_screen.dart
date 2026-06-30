@@ -410,42 +410,57 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
               ),
               const SizedBox(height: 16),
 
-              // Reason dropdown
-              DropdownButtonFormField<String>(
-                value: selectedReason,
-                style: GoogleFonts.poppins(
-                    fontSize: 14, color: AppColors.textPrimary),
-                decoration: InputDecoration(
-                  labelText: 'Reason',
-                  labelStyle: GoogleFonts.poppins(
-                      fontSize: 13, color: AppColors.textSecondary),
-                  prefixIcon: const Icon(Icons.list_alt_rounded,
-                      color: AppColors.primary, size: 20),
-                  filled: true,
-                  fillColor: AppColors.surfaceLight,
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: AppColors.divider)),
-                  enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: AppColors.divider)),
-                  focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                          color: AppColors.primary, width: 1.5)),
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 14),
-                ),
-                items: reasons
-                    .map((r) => DropdownMenuItem(
-                        value: r,
-                        child: Text(r,
-                            style: GoogleFonts.poppins(fontSize: 14))))
-                    .toList(),
-                onChanged: (v) =>
-                    setDs(() => selectedReason = v ?? reasons.first),
+              // Reason — inline selectable chips (no native dropdown overlay)
+              Text('Reason',
+                  style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary)),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: reasons.map((r) {
+                  final selected = r == selectedReason;
+                  return InkWell(
+                    onTap: () => setDs(() => selectedReason = r),
+                    borderRadius: BorderRadius.circular(9),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? accent.withValues(alpha: 0.12)
+                            : AppColors.surfaceLight,
+                        borderRadius: BorderRadius.circular(9),
+                        border: Border.all(
+                          color: selected ? accent : AppColors.divider,
+                          width: selected ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (selected) ...[
+                            Icon(Icons.check_rounded, size: 15, color: accent),
+                            const SizedBox(width: 5),
+                          ],
+                          Text(
+                            r,
+                            style: GoogleFonts.poppins(
+                              fontSize: 12.5,
+                              fontWeight: selected
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                              color:
+                                  selected ? accent : AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
               ),
               const SizedBox(height: 16),
 

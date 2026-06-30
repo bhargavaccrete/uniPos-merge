@@ -5,6 +5,7 @@ class RouteNames {
   static const userSelection = '/userSelectionScreen';
   static const restore = '/existingUserRestoreScreen';
   static const licenseKeyEntry = '/license-key-entry';
+  static const licenseLock = '/license-lock';
   static const setupWizard = '/setup-wizard';
 
   // Restaurant - Auth

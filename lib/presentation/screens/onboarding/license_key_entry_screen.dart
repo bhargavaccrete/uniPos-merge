@@ -131,6 +131,8 @@ class _LicenseKeyEntryScreenState extends State<LicenseKeyEntryScreen> {
                           label: 'License Key',
                           hint: 'e.g. XXXX-XXXX-XXXX-XXXX',
                           icon: Icons.vpn_key_rounded,
+                          // Keys are alphanumeric — force the full text keyboard.
+                          keyboardType: TextInputType.text,
                           enableSuggestions: false,
                           autocorrect: false,
                         ),

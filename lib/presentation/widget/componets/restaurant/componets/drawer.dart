@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -12,7 +13,10 @@ import 'package:billberrylite/presentation/widget/componets/common/app_dialog.da
 import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:billberrylite/util/restaurant/restaurant_auth_helper.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/routes/routes_name.dart';
+import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 import 'package:billberrylite/domain/services/common/unified_backup_service.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
@@ -118,12 +122,13 @@ class _DrawerrState extends State<Drawerr> {
 
             // Menu Items
             Expanded(
-              child: ListView(
-                padding: EdgeInsets.symmetric(
-                  vertical: AppResponsive.getValue(context, mobile: 12, tablet: 16),
-                  horizontal: AppResponsive.getValue(context, mobile: 8, tablet: 12),
-                ),
-                children: [
+              child: Observer(
+                builder: (context) => ListView(
+                  padding: EdgeInsets.symmetric(
+                    vertical: AppResponsive.getValue(context, mobile: 12, tablet: 16),
+                    horizontal: AppResponsive.getValue(context, mobile: 8, tablet: 12),
+                  ),
+                  children: [
                   _buildDrawerItem(
                     context: context,
                     icon: Icons.home_rounded,
@@ -147,7 +152,8 @@ class _DrawerrState extends State<Drawerr> {
                       isTablet: isTablet,
                     ),
 
-                  // Printer Settings Expandable (store config — admin/manager only)
+                  // Printer Settings Expandable (store config — admin/manager only).
+                  // Follows billing (printing is required to operate), not settings.
                   if (RestaurantSession.canAccess('settings'))
                   _buildExpandableSection(
                     context: context,
@@ -165,6 +171,7 @@ class _DrawerrState extends State<Drawerr> {
                         icon: Icons.add_circle_outline,
                         title: 'Add Printer',
                         onTap: () {
+                          if (!PlanGuard.allowedOr(context, EntKeys.billing, featureName: 'Printer Settings')) return;
                           Navigator.pop(context);
                           Navigator.pushNamed(context, RouteNames.restaurantPrinterSettings);
                         },
@@ -182,6 +189,7 @@ class _DrawerrState extends State<Drawerr> {
                         icon: Icons.tune_rounded,
                         title: 'Customize Printer',
                         onTap: () {
+                          if (!PlanGuard.allowedOr(context, EntKeys.billing, featureName: 'Printer Settings')) return;
                           Navigator.pop(context);
                           Navigator.pushNamed(context, RouteNames.restaurantPrinterCustomization);
                         },
@@ -197,6 +205,7 @@ class _DrawerrState extends State<Drawerr> {
                     icon: Icons.dashboard_customize_rounded,
                     title: 'Customization',
                     onTap: () {
+                      if (!PlanGuard.allowedOr(context, EntKeys.settings, featureName: 'Customization')) return;
                       Navigator.pop(context);
                       Navigator.pushNamed(context, RouteNames.restaurantCustomizationDrawer);
                     },
@@ -210,6 +219,7 @@ class _DrawerrState extends State<Drawerr> {
                       icon: Icons.bar_chart_rounded,
                       title: 'Reports',
                       onTap: () {
+                        if (!PlanGuard.allowedOr(context, EntKeys.reports, featureName: 'Reports')) return;
                         Navigator.pop(context);
                         Navigator.pushNamed(context, RouteNames.restaurantReports);
                       },
@@ -222,12 +232,14 @@ class _DrawerrState extends State<Drawerr> {
                       icon: Icons.account_balance_wallet_rounded,
                       title: 'Expenses',
                       onTap: () {
+                        if (!PlanGuard.allowedOr(context, EntKeys.expenses, featureName: 'Expenses')) return;
                         Navigator.pop(context);
                         Navigator.pushNamed(context, RouteNames.restaurantExpenses);
                       },
                       isTablet: isTablet,
                     ),
 
+                    // End Day is always reachable (day lifecycle close path).
                     if (RestaurantSession.canAccess('cashDrawer'))
                     _buildDrawerItem(
                       context: context,
@@ -247,6 +259,7 @@ class _DrawerrState extends State<Drawerr> {
                     icon: Icons.import_export_rounded,
                     title: 'Import/Export',
                     onTap: () {
+                      if (!PlanGuard.allowedOr(context, EntKeys.dataBackup, featureName: 'Backup & Restore')) return;
                       Navigator.pop(context);
                       _showImportExportDialog(context);
                     },
@@ -259,6 +272,7 @@ class _DrawerrState extends State<Drawerr> {
                     icon: Icons.data_object_rounded,
                     title: 'Test Data Generator',
                     onTap: () {
+                      if (!PlanGuard.allowedOr(context, EntKeys.settings, featureName: 'Settings')) return;
                       Navigator.pop(context);
                       Navigator.pushNamed(context, RouteNames.restaurantTestData);
                     },
@@ -296,6 +310,7 @@ class _DrawerrState extends State<Drawerr> {
                 ],
               ),
             ),
+          ),
 
             // Footer
             Container(

@@ -1,4 +1,6 @@
 import '../../../core/di/service_locator.dart';
+import '../../../core/plan/entitlement_keys.dart';
+import '../../../core/plan/plan_enforcement.dart';
 import '../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../util/restaurant/restaurant_session.dart';
@@ -29,6 +31,10 @@ class RefundService {
     required PastOrderModel order,
     required PartialRefundResult refundResult,
   }) async {
+    // Plan gate — a refund edits a committed bill (billing.invoice.edit).
+    if (!PlanEnforce.allows(EntKeys.billingInvoiceEdit)) {
+      throw Exception('Refunds aren’t available on your current plan.');
+    }
     try {
 
       // Update refunded quantities for each item.
@@ -194,6 +200,10 @@ class RefundService {
     required String reason,
   }) async {
     try {
+      // Plan gate — voiding a completed order (billing.invoice.void).
+      if (!PlanEnforce.allows(EntKeys.billingInvoiceVoid)) {
+        throw Exception('Voiding orders isn’t available on your current plan.');
+      }
 
       final _staffLabel = RestaurantSession.isAdmin
           ? 'Admin'

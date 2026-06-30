@@ -8,6 +8,8 @@ import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../domain/services/restaurant/cart_calculation_service.dart';
 import '../../../../core/di/service_locator.dart';
+import '../../../../core/plan/entitlement_keys.dart';
+import '../../../../core/plan/plan_enforcement.dart';
 import '../util/restaurant_print_helper.dart';
 import '../start order/cart/customerdetails.dart';
 import 'partial_refund_dialog.dart';
@@ -652,6 +654,12 @@ class _OrderdetailsState extends State<Orderdetails> {
   // --- HELPER WIDGETS AND FUNCTIONS (ADD ALL OF THESE) ---
 
   Future<void> _printBill(BuildContext context) async {
+    // Plan gate — reprinting/exporting a bill (billing.invoice.export).
+    if (!PlanEnforce.allows(EntKeys.billingInvoiceExport)) {
+      NotificationService.instance
+          .showError('Printing bills isn’t available on your current plan.');
+      return;
+    }
     try {
       // Convert pastOrderModel to OrderModel for printing
       final orderForPrint = OrderModel(

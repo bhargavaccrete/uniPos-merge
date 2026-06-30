@@ -1,4 +1,6 @@
 import 'package:mobx/mobx.dart';
+import '../../../core/plan/entitlement_keys.dart';
+import '../../../core/plan/plan_enforcement.dart';
 import '../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../data/repositories/restaurant/category_repository.dart';
@@ -89,6 +91,13 @@ abstract class _CategoryStore with Store {
       isLoading = true;
       errorMessage = null;
 
+      // Plan gate — add category (manage_menu.categories.add).
+      if (!PlanEnforce.allows(EntKeys.manageMenuCategoriesAdd)) {
+        errorMessage =
+            'Adding categories isn’t available on your current plan.';
+        return false;
+      }
+
       // Block case-insensitive duplicate names at the source, so every caller
       // (add screens, import) is protected even if it forgets to pre-check.
       final nameKey = category.name.trim().toLowerCase();
@@ -119,6 +128,12 @@ abstract class _CategoryStore with Store {
       isLoading = true;
       errorMessage = null;
 
+      // Plan gate — edit category (manage_menu.categories.edit).
+      if (!PlanEnforce.allows(EntKeys.manageMenuCategoriesEdit)) {
+        errorMessage = 'Editing categories isn’t available on your current plan.';
+        return false;
+      }
+
       await _repository.updateCategory(category);
 
       // Update in local list
@@ -141,6 +156,12 @@ abstract class _CategoryStore with Store {
     try {
       isLoading = true;
       errorMessage = null;
+
+      // Plan gate — delete category (manage_menu.categories.delete).
+      if (!PlanEnforce.allows(EntKeys.manageMenuCategoriesDelete)) {
+        errorMessage = 'Deleting categories isn’t available on your current plan.';
+        return false;
+      }
 
       await _repository.deleteCategory(categoryId);
 
