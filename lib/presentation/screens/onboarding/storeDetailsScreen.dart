@@ -4,6 +4,7 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/stores/setup_wizard_store.dart';
 import '../../../presentation/widget/componets/common/app_text_field.dart';
+import 'package:country_state_city_picker/country_state_city_picker.dart';
 import '../../../util/color.dart';
 import '../../../util/common/app_responsive.dart';
 
@@ -38,6 +39,8 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
   late TextEditingController _pincodeController;
   late TextEditingController _gstController;
   late TextEditingController _panController;
+
+
 
   @override
   void initState() {
@@ -349,6 +352,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                         hint: 'e.g. Green Apple Cafe',
                         icon: Icons.store_rounded,
                         required: true,
+                        maxLength: 50,
                         onChanged: (v) => widget.store.setStoreName(v),
                         validator: (v) =>
                             (v == null || v.isEmpty) ? 'Store name is required' : null,
@@ -357,9 +361,10 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                       AppTextField(
                         controller: _ownerNameController,
                         label: 'Owner Name',
-                        hint: 'e.g. Bhargav Patel',
+                        hint: 'Enter owner name',
                         icon: Icons.person_rounded,
                         required: true,
+                        maxLength: 50,
                         onChanged: (v) => widget.store.setOwnerName(v),
                         validator: (v) =>
                             (v == null || v.isEmpty) ? 'Owner name is required' : null,
@@ -377,6 +382,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
               hint: 'e.g. Green Apple Cafe',
               icon: Icons.store_rounded,
               required: true,
+              maxLength: 50,
               onChanged: (v) => widget.store.setStoreName(v),
               validator: (v) =>
                   (v == null || v.isEmpty) ? 'Store name is required' : null,
@@ -385,9 +391,10 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
             AppTextField(
               controller: _ownerNameController,
               label: 'Owner Name',
-              hint: 'e.g. Bhargav Patel',
+              hint: 'Enter owner name',
               icon: Icons.person_rounded,
               required: true,
+              maxLength: 50,
               onChanged: (v) => widget.store.setOwnerName(v),
               validator: (v) =>
                   (v == null || v.isEmpty) ? 'Owner name is required' : null,
@@ -541,8 +548,19 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                   label: 'Email',
                   hint: 'info@store.com',
                   icon: Icons.email_rounded,
+                  required: true,
+                  maxLength: 60,
                   keyboardType: TextInputType.emailAddress,
                   onChanged: (v) => widget.store.setEmail(v),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) {
+                      return 'Email is required';
+                    }
+                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(v)) {
+                      return 'Enter a valid email address';
+                    }
+                    return null;
+                  },
                 ),
               ),
             ],
@@ -555,6 +573,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
             icon: Icons.location_on_rounded,
             required: true,
             maxLines: isTablet ? 2 : 3,
+            maxLength: 150,
             onChanged: (v) => widget.store.setAddress(v),
             validator: (v) =>
                 (v == null || v.isEmpty) ? 'Address is required' : null,
@@ -570,6 +589,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                   hint: 'e.g. Gandhinagar',
                   icon: Icons.location_city_rounded,
                   required: true,
+                  maxLength: 50,
                   onChanged: (v) => widget.store.setCity(v),
                   validator: (v) =>
                       (v == null || v.isEmpty) ? 'City is required' : null,
@@ -583,6 +603,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                   hint: 'e.g. Gujarat',
                   icon: Icons.map_rounded,
                   required: true,
+                  maxLength: 50,
                   onChanged: (v) => widget.store.setState(v),
                   validator: (v) =>
                       (v == null || v.isEmpty) ? 'State is required' : null,
@@ -601,6 +622,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                   hint: 'e.g. India',
                   icon: Icons.public_rounded,
                   required: true,
+                  maxLength: 50,
                   onChanged: (v) => widget.store.setCountry(v),
                   validator: (v) =>
                       (v == null || v.isEmpty) ? 'Country is required' : null,
@@ -645,6 +667,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
               label: 'Tax ID',
               hint: 'Optional',
               icon: Icons.receipt_long_rounded,
+              maxLength: 15,
               onChanged: (v) => widget.store.setGstin(v),
             ),
           ),
@@ -655,6 +678,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
               label: 'Business ID',
               hint: 'Optional',
               icon: Icons.credit_card_rounded,
+              maxLength: 10,
               onChanged: (v) => widget.store.setPan(v),
             ),
           ),

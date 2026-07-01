@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
@@ -156,9 +155,11 @@ class _LicensingScreenState extends State<LicensingScreen> {
           if (info != null) ...[
             const SizedBox(height: 14),
             _infoRow('License Key', info.maskedKey),
-            if (info.expiryDate != null)
-              _infoRow(
-                  'Expires', DateFormat('dd MMM yyyy').format(info.expiryDate!)),
+            _infoRow(
+                'Expires',
+                info.expiryDate != null
+                    ? DateFormat('dd MMM yyyy').format(info.expiryDate!)
+                    : 'Never'),
           ] else ...[
             const SizedBox(height: 12),
             Text(
@@ -208,30 +209,6 @@ class _LicensingScreenState extends State<LicensingScreen> {
               color: AppColors.primary,
               onTap: () => _showActivateSheet(),
             ),
-          if (kDebugMode) ...[
-            _actionButton(
-              label: '[DEV] Inject Valid License (30 days)',
-              icon: Icons.science_rounded,
-              color: Colors.teal,
-              onTap: () async {
-                await _store.injectMockLicense(validityDays: 30);
-                _showSnack('Mock license injected', isError: false);
-                setState(() {});
-              },
-            ),
-            const SizedBox(height: 10),
-            _actionButton(
-              label: '[DEV] Inject Expired License',
-              icon: Icons.science_rounded,
-              color: Colors.orange,
-              onTap: () async {
-                await _store.injectExpiredLicense();
-                _showSnack('Expired license injected — restart to see lock', isError: false);
-                setState(() {});
-              },
-            ),
-            const SizedBox(height: 10),
-          ],
           if (hasLicense) ...[
             _actionButton(
               label: 'Re-activate / Change Key',
@@ -458,8 +435,13 @@ class _ActivateSheetState extends State<_ActivateSheet> {
     }
     setState(() => _loading = true);
 
-    final businessName =
-        locator<CompanyStore>().company?.comapanyName ?? '';
+    final companyStore = locator<CompanyStore>();
+    // Ensure the company is hydrated — otherwise a stored store name would be
+    // lost and we'd re-activate with an empty businessname.
+    if (companyStore.company == null) {
+      await companyStore.loadCompany();
+    }
+    final businessName = companyStore.company?.comapanyName ?? '';
     final success = await widget.store.activateLicense(
       key,
       businessName: businessName,

@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
@@ -50,12 +51,6 @@ class _LicenseKeyEntryScreenState extends State<LicenseKeyEntryScreen> {
     _goToSetup();
   }
 
-  Future<void> _skip() async {
-    // Bypass the license requirement so the app isn't locked later by the guard.
-    await _store.skipLicense();
-    if (mounted) _goToSetup();
-  }
-
   void _goToSetup() =>
       Navigator.pushReplacementNamed(context, RouteNames.setupWizard);
 
@@ -64,175 +59,179 @@ class _LicenseKeyEntryScreenState extends State<LicenseKeyEntryScreen> {
     final isTablet = !AppResponsive.isMobile(context);
     final pad = isTablet ? 40.0 : 24.0;
 
-    return Scaffold(
-      backgroundColor: AppColors.surfaceLight,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(pad),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: isTablet ? 480 : double.infinity,
-                minHeight: MediaQuery.of(context).size.height - pad * 2,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 88,
-                    height: 88,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.key_rounded,
-                        size: 44, color: AppColors.primary),
+    return PopScope(
+      canPop: !_loading,
+      child: Scaffold(
+        backgroundColor: AppColors.surfaceLight,
+        body: SafeArea(
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              padding: EdgeInsets.all(pad),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: isTablet ? 480 : double.infinity,
+                    minHeight: MediaQuery.of(context).size.height - pad * 2,
                   ),
-                  SizedBox(height: AppResponsive.largeSpacing(context)),
-                  Text(
-                    'Enter Your License Key',
-                    style: GoogleFonts.poppins(
-                      fontSize: isTablet ? 26 : 22,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  SizedBox(height: AppResponsive.smallSpacing(context)),
-                  Text(
-                    'Your key will be validated now and activated\nautomatically after store setup is complete.',
-                    style: TextStyle(
-                      fontSize: isTablet ? 15 : 13,
-                      color: AppColors.textSecondary,
-                      height: 1.5,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  SizedBox(height: AppResponsive.largeSpacing(context)),
-                  Container(
-                    padding: EdgeInsets.all(isTablet ? 22 : 18),
-                    decoration: BoxDecoration(
-                      color: AppColors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.divider),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 88,
+                        height: 88,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
                         ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        AppTextField(
-                          controller: _keyController,
-                          label: 'License Key',
-                          hint: 'e.g. XXXX-XXXX-XXXX-XXXX',
-                          icon: Icons.vpn_key_rounded,
-                          // Keys are alphanumeric — force the full text keyboard.
-                          keyboardType: TextInputType.text,
-                          enableSuggestions: false,
-                          autocorrect: false,
+                        child: Icon(Icons.key_rounded,
+                            size: 44, color: AppColors.primary),
+                      ),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
+                      Text(
+                        'Enter Your License Key',
+                        style: GoogleFonts.poppins(
+                          fontSize: isTablet ? 26 : 22,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
                         ),
-                        if (_errorMsg != null) ...[
-                          const SizedBox(height: 6),
-                          Row(
-                            children: [
-                              Icon(Icons.error_outline_rounded,
-                                  size: 14, color: AppColors.danger),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  _errorMsg!,
-                                  style: TextStyle(
-                                      fontSize: 12, color: AppColors.danger),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                        const SizedBox(height: 18),
-                        SizedBox(
-                          width: double.infinity,
-                          height: isTablet ? 54 : 50,
-                          child: ElevatedButton(
-                            onPressed: _loading ? null : _validate,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              disabledBackgroundColor:
-                                  AppColors.primary.withValues(alpha: 0.5),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: AppResponsive.smallSpacing(context)),
+                      Text(
+                        'Your key will be validated now and activated\nautomatically after store setup is complete.',
+                        style: TextStyle(
+                          fontSize: isTablet ? 15 : 13,
+                          color: AppColors.textSecondary,
+                          height: 1.5,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
+                      Container(
+                        padding: EdgeInsets.all(isTablet ? 22 : 18),
+                        decoration: BoxDecoration(
+                          color: AppColors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.divider),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
                             ),
-                            child: _loading
-                                ? const SizedBox(
-                                    width: 22,
-                                    height: 22,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2, color: Colors.white),
-                                  )
-                                : Text(
-                                    'Validate & Continue',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: isTablet ? 16 : 15,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AppTextField(
+                              controller: _keyController,
+                              label: 'License Key',
+                              hint: 'e.g. XXXX-XXXX-XXXX-XXXX',
+                              icon: Icons.vpn_key_rounded,
+                              // Keys are alphanumeric — force the full text keyboard.
+                              keyboardType: TextInputType.text,
+                              enableSuggestions: false,
+                              autocorrect: false,
+                            ),
+                            if (_errorMsg != null) ...[
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Icon(Icons.error_outline_rounded,
+                                      size: 14, color: AppColors.danger),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      _errorMsg!,
+                                      style: TextStyle(
+                                          fontSize: 12, color: AppColors.danger),
                                     ),
                                   ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: AppResponsive.largeSpacing(context)),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: AppColors.info.withValues(alpha: 0.07),
-                      borderRadius: BorderRadius.circular(10),
-                      border:
-                          Border.all(color: AppColors.info.withValues(alpha: 0.25)),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline_rounded,
-                            size: 18, color: AppColors.info),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Activation requires your store name. '
-                            'We\'ll activate automatically after setup.',
-                            style: TextStyle(
-                              fontSize: isTablet ? 13 : 12,
-                              color: AppColors.info,
-                              height: 1.4,
+                                ],
+                              ),
+                            ],
+                            const SizedBox(height: 18),
+                            SizedBox(
+                              width: double.infinity,
+                              height: isTablet ? 54 : 50,
+                              child: ElevatedButton(
+                                onPressed: _loading ? null : _validate,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  disabledBackgroundColor:
+                                      AppColors.primary.withValues(alpha: 0.5),
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12)),
+                                ),
+                                child: Text(
+                                  'Validate & Continue',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: isTablet ? 16 : 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
+                      Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: AppColors.info.withValues(alpha: 0.07),
+                          borderRadius: BorderRadius.circular(10),
+                          border:
+                              Border.all(color: AppColors.info.withValues(alpha: 0.25)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline_rounded,
+                                size: 18, color: AppColors.info),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Activation requires your store name. '
+                                'We\'ll activate automatically after setup.',
+                                style: TextStyle(
+                                  fontSize: isTablet ? 13 : 12,
+                                  color: AppColors.info,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(height: AppResponsive.mediumSpacing(context)),
-                  TextButton(
-                    onPressed: _skip,
-                    child: Text(
-                      'Skip for now — activate in Settings later',
-                      style: TextStyle(
-                        fontSize: isTablet ? 13 : 12,
-                        color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+            if (_loading)
+              Positioned.fill(
+                child: AbsorbPointer(
+                  absorbing: true,
+                  child: Container(
+                    color: Colors.black.withOpacity(0.18),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                        strokeWidth: 4,
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

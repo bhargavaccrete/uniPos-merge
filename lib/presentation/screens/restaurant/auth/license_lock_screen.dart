@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/routes/routes_name.dart';
 import 'package:billberrylite/data/models/restaurant/license_model.dart';
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -35,9 +36,22 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
     super.dispose();
   }
 
-  bool get _isExpired =>
-      _store.licenseInfo != null &&
-      _store.licenseInfo!.status != LicenseStatus.notActivated;
+  // Three mutually-exclusive lock reasons. Everything on this screen keys off
+  // these instead of a single boolean, so `suspended` (deactivated by Bill
+  // Berry) no longer masquerades as `expired`.
+  LicenseStatus get _status =>
+      _store.licenseInfo?.status ?? LicenseStatus.notActivated;
+
+  bool get _isNotActivated => _status == LicenseStatus.notActivated;
+  bool get _isExpired => _status == LicenseStatus.expired;
+  bool get _isDeactivated => _status == LicenseStatus.suspended;
+
+  // Skip is only ever allowed on a fresh device. An expired or deactivated
+  // license must be renewed or resolved with support — it cannot be bypassed.
+  bool get _canSkip => _isNotActivated;
+
+  void _contactSupport() =>
+      Navigator.pushNamed(context, RouteNames.restaurantNeedHelp);
 
   Future<void> _activate() async {
     final key = _keyController.text.trim();
@@ -85,14 +99,26 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
                     _headline(isTablet),
                     SizedBox(height: AppResponsive.smallSpacing(context)),
                     _subtext(isTablet),
+                    if (_isDeactivated) ...[
+                      SizedBox(height: AppResponsive.mediumSpacing(context)),
+                      _deactivatedBanner(isTablet),
+                    ],
                     if (_isExpired) ...[
                       SizedBox(height: AppResponsive.mediumSpacing(context)),
                       _expiredInfoCard(isTablet),
                     ],
+                    // For expired / deactivated licenses, contacting support is
+                    // the primary path — surface it above the key field.
+                    if (!_isNotActivated) ...[
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
+                      _contactButton(isTablet),
+                    ],
                     SizedBox(height: AppResponsive.largeSpacing(context)),
                     _keyInputCard(isTablet),
-                    SizedBox(height: AppResponsive.mediumSpacing(context)),
-                    _skipButton(isTablet),
+                    if (_canSkip) ...[
+                      SizedBox(height: AppResponsive.mediumSpacing(context)),
+                      _skipButton(isTablet),
+                    ],
                     SizedBox(height: AppResponsive.largeSpacing(context)),
                     _supportNote(isTablet),
                   ],
@@ -114,7 +140,11 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
         shape: BoxShape.circle,
       ),
       child: Icon(
-        _isExpired ? Icons.lock_clock_rounded : Icons.lock_outline_rounded,
+        _isDeactivated
+            ? Icons.gpp_bad_rounded
+            : _isExpired
+                ? Icons.lock_clock_rounded
+                : Icons.lock_outline_rounded,
         size: 48,
         color: AppColors.danger,
       ),
@@ -123,7 +153,11 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
 
   Widget _headline(bool isTablet) {
     return Text(
-      _isExpired ? 'License Expired' : 'License Required',
+      _isDeactivated
+          ? 'License Deactivated'
+          : _isExpired
+              ? 'License Expired'
+              : 'License Required',
       style: GoogleFonts.poppins(
         fontSize: isTablet ? 26 : 22,
         fontWeight: FontWeight.bold,
@@ -134,9 +168,17 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
   }
 
   Widget _subtext(bool isTablet) {
-    final msg = _isExpired
-        ? 'Your license has expired. Enter a new key to continue using Bill Berry Lite.'
-        : 'This device is not licensed. Enter your license key to unlock the app.';
+    final String msg;
+    if (_isDeactivated) {
+      msg =
+          'This device\'s license has been deactivated. Please contact Bill Berry to restore access or get a new license key.';
+    } else if (_isExpired) {
+      msg =
+          'Your license has expired. Contact Bill Berry for a new key to continue using Bill Berry Lite.';
+    } else {
+      msg =
+          'This device is not licensed. Enter your license key to unlock the app.';
+    }
     return Text(
       msg,
       style: TextStyle(
@@ -191,6 +233,61 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _deactivatedBanner(bool isTablet) {
+    return Container(
+      padding: EdgeInsets.all(isTablet ? 18 : 14),
+      decoration: BoxDecoration(
+        color: AppColors.danger.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.danger.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.report_gmailerrorred_rounded,
+              size: 20, color: AppColors.danger),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Your license was deactivated by Bill Berry. Please reach out to '
+              'reactivate this device or purchase a new license key.',
+              style: TextStyle(
+                fontSize: isTablet ? 13 : 12,
+                color: AppColors.danger,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _contactButton(bool isTablet) {
+    return SizedBox(
+      width: double.infinity,
+      height: isTablet ? 54 : 50,
+      child: ElevatedButton.icon(
+        onPressed: _loading ? null : _contactSupport,
+        icon: const Icon(Icons.support_agent_rounded, color: Colors.white),
+        label: Text(
+          'Contact Bill Berry',
+          style: GoogleFonts.poppins(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12)),
+        ),
       ),
     );
   }

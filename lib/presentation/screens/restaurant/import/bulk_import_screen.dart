@@ -5,6 +5,7 @@ import 'package:billberrylite/domain/services/restaurant/notification_service.da
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 
 
 /// Bulk import items into the menu from an Excel spreadsheet.
@@ -455,18 +456,11 @@ class _RestaurantBulkImportScreenState extends State<RestaurantBulkImportScreen>
   Future<bool> _confirmImport(int itemCount, int categoryCount) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-        ),
-        title: Text(
-          'Confirm Import',
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.subheadingFontSize(context),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        content: Column(
+      builder: (ctx) => AppDialogShell(
+        title: 'Confirm Import',
+        accent: AppColors.primary,
+        icon: Icons.inventory_2_rounded,
+        body: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -493,23 +487,12 @@ class _RestaurantBulkImportScreenState extends State<RestaurantBulkImportScreen>
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel',
-                style: GoogleFonts.poppins(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
+          appDialogCancelButton(ctx, label: 'Cancel'),
+          const SizedBox(width: 12),
+          appDialogPrimaryButton(
+            label: 'Import',
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
-              ),
-            ),
-            child: Text('Import',
-                style: GoogleFonts.poppins(
-                    color: Colors.white, fontWeight: FontWeight.w600)),
+            color: AppColors.primary,
           ),
         ],
       ),
@@ -636,40 +619,11 @@ class _RestaurantBulkImportScreenState extends State<RestaurantBulkImportScreen>
   void _showResultDialog(ImportResult result) {
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(
-          horizontal: AppResponsive.isMobile(context) ? 24 : 160,
-          vertical: 24,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-        ),
-        title: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
-              decoration: BoxDecoration(
-                color: (result.success ? AppColors.success : AppColors.danger)
-                    .withOpacity(0.1),
-                borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
-              ),
-              child: Icon(
-                result.success ? Icons.check_circle : Icons.error,
-                color: result.success ? AppColors.success : AppColors.danger,
-                size: AppResponsive.iconSize(context),
-              ),
-            ),
-            SizedBox(width: AppResponsive.mediumSpacing(context)),
-            Text(
-              'Import Complete',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.subheadingFontSize(context),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
+      builder: (dialogContext) => AppDialogShell(
+        title: 'Import Complete',
+        accent: result.success ? AppColors.success : AppColors.danger,
+        icon: result.success ? Icons.check_circle : Icons.error,
+        body: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -717,22 +671,10 @@ class _RestaurantBulkImportScreenState extends State<RestaurantBulkImportScreen>
           ),
         ),
         actions: [
-          TextButton(
+          appDialogPrimaryButton(
+            label: 'OK',
             onPressed: () => Navigator.of(dialogContext).pop(),
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.primary,
-              padding: EdgeInsets.symmetric(
-                horizontal: AppResponsive.largeSpacing(context),
-                vertical: AppResponsive.mediumSpacing(context),
-              ),
-            ),
-            child: Text(
-              'OK',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.bodyFontSize(context),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            color: result.success ? AppColors.success : AppColors.danger,
           ),
         ],
       ),

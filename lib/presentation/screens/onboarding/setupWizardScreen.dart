@@ -1,6 +1,8 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
@@ -75,7 +77,39 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
     _animationController.forward();
 
     // Load existing data from Hive
-    _store.loadExistingData();
+    _store.loadExistingData().then((_) async {
+      if (!mounted) return;
+      final licenseStore = locator<LicenseStore>();
+      final isLicensed = licenseStore.isLicensed;
+
+      if (_store.hasStoreDetails) {
+        final steps = SetupStep.getSteps();
+        int targetStep = 0;
+        if (isLicensed) {
+          targetStep = steps.indexWhere((s) => s.title == 'Tax Setup');
+          if (targetStep < 0) {
+            targetStep = steps.indexWhere((s) => s.title == 'Product Setup');
+          }
+        } else {
+          targetStep = steps.indexWhere((s) => s.title == 'Verify Email');
+        }
+
+        // Restore saved progress index from SharedPreferences if higher
+        final prefs = await SharedPreferences.getInstance();
+        final savedStep = prefs.getInt('setup_wizard_last_step') ?? 0;
+        if (savedStep > targetStep && savedStep < steps.length) {
+          targetStep = savedStep;
+        }
+
+        if (targetStep >= 0) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _jumpToStep(targetStep);
+            }
+          });
+        }
+      }
+    });
   }
 
   @override
@@ -85,12 +119,23 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
     super.dispose();
   }
 
+  Future<void> _saveWizardProgress(int step) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('setup_wizard_last_step', step);
+    } catch (e) {
+      debugPrint('SetupWizardScreen: Failed to save wizard step: $e');
+    }
+  }
+
   void _nextStep() {
     // Dismiss keyboard before moving to next step
     FocusScope.of(context).unfocus();
 
     if (_store.currentStep < _totalSteps - 1) {
+      final next = _store.currentStep + 1;
       _store.nextStep();
+      _saveWizardProgress(next);
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -117,7 +162,9 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
           return; // don't step back onto (or before) the activated license step
         }
       }
+      final prev = _store.currentStep - 1;
       _store.previousStep();
+      _saveWizardProgress(prev);
       _pageController.previousPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -130,6 +177,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
     FocusScope.of(context).unfocus();
 
     _store.setCurrentStep(step);
+    _saveWizardProgress(step);
     _pageController.animateToPage(
       step,
       duration: const Duration(milliseconds: 300),
@@ -227,10 +275,29 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         backgroundColor: AppColors.surfaceLight,
         body: SafeArea(
           child: Observer(
-            builder: (_) => Responsive(
-              mobile: _buildMobileLayout(),
-              tablet: _buildTabletLayout(),
-              desktop: _buildDesktopLayout(),
+            builder: (_) => Stack(
+              children: [
+                Responsive(
+                  mobile: _buildMobileLayout(),
+                  tablet: _buildTabletLayout(),
+                  desktop: _buildDesktopLayout(),
+                ),
+                if (_store.isLoading)
+                  Positioned.fill(
+                    child: AbsorbPointer(
+                      absorbing: true,
+                      child: Container(
+                        color: Colors.black.withOpacity(0.18),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                            strokeWidth: 4,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
@@ -386,7 +453,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
           if (_store.currentStep > 0)
             IconButton(
               icon: Icon(Icons.arrow_back, color: AppColors.darkNeutral),
-              onPressed: _previousStep,
+              onPressed: _store.isLoading ? null : _previousStep,
             )
           else
             const SizedBox(width: 48),
@@ -410,7 +477,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
           ),
           IconButton(
             icon: Icon(Icons.close, color: AppColors.darkNeutral),
-            onPressed: _showExitDialog,
+            onPressed: _store.isLoading ? null : _showExitDialog,
           ),
         ],
       ),
@@ -576,7 +643,6 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
           opacity: _fadeAnimation,
           child: Observer(
             builder: (_) => ReviewStep(
-              selectedBusinessType: _store.selectedBusinessTypeName,
               storeName: _store.storeName,
               ownerName: _store.ownerName,
               phone: _store.phone,
@@ -1143,7 +1209,6 @@ class WelcomeStep extends StatelessWidget {
 }
 
 class ReviewStep extends StatelessWidget {
-  final String? selectedBusinessType;
   final String storeName;
   final String ownerName;
   final String phone;
@@ -1151,7 +1216,6 @@ class ReviewStep extends StatelessWidget {
 
   const ReviewStep({
     super.key,
-    this.selectedBusinessType,
     required this.storeName,
     required this.ownerName,
     required this.phone,
@@ -1215,7 +1279,6 @@ class ReviewStep extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  _buildSummaryItem(context, 'Business Type', selectedBusinessType ?? 'Not Set'),
                   _buildSummaryItem(context, 'Store Name', storeName.isEmpty ? 'Not Set' : storeName),
                   _buildSummaryItem(context, 'Owner', ownerName.isEmpty ? 'Not Set' : ownerName),
                   _buildSummaryItem(context, 'Phone', phone.isEmpty ? 'Not Set' : phone),

@@ -121,8 +121,6 @@ class RouteNames {
   static const restaurantBulkImport = '/restaurant-bulk-import';
   static const restaurantDataGenratorScreen = '/restaurant-datageneratorscreen';
   static const restaurantSplashPreview = '/restaurant-splash-preview';
-  static const restaurantLicenseEmailDemo = '/restaurant-license-email-demo';
-  static const restaurantEmailSetupDemo = '/restaurant-email-setup-demo';
   static const restaurantlogin  = '/restaurant-login';
 
 

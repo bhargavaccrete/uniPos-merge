@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
 import 'package:billberrylite/util/color.dart';
@@ -59,9 +61,13 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
 
     final (start, end) = _periodBounds();
 
+    // Plan data-scope: clamp the visible history window (reports.history_limit_days).
+    final cutoff = PlanEnforce.windowCutoff(EntKeys.reportsHistoryLimitDays);
+
     for (final order in pastOrderStore.pastOrders) {
       final status = order.orderStatus?.toUpperCase() ?? '';
       if (status == 'VOID' || status == 'VOIDED' || status == 'FULLY_REFUNDED') continue;
+      if (cutoff != null && order.orderAt != null && order.orderAt!.isBefore(cutoff)) continue;
 
       // Period filter — orders without a timestamp can't be placed in a range.
       if (start != null && end != null) {

@@ -21,6 +21,8 @@ import '../../../../util/common/app_responsive.dart';
 import '../../../../util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 
+part 'widgets/category_section_card.dart';
+
 enum StockStatus { inStock, orderAvailable, outOfStock, notTracked }
 
 class MenuScreen extends StatefulWidget {
@@ -37,6 +39,7 @@ class MenuScreen extends StatefulWidget {
 class _MenuScreenState extends State<MenuScreen> {
   // Sentinel category id for the "Favorites" tab.
   static const String _kFavorites = '__favorites__';
+  int _scrollRequestId = 0;
 
   void _toggleFavorite(Items item) {
     itemStore.updateItem(item.copyWith(isFavorite: !item.isFavorite));
@@ -247,18 +250,19 @@ class _MenuScreenState extends State<MenuScreen> {
           isScrollControlled: true,
           backgroundColor: Colors.transparent,
           builder: (context) {
-            return DraggableScrollableSheet(
-              expand: false,
-              initialChildSize: 0.5,
-              minChildSize: 0.3,
-              maxChildSize: 0.85,
-              builder: (_, controller) {
-                return ItemOptionsDialog(
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.85,
+                ),
+                child: ItemOptionsDialog(
                   item: item,
                   categoryName: categoryName,
-                  scrollController: controller,
-                );
-              },
+                ),
+              ),
             );
           },
         );
@@ -466,48 +470,13 @@ class _MenuScreenState extends State<MenuScreen> {
                 padding: EdgeInsets.only(top: 10, bottom: hasItems ? 80 : 0),
                 child: Column(
                   children: [
-                    // Search row with inline refresh
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: SizedBox(
-                                // height: height * 0.05,
-                                child: AppTextField(
-                                  controller: _searchController,
-                                  focusNode: _searchFocusNode,
-                                  hint: 'Search Items',
-                                  icon: Icons.search_rounded,
-                                )),
-                          ),
-                          SizedBox(width: 8),
-                          // Inline refresh button — replaces the FAB
-                          SizedBox(
-                            width: height * 0.04,
-                            height: height * 0.04,
-                            child: Material(
-                              color: AppColors.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(8),
-                                onTap: _isLoadingData ? null : () => _loadData(force: true),
-                                child: Center(
-                                  child: _isLoadingData
-                                      ? SizedBox(
-                                          width: 14,
-                                          height: 14,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                                          ),
-                                        )
-                                      : Icon(Icons.refresh, color: AppColors.primary, size: 18),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                      child: AppTextField(
+                        controller: _searchController,
+                        focusNode: _searchFocusNode,
+                        hint: 'Search Items',
+                        icon: Icons.search_rounded,
                       ),
                     ),
 
@@ -521,31 +490,11 @@ class _MenuScreenState extends State<MenuScreen> {
                         // Show a Favorites pill first, but only when there are
                         // favorites to jump to (mirrors hiding empty categories).
                         final hasFav = enabledItems.any((i) => i.isFavorite);
-                        if (cats.isEmpty && !hasFav) return const SizedBox.shrink();
-                        return SizedBox(
-                          height: 34,
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            itemCount: cats.length + (hasFav ? 1 : 0),
-                            separatorBuilder: (_, __) => const SizedBox(width: 8),
-                            itemBuilder: (context, i) {
-                              if (hasFav && i == 0) {
-                                return _buildStripChip(
-                                  label: 'Favorites',
-                                  icon: Icons.star_rounded,
-                                  isActive: activeCategory == _kFavorites,
-                                  onTap: () => _selectStripCategory(_kFavorites),
-                                );
-                              }
-                              final cat = cats[i - (hasFav ? 1 : 0)];
-                              return _buildStripChip(
-                                label: cat.name,
-                                isActive: activeCategory == cat.id,
-                                onTap: () => _selectStripCategory(cat.id),
-                              );
-                            },
-                          ),
+                        return _HorizontalCategoryStrip(
+                          categories: cats,
+                          hasFavorites: hasFav,
+                          activeCategory: activeCategory,
+                          onCategorySelected: _selectStripCategory,
                         );
                       },
                     ),
@@ -610,106 +559,49 @@ class _MenuScreenState extends State<MenuScreen> {
                           // post-frame, once per query change).
                           _syncSearchExpansion();
 
-                          return ListView.builder(
+                          return SingleChildScrollView(
                             controller: _listScrollController,
-                            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            itemCount: categories.length + 1,
-                            itemBuilder: (context, rawIndex) {
-                              // Favorites section pinned at the very top.
-                              if (rawIndex == 0) {
-                                return _buildFavoritesSection(visibleItems, query, lowerQuery, cartItems);
-                              }
-                              final index = rawIndex - 1;
-                              final category = categories[index];
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            child: Column(
+                              children: [
+                                _buildFavoritesSection(visibleItems, query, lowerQuery, cartItems),
+                                ...categories.map((category) {
+                                  if (!_categoryKeys.containsKey(category.id)) {
+                                    _categoryKeys[category.id] = GlobalKey();
+                                  }
+                                  if (!_expansionControllers.containsKey(category.id)) {
+                                    _expansionControllers[category.id] = ExpansibleController();
+                                  }
 
-                              if (!_categoryKeys.containsKey(category.id)) {
-                                _categoryKeys[category.id] = GlobalKey();
-                              }
-                              if (!_expansionControllers.containsKey(category.id)) {
-                                _expansionControllers[category.id] = ExpansibleController();
-                              }
+                                  final categoryItems = visibleItems.where((item) => item.categoryOfItem == category.id).toList();
 
-                              final categoryItems = visibleItems.where((item) => item.categoryOfItem == category.id).toList();
+                                  final searchFilteredItems = query.isEmpty
+                                      ? categoryItems
+                                      : categoryItems.where((item) {
+                                    return item.name.toLowerCase().contains(lowerQuery) ||
+                                        (item.itemCode != null && item.itemCode!.toLowerCase().contains(lowerQuery));
+                                  }).toList();
 
-                              final searchFilteredItems = query.isEmpty
-                                  ? categoryItems
-                                  : categoryItems.where((item) {
-                                return item.name.toLowerCase().contains(lowerQuery) ||
-                                    (item.itemCode != null && item.itemCode!.toLowerCase().contains(lowerQuery));
-                              }).toList();
+                                  // Don't show empty categories when searching
+                                  if (query.isNotEmpty && searchFilteredItems.isEmpty) {
+                                    return const SizedBox.shrink();
+                                  }
 
-                              // Don't show empty categories when searching
-                              if (query.isNotEmpty && searchFilteredItems.isEmpty) {
-                                return SizedBox.shrink();
-                              }
-
-                              return Card(
-                                key: _categoryKeys[category.id],
-                                margin: EdgeInsets.only(bottom: 12),
-                                elevation: 2,
-                                color: AppColors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Theme(
-                                  data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                                  child: ExpansionTile(
-                                    controller: _expansionControllers[category.id],
+                                  return _CategorySectionCard(
+                                    category: category,
+                                    searchFilteredItems: searchFilteredItems,
                                     initiallyExpanded: query.isNotEmpty,
-                                    leading: Container(
-                                      padding: EdgeInsets.all(10),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: Icon(
-                                        Icons.restaurant_menu,
-                                        color: AppColors.primary,
-                                        size: 24,
-                                      ),
-                                    ),
-                                    title: Text(
-                                      category.name,
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
-                                    subtitle: Text(
-                                      '${searchFilteredItems.length} items',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 12,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                    ),
-                                    children: [
-                                      ListView.separated(
-                                        shrinkWrap: true,
-                                        physics: NeverScrollableScrollPhysics(),
-                                        padding: EdgeInsets.fromLTRB(12, 0, 12, 12),
-                                        itemCount: searchFilteredItems.length,
-                                        separatorBuilder: (_, __) => SizedBox(height: 8),
-                                        itemBuilder: (context, itemIndex) {
-                                          final item = searchFilteredItems[itemIndex];
-                                          return _ItemListTile(
-                                            key: ValueKey('${item.id}_${item.isFavorite}'),
-                                            item: item,
-                                            onTap: () => _handleItemTap(item),
-                                            onToggleFavorite: () => _toggleFavorite(item),
-                                            formatStock: _formatStockDisplay,
-                                            getStockStatus: _getStockStatus,
-                                            cartEntries: cartItems
-                                                .where((c) => c.productId == item.id)
-                                                .toList(),
-                                          );
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
+                                    controller: _expansionControllers[category.id],
+                                    cardKey: _categoryKeys[category.id]!,
+                                    cartItems: cartItems,
+                                    onItemTap: _handleItemTap,
+                                    onToggleFavorite: _toggleFavorite,
+                                    formatStock: _formatStockDisplay,
+                                    getStockStatus: _getStockStatus,
+                                  );
+                                }).toList(),
+                              ],
+                            ),
                           );
                         },
                       ),
@@ -1142,92 +1034,100 @@ class _MenuScreenState extends State<MenuScreen> {
     return 'N/A';
   }
 
-  /// A single pill in the horizontal quick-nav strip. Shared by the Favorites
-  /// chip and the per-category chips.
-  Widget _buildStripChip({
-    required String label,
-    IconData? icon,
-    required bool isActive,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        decoration: BoxDecoration(
-          color: isActive ? AppColors.primary : AppColors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isActive ? AppColors.primary : AppColors.divider,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 14, color: isActive ? Colors.white : Colors.amber),
-              const SizedBox(width: 4),
-            ],
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: isActive ? Colors.white : AppColors.textPrimary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  void _scrollToCategoryWhenStable(String categoryId, int requestId, {int maxFrames = 20}) {
+    double lastHeight = 0.0;
+    int frameCount = 0;
 
-  void _selectStripCategory(String categoryId) {
-    // Collapse the previously active category
-    if (activeCategory != null && activeCategory != categoryId) {
-      final prev = _expansionControllers[activeCategory];
-      if (prev != null) try { prev.collapse(); } catch (_) {}
-    }
+    void checkStability() {
+      if (!mounted || requestId != _scrollRequestId) return;
 
-    setState(() => activeCategory = categoryId);
+      final key = _categoryKeys[categoryId];
+      final context = key?.currentContext;
 
-    // Phase 1: jumpTo estimated offset so ListView.builder renders the item.
-    // Off-screen items have null currentContext — ensureVisible is a no-op without this.
-    // Favorites is always the first row (index 0); categories follow it.
-    final cats = categoryStore.categories;
-    final idx = categoryId == _kFavorites
-        ? 0
-        : cats.indexWhere((c) => c.id == categoryId);
-    if (idx >= 0 && _listScrollController.hasClients) {
-      try {
-        final max = _listScrollController.position.maxScrollExtent;
-        _listScrollController.jumpTo((idx * 72.0).clamp(0.0, max));
-      } catch (_) {}
-    }
+      if (context != null) {
+        final RenderBox? box = context.findRenderObject() as RenderBox?;
+        if (box != null && box.hasSize) {
+          final double currentHeight = box.size.height;
+          frameCount++;
 
-    // Phase 2: expand the tile, then wait for its animation to finish before
-    // scrolling — ExpansionTile animates over ~300ms, so ensureVisible must
-    // fire after that or the card height is still mid-animation and the
-    // scroll target position is wrong.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final ctrl = _expansionControllers[categoryId];
-      if (ctrl != null) try { ctrl.expand(); } catch (_) {}
+          debugPrint('[MENU_TRACE] [SCROLL-POLL] t=${DateTime.now().millisecondsSinceEpoch}ms categoryId=$categoryId frame=$frameCount height=$currentHeight');
 
-      Future.delayed(const Duration(milliseconds: 320), () {
-        if (!mounted) return;
-        final key = _categoryKeys[categoryId];
-        if (key?.currentContext != null) {
+          const double kHeightTolerance = 0.5;
+          if ((currentHeight - lastHeight).abs() > kHeightTolerance && frameCount < maxFrames) {
+            lastHeight = currentHeight;
+            WidgetsBinding.instance.addPostFrameCallback((_) => checkStability());
+            return;
+          }
+        }
+      }
+
+      if (context != null && mounted && requestId == _scrollRequestId) {
+        final RenderBox? box = context.findRenderObject() as RenderBox?;
+        if (box != null && box.attached) {
+          final RenderBox? scrollBox = Scrollable.maybeOf(context)?.context.findRenderObject() as RenderBox?;
+          if (scrollBox != null) {
+            try {
+              final double localY = box.localToGlobal(Offset.zero, ancestor: scrollBox).dy;
+              if (localY.abs() < 1.5) {
+                return;
+              }
+              if (_listScrollController.hasClients) {
+                final double currentOffset = _listScrollController.offset;
+                final double maxOffset = _listScrollController.position.maxScrollExtent;
+                if ((currentOffset - maxOffset).abs() < 1.5) {
+                  return;
+                }
+              }
+            } catch (_) {}
+          }
+
+          final offset = _listScrollController.hasClients ? _listScrollController.offset : 0.0;
+          debugPrint('[MENU_TRACE] [SCROLL-STABLE] t=${DateTime.now().millisecondsSinceEpoch}ms categoryId=$categoryId offset=$offset');
+
           Scrollable.ensureVisible(
-            key!.currentContext!,
-            duration: const Duration(milliseconds: 300),
+            context,
+            duration: const Duration(milliseconds: 200),
             curve: Curves.easeInOut,
             alignment: 0.0,
             alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
           );
         }
-      });
-    });
+      }
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => checkStability());
+  }
+
+  /// A single pill in the horizontal quick-nav strip. Shared by the Favorites
+  /// chip and the per-category chips.
+  void _selectStripCategory(String categoryId) {
+    // Collapse the previously active category
+    if (activeCategory != null && activeCategory != categoryId) {
+      final prev = _expansionControllers[activeCategory];
+      if (prev != null) {
+        try {
+          debugPrint('[MENU_TRACE] [COLLAPSE] t=${DateTime.now().millisecondsSinceEpoch}ms categoryId=$activeCategory');
+          prev.collapse();
+        } catch (_) {}
+      }
+    }
+
+    activeCategory = categoryId;
+
+    // Expand the selected category immediately (always built and mounted)
+    final ctrl = _expansionControllers[categoryId];
+    if (ctrl != null) {
+      try {
+        debugPrint('[MENU_TRACE] [EXPAND] t=${DateTime.now().millisecondsSinceEpoch}ms categoryId=$categoryId');
+        ctrl.expand();
+      } catch (_) {}
+    }
+
+    // Increment request ID to cancel any pending stabilization frame checks
+    final int currentId = ++_scrollRequestId;
+
+    // Cancelable Dynamic Correction: Refocus precisely once layout has fully stabilized
+    _scrollToCategoryWhenStable(categoryId, currentId);
   }
 
   Widget _buildCartBar(BuildContext context, Size size) {
@@ -1565,5 +1465,117 @@ class _ItemListTileState extends State<_ItemListTile> {
       case StockStatus.notTracked: return const SizedBox.shrink();
     }
     return Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(8)), child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: textColor)));
+  }
+}
+
+class _HorizontalCategoryStrip extends StatefulWidget {
+  final List<dynamic> categories;
+  final bool hasFavorites;
+  final String? activeCategory;
+  final ValueChanged<String> onCategorySelected;
+
+  const _HorizontalCategoryStrip({
+    required this.categories,
+    required this.hasFavorites,
+    required this.activeCategory,
+    required this.onCategorySelected,
+  });
+
+  @override
+  State<_HorizontalCategoryStrip> createState() => _HorizontalCategoryStripState();
+}
+
+class _HorizontalCategoryStripState extends State<_HorizontalCategoryStrip> {
+  String? _activeCategory;
+
+  @override
+  void initState() {
+    super.initState();
+    _activeCategory = widget.activeCategory;
+  }
+
+  @override
+  void didUpdateWidget(covariant _HorizontalCategoryStrip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.activeCategory != oldWidget.activeCategory) {
+      _activeCategory = widget.activeCategory;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.categories.isEmpty && !widget.hasFavorites) {
+      return const SizedBox.shrink();
+    }
+    return SizedBox(
+      height: 34,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        itemCount: widget.categories.length + (widget.hasFavorites ? 1 : 0),
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          if (widget.hasFavorites && i == 0) {
+            return _buildStripChip(
+              label: 'Favorites',
+              icon: Icons.star_rounded,
+              isActive: _activeCategory == _MenuScreenState._kFavorites,
+              onTap: () {
+                setState(() => _activeCategory = _MenuScreenState._kFavorites);
+                widget.onCategorySelected(_MenuScreenState._kFavorites);
+              },
+            );
+          }
+          final cat = widget.categories[i - (widget.hasFavorites ? 1 : 0)];
+          return _buildStripChip(
+            label: cat.name,
+            isActive: _activeCategory == cat.id,
+            onTap: () {
+              setState(() => _activeCategory = cat.id);
+              widget.onCategorySelected(cat.id);
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildStripChip({
+    required String label,
+    IconData? icon,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.primary : AppColors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isActive ? AppColors.primary : AppColors.divider,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 14, color: isActive ? Colors.white : Colors.amber),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: isActive ? Colors.white : AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

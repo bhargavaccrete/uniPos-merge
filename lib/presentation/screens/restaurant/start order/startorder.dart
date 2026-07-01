@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/di/service_locator.dart';
+import '../../../../core/plan/plan_enforcement.dart';
+import '../../../../core/plan/entitlement_keys.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../util/color.dart';
 import '../../../../util/common/app_responsive.dart';
@@ -31,7 +33,7 @@ class _StartorderState extends State<Startorder>
     with SingleTickerProviderStateMixin {
   late TabController tabController;
   String? _tableIdForCurrentSession;
-  late final int _tabCount = OrderSettings.enableDineIn ? 3 : 2;
+  late final int _tabCount = (OrderSettings.enableDineIn && PlanEnforce.allows(EntKeys.billingTables)) ? 3 : 2;
   DateTime? _lastBackPress;
   int _previousTabIndex = 0;
 
@@ -77,7 +79,7 @@ class _StartorderState extends State<Startorder>
       orderStore.loadOrders();
     }
     // Refresh tables when switching to tables tab (only if dine-in enabled)
-    else if (tabController.index == 2 && OrderSettings.enableDineIn) {
+    else if (tabController.index == 2 && (OrderSettings.enableDineIn && PlanEnforce.allows(EntKeys.billingTables))) {
       tableStore.loadTables();
       orderStore.loadOrders(); // CRITICAL: Need orders to find active order for table
     }
@@ -316,7 +318,7 @@ class _StartorderState extends State<Startorder>
                   Expanded(child: _buildTabButton(0, Icons.restaurant_menu, 'Menu')),
                   SizedBox(width: 8),
                   Expanded(child: _buildTabButton(1, Icons.receipt_long, 'Orders')),
-                  if (OrderSettings.enableDineIn) ...[
+                  if ((OrderSettings.enableDineIn && PlanEnforce.allows(EntKeys.billingTables))) ...[
                     SizedBox(width: 8),
                     Expanded(child: _buildTabButton(2, Icons.table_restaurant, 'Tables')),
                   ],
@@ -334,7 +336,7 @@ class _StartorderState extends State<Startorder>
                   isForAddingItem: widget.isForAddingItem ?? false,
                 ),
                 Order(),
-                if (OrderSettings.enableDineIn)
+                if ((OrderSettings.enableDineIn && PlanEnforce.allows(EntKeys.billingTables)))
                   const TableScreen(),
               ],
             ),
@@ -360,7 +362,7 @@ class _StartorderState extends State<Startorder>
               tabs: [
                 Tab(icon: Icon(Icons.restaurant_menu, size: 22), text: 'Menu'),
                 Tab(icon: Icon(Icons.receipt_long, size: 22), text: 'Orders'),
-                if (OrderSettings.enableDineIn)
+                if ((OrderSettings.enableDineIn && PlanEnforce.allows(EntKeys.billingTables)))
                   Tab(icon: Icon(Icons.table_restaurant, size: 22), text: 'Tables'),
               ],
             ),

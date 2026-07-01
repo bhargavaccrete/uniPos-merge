@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
@@ -299,10 +301,14 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
     int previousOrders = 0;
     double previousAmount = 0.0;
 
+    // Plan data-scope: clamp the visible history window (reports.history_limit_days).
+    final cutoff = PlanEnforce.windowCutoff(EntKeys.reportsHistoryLimitDays);
+
     for (final order in pastOrderStore.pastOrders) {
       final status = order.orderStatus ?? '';
       if (status == 'VOID' || status == 'VOIDED' || status == 'FULLY_REFUNDED') continue;
       if (order.orderAt == null) continue;
+      if (cutoff != null && order.orderAt!.isBefore(cutoff)) continue;
 
       final netAmount = order.totalPrice - (order.refundAmount ?? 0.0);
 

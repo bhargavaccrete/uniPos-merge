@@ -389,7 +389,6 @@ class _SetupWizardEmailFlowScreenState extends State<SetupWizardEmailFlowScreen>
       // 9 Review
       anim(Observer(
         builder: (_) => ReviewStep(
-          selectedBusinessType: _store.selectedBusinessTypeName,
           storeName: _store.storeName,
           ownerName: _store.ownerName,
           phone: _store.phone,

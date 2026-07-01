@@ -42,7 +42,7 @@ abstract class _LicenseStore with Store {
   // device clock backward cannot make an expired license look valid.
   static const _lastSeenKey = 'unipos_last_seen_epoch';
   // Server-driven entitlements manifest (signed) cache — separate from the RSA
-  // license token. Drives PlanGate/Entitlements; refreshed by sync.
+  // license token. Drives Entitlements; refreshed by sync.
   static const _manifestRawKey = 'unipos_manifest_raw';
   static const _manifestSigKey = 'unipos_manifest_sig';
   static const _entVersionKey = 'unipos_entitlement_version';
@@ -126,6 +126,15 @@ abstract class _LicenseStore with Store {
     Entitlements.instance.clear();
   }
 
+  /// Soft lock: strip all entitlements/manifest so no licensed feature is
+  /// reachable, but keep [licenseInfo] (with its expired/suspended status) and
+  /// the heartbeat running. The lock screen reads the preserved status to show
+  /// the correct message; a later server reactivation restores access on its own.
+  Future<void> _lockOutKeepingStatus() async {
+    await _clearManifestCache();
+    Entitlements.instance.clear();
+  }
+
   // ── Entitlements Manifest (signed) ─────────────────────────────────────────
 
   Future<void> _saveManifest(String raw, String sig, int version) async {
@@ -158,11 +167,15 @@ abstract class _LicenseStore with Store {
   /// Verifies a manifest+signature carried in a server [data] block, loads it
   /// into [Entitlements], and caches it. No-op if the block lacks a manifest or
   /// the signature/identity checks fail (keeps the prior cached entitlements).
-  Future<void> _ingestManifest(
+  /// Returns true only if a valid, verified manifest was loaded. Returns false
+  /// when the response carried no manifest, or the manifest failed verification
+  /// (in which case all license state is wiped — it can't be trusted). Callers
+  /// that require entitlements (activation) MUST treat false as a hard failure.
+  Future<bool> _ingestManifest(
       Map<String, dynamic> data, String deviceId, String licenseKey) async {
     final raw = data['manifest'] as String?;
     final sig = data['signature'] as String?;
-    if (raw == null || sig == null) return;
+    if (raw == null || sig == null) return false;
     final parsed = await ManifestService.verifyAndParse(
       manifestRaw: raw,
       sigB64: sig,
@@ -171,10 +184,13 @@ abstract class _LicenseStore with Store {
     );
     if (parsed == null) {
       await clearAllLicenseState();
-      return;
+      return false;
     }
+    // Full REPLACE (not merge): loadFromManifest clears first, so a downgrade
+    // key drops features the new plan omits and an upgrade key adds new ones.
     Entitlements.instance.loadFromManifest(parsed);
     await _saveManifest(raw, sig, parsed.version);
+    return true;
   }
 
   /// Loads the cached manifest into [Entitlements] for offline-first enforcement.
@@ -226,8 +242,11 @@ abstract class _LicenseStore with Store {
       );
       final valid = data['valid'] as bool? ?? true;
       if (!valid) {
-        // REVOKED / CANCELLED / DEVICE_MISMATCH / EXPIRED — hard lock.
-        await clearAllLicenseState();
+        // Server rejected. Sync's envelope doesn't reliably carry the full
+        // license record, so defer to checkStatus() — the one endpoint with an
+        // authoritative reason — to apply the precise state (expired/suspended
+        // preserved, device-mismatch wiped).
+        await checkStatus();
         return;
       }
       await _touchLastSync();
@@ -498,8 +517,19 @@ abstract class _LicenseStore with Store {
       };
       await _saveToken(jsonEncode(storedJson));
       // Verify + cache the entitlements manifest carried in the same response.
-      await _ingestManifest(
+      // A licensed device MUST have a verified manifest (strict-whitelist model),
+      // so a missing/invalid manifest is a hard activation failure — otherwise a
+      // key change would report success while the app silently locks out or keeps
+      // the OLD plan's entitlements.
+      final ingested = await _ingestManifest(
           data, devicePayload['deviceid'] as String? ?? '', info.licenseKey);
+      if (!ingested) {
+        await clearAllLicenseState();
+        errorMessage =
+            'License activated but entitlements could not be verified. '
+            'Please try again or contact support.';
+        return false;
+      }
       EntitlementDebug.dump('ACTIVATE', data); // debug-only diagnostics
       await _touchLastSync();
       startHeartbeatTimer();
@@ -526,10 +556,16 @@ abstract class _LicenseStore with Store {
 
       if (valid) {
         await _applyServerData(data);
-      } else if (reason == 'EXPIRED') {
+      } else if (reason == 'EXPIRED' || reason == 'SUSPENDED') {
+        // Keep the license record so the lock screen can show the right state
+        // (expired vs. deactivated) — but strip entitlements so no licensed
+        // feature stays reachable. The persisted status ('expired'/'suspended')
+        // survives an offline restart via the saved token.
         await _applyServerData(data);
+        await _lockOutKeepingStatus();
       } else {
-        // DEVICE_MISMATCH, SUSPENDED, or unknown reason — hard lock
+        // DEVICE_MISMATCH or unknown reason — can't trust the identity at all,
+        // wipe everything (this reverts the device to "License Required").
         await clearAllLicenseState();
       }
     } on LicenseApiException catch (e) {
@@ -546,7 +582,10 @@ abstract class _LicenseStore with Store {
     if (licenseInfo == null) return;
     try {
       final accepted = await _api.heartbeat(licenseInfo!.licenseKey);
-      if (!accepted) await clearAllLicenseState();
+      // Heartbeat only returns accept/reject with no reason — defer to
+      // checkStatus() so a rejection resolves to the correct locked state
+      // (expired/suspended preserved) rather than a blanket wipe.
+      if (!accepted) await checkStatus();
     } catch (_) {
       // Network error — offline grace, keep license active
     }

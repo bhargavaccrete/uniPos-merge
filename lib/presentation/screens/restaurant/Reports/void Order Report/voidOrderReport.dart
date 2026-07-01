@@ -8,6 +8,8 @@ import 'package:billberrylite/util/common/app_responsive.dart';
 import '../../../../widget/componets/common/report_summary_card.dart';
 import '../../../../widget/componets/common/primary_app_bar.dart';
 import '../../../../../core/di/service_locator.dart';
+import '../../../../../core/plan/entitlement_keys.dart';
+import '../../../../../core/plan/plan_enforcement.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../tabbar/orderDetails.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
@@ -287,11 +289,15 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
       endBound = _endDate!.add(const Duration(days: 1));
     }
 
+    // Plan data-scope: clamp the visible history window (reports.history_limit_days).
+    final cutoff = PlanEnforce.windowCutoff(EntKeys.reportsHistoryLimitDays);
+
     final reasonCounts = <String, int>{};
     for (final order in pastOrderStore.pastOrders) {
       final status = order.orderStatus?.toUpperCase() ?? '';
       if (status != 'VOID' && status != 'VOIDED' && status != 'CANCELLED') continue;
       if (order.orderAt == null) continue;
+      if (cutoff != null && order.orderAt!.isBefore(cutoff)) continue;
       if (isCustom && !hasCustomRange) continue;
 
       if (order.orderAt!.isBefore(startBound) || !order.orderAt!.isBefore(endBound)) {

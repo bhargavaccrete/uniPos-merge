@@ -17,6 +17,12 @@ import '../../../widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import '../../../../util/common/app_responsive.dart';
 import '../../../widget/componets/common/primary_app_bar.dart';
+import 'dart:io';
+import 'package:share_plus/share_plus.dart';
+import 'package:billberrylite/domain/services/common/unified_backup_service.dart';
+import 'package:billberrylite/main.dart' as main_app;
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
 
 class Settingsscreen extends StatefulWidget {
   const Settingsscreen({super.key});
@@ -920,6 +926,18 @@ class _settingsScreenState extends State<Settingsscreen> {
                   setState(() => _backupEnabled = val);
                 },
               ),
+              _tileDivider(),
+              _navTile(
+                context,
+                'Backup & Restore',
+                'Import or export your POS backup data',
+                Icons.import_export_rounded,
+                Colors.orange,
+                () {
+                  if (!PlanGuard.allowedOr(context, EntKeys.dataBackup, featureName: 'Backup & Restore')) return;
+                  _showImportExportDialog(context);
+                },
+              ),
             ]),
             SizedBox(height: AppResponsive.largeSpacing(context)),
 
@@ -933,22 +951,6 @@ class _settingsScreenState extends State<Settingsscreen> {
                 Icons.verified_rounded,
                 AppColors.primary,
                 () => Navigator.pushNamed(context, RouteNames.restaurantLicensing),
-              ),
-              _navTile(
-                context,
-                'License via Email (Demo)',
-                'Preview the email-based key request flow',
-                Icons.mark_email_read_rounded,
-                AppColors.info,
-                () => Navigator.pushNamed(context, RouteNames.restaurantLicenseEmailDemo),
-              ),
-              _navTile(
-                context,
-                'Email Setup Flow (Demo)',
-                'Full onboarding wizard with email licensing',
-                Icons.auto_awesome_rounded,
-                AppColors.info,
-                () => Navigator.pushNamed(context, RouteNames.restaurantEmailSetupDemo),
               ),
             ]),
             SizedBox(height: AppResponsive.largeSpacing(context)),
@@ -1069,6 +1071,258 @@ class _settingsScreenState extends State<Settingsscreen> {
                 fontWeight: FontWeight.w600,
                 color: color)),
       ),
+    );
+  }
+
+  void _showImportExportDialog(BuildContext context) {
+    final importExportHInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        : 24.0;
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              insetPadding: EdgeInsets.symmetric(horizontal: importExportHInset, vertical: 24),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Center(
+                child: Text(
+                  'Backup & Restore',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.getValue(context, mobile: 18, tablet: 20),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Download to Downloads Button
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        minimumSize: Size(double.infinity, AppResponsive.buttonHeight(context)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      icon: const Icon(Icons.download, color: Colors.white),
+                      label: Text(
+                        'Download Backup',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: AppResponsive.buttonFontSize(context),
+                        ),
+                      ),
+                      onPressed: () async {
+                        final outerContext = context;
+                        if (!await UnifiedBackupService.ensureBackupPassword(outerContext)) {
+                          return;
+                        }
+                        if (!outerContext.mounted) return;
+                        Navigator.pop(outerContext);
+
+                        final navigatorState = Navigator.of(outerContext, rootNavigator: true);
+                        final backupHInset = !AppResponsive.isMobile(outerContext)
+                            ? ((AppResponsive.screenWidth(outerContext) - AppResponsive.dialogWidth(outerContext)) / 2).clamp(40.0, 200.0)
+                            : 24.0;
+                        showDialog(
+                          context: outerContext,
+                          barrierDismissible: false,
+                          builder: (BuildContext context) {
+                            return PopScope(
+                              canPop: false,
+                              child: AlertDialog(
+                                insetPadding: EdgeInsets.symmetric(horizontal: backupHInset, vertical: 24),
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const CircularProgressIndicator(),
+                                    AppResponsive.verticalSpace(context, size: SpacingSize.medium),
+                                    Text(
+                                      'Creating backup...\nPlease wait',
+                                      textAlign: TextAlign.center,
+                                      style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        );
+
+                        String? filePath;
+                        try {
+                          filePath = await UnifiedBackupService.exportToDownloads();
+                        } catch (e) {
+                          debugPrint('❌ Backup error: $e');
+                        } finally {
+                          try {
+                            navigatorState.pop();
+                          } catch (e) {
+                            debugPrint('❌ Error closing dialog: $e');
+                          }
+                        }
+
+                        await Future.delayed(const Duration(milliseconds: 300));
+
+                        if (filePath == null) {
+                          if (outerContext.mounted) {
+                            NotificationService.instance.showError('Backup failed');
+                          }
+                          return;
+                        }
+
+                        if (outerContext.mounted) {
+                          NotificationService.instance.showSuccess('Backup saved successfully! Location: Downloads folder');
+                        }
+                      },
+                    ),
+
+                    AppResponsive.verticalSpace(context, size: SpacingSize.medium),
+
+                    // Share Backup Button
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        minimumSize: Size(double.infinity, AppResponsive.buttonHeight(context)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      icon: const Icon(Icons.share, color: Colors.white),
+                      label: Text(
+                        'Share Backup',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: AppResponsive.buttonFontSize(context),
+                        ),
+                      ),
+                      onPressed: () async {
+                        final outerContext = context;
+                        if (!await UnifiedBackupService.ensureBackupPassword(outerContext)) {
+                          return;
+                        }
+                        if (!outerContext.mounted) return;
+                        Navigator.pop(outerContext);
+
+                        final navigatorState = Navigator.of(outerContext, rootNavigator: true);
+                        final shareHInset = !AppResponsive.isMobile(outerContext)
+                            ? ((AppResponsive.screenWidth(outerContext) - AppResponsive.dialogWidth(outerContext)) / 2).clamp(40.0, 200.0)
+                            : 24.0;
+                        showDialog(
+                          context: outerContext,
+                          barrierDismissible: false,
+                          builder: (BuildContext ctx) {
+                            return PopScope(
+                              canPop: false,
+                              child: AlertDialog(
+                                insetPadding: EdgeInsets.symmetric(horizontal: shareHInset, vertical: 24),
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const CircularProgressIndicator(),
+                                    AppResponsive.verticalSpace(ctx, size: SpacingSize.medium),
+                                    Text(
+                                      'Creating backup...\nPlease wait',
+                                      textAlign: TextAlign.center,
+                                      style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(ctx)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        );
+
+                        String? filePath;
+                        try {
+                          filePath = await UnifiedBackupService.exportToShare();
+                        } catch (e) {
+                          debugPrint('❌ Share backup error: $e');
+                        } finally {
+                          try {
+                            navigatorState.pop();
+                          } catch (e) {
+                            debugPrint('❌ Error closing dialog: $e');
+                          }
+                        }
+
+                        await Future.delayed(const Duration(milliseconds: 300));
+
+                        if (filePath == null) {
+                          final globalContext = main_app.navigatorKey.currentContext;
+                          if (globalContext != null && globalContext.mounted) {
+                            NotificationService.instance.showError('Backup creation failed');
+                          }
+                          return;
+                        }
+
+                        await Share.shareXFiles(
+                          [XFile(filePath)],
+                          subject: 'Bill Berry Lite Backup',
+                        );
+                      },
+                    ),
+
+                    AppResponsive.verticalSpace(context, size: SpacingSize.medium),
+                    const Divider(),
+                    AppResponsive.verticalSpace(context, size: SpacingSize.small),
+
+                    // Import Button
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        minimumSize: Size(double.infinity, AppResponsive.buttonHeight(context)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      icon: const Icon(Icons.restore, color: Colors.white),
+                      label: Text(
+                        'Import Backup',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: AppResponsive.buttonFontSize(context),
+                        ),
+                      ),
+                      onPressed: () async {
+                        Navigator.pop(context); // close the backup menu
+
+                        bool importSuccess = false;
+                        try {
+                          importSuccess = await UnifiedBackupService.importData(context);
+                        } catch (e) {
+                          debugPrint('Import error in settings: $e');
+                        }
+
+                        if (importSuccess) {
+                          await Future.delayed(const Duration(milliseconds: 300));
+
+                          final globalContext = main_app.navigatorKey.currentContext;
+                          if (globalContext != null) {
+                            await showAppInfoDialog(
+                              context: globalContext,
+                              title: 'Import Completed',
+                              message: 'Data imported successfully!\n\nPlease close and restart the app.',
+                              buttonLabel: 'Close App',
+                              accent: AppColors.success,
+                              icon: Icons.check_circle_rounded,
+                            );
+                            exit(0);
+                          }
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

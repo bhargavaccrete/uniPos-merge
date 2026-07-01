@@ -88,11 +88,11 @@ class _OrderdetailsState extends State<Orderdetails> {
                 onTap: () => _printBill(context),
               ),
             ),
-            if (!isFullyRefunded && !isVoid && AppSettings.refundsEnabled)
+            if (!isFullyRefunded && !isVoid && AppSettings.refundsEnabled && PlanEnforce.allows(EntKeys.billingReturns))
               const SizedBox(width: 12),
             // Refund option is hidden entirely when refunds are turned off in
             // settings. When on, it stays subject to the refund-window check.
-            if (!isFullyRefunded && !isVoid && AppSettings.refundsEnabled)
+            if (!isFullyRefunded && !isVoid && AppSettings.refundsEnabled && PlanEnforce.allows(EntKeys.billingReturns))
               Expanded(
                 child: Tooltip(
                   message: isRefundEligible ? '' : AppSettings.refundWindowMinutes == 0 ? '' : 'Refund window has passed',

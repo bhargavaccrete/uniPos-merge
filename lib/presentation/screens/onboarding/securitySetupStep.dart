@@ -215,16 +215,42 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
             ),
             ],
 
-            if (_error != null) ...[
-              SizedBox(height: AppResponsive.mediumSpacing(context)),
-              Text(_error!,
-                  style: GoogleFonts.poppins(color: Colors.red, fontSize: 12.5)),
-            ],
-
-                ],
+                 ],
               ),
             ),
           ),
+          if (_error != null)
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.largeSpacing(context),
+                vertical: 8,
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.danger.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.danger.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline_rounded, size: 20, color: AppColors.danger),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _error!,
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          color: AppColors.danger,
+                          fontWeight: FontWeight.w500,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           // Pinned footer — Back / Continue stay at the bottom like other steps.
           Container(
             padding: EdgeInsets.fromLTRB(

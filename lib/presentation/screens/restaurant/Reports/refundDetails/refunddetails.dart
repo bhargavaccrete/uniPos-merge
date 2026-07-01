@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
 import 'package:billberrylite/util/color.dart';
@@ -211,11 +213,15 @@ class _RefundDataViewState extends State<RefundDataView> {
       endBound = _endDate!.add(const Duration(days: 1));
     }
 
+    // Plan data-scope: clamp the visible history window (reports.history_limit_days).
+    final cutoff = PlanEnforce.windowCutoff(EntKeys.reportsHistoryLimitDays);
+
     // Single pass: date filter + status filter + accumulate totals + reason counts
     for (final order in pastOrderStore.pastOrders) {
       final status = order.orderStatus ?? '';
       if (status != 'FULLY_REFUNDED' && status != 'PARTIALLY_REFUNDED') continue;
       if (order.refundedAt == null) continue;
+      if (cutoff != null && order.refundedAt!.isBefore(cutoff)) continue;
       if (isCustom && !hasCustomRange) continue;
 
       if (order.refundedAt!.isBefore(startBound) || !order.refundedAt!.isBefore(endBound)) {

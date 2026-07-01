@@ -4,7 +4,7 @@
 /// that every endpoint shares. Per-feature route paths stay inside their own
 /// service file so this never becomes a dumping ground.
 class ApiConstants {
-  static const String baseUrl = 'http://192.168.120.47:8002';
+  static const String baseUrl = 'http://192.168.120.47:8005';
 
   static const String deviceKey =
       '66e6c682046bd7998b86bc27ed26963ad260e04b8fd62f76d48b9e718ffdee65';

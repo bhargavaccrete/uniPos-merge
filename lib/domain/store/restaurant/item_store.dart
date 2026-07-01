@@ -219,10 +219,16 @@ abstract class _ItemStore with Store {
 
       await _repository.updateItem(item);
 
-      // Force reload to ensure MobX detects changes
-      // This is necessary because items are Hive objects and modifying them
-      // in place doesn't trigger MobX observers properly
-      await loadItems();
+      // Replace the item in place so it keeps its list position. Assigning a new
+      // object to an ObservableList index triggers MobX (same pattern as
+      // toggleItemStatus/updateStock); a full loadItems() would clear+refill the
+      // list and, for legacy auto-keyed items, reorder them.
+      final index = items.indexWhere((i) => i.id == item.id);
+      if (index != -1) {
+        items[index] = item;
+      } else {
+        items.add(item);
+      }
 
       return true;
     } catch (e) {

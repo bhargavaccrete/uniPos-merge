@@ -6,6 +6,9 @@ import 'package:billberrylite/util/images.dart';
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/domain/services/common/device_id_service.dart';
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
+import 'package:billberrylite/core/routes/routes_name.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/repositories/business_details_repository.dart';
 import '../../../util/color.dart';
 import '../../../util/responsive.dart';
 
@@ -130,14 +133,21 @@ class _SplashScreenState extends State<SplashScreen>
         Navigator.pushReplacementNamed(context, '/walkthrough');
       }
     } else {
-      final skipWalkthrough = prefs.getBool('skip_walkthrough') ?? false;
-
-      if (skipWalkthrough) {
-        // User chose to skip walkthrough - go directly to user selection
-        Navigator.pushReplacementNamed(context, '/userSelectionScreen');
+      final businessDetailsRepo = locator<BusinessDetailsRepository>();
+      final savedDetails = businessDetailsRepo.get();
+      if (savedDetails != null && (savedDetails.storeName?.isNotEmpty ?? false)) {
+        // User already started setup wizard - resume setup wizard directly
+        Navigator.pushReplacementNamed(context, RouteNames.setupWizard);
       } else {
-        // Show walkthrough to new users
-        Navigator.pushReplacementNamed(context, '/walkthrough');
+        final skipWalkthrough = prefs.getBool('skip_walkthrough') ?? false;
+
+        if (skipWalkthrough) {
+          // User chose to skip walkthrough - go directly to user selection
+          Navigator.pushReplacementNamed(context, '/userSelectionScreen');
+        } else {
+          // Show walkthrough to new users
+          Navigator.pushReplacementNamed(context, '/walkthrough');
+        }
       }
     }
   }

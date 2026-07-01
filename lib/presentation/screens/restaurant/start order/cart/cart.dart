@@ -10,6 +10,8 @@ import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/restaurant/order_settings.dart';
+import '../../../../../core/plan/plan_enforcement.dart';
+import '../../../../../core/plan/entitlement_keys.dart';
 import '../../tabbar/table.dart';
 import '../startorder.dart';
 import '../../../../../util/common/app_responsive.dart';
@@ -526,7 +528,7 @@ class _CartScreenState extends State<CartScreen>
                       children: [
                         _buildTabChip('Take Away', Icons.shopping_bag_outlined, selectedFilter == "Take Away",
                           () => setState(() => selectedFilter = "Take Away")),
-                        if (OrderSettings.enableDineIn)
+                        if (OrderSettings.enableDineIn && PlanEnforce.allows(EntKeys.billingTables))
                           _buildTabChip('Dine In', Icons.restaurant, selectedFilter == "Dine In",
                             () async {
                               final result = await Navigator.push(context,

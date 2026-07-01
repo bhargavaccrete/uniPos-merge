@@ -140,14 +140,28 @@ class _DrawerrState extends State<Drawerr> {
                     isTablet: isTablet,
                   ),
 
-                  if (widget.showClearCart)
+                  if (widget.showClearCart && cartStore.isNotEmpty)
                     _buildDrawerItem(
                       context: context,
                       icon: Icons.cleaning_services_rounded,
                       title: 'Clear Cart',
-                      onTap: () {
+                      onTap: () async {
                         Navigator.pop(context);
-                        _showClearCartDialog(context);
+                        final confirmed = await showAppConfirmDialog(
+                          context: context,
+                          title: 'Clear Cart?',
+                          message: 'Are you sure you want to clear the cart?',
+                          confirmLabel: 'Clear',
+                          cancelLabel: 'Cancel',
+                          accent: Colors.orange,
+                          icon: Icons.warning_rounded,
+                        );
+                        if (confirmed) {
+                          await clearCart();
+                          if (context.mounted) {
+                            Navigator.pushNamed(context, RouteNames.restaurantStartOrder);
+                          }
+                        }
                       },
                       isTablet: isTablet,
                     ),
@@ -246,19 +260,6 @@ class _DrawerrState extends State<Drawerr> {
                       isTablet: isTablet,
                     ),
                   ],
-
-                  if (RestaurantSession.canAccess('settings'))
-                  _buildDrawerItem(
-                    context: context,
-                    icon: Icons.import_export_rounded,
-                    title: 'Import/Export',
-                    onTap: () {
-                      if (!PlanGuard.allowedOr(context, EntKeys.dataBackup, featureName: 'Backup & Restore')) return;
-                      Navigator.pop(context);
-                      _showImportExportDialog(context);
-                    },
-                    isTablet: isTablet,
-                  ),
 
                   if (RestaurantSession.canAccess('settings'))
                   _buildDrawerItem(
@@ -504,93 +505,6 @@ class _DrawerrState extends State<Drawerr> {
     );
   }
 
-  void _showClearCartDialog(BuildContext context) {
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.warning_rounded,
-                color: Colors.orange,
-                size: AppResponsive.getValue(context, mobile: 24, tablet: 28),
-              ),
-            ),
-            AppResponsive.horizontalSpace(context, size: SpacingSize.small),
-            Expanded(
-              child: Text(
-                'Clear Cart?',
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.getValue(context, mobile: 18, tablet: 20),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          'Are you sure you want to clear the cart?',
-          style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context)),
-        ),
-        actions: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                style: TextButton.styleFrom(
-                  padding: AppResponsive.horizontalPadding(context),
-                ),
-                child: Text(
-                  "No",
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.buttonFontSize(context),
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              AppResponsive.horizontalSpace(context, size: SpacingSize.small),
-              ElevatedButton(
-                onPressed: () async {
-                  Navigator.pop(dialogContext);
-                  await clearCart();
-                  Navigator.pushNamed(context, RouteNames.restaurantStartOrder);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                  padding: AppResponsive.horizontalPadding(context),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  elevation: 0,
-                ),
-                child: Text(
-                  "Yes",
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.buttonFontSize(context),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showChangePinDialog(BuildContext context) {
     final currentPinCtrl = TextEditingController();
@@ -745,274 +659,6 @@ class _DrawerrState extends State<Drawerr> {
               ],
             ),
           ),
-        );
-      },
-    );
-  }
-
-  void _showImportExportDialog(BuildContext context) {
-    final importExportHInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              insetPadding: EdgeInsets.symmetric(horizontal: importExportHInset, vertical: 24),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: Center(
-                child: Text(
-                  'Backup & Restore',
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.getValue(context, mobile: 18, tablet: 20),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Download to Downloads Button
-
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        minimumSize: Size(double.infinity, AppResponsive.buttonHeight(context)),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      icon: Icon(Icons.download, color: Colors.white),
-                      label: Text(
-                        'Download Backup',
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: AppResponsive.buttonFontSize(context),
-                        ),
-                      ),
-                      onPressed: () async {
-                        final outerContext = context;
-                        // Backups are always encrypted — make sure a password is set first.
-                        if (!await UnifiedBackupService
-                            .ensureBackupPassword(outerContext)) {
-                          return;
-                        }
-                        if (!outerContext.mounted) return;
-                        Navigator.pop(outerContext);
-
-                        final navigatorState =
-                            Navigator.of(outerContext, rootNavigator: true);
-                        final backupHInset = !AppResponsive.isMobile(outerContext)
-                            ? ((AppResponsive.screenWidth(outerContext) - AppResponsive.dialogWidth(outerContext)) / 2).clamp(40.0, 200.0)
-                            : 24.0;
-                        showDialog(
-                          context: outerContext,
-                          barrierDismissible: false,
-                          builder: (BuildContext context) {
-                            return WillPopScope(
-                              onWillPop: () async => false,
-                              child: AlertDialog(
-                                insetPadding: EdgeInsets.symmetric(horizontal: backupHInset, vertical: 24),
-                                content: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    CircularProgressIndicator(),
-                                    AppResponsive.verticalSpace(context, size: SpacingSize.medium),
-                                    Text(
-                                      'Creating backup...\nPlease wait',
-                                      textAlign: TextAlign.center,
-                                      style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context)),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        );
-
-                        String? filePath;
-                        try {
-                          filePath =
-                              await UnifiedBackupService.exportToDownloads();
-                        } catch (e) {
-                          debugPrint('❌ Backup error: $e');
-                        } finally {
-                          try {
-                            navigatorState.pop();
-                          } catch (e) {
-                            debugPrint('❌ Error closing dialog: $e');
-                          }
-                        }
-
-                        await Future.delayed(Duration(milliseconds: 300));
-
-                        if (filePath == null) {
-                          if (outerContext.mounted) {
-                            NotificationService.instance.showError('Backup failed');
-                          }
-                          return;
-                        }
-
-                        if (outerContext.mounted) {
-                          NotificationService.instance.showSuccess('Backup saved successfully! Location: Downloads folder');
-                        }
-                      },
-                    ),
-
-                    AppResponsive.verticalSpace(context, size: SpacingSize.medium),
-
-                    // Share Backup Button
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        minimumSize: Size(double.infinity, AppResponsive.buttonHeight(context)),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      icon: Icon(Icons.share, color: Colors.white),
-                      label: Text(
-                        'Share Backup',
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: AppResponsive.buttonFontSize(context),
-                        ),
-                      ),
-                      onPressed: () async {
-                        final outerContext = context;
-                        // Backups are always encrypted — make sure a password is set first.
-                        if (!await UnifiedBackupService
-                            .ensureBackupPassword(outerContext)) {
-                          return;
-                        }
-                        if (!outerContext.mounted) return;
-                        Navigator.pop(outerContext);
-
-                        final navigatorState =
-                            Navigator.of(outerContext, rootNavigator: true);
-                        final shareHInset = !AppResponsive.isMobile(outerContext)
-                            ? ((AppResponsive.screenWidth(outerContext) - AppResponsive.dialogWidth(outerContext)) / 2).clamp(40.0, 200.0)
-                            : 24.0;
-                        showDialog(
-                          context: outerContext,
-                          barrierDismissible: false,
-                          builder: (BuildContext ctx) {
-                            return PopScope(
-                              canPop: false,
-                              child: AlertDialog(
-                                insetPadding: EdgeInsets.symmetric(horizontal: shareHInset, vertical: 24),
-                                content: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const CircularProgressIndicator(),
-                                    AppResponsive.verticalSpace(ctx, size: SpacingSize.medium),
-                                    Text(
-                                      'Creating backup...\nPlease wait',
-                                      textAlign: TextAlign.center,
-                                      style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(ctx)),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        );
-
-                        String? filePath;
-                        try {
-                          filePath = await UnifiedBackupService.exportToShare();
-                        } catch (e) {
-                          debugPrint('❌ Share backup error: $e');
-                        } finally {
-                          try {
-                            navigatorState.pop();
-                          } catch (e) {
-                            debugPrint('❌ Error closing dialog: $e');
-                          }
-                        }
-
-                        await Future.delayed(const Duration(milliseconds: 300));
-
-                        if (filePath == null) {
-                          final globalContext = main_app.navigatorKey.currentContext;
-                          if (globalContext != null && globalContext.mounted) {
-                            NotificationService.instance.showError('Backup creation failed');
-                          }
-                          return;
-                        }
-
-                        await Share.shareXFiles(
-                          [XFile(filePath)],
-                          subject: 'Bill Berry Lite Backup',
-                        );
-                      },
-                    ),
-
-                    AppResponsive.verticalSpace(context, size: SpacingSize.medium),
-                    Divider(),
-                    AppResponsive.verticalSpace(context, size: SpacingSize.small),
-
-                    // Import Button
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        minimumSize: Size(double.infinity, AppResponsive.buttonHeight(context)),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      icon: Icon(Icons.restore, color: Colors.white),
-                      label: Text(
-                        'Import Backup',
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: AppResponsive.buttonFontSize(context),
-                        ),
-                      ),
-                      onPressed: () async {
-                        Navigator.pop(context); // close the backup menu
-
-                        // importData shows its OWN file picker and (for encrypted
-                        // backups) a password prompt. Do NOT pre-show a blocking
-                        // "Importing…" modal here — a non-dismissible barrier sits
-                        // on top of that prompt, so the import would silently never
-                        // ask for the password.
-                        bool importSuccess = false;
-                        try {
-                          importSuccess =
-                              await UnifiedBackupService.importData(context);
-                        } catch (e) {
-                          debugPrint('Import error in drawer: $e');
-                        }
-
-                        if (importSuccess) {
-                            await Future.delayed(Duration(milliseconds: 300));
-
-                            final globalContext =
-                                main_app.navigatorKey.currentContext;
-                            if (globalContext != null) {
-                              await showAppInfoDialog(
-                                context: globalContext,
-                                title: 'Import Completed',
-                                message:
-                                    'Data imported successfully!\n\nPlease close and restart the app.',
-                                buttonLabel: 'Close App',
-                                accent: AppColors.success,
-                                icon: Icons.check_circle_rounded,
-                              );
-                              exit(0);
-                            }
-                          }
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
         );
       },
     );

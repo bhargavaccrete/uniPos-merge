@@ -31,8 +31,8 @@ class RefundService {
     required PastOrderModel order,
     required PartialRefundResult refundResult,
   }) async {
-    // Plan gate — a refund edits a committed bill (billing.invoice.edit).
-    if (!PlanEnforce.allows(EntKeys.billingInvoiceEdit)) {
+    // Plan gate — refunds are the Returns capability (billing.returns).
+    if (!PlanEnforce.allows(EntKeys.billingReturns)) {
       throw Exception('Refunds aren’t available on your current plan.');
     }
     try {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -42,6 +43,9 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
   String? _errorMsg;
   String _submittedEmail = '';
   Timer? _ticker;
+
+  DateTime? _lastResendTime;
+  bool _isResending = false;
 
   @override
   void initState() {
@@ -90,6 +94,21 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
     return '$m:$s';
   }
 
+  int get _resendCooldownSeconds {
+    if (_lastResendTime == null) return 0;
+    final diff = DateTime.now().difference(_lastResendTime!);
+    final remaining = 60 - diff.inSeconds;
+    return remaining < 0 ? 0 : remaining;
+  }
+
+  void _setLoading(bool val) {
+    if (!mounted) return;
+    setState(() {
+      _loading = val;
+    });
+    widget.store.isLoading = val;
+  }
+
   // ── Actions ────────────────────────────────────────────────────────────────
   Future<void> _sendOtp() async {
     final email = _emailController.text.trim();
@@ -98,17 +117,18 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
       return;
     }
     widget.store.setEmail(email);
+    _setLoading(true);
     setState(() {
-      _loading = true;
       _errorMsg = null;
     });
     final ok = await _license.requestSignupOtp(widget.store.buildSignupBody());
     if (!mounted) return;
+    _setLoading(false);
     setState(() {
-      _loading = false;
       if (ok) {
         _submittedEmail = email;
         _phase = _Phase.otp;
+        _lastResendTime = DateTime.now();
         _startTicker();
       } else {
         _errorMsg = _license.signupError;
@@ -122,8 +142,9 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
       setState(() => _errorMsg = 'Please enter the code from your email');
       return;
     }
+    _setLoading(true);
     setState(() {
-      _loading = true;
+      _isResending = false;
       _errorMsg = null;
     });
     final ok = await _license.verifyOtp(_submittedEmail, otp);
@@ -131,8 +152,8 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
     // Drop the numeric OTP keyboard before showing the (alphanumeric) key field,
     // so the soft keyboard re-queries the type instead of staying digits-only.
     FocusScope.of(context).unfocus();
+    _setLoading(false);
     setState(() {
-      _loading = false;
       if (ok) {
         _ticker?.cancel();
         _phase = _Phase.enterKey;
@@ -143,15 +164,19 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
   }
 
   Future<void> _resendOtp() async {
+    if (_resendCooldownSeconds > 0) return;
+    _setLoading(true);
     setState(() {
-      _loading = true;
+      _isResending = true;
       _errorMsg = null;
     });
     final ok = await _license.resendOtp(_submittedEmail);
     if (!mounted) return;
+    _setLoading(false);
     setState(() {
-      _loading = false;
+      _isResending = false;
       if (ok) {
+        _lastResendTime = DateTime.now();
         _startTicker();
       } else {
         _errorMsg = _license.signupError;
@@ -159,22 +184,24 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
     });
   }
 
-
   Future<void> _submitKey() async {
     final key = _keyController.text.trim();
     if (key.isEmpty) {
       setState(() => _errorMsg = 'Please enter the license key from your email');
       return;
     }
+    _setLoading(true);
     setState(() {
-      _loading = true;
       _errorMsg = null;
     });
     final valid = await _license.validateKey(key);
-    if (!mounted) return;
+    if (!mounted) {
+      _setLoading(false);
+      return;
+    }
     if (!valid) {
+      _setLoading(false);
       setState(() {
-        _loading = false;
         _errorMsg = _license.errorMessage;
       });
       return;
@@ -188,12 +215,15 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
     final activated = await _license.activateWithPendingKey(
       businessName: widget.store.storeName,
     );
-    if (!mounted) return;
+    if (!mounted) {
+      _setLoading(false);
+      return;
+    }
+    _setLoading(false);
     if (activated) {
       widget.onNext();
     } else {
       setState(() {
-        _loading = false;
         _errorMsg =
             _license.errorMessage ?? 'Activation failed. Please try again.';
       });
@@ -270,7 +300,6 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
         _primaryButton(context,
             label: 'Send Verification Code', onPressed: _sendOtp),
         _backButton(context, onPressed: widget.onPrevious),
-        _skipButton(context),
       ],
     );
   }
@@ -308,12 +337,19 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
         _primaryButton(context, label: 'Verify', onPressed: _verifyOtp),
         SizedBox(height: AppResponsive.smallSpacing(context)),
         TextButton(
-          onPressed: _loading ? null : _resendOtp,
-          child: Text("Didn't get it? Resend code",
-              style: TextStyle(
-                  fontSize: AppResponsive.smallFontSize(context),
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w600)),
+          onPressed: (_loading || _resendCooldownSeconds > 0) ? null : _resendOtp,
+          child: Text(
+            _resendCooldownSeconds > 0
+                ? "Resend code in ${_resendCooldownSeconds}s"
+                : "Didn't get it? Resend code",
+            style: TextStyle(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: (_loading || _resendCooldownSeconds > 0)
+                  ? AppColors.textSecondary
+                  : AppColors.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
         _backButton(context,
             onPressed: () => setState(() {
@@ -321,7 +357,6 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
                   _errorMsg = null;
                   _phase = _Phase.email;
                 })),
-        _skipButton(context),
       ],
     );
   }
@@ -354,31 +389,7 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
                   _phase = _Phase.otp;
                   _startTicker();
                 })),
-        _skipButton(context),
       ],
-    );
-  }
-
-  /// DEBUG-ONLY: skip the license (turns on bypass) so the whole app can be
-  /// tested with every feature unlocked and no limits. Stripped from release.
-  Future<void> _skipForTesting() async {
-    await _license.skipLicense();
-    if (mounted) widget.onNext();
-  }
-
-  Widget _skipButton(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(top: AppResponsive.smallSpacing(context)),
-      child: TextButton(
-        onPressed: _loading ? null : _skipForTesting,
-        child: Text(
-          'Skip for now — activate in Settings later',
-          style: TextStyle(
-            fontSize: AppResponsive.smallFontSize(context),
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ),
     );
   }
 
@@ -431,17 +442,11 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
           elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
-        child: _loading
-            ? const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: Colors.white))
-            : Text(label,
-                style: TextStyle(
-                    fontSize: AppResponsive.buttonFontSize(context),
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white)),
+        child: Text(label,
+            style: TextStyle(
+                fontSize: AppResponsive.buttonFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: Colors.white)),
       ),
     );
   }

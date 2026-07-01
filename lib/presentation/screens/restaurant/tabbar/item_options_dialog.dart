@@ -361,7 +361,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.max,
+        mainAxisSize: MainAxisSize.min,
         children: [
           // Drag handle
           Container(
@@ -423,7 +423,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
           SizedBox(height: 20),
 
           // Scrollable content
-          Expanded(
+          Flexible(
             child: SingleChildScrollView(
               controller: widget.scrollController,
               padding: EdgeInsets.fromLTRB(20, 0, 20, 20),

@@ -7,6 +7,8 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 
 import '../../../../core/di/service_locator.dart';
+import '../../../../core/plan/plan_guard.dart';
+import '../../../../core/plan/entitlement_keys.dart';
 import '../../../../util/restaurant/restaurant_session.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../data/models/restaurant/db/pastordermodel_313.dart';
@@ -124,6 +126,12 @@ class _ActiveorderState extends State<Activeorder> {
   }
 
   Future<void> _deleteOrder(String orderId) async {
+    // Plan gate — voiding a bill is billing.invoice.void. This path writes the
+    // VOID record directly (not via RefundService), so it needs its own check.
+    if (!PlanGuard.allowedOr(context, EntKeys.billingInvoiceVoid,
+        featureName: 'Void Order')) {
+      return;
+    }
     final String? voidReason = await _showVoidReasonDialog();
     if (voidReason == null) return;
 

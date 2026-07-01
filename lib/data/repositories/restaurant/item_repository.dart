@@ -47,20 +47,24 @@ class ItemRepository {
 
   /// Update an existing item in Hive.
   ///
-  /// Removes any stale copy of this item first. Generated/imported items live
-  /// under an auto-increment key (`box.addAll`), so a plain `put(item.id)` would
-  /// ADD a second record instead of overwriting — duplicating the item with
-  /// conflicting fields (e.g. favourite flag). We delete every record carrying
-  /// this id under a different key, then write the canonical id-keyed record.
+  /// Overwrites the record UNDER ITS EXISTING KEY so the item keeps its position
+  /// in the box (and therefore in the menu). Generated/imported items live under
+  /// an auto-increment key (`box.addAll`); a plain `put(item.id)` would both ADD
+  /// a duplicate AND move it to the end of the box — the latter slid favourited
+  /// items to the bottom of their category. Any extra stale copies of this id are
+  /// dropped so a single record remains.
   Future<void> updateItem(Items item) async {
-    final staleKeys = _itemBox.keys
-        .where((k) => k != item.id && _itemBox.get(k)?.id == item.id)
-        .toList();
-    for (final k in staleKeys) {
-      await _itemBox.delete(k);
-    }
+    final keysForId =
+        _itemBox.keys.where((k) => _itemBox.get(k)?.id == item.id).toList();
 
-    await _itemBox.put(item.id, item);
+    if (keysForId.isEmpty) {
+      await _itemBox.put(item.id, item);
+    } else {
+      await _itemBox.put(keysForId.first, item); // in-place, order preserved
+      for (final k in keysForId.skip(1)) {
+        await _itemBox.delete(k); // remove duplicates
+      }
+    }
 
     // CRITICAL: Flush to disk on web platform to ensure data is persisted
     // Hive web uses IndexedDB which has caching issues

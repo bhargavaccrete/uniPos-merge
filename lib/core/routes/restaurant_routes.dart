@@ -13,8 +13,6 @@ import 'package:billberrylite/presentation/screens/restaurant/Reports/salesbyCat
 import 'package:billberrylite/presentation/screens/restaurant/Reports/salesbyItem/salesbyitem.dart';
 import 'package:billberrylite/presentation/screens/restaurant/Reports/totalsales/totalsales.dart';
 import 'package:billberrylite/presentation/screens/restaurant/Settings/data_generator_screen.dart';
-import 'package:billberrylite/presentation/screens/restaurant/Settings/license_email_flow_demo_screen.dart';
-import 'package:billberrylite/presentation/screens/onboarding/setup_wizard_email_flow_screen.dart';
 import 'package:billberrylite/presentation/screens/restaurant/attendance/staff_attendance_screen.dart';
 import 'package:billberrylite/presentation/screens/restaurant/attendance/attendance_report_screen.dart';
 import 'package:billberrylite/presentation/screens/restaurant/import/bulk_import_screen.dart';
@@ -259,8 +257,6 @@ class RestaurantRoutes {
     RouteNames.restaurantBulkImport: _guard(const RestaurantBulkImportScreen(), 'settings'),
     RouteNames.restaurantDataGenratorScreen: _guard(const DataGeneratorScreen(), 'settings'),
     RouteNames.restaurantSplashPreview: _guard(const AnimatedSplashScreen(), 'settings'),
-    RouteNames.restaurantLicenseEmailDemo: _guard(const LicenseEmailFlowDemoScreen(), 'settings'),
-    RouteNames.restaurantEmailSetupDemo: _guard(const SetupWizardEmailFlowScreen(), 'settings'),
 
   };
 }

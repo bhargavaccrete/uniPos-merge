@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../core/plan/entitlement_keys.dart';
 import '../../../../../core/plan/plan_guard.dart';
+import '../../../../../core/plan/plan_enforcement.dart';
 import '../../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
@@ -132,6 +133,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
   }
 
   Future<void> _loadExistingCustomer() async {
+    if (!PlanEnforce.allows(EntKeys.customers)) return;
     final phone = widget.existingModel?.customerNumber?.trim() ?? '';
     final name = widget.existingModel?.customerName?.trim() ?? '';
     try {
@@ -237,6 +239,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+              // Customer capture only when the plan includes Customers.
+              if (PlanEnforce.allows(EntKeys.customers)) ...[
               // Show selected customer info
               if (selectedCustomer != null)
                 Container(
@@ -581,6 +585,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                     ),
                   ),
                 ),
+              ], // end customers-only capture block
 
               SizedBox(height: 10),
 
@@ -1893,6 +1898,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
   // Update customer statistics (visits, loyalty points, last visit, etc.)
   Future<void> _updateCustomerStats(RestaurantCustomer customer, String orderType, {int pointsToEarn = 0}) async {
+    if (!PlanEnforce.allows(EntKeys.customers)) return;
     try {
 
       await restaurantCustomerStore.updateCustomerVisit(
@@ -1913,6 +1919,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
   /// If the user typed a name or phone but did not select from autocomplete,
   /// find-or-create a customer record and link them to this order.
   Future<void> _autoSaveNewCustomer() async {
+    if (!PlanEnforce.allows(EntKeys.customers)) return; // customers not in plan
     if (selectedCustomer != null) return; // already linked via autocomplete
 
     final name = _nameController.text.trim();

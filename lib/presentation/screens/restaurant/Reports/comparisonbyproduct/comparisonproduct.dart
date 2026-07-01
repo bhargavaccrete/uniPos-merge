@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
@@ -223,11 +225,15 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
     Map<String, int> currentQuantities = {};
     Map<String, int> previousQuantities = {};
 
+    // Plan data-scope: clamp the visible history window (reports.history_limit_days).
+    final cutoff = PlanEnforce.windowCutoff(EntKeys.reportsHistoryLimitDays);
+
     for (final order in allOrders) {
       final orderStatus = order.orderStatus?.toUpperCase() ?? '';
       if (orderStatus == 'FULLY_REFUNDED') continue;
       if (orderStatus == 'VOID' || orderStatus == 'VOIDED') continue;
       if (order.orderAt == null) continue;
+      if (cutoff != null && order.orderAt!.isBefore(cutoff)) continue;
 
       // Check if current period
       if (order.orderAt!.isAfter(currentStart.subtract(const Duration(seconds: 1))) &&

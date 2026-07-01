@@ -35,6 +35,7 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
   bool _isInitialized = false;
 
   final StoreSettingsService _storeSettings = StoreSettingsService();
+  final TextEditingController _methodNameController = TextEditingController();
   final TextEditingController _upiIdController = TextEditingController();
   final TextEditingController _upiPayeeController = TextEditingController();
 
@@ -87,6 +88,7 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
   void dispose() {
     _qrDebounce?.cancel();
     _upiQrData.dispose();
+    _methodNameController.dispose();
     _upiIdController.dispose();
     _upiPayeeController.dispose();
     super.dispose();
@@ -120,7 +122,7 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
 
 
   void _showEditDialog(PaymentMethod method) async {
-    final nameController = TextEditingController(text: method.name);
+    _methodNameController.text = method.name;
     if (method.value == 'upi') {
       final upiId = await _storeSettings.getUpiId();
       final upiPayee = await _storeSettings.getUpiPayeeName();
@@ -145,7 +147,7 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             AppTextField(
-              controller: nameController,
+              controller: _methodNameController,
               label: 'Method Name',
               hint: 'Enter method name',
               icon: Icons.payment_rounded,
@@ -245,10 +247,10 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
           appDialogPrimaryButton(
             label: 'Update',
             onPressed: () async {
-              if (nameController.text.isNotEmpty) {
+              if (_methodNameController.text.isNotEmpty) {
                 final updatedMethod = method.copyWith(
-                  name: nameController.text,
-                  value: nameController.text.toLowerCase().replaceAll(' ', '_'),
+                  name: _methodNameController.text,
+                  value: _methodNameController.text.toLowerCase().replaceAll(' ', '_'),
                 );
                 await _store.updatePaymentMethod(updatedMethod);
                 if (isUpi) {
@@ -269,7 +271,6 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
         ],
       ),
     );
-    nameController.dispose();
   }
 
   Future<void> _initializeStore() async {
@@ -376,7 +377,7 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
   // ── Add dialog ──────────────────────────────────────────────────────────────
 
   Future<void> _showAddMethodDialog() async {
-    final nameController = TextEditingController();
+    _methodNameController.clear();
     String selectedIcon = 'payment';
     String? errorText;
 
@@ -400,7 +401,7 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
                       color: AppColors.textSecondary)),
               const SizedBox(height: 6),
               TextField(
-                controller: nameController,
+                controller: _methodNameController,
                 textCapitalization: TextCapitalization.words,
                 style: GoogleFonts.poppins(
                     fontSize: 14, color: AppColors.textPrimary),
@@ -502,7 +503,7 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
             appDialogPrimaryButton(
               label: 'Add',
               onPressed: () async {
-                final name = nameController.text.trim();
+                final name = _methodNameController.text.trim();
 
                 // Validation: empty name
                 if (name.isEmpty) {
@@ -530,7 +531,6 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
         ),
       ),
     );
-    nameController.dispose();
   }
 
   // ── Delete confirm ──────────────────────────────────────────────────────────

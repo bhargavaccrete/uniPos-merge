@@ -20,6 +20,8 @@ import '../../../../../util/restaurant/restaurant_session.dart';
 
 import '../../../../../data/models/restaurant/db/customer_model_125.dart';
 import '../../../../../core/di/service_locator.dart';
+import '../../../../../core/plan/plan_enforcement.dart';
+import '../../../../../core/plan/entitlement_keys.dart';
 import '../../../../../data/models/restaurant/db/item_cancellation_model_134.dart';
 import '../../../../../data/repositories/restaurant/item_cancellation_repository.dart';
 import '../../../../widget/componets/common/app_text_field.dart';
@@ -804,6 +806,7 @@ class _TakeawayState extends State<Takeaway> {
   }
 
   Future<void> DineinCart() async {
+    if (!PlanEnforce.allows(EntKeys.billingTables)) return;
     Navigator.push(context, MaterialPageRoute(builder: (context) => TableScreen()));
   }
 
@@ -819,6 +822,7 @@ class _TakeawayState extends State<Takeaway> {
 
   // Update customer statistics (visits, loyalty points, last visit, etc.)
   Future<void> _updateCustomerStats(RestaurantCustomer customer, String orderType, {int pointsToEarn = 0}) async {
+    if (!PlanEnforce.allows(EntKeys.customers)) return;
     try {
 
       await restaurantCustomerStore.updateCustomerVisit(
@@ -838,6 +842,8 @@ class _TakeawayState extends State<Takeaway> {
 
   // Check if customer exists or create new customer
   Future<RestaurantCustomer?> _getOrCreateCustomer(String name, String phone, String orderType) async {
+    // Customers not in plan → never search, create, or link a customer.
+    if (!PlanEnforce.allows(EntKeys.customers)) return null;
     try {
       // If customer is already selected, return it
       if (selectedCustomer != null) {
@@ -1757,6 +1763,8 @@ class _TakeawayState extends State<Takeaway> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Customer capture only when the plan includes Customers.
+                            if (PlanEnforce.allows(EntKeys.customers)) ...[
                             // Section label
                             Row(
                               children: [
@@ -1876,6 +1884,10 @@ class _TakeawayState extends State<Takeaway> {
                                 Expanded(child: AppTextField(controller: remarkController, label: 'Remark', hint: 'e.g. No onions', icon: Icons.note_alt_outlined)),
                               ],
                             ),
+                            ] else ...[
+                            // Customers off — keep the kitchen remark only.
+                            AppTextField(controller: remarkController, label: 'Remark', hint: 'e.g. No onions', icon: Icons.note_alt_outlined),
+                            ],
                             const SizedBox(height: 20),
 
                             // Total summary card

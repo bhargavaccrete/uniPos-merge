@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
@@ -224,6 +226,9 @@ class _DiscountDataViewState extends State<DiscountDataView> {
     double subtotalSum = 0.0;
     double netAmountSum = 0.0;
 
+    // Plan data-scope: clamp the visible history window (reports.history_limit_days).
+    final cutoff = PlanEnforce.windowCutoff(EntKeys.reportsHistoryLimitDays);
+
     for (final order in pastOrderStore.pastOrders) {
       if ((order.Discount ?? 0) <= 0) continue;
 
@@ -232,6 +237,7 @@ class _DiscountDataViewState extends State<DiscountDataView> {
 
       final orderDate = order.orderAt;
       if (orderDate == null) continue;
+      if (cutoff != null && orderDate.isBefore(cutoff)) continue;
       if (orderDate.isBefore(rangeStart) || !orderDate.isBefore(rangeEnd)) continue;
 
       results.add(order);
