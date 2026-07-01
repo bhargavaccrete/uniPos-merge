@@ -28,7 +28,6 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
       {'key': 'Restaurant Name', 'icon': Icons.restaurant, 'description': 'Show restaurant name on receipts'},
       {'key': 'Restaurant Address', 'icon': Icons.location_on, 'description': 'Show restaurant address'},
       {'key': 'Restaurant Mobile No', 'icon': Icons.phone, 'description': 'Show contact number'},
-      {'key': 'Website Name', 'icon': Icons.language, 'description': 'Show website URL'},
     ],
     'Order Details': [
       {'key': 'Order ID', 'icon': Icons.numbers, 'description': 'Show order/bill number'},
@@ -45,8 +44,6 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
     ],
     'Additional Options': [
       {'key': 'Powered By', 'icon': Icons.info_outline, 'description': 'Show "Powered by Bill Berry Lite" footer'},
-      {'key': 'Custom Field', 'icon': Icons.edit_note, 'description': 'Show custom field if configured'},
-      {'key': 'Extra Info', 'icon': Icons.add_circle_outline, 'description': 'Show additional information'},
     ],
   };
 

@@ -122,7 +122,7 @@ class EscPosReceiptBuilder {
     if (receiptData.tableNo != null && receiptData.tableNo!.isNotEmpty) {
       infoLine += 'Table: ${receiptData.tableNo}';
     }
-    if (receiptData.orderType != null) {
+    if (PrintSettings.showOrderType && receiptData.orderType != null) {
       if (infoLine.isNotEmpty) infoLine += '  |  ';
       infoLine += receiptData.orderType!;
     }
@@ -279,7 +279,7 @@ class EscPosReceiptBuilder {
     }
 
     // Order type + table
-    if (receiptData.orderType != null) {
+    if (PrintSettings.showOrderType && receiptData.orderType != null) {
       String typeLine = 'Type: ${receiptData.orderType}';
       if (receiptData.tableNo != null && receiptData.tableNo!.isNotEmpty) {
         typeLine += '  Table: ${receiptData.tableNo}';

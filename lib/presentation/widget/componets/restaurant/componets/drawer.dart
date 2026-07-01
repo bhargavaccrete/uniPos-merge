@@ -177,13 +177,7 @@ class _DrawerrState extends State<Drawerr> {
                         },
                         isTablet: isTablet,
                       ),
-                      _buildSubItem(
-                        context: context,
-                        icon: Icons.settings_outlined,
-                        title: 'Cash Drawer Setting',
-                        onTap: () {},
-                        isTablet: isTablet,
-                      ),
+
                       _buildSubItem(
                         context: context,
                         icon: Icons.tune_rounded,

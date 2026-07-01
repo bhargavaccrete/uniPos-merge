@@ -270,6 +270,7 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
         _primaryButton(context,
             label: 'Send Verification Code', onPressed: _sendOtp),
         _backButton(context, onPressed: widget.onPrevious),
+        _skipButton(context),
       ],
     );
   }
@@ -320,7 +321,7 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
                   _errorMsg = null;
                   _phase = _Phase.email;
                 })),
-        _devSkipButton(context),
+        _skipButton(context),
       ],
     );
   }
@@ -353,7 +354,7 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
                   _phase = _Phase.otp;
                   _startTicker();
                 })),
-        _devSkipButton(context),
+        _skipButton(context),
       ],
     );
   }
@@ -365,18 +366,17 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
     if (mounted) widget.onNext();
   }
 
-  Widget _devSkipButton(BuildContext context) {
-    if (!kDebugMode) return const SizedBox.shrink();
-    return TextButton.icon(
-      onPressed: _loading ? null : _skipForTesting,
-      icon: const Icon(Icons.skip_next_rounded,
-          size: 18, color: AppColors.textSecondary),
-      label: Text(
-        'Skip for now (test mode)',
-        style: TextStyle(
-          fontSize: AppResponsive.smallFontSize(context),
-          color: AppColors.textSecondary,
-          fontWeight: FontWeight.w500,
+  Widget _skipButton(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(top: AppResponsive.smallSpacing(context)),
+      child: TextButton(
+        onPressed: _loading ? null : _skipForTesting,
+        child: Text(
+          'Skip for now — activate in Settings later',
+          style: TextStyle(
+            fontSize: AppResponsive.smallFontSize(context),
+            color: AppColors.textSecondary,
+          ),
         ),
       ),
     );

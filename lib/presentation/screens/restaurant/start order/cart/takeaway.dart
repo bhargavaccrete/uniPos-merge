@@ -2225,19 +2225,290 @@ class _TakeawayState extends State<Takeaway> {
     // 4. Clear the user's cart
     await restaurantCartStore.clearCart();
 
-    // 4. Navigate and show success message
+    // 5. Show success notification and print dialog
     if (mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const Startorder()),
-            (Route<dynamic> route) => false,
-      );
-      // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quick Settle Successful')));
-
       NotificationService.instance.showSuccess(
           'Quick Settle Successful'
       );
+      await _showOrderSuccessDialogWithBillNumber(pastOrder, calculations, billNumber);
     }
   }
 
+  // Success dialog for settled orders (with bill number)
+  Future<void> _showOrderSuccessDialogWithBillNumber(
+      PastOrderModel pastOrder, CartCalculationService calculations, int billNumber) async {
+    if (!mounted) return;
 
+    // Convert pastOrderModel to OrderModel for printing
+    final orderForPrint = OrderModel(
+      id: pastOrder.id,
+      customerName: pastOrder.customerName,
+      customerNumber: '',
+      customerEmail: '',
+      items: pastOrder.items,
+      status: 'Completed',
+      timeStamp: pastOrder.orderAt ?? DateTime.now(),
+      orderType: pastOrder.orderType ?? 'Take Away',
+      tableNo: pastOrder.tableNo,
+      totalPrice: pastOrder.totalPrice,
+      kotNumbers: pastOrder.kotNumbers,
+      itemCountAtLastKot: pastOrder.items.length,
+      kotBoundaries: pastOrder.kotBoundaries,
+      subTotal: pastOrder.subTotal,
+      gstAmount: pastOrder.gstAmount,
+      gstRate: pastOrder.gstRate,
+      discount: pastOrder.Discount,
+      paymentMethod: pastOrder.paymentmode,
+      isPaid: true,
+      paymentStatus: 'Paid',
+      completedAt: DateTime.now(),
+      isTaxInclusive: pastOrder.isTaxInclusive, // Use stored tax mode from past order
+      isSplitPayment: pastOrder.isSplitPayment,
+      paymentListJson: pastOrder.paymentListJson,
+      totalPaid: pastOrder.totalPaid,
+      changeReturn: pastOrder.changeReturn,
+    );
+
+    await _showSuccessDialog(
+      order: orderForPrint,
+      calculations: calculations,
+      billNumber: billNumber,
+      pointsUsed: 0,
+      title: 'Order Settled!',
+      printLabel: 'Print Bill',
+    );
+  }
+
+  void _navigateToHome() {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const Startorder()),
+      (Route<dynamic> route) => false,
+    );
+  }
+
+  /// Shared success dialog for both newly placed and settled orders.
+  /// Green header band + order summary + Done / Print actions.
+  Future<void> _showSuccessDialog({
+    required OrderModel order,
+    required CartCalculationService calculations,
+    required int? billNumber,
+    required int pointsUsed,
+    required String title,
+    required String printLabel,
+  }) async {
+    if (!mounted) return;
+
+    final sym = CurrencyHelper.currentSymbol;
+    final paid = order.totalPaid ?? 0;
+    final change = order.changeReturn ?? 0;
+    final method = (order.isSplitPayment ?? false)
+        ? 'Split'
+        : (order.paymentMethod ?? '').trim();
+    final noun = printLabel.toLowerCase().contains('bill') ? 'bill' : 'receipt';
+    String cap(String s) => s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => PopScope(
+        canPop: false,
+        child: Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          clipBehavior: Clip.antiAlias,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ── Green header band ────────────────────────────────
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 22),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.green.shade400, Colors.green.shade600],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.check_rounded, color: Colors.white, size: 38),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        title,
+                        style: GoogleFonts.poppins(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      if (billNumber != null) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.22),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            'Bill #INV$billNumber',
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+                // ── Body ─────────────────────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 22),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Order summary
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceLight,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.divider),
+                        ),
+                        child: Column(
+                          children: [
+                            _summaryRow('Total',
+                                '$sym${DecimalSettings.formatAmount(order.totalPrice)}',
+                                emphasize: true),
+                            if (paid > 0) ...[
+                              const SizedBox(height: 10),
+                              _summaryRow('Paid', '$sym${DecimalSettings.formatAmount(paid)}'),
+                            ],
+                            if (change > 0) ...[
+                              const SizedBox(height: 10),
+                              _summaryRow('Change', '$sym${DecimalSettings.formatAmount(change)}'),
+                            ],
+                            if (method.isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              _summaryRow('Payment', cap(method)),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        'Would you like to print the $noun?',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          fontSize: 13.5,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      // Action buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _navigateToHome();
+                              },
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 13),
+                                side: BorderSide(color: AppColors.divider),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              child: Text(
+                                'Done',
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                await RestaurantPrintHelper.printOrderReceipt(
+                                  context: context,
+                                  order: order,
+                                  calculations: calculations,
+                                  billNumber: billNumber,
+                                  loyaltyPointsDiscount: pointsUsed,
+                                );
+                                // User stays on dialog — press Done to go home
+                              },
+                              icon: const Icon(Icons.print_rounded, size: 20),
+                              label: Text(
+                                printLabel,
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(vertical: 13),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _summaryRow(String label, String value, {bool emphasize = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: emphasize ? 14 : 13,
+            fontWeight: emphasize ? FontWeight.w600 : FontWeight.w500,
+            color: emphasize ? AppColors.primary : AppColors.textSecondary,
+          ),
+        ),
+        Text(
+          value,
+          style: GoogleFonts.poppins(
+            fontSize: emphasize ? 15 : 13.5,
+            fontWeight: emphasize ? FontWeight.bold : FontWeight.w600,
+            color: emphasize ? AppColors.primary : AppColors.textPrimary,
+          ),
+        ),
+      ],
+    );
+  }
 }

@@ -345,7 +345,7 @@ class ReceiptPdfService {
               style: pw.TextStyle(fontSize: 12,fontWeight:pw.FontWeight.bold),
             ),
           ],
-          if (data.orderType != null) ...[
+          if (PrintSettings.showOrderType && data.orderType != null) ...[
             pw.Text(
               'Type: ${data.orderType!.toUpperCase()}${(data.isAddonKot == true && data.kotStatus?.toUpperCase() != 'CANCEL') ? ' (ADD-ON)' : ''}',
               style:  pw.TextStyle(fontSize: 12,fontWeight:pw.FontWeight.bold),
@@ -397,7 +397,7 @@ class ReceiptPdfService {
             ),
           ],
           // Order Type field (Dine-in/Takeaway/Delivery)
-          if (data.orderType != null) ...[
+          if (PrintSettings.showOrderType && data.orderType != null) ...[
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [

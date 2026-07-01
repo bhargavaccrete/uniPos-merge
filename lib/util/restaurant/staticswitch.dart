@@ -69,7 +69,7 @@ class AppSettings {
       "Generate KOT", // ✅ WORKING
       // "Show Payment Method", // ❌ NOT IMPLEMENTED - Commented out
       "Tax Is Inclusive", // ✅ WORKING
-      "Discount On Items", // ✅ WORKING
+      // "Discount On Items", // ❌ NOT SHOWING IN UI - Commented out
     ],
     "Inventory": [
       "Low Stock Alerts",

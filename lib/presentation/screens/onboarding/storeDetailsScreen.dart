@@ -49,17 +49,17 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
       (v != null && v.isNotEmpty) ? v : fallback;
 
   void _initializeControllers() {
-    _storeNameController = TextEditingController(text: _val(widget.store.storeName, 'Green Apple'));
-    _ownerNameController = TextEditingController(text: _val(widget.store.ownerName, 'Bhargav'));
-    _phoneController = TextEditingController(text: _val(widget.store.phone, '7845963574'));
-    _emailController = TextEditingController(text: _val(widget.store.email, 'info@apple.com'));
-    _addressController = TextEditingController(text: _val(widget.store.address, 'Infocity, Gandhinnagar'));
-    _cityController = TextEditingController(text: _val(widget.store.city, 'Gandhinagar'));
-    _stateController = TextEditingController(text: _val(widget.store.state, 'Gujarat'));
-    _countryController = TextEditingController(text: _val(widget.store.country, 'India'));
-    _pincodeController = TextEditingController(text: _val(widget.store.pincode, '382355'));
-    _gstController = TextEditingController(text: _val(widget.store.gstin, 'GVFU415151YVBF'));
-    _panController = TextEditingController(text: _val(widget.store.pan, 'FU415151YVBF'));
+    _storeNameController = TextEditingController(text: widget.store.storeName ?? '');
+    _ownerNameController = TextEditingController(text: widget.store.ownerName ?? '');
+    _phoneController = TextEditingController(text: widget.store.phone ?? '');
+    _emailController = TextEditingController(text: widget.store.email ?? '');
+    _addressController = TextEditingController(text: widget.store.address ?? '');
+    _cityController = TextEditingController(text: widget.store.city ?? '');
+    _stateController = TextEditingController(text: widget.store.state ?? '');
+    _countryController = TextEditingController(text: widget.store.country ?? '');
+    _pincodeController = TextEditingController(text: widget.store.pincode ?? '');
+    _gstController = TextEditingController(text: widget.store.gstin ?? '');
+    _panController = TextEditingController(text: widget.store.pan ?? '');
   }
 
   @override
@@ -642,7 +642,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
           Expanded(
             child: AppTextField(
               controller: _gstController,
-              label: 'GST Number',
+              label: 'Tax ID',
               hint: 'Optional',
               icon: Icons.receipt_long_rounded,
               onChanged: (v) => widget.store.setGstin(v),
@@ -652,7 +652,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
           Expanded(
             child: AppTextField(
               controller: _panController,
-              label: 'PAN Number',
+              label: 'Business ID',
               hint: 'Optional',
               icon: Icons.credit_card_rounded,
               onChanged: (v) => widget.store.setPan(v),
