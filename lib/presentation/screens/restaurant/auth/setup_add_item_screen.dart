@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:uuid/uuid.dart';
+import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'package:billberrylite/core/plan/entitlements.dart';
@@ -386,12 +387,16 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   Future<void> _saveItem() async {
     if (_isSaving) return; // double-tap guard
 
-    // Plan limit — menu-items module + count cap. Enforced once the manifest is
-    // live (activation now happens at the Verify Email step, before this one).
-    // Only enforce once a manifest is live (don't block first-run setup before
-    // activation). The blocker (Contact Bill Berry) replaces the old toast.
+    // Plan limit — menu-items module + count cap. Never enforce during the
+    // setup wizard: activation moved to the Verify Email step (before this one),
+    // so the manifest is already live here and the cap would otherwise block
+    // owners from building their initial menu (and its "Contact Bill Berry"
+    // exit is login-gated → dead-ends on the PIN screen). AppConfig.isSetupComplete
+    // is false throughout the wizard and true for the standalone post-setup use.
     final lic = locator<LicenseStore>();
-    if (!lic.licenseBypassed && Entitlements.instance.hasManifest) {
+    if (AppConfig.isSetupComplete &&
+        !lic.licenseBypassed &&
+        Entitlements.instance.hasManifest) {
       if (!PlanGuard.allowedOr(context, EntKeys.manageMenuItems, featureName: 'Menu Items')) return;
       if (!PlanGuard.withinLimitOr(context, EntKeys.manageMenuItemsMax, itemStore.items.length, unit: 'items')) return;
     }

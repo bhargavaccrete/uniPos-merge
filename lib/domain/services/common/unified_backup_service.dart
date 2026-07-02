@@ -20,6 +20,8 @@ import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'package:billberrylite/core/constants/hive_box_names.dart';
 import 'package:billberrylite/core/init/hive_init.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/data/models/common/business_type.dart';
 import 'package:billberrylite/data/models/common/business_details.dart';
 import 'package:billberrylite/models/tax_details.dart';
@@ -469,41 +471,31 @@ class UnifiedBackupService {
       context: dialogContext,
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: const [
-              Icon(Icons.lock_outline, color: Colors.orange),
-              SizedBox(width: 8),
-              Text('Encrypted Backup'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('This backup is encrypted. Enter your backup password to restore.'),
-              const SizedBox(height: 16),
-              AppTextField(
-                controller: controller,
-                obscureText: obscure,
-                autofocus: true,
-                label: 'Backup Password',
-                suffixIcon: IconButton(
-                  icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
-                  onPressed: () => setState(() => obscure = !obscure),
-                ),
-              ),
-            ],
+        builder: (ctx, setState) => AppDialogShell(
+          title: 'Encrypted Backup',
+          subtitle: 'Enter your backup password to restore',
+          accent: AppColors.primary,
+          icon: Icons.lock_outline_rounded,
+          body: AppTextField(
+            controller: controller,
+            obscureText: obscure,
+            autofocus: true,
+            label: 'Backup Password',
+            // Backup password is a 6-digit numeric PIN (matches the Set dialog).
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            suffixIcon: IconButton(
+              icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
+              onPressed: () => setState(() => obscure = !obscure),
+            ),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, null),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
+            appDialogCancelButton(ctx),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: 'Restore',
               onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-              child: const Text('Restore'),
             ),
           ],
         ),

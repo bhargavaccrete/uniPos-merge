@@ -5,28 +5,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/routes/routes_name.dart';
 import 'package:billberrylite/util/color.dart';
-import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/restaurant/restaurant_auth_helper.dart';
 import 'package:billberrylite/util/restaurant/restaurant_session.dart';
-import 'package:billberrylite/util/restaurant/staticswitch.dart';
-import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
-import '../../../../screens/restaurant/welcome_Admin.dart';
-import '../../../../screens/restaurant/AuthSelectionScreen.dart';
-import '../../../../screens/restaurant/need help/needhelp.dart';
-import '../../../../screens/retail/reports_screen.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 
 class DrawerManage extends StatelessWidget {
-  final bool issync;
-  final bool isDelete;
   final bool islogout;
 
   const DrawerManage({
     super.key,
-    required this.issync,
-    required this.isDelete,
     required this.islogout,
   });
 
@@ -135,19 +124,6 @@ class DrawerManage extends StatelessWidget {
                     },
                     isTablet: isTablet,
                   ),
-                  // End Shift removed — shifts end automatically on EOD and logout
-                  if (issync) ...[
-                    _buildDrawerItem(
-                      context: context,
-                      icon: Icons.sync_rounded,
-                      title: 'Sync Data',
-                      onTap: () {
-                        Navigator.pop(context);
-                        // Add sync functionality
-                      },
-                      isTablet: isTablet,
-                    ),
-                  ],
                   _buildDrawerItem(
                     context: context,
                     icon: Icons.help_outline_rounded,
@@ -180,27 +156,14 @@ class DrawerManage extends StatelessWidget {
                       isTablet: isTablet,
                     ),
 
-                  // Divider before danger zone
-                  if (isDelete || islogout) ...[
+                  // Divider before logout
+                  if (islogout) ...[
                     Padding(
                       padding: EdgeInsets.symmetric(vertical: 12),
                       child: Divider(color: AppColors.divider, thickness: 1),
                     ),
                   ],
 
-                  // Danger zone (admin only)
-                  if (isDelete && RestaurantSession.isAdmin)
-                    _buildDrawerItem(
-                      context: context,
-                      icon: Icons.delete_outline_rounded,
-                      title: 'Delete Account',
-                      onTap: () {
-                        Navigator.pop(context);
-                        _showDeleteAccountDialog(context);
-                      },
-                      isTablet: isTablet,
-                      isDanger: true,
-                    ),
                   if (islogout)
                     _buildDrawerItem(
                       context: context,
@@ -317,403 +280,6 @@ class DrawerManage extends StatelessWidget {
     );
   }
 
-  /// Computes the expected cash in the drawer right now using the same formula
-  /// as the Cash Drawer screen: opening + cashSales + cashIn − cashOut − cashExpenses
-  Future<double> _loadExpectedBalance() async {
-    final opening = await DayManagementService.getOpeningBalance();
-    final dayStart = await DayManagementService.getDayStartTimestamp() ?? DateTime.now();
-
-    await cashMovementStore.loadTodayMovements(dayStart);
-    await pastOrderStore.loadPastOrders();
-    await expenseStore.loadExpenses();
-
-    double cashSales = 0;
-    for (final o in pastOrderStore.pastOrders) {
-      final status = (o.orderStatus ?? '').toUpperCase();
-      if (status == 'VOIDED') continue;
-      final isToday = o.orderAt?.isAfter(dayStart.subtract(const Duration(seconds: 1))) ?? false;
-      if (!isToday) continue;
-      final method = (o.paymentmode ?? '').toLowerCase().trim();
-      if (method == 'cash') {
-        cashSales += (o.totalPrice - (o.refundAmount ?? 0.0)).clamp(0.0, double.infinity);
-      } else if (o.isSplitPayment == true) {
-        for (final p in o.paymentList) {
-          if ((p['method'] as String? ?? '').toLowerCase() == 'cash') {
-            cashSales += (p['amount'] as num? ?? 0).toDouble();
-          }
-        }
-      }
-    }
-
-    double cashExpenses = 0;
-    for (final e in expenseStore.expenses) {
-      final isC = (e.paymentType ?? '').toLowerCase().trim() == 'cash';
-      final isToday = e.dateandTime.isAfter(dayStart.subtract(const Duration(seconds: 1)));
-      if (isC && isToday) cashExpenses += e.amount;
-    }
-
-    return opening + cashSales + cashMovementStore.totalCashIn
-        - cashMovementStore.totalCashOut - cashExpenses;
-  }
-
-  void _showEndShiftDialog(BuildContext context) {
-    final shift = shiftStore.activeShift;
-    if (shift == null) return;
-
-    // Capture navigator before the drawer closes and its context becomes stale.
-    // NavigatorState outlives the DrawerManage widget, so it's safe to use
-    // across async gaps without a mounted check.
-    final navigator = Navigator.of(context);
-
-    final duration = DateTime.now().difference(shift.startTime);
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-
-    // Phase tracking
-    bool isClosing = false;
-    bool showCashCount = false;
-    final amountCtrl = TextEditingController();
-    final noteCtrl = TextEditingController();
-    bool isSaving = false;
-    // Loaded once when cash count begins
-    Future<double>? balanceFuture;
-    double? resolvedExpected;
-    bool listenerAdded = false;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) {
-          // Register amount listener once so live diff updates on every keystroke
-          if (!listenerAdded) {
-            listenerAdded = true;
-            amountCtrl.addListener(() => setS(() {}));
-          }
-
-          // ── Phase 2: Shift Cash Count ────────────────────────────────
-          if (showCashCount) {
-            final currency = CurrencyHelper.currentSymbol;
-            final counted = double.tryParse(amountCtrl.text.trim());
-            final diff = (counted != null && resolvedExpected != null)
-                ? counted - resolvedExpected!
-                : null;
-            final isShort = diff != null && diff < -1.0;
-            final isOver  = diff != null && diff > 1.0;
-
-            return AppDialogShell(
-              title: 'Shift Cash Count',
-              subtitle: 'Count the cash in the drawer',
-              accent: Colors.orange,
-              icon: Icons.point_of_sale_rounded,
-              body: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Who is ending shift
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceMedium,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(children: [
-                      const Icon(Icons.person_outline, size: 18, color: AppColors.textSecondary),
-                      const SizedBox(width: 8),
-                      Text('Shift ended by: ${shift.staffName}',
-                          style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
-                    ]),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // POS Expected balance
-                  FutureBuilder<double>(
-                    future: balanceFuture,
-                    builder: (ctx, snap) {
-                      if (snap.connectionState == ConnectionState.waiting) {
-                        return Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Row(children: [
-                            const SizedBox(width: 14, height: 14,
-                                child: CircularProgressIndicator(strokeWidth: 2)),
-                            const SizedBox(width: 10),
-                            Text('Calculating expected balance...',
-                                style: GoogleFonts.poppins(fontSize: 12, color: Colors.blue.shade700)),
-                          ]),
-                        );
-                      }
-                      if (snap.hasError || !snap.hasData) return const SizedBox.shrink();
-                      final balance = snap.data!;
-                      resolvedExpected = balance;
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.blue.shade200),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text('POS expects in drawer',
-                                  style: GoogleFonts.poppins(fontSize: 11, color: Colors.blue.shade700)),
-                              Text('Based on sales, cash in/out',
-                                  style: GoogleFonts.poppins(fontSize: 10, color: Colors.blue.shade400)),
-                            ]),
-                            Text(
-                              '$currency ${balance.toStringAsFixed(2)}',
-                              style: GoogleFonts.poppins(
-                                  fontSize: 20, fontWeight: FontWeight.w800, color: Colors.blue.shade800),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 16),
-                  Text('Cash you counted',
-                      style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary)),
-                  const SizedBox(height: 6),
-                  AppTextField(
-                    controller: amountCtrl,
-                    hint: '0.00',
-                    icon: Icons.attach_money,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
-                  ),
-
-                  // Live difference panel
-                  if (diff != null) ...[
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: isShort
-                            ? Colors.red.shade50
-                            : isOver
-                                ? Colors.orange.shade50
-                                : Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: isShort
-                              ? Colors.red.shade200
-                              : isOver
-                                  ? Colors.orange.shade200
-                                  : Colors.green.shade200,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            isShort ? 'Short' : isOver ? 'Over' : 'Matched',
-                            style: GoogleFonts.poppins(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: isShort
-                                  ? Colors.red.shade700
-                                  : isOver
-                                      ? Colors.orange.shade700
-                                      : Colors.green.shade700,
-                            ),
-                          ),
-                          Text(
-                            isShort
-                                ? '-$currency ${diff.abs().toStringAsFixed(2)}'
-                                : isOver
-                                    ? '+$currency ${diff.toStringAsFixed(2)}'
-                                    : '$currency 0.00',
-                            style: GoogleFonts.poppins(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: isShort
-                                  ? Colors.red.shade700
-                                  : isOver
-                                      ? Colors.orange.shade700
-                                      : Colors.green.shade700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-
-                  const SizedBox(height: 16),
-                  Text('Note (optional)',
-                      style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary)),
-                  const SizedBox(height: 6),
-                  AppTextField(
-                    controller: noteCtrl,
-                    hint: 'e.g. "All good" or explain any difference',
-                    icon: Icons.note_alt_outlined,
-                  ),
-                ],
-              ),
-              actions: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: isSaving ? null : () async {
-                      Navigator.pop(ctx);
-                      await _clearLoginState();
-                      navigator.pushNamedAndRemoveUntil(
-                          RouteNames.restaurantLogin, (r) => false);
-                    },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.textSecondary,
-                      side: BorderSide(color: AppColors.divider),
-                      padding: const EdgeInsets.symmetric(vertical: 13),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: Text('Skip', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: isSaving ? null : () async {
-                      final amount = double.tryParse(amountCtrl.text.trim()) ?? 0;
-                      if (amount <= 0) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                            const SnackBar(content: Text('Enter the cash amount you counted')));
-                        return;
-                      }
-                      setS(() => isSaving = true);
-                      final expectedBalance = await (balanceFuture ?? Future.value(0.0));
-                      await cashHandoverStore.recordShiftEnd(
-                        closedBy: shift.staffName,
-                        countedAmount: amount,
-                        expectedAmount: expectedBalance,
-                        note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
-                      );
-                      if (ctx.mounted) Navigator.pop(ctx);
-                      await _clearLoginState();
-                      navigator.pushNamedAndRemoveUntil(
-                          RouteNames.restaurantLogin, (r) => false);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange.shade700,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 13),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: isSaving
-                        ? const SizedBox(width: 18, height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : Text('Save & End Shift',
-                            style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-                  ),
-                ),
-              ],
-            );
-          }
-
-          // ── Phase 1: End Shift confirm ──────────────────────────────
-          return AppDialogShell(
-            title: 'End Shift',
-            accent: Colors.orange,
-            icon: Icons.lock_clock_rounded,
-            body: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _infoRow(Icons.person, 'Staff', shift.staffName),
-                SizedBox(height: 8),
-                _infoRow(Icons.timer, 'Duration', '${hours}h ${minutes}m'),
-                SizedBox(height: 8),
-                _infoRow(Icons.play_arrow, 'Started',
-                    '${shift.startTime.hour.toString().padLeft(2, '0')}:${shift.startTime.minute.toString().padLeft(2, '0')}'),
-                SizedBox(height: 12),
-                Container(
-                  padding: EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.07),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
-                  ),
-                  child: Text(
-                    'Orders during this shift will be tallied and saved to the Shift Report.',
-                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.orange.shade800),
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              appDialogCancelButton(ctx),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: isClosing
-                      ? null
-                      : () async {
-                          setS(() => isClosing = true);
-                          final closed = await shiftStore.closeShift(shift.id);
-                          if (closed != null) {
-                            await RestaurantSession.clearShiftSession();
-                            if (!AppSettings.shiftHandover) {
-                              // Handover disabled — skip Phase 2, go straight to logout
-                              if (ctx.mounted) Navigator.pop(ctx);
-                              await _clearLoginState();
-                              navigator.pushNamedAndRemoveUntil(
-                                  RouteNames.restaurantLogin, (r) => false);
-                              return;
-                            }
-                            // Switch to cash count phase; kick off balance load once
-                            if (ctx.mounted) setS(() {
-                              showCashCount = true;
-                              balanceFuture ??= _loadExpectedBalance();
-                            });
-                          } else {
-                            if (ctx.mounted) {
-                              setS(() => isClosing = false);
-                              ScaffoldMessenger.of(ctx).showSnackBar(
-                                const SnackBar(content: Text('Failed to end shift. Please try again.')),
-                              );
-                            }
-                          }
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 13),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: isClosing
-                      ? const SizedBox(width: 18, height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : Text('End Shift', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _infoRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: AppColors.textSecondary),
-        SizedBox(width: 8),
-        Text('$label: ',
-            style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary)),
-        Text(value,
-            style: GoogleFonts.poppins(
-                fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-      ],
-    );
-  }
-
   void _showChangePinDialog(BuildContext context) {
     final currentPinCtrl = TextEditingController();
     final newPinCtrl = TextEditingController();
@@ -819,20 +385,6 @@ class DrawerManage extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  void _showDeleteAccountDialog(BuildContext context) async {
-    final ok = await showAppConfirmDialog(
-      context: context,
-      title: 'Delete Account',
-      message:
-          'This action cannot be undone. All your data will be permanently deleted.',
-      confirmLabel: 'Delete',
-      accent: Colors.red,
-      icon: Icons.warning_rounded,
-    );
-    if (!ok) return;
-    // Add delete account logic here
   }
 
   void _showLogoutDialog(BuildContext context) async {

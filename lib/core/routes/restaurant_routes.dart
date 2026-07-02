@@ -251,7 +251,10 @@ class RestaurantRoutes {
     RouteNames.restaurantAttendanceReport: _guard(const AttendanceReportScreen(), 'reports', EntKeys.reportsAttendance),
 
     // Restaurant - Other
-    RouteNames.restaurantNeedHelp: _guard(const NeedhelpDrawer()),
+    // Support/Help must stay reachable WITHOUT login — it's the escape hatch
+    // from the license-lock screen, the upgrade blocker, and the setup wizard.
+    // Guarding it bounced un-logged-in users to the PIN screen (a dead end).
+    RouteNames.restaurantNeedHelp: (_) => const NeedhelpDrawer(),
     RouteNames.restaurantCustomizationDrawer: _guard(const CustomizationDrawer(), 'settings'),
     RouteNames.restaurantTestData: _guard(const TestDataScreen(), 'settings'),
     RouteNames.restaurantBulkImport: _guard(const RestaurantBulkImportScreen(), 'settings'),

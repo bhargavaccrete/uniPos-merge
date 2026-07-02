@@ -1987,17 +1987,6 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                   ]),
                 ),
               ),
-              const SizedBox(width: 12),
-              // Print is intentionally NOT here — the day isn't closed yet, so
-              // printing a draft summary is premature. Print belongs to the
-              // completed-EOD flow only.
-              Column(children: [
-                _iconActionButton(
-                    icon: Icons.refresh_rounded,
-                    label: 'Refresh',
-                    color: Colors.blueGrey,
-                    onTap: _loadEODData),
-              ]),
             ]),
 
             const SizedBox(height: 20),

@@ -15,6 +15,7 @@ import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../util/restaurant/staticswitch.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../widget/componets/common/app_text_field.dart';
+import '../../../widget/componets/common/app_empty_state.dart';
 import 'WeightItemDialog.dart';
 import 'item_options_dialog.dart';
 import '../../../../util/common/app_responsive.dart';
@@ -559,6 +560,22 @@ class _MenuScreenState extends State<MenuScreen> {
                           // post-frame, once per query change).
                           _syncSearchExpansion();
 
+                          // Searching but nothing matches → empty state instead
+                          // of a blank scroll area.
+                          if (query.isNotEmpty &&
+                              !visibleItems.any((item) =>
+                                  item.name.toLowerCase().contains(lowerQuery) ||
+                                  (item.itemCode != null &&
+                                      item.itemCode!
+                                          .toLowerCase()
+                                          .contains(lowerQuery)))) {
+                            return const AppEmptyState(
+                              icon: Icons.search_off_rounded,
+                              title: 'No items found',
+                              message: 'Try a different search term.',
+                            );
+                          }
+
                           return SingleChildScrollView(
                             controller: _listScrollController,
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -734,15 +751,12 @@ class _MenuScreenState extends State<MenuScreen> {
                         }
 
                         if (filteredItems.isEmpty) {
-                          return Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.search_off, size: 64, color: AppColors.divider),
-                                const SizedBox(height: 16),
-                                Text('No items found', style: GoogleFonts.poppins(fontSize: 16, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
-                              ],
-                            ),
+                          return AppEmptyState(
+                            icon: Icons.search_off_rounded,
+                            title: 'No items found',
+                            message: query.isNotEmpty
+                                ? 'Try a different search term.'
+                                : 'No items in this category yet.',
                           );
                         }
 

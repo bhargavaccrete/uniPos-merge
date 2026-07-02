@@ -93,9 +93,7 @@ class taxSetting extends StatelessWidget {
         ),
       ),
       drawer: DrawerManage(
-        issync: true,
         islogout: true,
-        isDelete: true,
       ),
     );
   }

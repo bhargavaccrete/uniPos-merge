@@ -45,6 +45,9 @@ class Takeaway extends StatefulWidget {
   final Function(CartItem) onIncreseQty;
   final Function(CartItem) onDecreseQty;
   final Function(CartItem, int)? onSetQty; // Set quantity directly (typed input)
+  // Called AFTER an active item's cancellation is committed immediately, so the
+  // parent can drop it from both the working list and the diff baseline.
+  final void Function(CartItem item, int qty)? onCommitCancel;
   final int? Function(CartItem)? availableStockOf; // null = unlimited stock
   final List<CartItem>? originalActiveItems;
   final Map<String, int>? originalQuantities;
@@ -63,6 +66,7 @@ class Takeaway extends StatefulWidget {
         required this.onIncreseQty,
         required this.onDecreseQty,
         this.onSetQty,
+        this.onCommitCancel,
         this.availableStockOf,
         required this.isDineIn,
         this.selectedTableNo,
@@ -749,11 +753,9 @@ class _TakeawayState extends State<Takeaway> {
                                 setState(() => reasonError = 'Reason is required');
                                 return;
                               }
-                              _cancelReasons[item.id] = reason;
                               Navigator.pop(ctx);
-                              for (int i = 0; i < cancelQty; i++) {
-                                widget.onDecreseQty(item);
-                              }
+                              // Commit the cancellation now — no separate Place Order.
+                              _cancelItemImmediately(item, cancelQty, reason);
                             },
                             child: Text(
                               'Confirm Cancel',
@@ -772,6 +774,170 @@ class _TakeawayState extends State<Takeaway> {
       },
     );
   }
+  /// Commits a single active-item cancellation immediately (no Place Order):
+  /// updates the saved order, restores stock, logs the audit, prints a Cancel
+  /// KOT, notifies the KDS — then asks the parent to drop it from the working
+  /// list AND the diff baseline so a later Place Order can't re-cancel it. Any
+  /// newly-added (unplaced) items stay pending.
+  Future<void> _cancelItemImmediately(
+      CartItem item, int cancelQty, String reason) async {
+    final existing = widget.existingModel;
+    if (existing == null) return;
+
+    // Baseline = the order's current saved active items.
+    final List<CartItem> savedItems = widget.originalActiveItems ?? existing.items;
+
+    // Which KOT did this item belong to (for audit + Cancel-KOT reference).
+    int kotFor(String id) {
+      final idx = savedItems.indexWhere((o) => o.id == id);
+      if (idx == -1) return 0;
+      final boundaries = existing.kotBoundaries;
+      final kotNums = existing.getKotNumbers();
+      for (int i = 0; i < boundaries.length; i++) {
+        if (idx < boundaries[i]) return i < kotNums.length ? kotNums[i] : 0;
+      }
+      return 0;
+    }
+    final kot = kotFor(item.id);
+
+    // Saved list with this line reduced/removed by cancelQty.
+    final List<CartItem> newSavedItems = [];
+    for (final o in savedItems) {
+      if (o.id == item.id) {
+        final remaining = o.quantity - cancelQty;
+        if (remaining > 0) newSavedItems.add(o.copyWith(quantity: remaining));
+      } else {
+        newSavedItems.add(o.copyWith());
+      }
+    }
+
+    final bool taxInclusive = existing.isTaxInclusive ?? AppSettings.isTaxInclusive;
+    final calc = CartCalculationService(
+      items: newSavedItems,
+      discountType: DiscountType.amount,
+      discountValue: existing.discount ?? 0.0,
+      serviceChargePercentage: widget.isdelivery ? 0.0 : (existing.serviceCharge ?? 0.0),
+      deliveryCharge: widget.isdelivery ? (existing.serviceCharge ?? 0.0) : 0.0,
+      isDeliveryOrder: widget.isdelivery,
+      isTaxInclusive: taxInclusive,
+    );
+
+    // If the last active item is being cancelled AND nothing new is pending,
+    // the order is empty → remove it entirely instead of leaving a blank active
+    // order. Otherwise just save the reduced order.
+    final bool hasPendingNew = widget.cartItems.any((w) => !w.isActive);
+    final bool orderEmpty = newSavedItems.isEmpty && !hasPendingNew;
+
+    if (orderEmpty) {
+      await orderStore.deleteOrder(existing.id);
+    } else {
+      await orderStore.updateOrder(existing.copyWith(
+        items: newSavedItems,
+        totalPrice: calc.grandTotal,
+        subTotal: taxInclusive ? calc.subtotal - calc.totalGST : calc.subtotal,
+        gstAmount: calc.totalGST,
+      ));
+    }
+
+    // Restore stock for the cancelled quantity.
+    final cancelledPortion = item.copyWith(quantity: cancelQty);
+    await InventoryService.restoreStockForOrder([cancelledPortion]);
+
+    // Audit for the Item Cancellation Report.
+    try {
+      final repo = locator<ItemCancellationRepository>();
+      final staff = RestaurantSession.staffName ??
+          (RestaurantSession.isAdmin ? 'Admin' : 'Staff');
+      final sessionId = await DayManagementService.getCurrentSessionId();
+      await repo.add(ItemCancellationModel(
+        id: const Uuid().v4(),
+        itemName: item.title,
+        variantName: item.variantName,
+        quantity: cancelQty,
+        amount: item.price * cancelQty,
+        reason: reason,
+        orderId: existing.id,
+        kotNumber: kot == 0 ? null : kot,
+        staffName: staff,
+        timestamp: DateTime.now(),
+        sessionId: sessionId,
+        orderType: existing.orderType,
+        tableNo: existing.tableNo,
+      ));
+    } catch (e) {
+      debugPrint('Item-cancellation audit failed: $e');
+    }
+
+    // Print a Cancel KOT for the kitchen.
+    if (mounted && AppSettings.generateKOT) {
+      try {
+        final correctionKot = await orderStore.getNextKotNumber();
+        final correctionOrder = existing.copyWith(
+          items: [cancelledPortion.copyWith(instruction: 'Cancelled from KOT #$kot')],
+          kotNumbers: [correctionKot],
+          kotBoundaries: [1],
+          kotStatuses: {correctionKot: 'CANCEL'},
+        );
+        await RestaurantPrintHelper.printKOT(
+          context: context,
+          order: correctionOrder,
+          kotNumber: correctionKot,
+          autoPrint: true,
+          cancelReference: kot == 0 ? null : 'KOT #$kot',
+        );
+      } catch (e) {}
+    }
+
+    // Notify the KDS.
+    try {
+      ws.broadcastEvent({
+        'type': 'ORDER_MODIFIED',
+        'orderId': existing.id,
+        'orderNumber': existing.orderNumber,
+        'kotNumbers': kot == 0 ? [] : [kot],
+        'tableNo': existing.tableNo,
+        'removedItems': [
+          {'id': item.id, 'title': item.title, 'quantity': cancelQty}
+        ],
+        'reducedItems': [],
+      });
+    } catch (e) {}
+
+    // Table: free it when the order is gone, else update its running total.
+    if (existing.tableNo != null && existing.tableNo!.isNotEmpty) {
+      if (orderEmpty) {
+        await tableStore.updateTableStatus(existing.tableNo!, 'Available');
+      } else {
+        await tableStore.updateTableStatus(
+          existing.tableNo!,
+          existing.status,
+          total: calc.grandTotal,
+          orderId: existing.id,
+          orderTime: existing.timeStamp,
+        );
+      }
+    }
+
+    // Order fully cancelled — nothing left to edit; leave the screen.
+    if (orderEmpty) {
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => Startorder()),
+          (route) => false,
+        );
+        NotificationService.instance.showSuccess('Order cancelled — no items left');
+      }
+      return;
+    }
+
+    // Sync the working list + diff baseline (drops the line, prevents re-cancel).
+    widget.onCommitCancel?.call(item, cancelQty);
+
+    if (mounted) {
+      NotificationService.instance.showSuccess('Item cancelled');
+    }
+  }
+
   Future<void> clearCart() async {
     try {
       await restaurantCartStore.clearCart();
@@ -2222,6 +2388,46 @@ class _TakeawayState extends State<Takeaway> {
 
     // 1. Add the completed order to history
     await pastOrderStore.addOrder(pastOrder);
+
+    // 1b. Auto-print the KOT (same as Place Order) — Quick Settle still sends the
+    // order to the kitchen. Non-blocking: a print failure must not fail settle.
+    if (mounted && AppSettings.generateKOT) {
+      try {
+        final kotOrder = OrderModel(
+          id: pastOrder.id,
+          customerName: 'Quick Settle',
+          customerNumber: '',
+          customerEmail: '',
+          items: plainItems,
+          status: 'Processing',
+          timeStamp: pastOrder.orderAt ?? DateTime.now(),
+          orderType: widget.isDineIn ? 'Dine In' : 'Take Away',
+          tableNo:
+              (widget.isDineIn ? (widget.selectedTableNo ?? widget.tableid) : null) ?? '',
+          subTotal: AppSettings.isTaxInclusive
+              ? calculations.subtotal - calculations.totalGST
+              : calculations.subtotal,
+          gstAmount: calculations.totalGST,
+          totalPrice: calculations.grandTotal,
+          gstRate: 0,
+          kotNumbers: [quickSettleKotNumber],
+          itemCountAtLastKot: plainItems.length,
+          kotBoundaries: [plainItems.length],
+          kotStatuses: {quickSettleKotNumber: 'Processing'},
+          orderNumber: billNumber,
+          isTaxInclusive: AppSettings.isTaxInclusive,
+          sessionId: currentSessionId,
+        );
+        await RestaurantPrintHelper.printKOT(
+          context: context,
+          order: kotOrder,
+          kotNumber: quickSettleKotNumber,
+          autoPrint: true,
+        );
+      } catch (e) {
+        // Don't block settle if KOT print fails.
+      }
+    }
 
     // 2. Deduct stock after successfully adding the order
     await InventoryService.deductStockForOrder(plainItems);

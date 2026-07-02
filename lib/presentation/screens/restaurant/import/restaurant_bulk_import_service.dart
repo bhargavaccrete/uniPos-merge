@@ -58,7 +58,7 @@ class RestaurantBulkImportService {
   Future<String> downloadTemplate() async {
     try {
       final bytes = ImportTemplateBuilder().build();
-      return await _saveBytes(bytes, 'billberrylite_restaurant_import_template_v4.xlsx');
+      return await _saveBytes(bytes, 'billberrylite_restaurant_import_template_v5.xlsx');
     } catch (e) {
       return 'Error downloading template: $e';
     }
@@ -1036,6 +1036,14 @@ class RestaurantBulkImportService {
         final hasVariants = _parseBool(rowData['HasVariants']?.toString() ?? '', false);
         final soldByWeight = _parseBool(rowData['IsSoldByWeight']?.toString() ?? '', false);
 
+        // Low-stock threshold: blank keeps the existing value (or null → global
+        // default). A provided number overrides it.
+        final lowThreshRaw = rowData['LowStockThreshold']?.toString().trim() ?? '';
+        final double? lowStockThreshold = lowThreshRaw.isEmpty
+            ? existingItem?.lowStockThreshold
+            : (double.tryParse(lowThreshRaw.replaceAll(RegExp(r'[^0-9.]'), '')) ??
+                existingItem?.lowStockThreshold);
+
         Items item = Items(
           id: existingItem?.id ?? const Uuid().v4(),
           name: rowData['ItemName']?.toString().trim() ?? '',
@@ -1052,6 +1060,11 @@ class RestaurantBulkImportService {
           allowOrderWhenOutOfStock: _parseBool(rowData['AllowOutOfStock']?.toString() ?? '', true),
           taxRate: taxRateValue,
           isEnabled: _parseBool(rowData['IsEnabled']?.toString() ?? '', true),
+          isFavorite: _parseBool(
+              rowData['IsFavorite']?.toString() ?? '', existingItem?.isFavorite ?? false),
+          lowStockThreshold: lowStockThreshold,
+          lowStockAlertEnabled: _parseBool(rowData['LowStockAlertEnabled']?.toString() ?? '',
+              existingItem?.lowStockAlertEnabled ?? false),
           // Preserve existing variants; the variant pass overrides them when the
           // import file actually carries variant rows for this item.
           variant: existingItem?.variant ?? [],

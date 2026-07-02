@@ -54,19 +54,50 @@ void main() async {
 
     runApp(const BillBerryApp());
 
-    // Ask for notification permission once the UI is up. The Android 13+
-    // POST_NOTIFICATIONS prompt is ignored if requested before the activity
-    // is resumed, so we defer it to after the first frame.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (AppConfig.isRestaurant) {
-        LocalNotificationService.instance.requestPermissionIfNeeded();
-      }
-    });
+    // Ask for notification permission once the Activity is truly RESUMED.
+    // Firing from addPostFrameCallback alone is unreliable on cold start: the
+    // first frame paints during the launch-screen transition, before the
+    // Android 13+ activity resumes, so the POST_NOTIFICATIONS dialog is
+    // silently dropped (it only appeared on the *second* launch).
+    if (AppConfig.isRestaurant) {
+      _NotificationPermissionRequester.scheduleOnResume();
+    }
   }, (error, stackTrace) {
     print('🔴🔴🔴 ZONE ERROR CAUGHT 🔴🔴🔴');
     print('Error: $error');
     print('Stack trace: $stackTrace');
   });
+}
+
+/// Requests the Android 13+ notification permission on the first confirmed
+/// `resumed` lifecycle event, then removes itself. Waiting for `resumed` (not
+/// just the first frame) is what makes the POST_NOTIFICATIONS prompt reliable
+/// on a cold start — see the call site in [main].
+class _NotificationPermissionRequester with WidgetsBindingObserver {
+  _NotificationPermissionRequester._();
+  bool _done = false;
+
+  static void scheduleOnResume() {
+    final r = _NotificationPermissionRequester._();
+    // Already resumed (warm start)? go now. Else wait for the resumed event.
+    if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+      r._fire();
+    } else {
+      WidgetsBinding.instance.addObserver(r);
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _fire();
+  }
+
+  void _fire() {
+    if (_done) return;
+    _done = true;
+    WidgetsBinding.instance.removeObserver(this);
+    LocalNotificationService.instance.requestPermissionIfNeeded();
+  }
 }
 
 Future<void> _initializeApp() async {

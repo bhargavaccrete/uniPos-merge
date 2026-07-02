@@ -7,10 +7,9 @@ import 'package:billberrylite/presentation/widget/componets/common/primary_app_b
 class NeedhelpDrawer extends StatelessWidget {
   const NeedhelpDrawer({super.key});
 
-  // ── Placeholder support details (swap with real ones later) ──────────
-  static const String _phone = '+91 1234567890';
-  static const String _email = 'support@billberry.com';
-  static const String _telegram = 'BillBerrySupport';
+  // ── Support details ──────────────────────────────────────────────────
+  static const String _phone = '+91 079 2321 3063';
+  static const String _email = 'sales@accreteinfo.com';
 
   Future<void> _launch(BuildContext context, Uri uri) async {
     // Capture before the await — context may unmount across the async gap.
@@ -56,24 +55,6 @@ class NeedhelpDrawer extends StatelessWidget {
               title: 'Call Support',
               value: _phone,
               onTap: () => _launch(context, Uri.parse('tel:${_digits(_phone)}')),
-            ),
-            const SizedBox(height: 12),
-            _contactCard(
-              context: context,
-              icon: Icons.chat_rounded,
-              color: const Color(0xFF25D366),
-              title: 'WhatsApp',
-              value: _phone,
-              onTap: () => _launch(context, Uri.parse('https://wa.me/${_digits(_phone)}')),
-            ),
-            const SizedBox(height: 12),
-            _contactCard(
-              context: context,
-              icon: Icons.send_rounded,
-              color: const Color(0xFF229ED9),
-              title: 'Telegram',
-              value: '@$_telegram',
-              onTap: () => _launch(context, Uri.parse('https://t.me/$_telegram')),
             ),
             const SizedBox(height: 12),
             _contactCard(

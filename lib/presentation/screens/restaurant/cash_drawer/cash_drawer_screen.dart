@@ -571,12 +571,6 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            onPressed: _loadAll,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
       ),
       body: Column(children: [
         Expanded(

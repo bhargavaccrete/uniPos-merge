@@ -93,7 +93,10 @@ class _CartScreenState extends State<CartScreen>
   }
 
   Future<bool> _handleBackPress() async {
-    if (_newlyAddedList.isNotEmpty) {
+    // Only warn for items added to an ALREADY-PLACED order — those aren't in a
+    // KOT yet and would be lost. A brand-new order's cart just persists, so back
+    // goes through silently (no discard, no dialog).
+    if (isExistingOrder && _newlyAddedList.isNotEmpty) {
       final result = await showDialog<String>(
         context: context,
         builder: (ctx) => AppDialogShell(
@@ -177,24 +180,32 @@ class _CartScreenState extends State<CartScreen>
   Future<void> _initializeCart() async {
     // Priority 1: If widget has existing order — items are already in memory
     if (widget.existingOrder != null) {
+      // Read the LATEST saved order: immediate item-cancels update orderStore
+      // but NOT the immutable widget.existingOrder, so re-init (e.g. returning
+      // from "Add Items") must not revive a cancelled quantity.
+      final baseOrder = orderStore.orders.firstWhere(
+        (o) => o.id == widget.existingOrder!.id,
+        orElse: () => widget.existingOrder!,
+      );
+
       if (_isIntalizedLoad) {
         restaurantCartStore.clearCart(); // fire-and-forget, no need to await
         _isIntalizedLoad = false;
         // Deep copy — mutations to _activeList items must not leak to the Hive-cached order
-        _originalActiveList = widget.existingOrder!.items.map((i) => i.copyWith()).toList();
+        _originalActiveList = baseOrder.items.map((i) => i.copyWith()).toList();
         _originalQuantities = {for (final item in _originalActiveList) item.id: item.quantity};
-        _currentKotBoundaries = List.from(widget.existingOrder!.kotBoundaries);
-        _currentKotNumbers = List.from(widget.existingOrder!.kotNumbers);
+        _currentKotBoundaries = List.from(baseOrder.kotBoundaries);
+        _currentKotNumbers = List.from(baseOrder.kotNumbers);
       }
 
       // Load any newly added cart items in parallel (non-blocking)
       final cartFuture = restaurantCartStore.loadCartItems();
 
       setState(() {
-        _activeList = widget.existingOrder!.items.map((i) => i.copyWith()).toList();
+        _activeList = baseOrder.items.map((i) => i.copyWith()).toList();
         isExistingOrder = true;
-        selectedFilter = widget.existingOrder!.orderType;
-        tableNo = widget.existingOrder!.tableNo;
+        selectedFilter = baseOrder.orderType;
+        tableNo = baseOrder.tableNo;
       });
 
       await cartFuture;
@@ -365,6 +376,7 @@ class _CartScreenState extends State<CartScreen>
         }
         await loadCartItems();
       },
+      onCommitCancel: _commitActiveCancel,
       onSetQty: (item, newQty) async {
         if (newQty < 1) return;
         // The field only edits non-active items; active items stay staged via +/−.
@@ -402,6 +414,51 @@ class _CartScreenState extends State<CartScreen>
         return inv.stockQuantity.toInt();
       },
     );
+  }
+
+  /// Sync after an active item's cancellation was committed IMMEDIATELY (in
+  /// takeaway). Drops/reduces it in the working list AND the diff baseline
+  /// (_originalActiveList/_originalQuantities) so a later "Place Order" for any
+  /// pending new items won't try to cancel this item again.
+  void _commitActiveCancel(CartItem item, int qty) {
+    setState(() {
+      // Working list — boundary-aware, mirrors _removeActiveItem on full removal.
+      final wIdx = _activeList.indexWhere((i) => i.id == item.id);
+      if (wIdx != -1) {
+        final remaining = _activeList[wIdx].quantity - qty;
+        if (remaining > 0) {
+          _activeList[wIdx].quantity = remaining;
+        } else {
+          int kotIndex = _currentKotBoundaries.length - 1;
+          for (int i = 0; i < _currentKotBoundaries.length; i++) {
+            if (wIdx < _currentKotBoundaries[i]) { kotIndex = i; break; }
+          }
+          _activeList.removeAt(wIdx);
+          for (int i = kotIndex; i < _currentKotBoundaries.length; i++) {
+            _currentKotBoundaries[i]--;
+          }
+          if (_currentKotBoundaries.isNotEmpty && kotIndex < _currentKotBoundaries.length) {
+            final prevBoundary = kotIndex == 0 ? 0 : _currentKotBoundaries[kotIndex - 1];
+            if (_currentKotBoundaries[kotIndex] == prevBoundary) {
+              _currentKotNumbers.removeAt(kotIndex);
+              _currentKotBoundaries.removeAt(kotIndex);
+            }
+          }
+        }
+      }
+      // Diff baseline — so the committed cancellation isn't re-detected.
+      final oIdx = _originalActiveList.indexWhere((i) => i.id == item.id);
+      if (oIdx != -1) {
+        final remaining = _originalActiveList[oIdx].quantity - qty;
+        if (remaining > 0) {
+          _originalActiveList[oIdx].quantity = remaining;
+          _originalQuantities[item.id] = remaining;
+        } else {
+          _originalActiveList.removeAt(oIdx);
+          _originalQuantities.remove(item.id);
+        }
+      }
+    });
   }
 
   /// Stage a quantity change for a KOT'd item — committed on "Place Order".
@@ -606,28 +663,18 @@ class _CartScreenState extends State<CartScreen>
                 ],
               ),
   
-              // Show Add Items button when viewing existing order
+              // Floating "Add Items" button when viewing an existing order.
               if (_activeList.isNotEmpty)
                 Positioned(
-                  bottom: 140,
-                  left: 0,
-                  right: 0,
-                  child: Center(
-                    child: ElevatedButton.icon(
-                      onPressed: _navigateAndAddMoreItems,
-                      icon: const Icon(Icons.add, size: 18),
-                      label: Text(
-                        'Add Items',
-                        style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        elevation: 1,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
+                  bottom: 170,
+                  right: 16,
+                  child: FloatingActionButton(
+                    heroTag: 'addItemsFab',
+                    onPressed: _navigateAndAddMoreItems,
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    tooltip: 'Add Items',
+                    child: const Icon(Icons.add),
                   ),
                 ),
             ],

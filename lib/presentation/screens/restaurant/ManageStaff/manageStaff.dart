@@ -57,8 +57,6 @@ class _manageStaffState extends State<manageStaff> {
 
   String selectedrole = 'Select Role';
   String searchQuery = '';
-  final _formKey = GlobalKey<FormState>();
-  final _editFormKey = GlobalKey<FormState>();
 
   @override
   void dispose() {
@@ -223,8 +221,6 @@ class _manageStaffState extends State<manageStaff> {
         title: 'Staff Management',
       ),
       drawer: DrawerManage(
-        isDelete: true,
-        issync: true,
         islogout: true,
       ),
       body: Column(
@@ -498,6 +494,8 @@ class _manageStaffState extends State<manageStaff> {
 
   void _showAddStaffDialog(BuildContext context, bool isTablet) {
     bool pinVisible = false;
+    // Local form key per dialog open (see edit dialog note).
+    final formKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
@@ -507,7 +505,7 @@ class _manageStaffState extends State<manageStaff> {
           accent: AppColors.primary,
           icon: Icons.person_add_rounded,
           body: Form(
-            key: _formKey,
+            key: formKey,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -606,7 +604,7 @@ class _manageStaffState extends State<manageStaff> {
             appDialogPrimaryButton(
               label: 'Add Staff',
               onPressed: () async {
-                if (_formKey.currentState!.validate()) {
+                if (formKey.currentState!.validate()) {
                   if (selectedrole == 'Select Role') {
                     NotificationService.instance.showInfo('Please select a role');
                     return;
@@ -649,11 +647,23 @@ class _manageStaffState extends State<manageStaff> {
     String editSelectedRole = staff.isCashier;
     bool isActive = staff.isActive ?? true;
     bool editPinVisible = false;
+    // Local form key per dialog open — a shared member GlobalKey inside a
+    // showDialog builder triggers a _dependents assertion on back-dismiss.
+    final editFormKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return StatefulBuilder(
+        return _DialogDisposeScope(
+          disposables: [
+            editUserNameController,
+            editFirstNameController,
+            editLastNameController,
+            editMobileController,
+            editEmailController,
+            editPinController,
+          ],
+          child: StatefulBuilder(
           builder: (context, setState) {
             return AppDialogShell(
               title: 'Edit Staff',
@@ -661,7 +671,7 @@ class _manageStaffState extends State<manageStaff> {
               accent: AppColors.primary,
               icon: Icons.edit_rounded,
               body: Form(
-                key: _editFormKey,
+                key: editFormKey,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -812,7 +822,7 @@ class _manageStaffState extends State<manageStaff> {
                 appDialogPrimaryButton(
                   label: 'Update Staff',
                   onPressed: () async {
-                    if (!_editFormKey.currentState!.validate()) return;
+                    if (!editFormKey.currentState!.validate()) return;
                     // FIX: Duplicate username check (exclude this staff's own record).
                     final newUsername = editUserNameController.text.trim().toLowerCase();
                     final isDuplicate = staffStore.staff.any(
@@ -854,18 +864,10 @@ class _manageStaffState extends State<manageStaff> {
               ],
             );
           },
+          ),
         );
       },
-    ).then((_) {
-      // Dispose the dialog-local controllers when it closes (created fresh
-      // on every open) so they don't leak.
-      editUserNameController.dispose();
-      editFirstNameController.dispose();
-      editLastNameController.dispose();
-      editMobileController.dispose();
-      editEmailController.dispose();
-      editPinController.dispose();
-    });
+    );
   }
 
   void _showStaffDetails(BuildContext context, StaffModel staff, bool isTablet) {
@@ -956,4 +958,30 @@ class _manageStaffState extends State<manageStaff> {
       NotificationService.instance.showSuccess('Staff deleted successfully');
     }
   }
+}
+
+/// Owns dialog-scoped [ChangeNotifier]s (TextEditingControllers, etc.) and
+/// disposes them in its own [dispose] — which runs only when the dialog subtree
+/// unmounts (after the exit animation). Disposing in showDialog().then() instead
+/// fires at pop-start, so a controller can be reused mid-animation → crash.
+class _DialogDisposeScope extends StatefulWidget {
+  final List<ChangeNotifier> disposables;
+  final Widget child;
+  const _DialogDisposeScope({required this.disposables, required this.child});
+
+  @override
+  State<_DialogDisposeScope> createState() => _DialogDisposeScopeState();
+}
+
+class _DialogDisposeScopeState extends State<_DialogDisposeScope> {
+  @override
+  void dispose() {
+    for (final d in widget.disposables) {
+      d.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

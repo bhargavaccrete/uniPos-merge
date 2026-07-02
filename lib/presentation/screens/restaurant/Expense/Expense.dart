@@ -60,7 +60,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      drawer: DrawerManage(issync: false, isDelete: false, islogout: false),
+      drawer: DrawerManage(islogout: false),
       appBar: buildPrimaryAppBar(
         title: 'Expenses',
         leading: Builder(

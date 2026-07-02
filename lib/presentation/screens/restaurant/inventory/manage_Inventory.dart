@@ -925,8 +925,6 @@ class _ManageInventoryState extends State<ManageInventory> {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       drawer: DrawerManage(
-        issync: false,
-        isDelete: true,
         islogout: true,
       ),
       appBar: buildPrimaryAppBar(

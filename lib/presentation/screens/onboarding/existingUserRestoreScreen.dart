@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 import 'package:billberrylite/domain/store/retail/customer_store.dart';
 import 'package:billberrylite/domain/store/retail/product_store.dart';
@@ -208,16 +207,6 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
     }
   }
 
-  String _formatDate(dynamic dateStr) {
-    if (dateStr == null || dateStr == 'Unknown') return 'Unknown';
-    try {
-      final date = DateTime.parse(dateStr.toString());
-      return DateFormat('MMM dd, yyyy').format(date);
-    } catch (e) {
-      return dateStr.toString();
-    }
-  }
-
   String _formatFileSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(2)} KB';
@@ -225,7 +214,7 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
   }
 
   void _nextStep() {
-    if (_currentStep < 2) {
+    if (_currentStep < 1) {
       setState(() {
         _currentStep++;
       });
@@ -448,7 +437,6 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
             physics: const NeverScrollableScrollPhysics(),
             children: [
               _buildFileUploadStep(),
-              _buildConfirmationStep(),
               _buildLicenseActivationStep(),
             ],
           ),
@@ -470,7 +458,6 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
                   _buildFileUploadStep(),
-                  _buildConfirmationStep(),
                   _buildLicenseActivationStep(),
                 ],
               ),
@@ -496,9 +483,7 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                 children: [
                   _buildStepIndicator(0, 'Select Backup', Icons.upload_file),
                   _buildStepConnector(afterStep: 0),
-                  _buildStepIndicator(1, 'Confirm & Restore', Icons.restore),
-                  _buildStepConnector(afterStep: 1),
-                  _buildStepIndicator(2, 'Activate License', Icons.key_rounded),
+                  _buildStepIndicator(1, 'Activate License', Icons.key_rounded),
                 ],
               ),
             ),
@@ -512,7 +497,6 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                   physics: const NeverScrollableScrollPhysics(),
                   children: [
                     _buildFileUploadStep(),
-                    _buildConfirmationStep(),
                     _buildLicenseActivationStep(),
                   ],
                 ),
@@ -532,9 +516,7 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
         children: [
           _buildProgressStep(0, 'Select File'),
           _buildProgressLine(0),
-          _buildProgressStep(1, 'Restore'),
-          _buildProgressLine(1),
-          _buildProgressStep(2, 'License'),
+          _buildProgressStep(1, 'License'),
         ],
       ),
     );
@@ -797,7 +779,12 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                   Expanded(
                     flex: 2,
                     child: ElevatedButton(
-                      onPressed: _fileValidated ? _nextStep : null,
+                      // Continue now performs the restore directly (the separate
+                      // Confirm step was removed); the password prompt is the
+                      // safety gate before this destructive action runs.
+                      onPressed: (_fileValidated && !_isLoading && !_isRestoring)
+                          ? _restoreData
+                          : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
@@ -807,179 +794,21 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                         ),
                         elevation: 0,
                       ),
-                      child: const Text(
-                        'Continue',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildConfirmationStep() {
-    return SlideTransition(
-      position: _slideAnimation,
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Confirm & Restore',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.darkNeutral,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Review your information before restoring',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                ),
-              ),
-              const SizedBox(height: 40),
-
-              // Summary Card
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Restore Summary',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.darkNeutral,
-                      ),
-                    ),
-                    const Divider(height: 30),
-                    _buildSummaryRow('Backup File:', _selectedFileName ?? 'N/A'),
-                    if (_fileMetadata != null) ...[
-                      _buildSummaryRow('File Size:', _fileMetadata!['dataSize']),
-                      _buildSummaryRow('Version:', _fileMetadata!['version']),
-                    ],
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 30),
-
-              // Warning message
-              Container(
-                padding: const EdgeInsets.all(15),
-                decoration: BoxDecoration(
-                  color: AppColors.warning.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: AppColors.warning.withOpacity(0.3),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.warning,
-                      color: AppColors.warning,
-                      size: 24,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'This will replace all existing data. This action cannot be undone.',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppColors.darkNeutral.withOpacity(0.8),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 40),
-
-              // Action buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _previousStep,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-                        foregroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      child: const Text(
-                        'Back',
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton(
-                      onPressed: (_isLoading || _isRestoring) ? null : _restoreData,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.success,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      child: _isLoading
+                      child: (_isLoading || _isRestoring)
                           ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
+                            )
                           : const Text(
-                        'Restore Data',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
+                              'Continue',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -1154,14 +983,6 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                           ),
                   ),
                 ),
-                const SizedBox(height: 10),
-                TextButton(
-                  onPressed: _goToDashboard,
-                  child: Text(
-                    'Skip for now',
-                    style: TextStyle(fontSize: 13, color: Colors.grey[500]),
-                  ),
-                ),
               ],
             ],
           ),
@@ -1201,34 +1022,4 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
     );
   }
 
-  Widget _buildSummaryRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 80,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 15,
-                color: Colors.grey[600],
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: AppColors.darkNeutral,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

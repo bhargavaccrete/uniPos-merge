@@ -54,6 +54,9 @@ class AppTextField extends StatefulWidget {
   final void Function(String)? onFieldSubmitted;
   final void Function()? onTap;
 
+  /// Keyboard action button (e.g. TextInputAction.next to chain focus).
+  final TextInputAction? textInputAction;
+
   final List<TextInputFormatter>? inputFormatters;
 
   /// Optional prefix widget (e.g. currency symbol text).
@@ -83,6 +86,7 @@ class AppTextField extends StatefulWidget {
     this.onChanged,
     this.onFieldSubmitted,
     this.onTap,
+    this.textInputAction,
     this.inputFormatters,
     this.prefixWidget,
     this.enableSuggestions = true,
@@ -155,6 +159,7 @@ class _AppTextFieldState extends State<AppTextField> {
       validator: widget.validator,
       onChanged: useVK ? null : widget.onChanged,
       onFieldSubmitted: widget.onFieldSubmitted,
+      textInputAction: widget.textInputAction,
       onTap: useVK
           ? () {
               widget.onTap?.call();

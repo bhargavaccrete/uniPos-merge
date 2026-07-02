@@ -469,9 +469,6 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Cash Drawer',
-        actions: [
-          IconButton(onPressed: _loadAll, icon: const Icon(Icons.refresh)),
-        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

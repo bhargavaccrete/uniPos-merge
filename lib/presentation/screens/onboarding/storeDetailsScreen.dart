@@ -40,7 +40,18 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
   late TextEditingController _gstController;
   late TextEditingController _panController;
 
-
+  // Focus nodes — chained so the keyboard "next" jumps to the following field.
+  final _storeNameFocus = FocusNode();
+  final _ownerNameFocus = FocusNode();
+  final _phoneFocus = FocusNode();
+  final _emailFocus = FocusNode();
+  final _addressFocus = FocusNode();
+  final _cityFocus = FocusNode();
+  final _stateFocus = FocusNode();
+  final _countryFocus = FocusNode();
+  final _pincodeFocus = FocusNode();
+  final _gstFocus = FocusNode();
+  final _panFocus = FocusNode();
 
   @override
   void initState() {
@@ -78,6 +89,17 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
     _pincodeController.dispose();
     _gstController.dispose();
     _panController.dispose();
+    _storeNameFocus.dispose();
+    _ownerNameFocus.dispose();
+    _phoneFocus.dispose();
+    _emailFocus.dispose();
+    _addressFocus.dispose();
+    _cityFocus.dispose();
+    _stateFocus.dispose();
+    _countryFocus.dispose();
+    _pincodeFocus.dispose();
+    _gstFocus.dispose();
+    _panFocus.dispose();
     super.dispose();
   }
 
@@ -348,6 +370,9 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                     children: [
                       AppTextField(
                         controller: _storeNameController,
+                        focusNode: _storeNameFocus,
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (_) => _ownerNameFocus.requestFocus(),
                         label: 'Store Name',
                         hint: 'e.g. Green Apple Cafe',
                         icon: Icons.store_rounded,
@@ -360,6 +385,9 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                       SizedBox(height: AppResponsive.mediumSpacing(context)),
                       AppTextField(
                         controller: _ownerNameController,
+                        focusNode: _ownerNameFocus,
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (_) => _phoneFocus.requestFocus(),
                         label: 'Owner Name',
                         hint: 'Enter owner name',
                         icon: Icons.person_rounded,
@@ -378,6 +406,9 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
             // Mobile: stacked
             AppTextField(
               controller: _storeNameController,
+              focusNode: _storeNameFocus,
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) => _ownerNameFocus.requestFocus(),
               label: 'Store Name',
               hint: 'e.g. Green Apple Cafe',
               icon: Icons.store_rounded,
@@ -390,6 +421,9 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
             SizedBox(height: AppResponsive.mediumSpacing(context)),
             AppTextField(
               controller: _ownerNameController,
+              focusNode: _ownerNameFocus,
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) => _phoneFocus.requestFocus(),
               label: 'Owner Name',
               hint: 'Enter owner name',
               icon: Icons.person_rounded,
@@ -530,6 +564,9 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
               Expanded(
                 child: AppTextField(
                   controller: _phoneController,
+                  focusNode: _phoneFocus,
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) => _emailFocus.requestFocus(),
                   label: 'Phone Number',
                   hint: '9876543210',
                   icon: Icons.phone_rounded,
@@ -545,6 +582,9 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
               Expanded(
                 child: AppTextField(
                   controller: _emailController,
+                  focusNode: _emailFocus,
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) => _addressFocus.requestFocus(),
                   label: 'Email',
                   hint: 'info@store.com',
                   icon: Icons.email_rounded,
@@ -568,6 +608,9 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
           SizedBox(height: AppResponsive.mediumSpacing(context)),
           AppTextField(
             controller: _addressController,
+            focusNode: _addressFocus,
+            textInputAction: TextInputAction.next,
+            onFieldSubmitted: (_) => _cityFocus.requestFocus(),
             label: 'Store Address',
             hint: 'Street / Area',
             icon: Icons.location_on_rounded,
@@ -585,6 +628,9 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
               Expanded(
                 child: AppTextField(
                   controller: _cityController,
+                  focusNode: _cityFocus,
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) => _stateFocus.requestFocus(),
                   label: 'City',
                   hint: 'e.g. Gandhinagar',
                   icon: Icons.location_city_rounded,
@@ -599,6 +645,9 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
               Expanded(
                 child: AppTextField(
                   controller: _stateController,
+                  focusNode: _stateFocus,
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) => _countryFocus.requestFocus(),
                   label: 'State',
                   hint: 'e.g. Gujarat',
                   icon: Icons.map_rounded,
@@ -618,6 +667,9 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
               Expanded(
                 child: AppTextField(
                   controller: _countryController,
+                  focusNode: _countryFocus,
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) => _pincodeFocus.requestFocus(),
                   label: 'Country',
                   hint: 'e.g. India',
                   icon: Icons.public_rounded,
@@ -632,6 +684,9 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
               Expanded(
                 child: AppTextField(
                   controller: _pincodeController,
+                  focusNode: _pincodeFocus,
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) => _gstFocus.requestFocus(),
                   label: 'Pincode',
                   hint: 'e.g. 382355',
                   icon: Icons.pin_drop_rounded,
@@ -664,6 +719,9 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
           Expanded(
             child: AppTextField(
               controller: _gstController,
+              focusNode: _gstFocus,
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) => _panFocus.requestFocus(),
               label: 'Tax ID',
               hint: 'Optional',
               icon: Icons.receipt_long_rounded,
@@ -675,6 +733,9 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
           Expanded(
             child: AppTextField(
               controller: _panController,
+              focusNode: _panFocus,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => _panFocus.unfocus(),
               label: 'Business ID',
               hint: 'Optional',
               icon: Icons.credit_card_rounded,

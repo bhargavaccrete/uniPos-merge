@@ -11,6 +11,7 @@ import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 
 import 'package:billberrylite/util/restaurant/restaurant_auth_helper.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 
 class StaffAttendanceScreen extends StatefulWidget {
@@ -33,78 +34,75 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
 
   Future<bool> _verifyPin(StaffModel staff) async {
     final TextEditingController pinController = TextEditingController();
-    bool _obscureText = true;
-    bool _hasError = false;
+    bool obscure = true;
+    bool hasError = false;
 
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppResponsive.largeBorderRadius(context))),
-            title: Text('Enter PIN for ${staff.firstName}',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppTextField(
-                  controller: pinController,
-                  label: 'PIN',
-                  hint: 'Enter PIN',
-                  icon: Icons.lock_outline_rounded,
-                  obscureText: _obscureText,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  autofocus: true,
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscureText ? Icons.visibility_off : Icons.visibility,
-                      size: AppResponsive.getValue(context, mobile: 20.0, tablet: 22.0, desktop: 24.0),
-                      color: AppColors.textSecondary,
-                    ),
-                    onPressed: () => setDialogState(() => _obscureText = !_obscureText),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AppDialogShell(
+          title: 'Enter PIN',
+          subtitle: 'Verify ${staff.firstName} to continue',
+          accent: AppColors.primary,
+          icon: Icons.lock_outline_rounded,
+          body: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppTextField(
+                controller: pinController,
+                label: 'PIN',
+                hint: 'Enter PIN',
+                icon: Icons.lock_outline_rounded,
+                obscureText: obscure,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                autofocus: true,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    obscure ? Icons.visibility_off : Icons.visibility,
+                    size: 20,
+                    color: AppColors.textSecondary,
+                  ),
+                  onPressed: () => setDialogState(() => obscure = !obscure),
+                ),
+              ),
+              if (hasError)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, left: 4),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline_rounded,
+                          size: 14, color: AppColors.danger),
+                      const SizedBox(width: 6),
+                      Text('Incorrect PIN',
+                          style: GoogleFonts.poppins(
+                              fontSize: 12, color: AppColors.danger)),
+                    ],
                   ),
                 ),
-                if (_hasError)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4, left: 4),
-                    child: Text(
-                      'Incorrect PIN',
-                      style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0), color: Colors.red.shade600),
-                    ),
-                  ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: Text('Cancel', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context))),
-                ),
-                onPressed: () {
-                  if (RestaurantAuthHelper.verifyPassword(pinController.text.trim(), staff.pinNo.trim())) {
-                    Navigator.pop(context, true);
-                  } else {
-                    setDialogState(() {
-                      _hasError = true;
-                      pinController.clear();
-                    });
-                  }
-                },
-                child: Text('Verify', style: GoogleFonts.poppins(color: Colors.white)),
-              ),
             ],
-          );
-        },
+          ),
+          actions: [
+            appDialogCancelButton(ctx),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: 'Verify',
+              onPressed: () {
+                if (RestaurantAuthHelper.verifyPassword(
+                    pinController.text.trim(), staff.pinNo.trim())) {
+                  Navigator.pop(ctx, true);
+                } else {
+                  setDialogState(() {
+                    hasError = true;
+                    pinController.clear();
+                  });
+                }
+              },
+            ),
+          ],
+        ),
       ),
     );
 
@@ -177,15 +175,6 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              staffStore.loadStaff();
-              attendanceStore.loadTodayRecords();
-            },
-          ),
-        ],
       ),
       body: Observer(builder: (_) {
         // Exclude the currently logged-in staff — their session IS their attendance
@@ -215,10 +204,17 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
             // ── Summary bar ───────────────────────────────────────────
             Container(
               margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
               decoration: BoxDecoration(
                 color: AppColors.primary,
-                borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.25),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -250,13 +246,20 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: AppColors.white,
-                      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: isOnBreak
                             ? Colors.blue.shade200
                             : (isIn ? Colors.green.shade200 : AppColors.divider),
                         width: 1.2,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [

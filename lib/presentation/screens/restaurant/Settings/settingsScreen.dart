@@ -453,7 +453,7 @@ class _settingsScreenState extends State<Settingsscreen> {
         titleFontSize: AppResponsive.headingFontSize(context),
       ),
       drawer:
-          DrawerManage(issync: false, isDelete: true, islogout: true),
+          DrawerManage(islogout: true),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(

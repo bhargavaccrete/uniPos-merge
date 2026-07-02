@@ -119,7 +119,7 @@ class _ManagemenuState extends State<Managemenu>
           SizedBox(width: 4),
         ],
       ),
-      drawer: DrawerManage(islogout: true, isDelete: false, issync: false),
+      drawer: DrawerManage(islogout: true),
       body: Column(
         children: [
           // Modern Tab Bar
