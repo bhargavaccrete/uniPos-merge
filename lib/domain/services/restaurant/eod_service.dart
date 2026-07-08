@@ -8,17 +8,15 @@ import 'package:billberrylite/domain/services/restaurant/day_management_service.
 import '../../../core/constants/hive_box_names.dart';
 import '../../../data/models/restaurant/db/cash_movement_model.dart';
 import 'package:hive/hive.dart';
+import 'package:billberrylite/util/restaurant/order_status_filter.dart';
 
 class EODService {
   static const _uuid = Uuid();
 
   /// Returns true if the order should be completely excluded from all EOD totals.
   /// VOID/VOIDED = never paid, CANCELLED = abandoned, FULLY_REFUNDED = all money returned.
-  static bool _isExcluded(String status) {
-    return status.contains('VOID') ||
-        status == 'CANCELLED' ||
-        status == 'FULLY_REFUNDED';
-  }
+  static bool _isExcluded(String status) =>
+      OrderStatusFilter.isExcludedFromRevenue(status);
 
   static Future<EndOfDayReport> generateEODReport({
     required DateTime date,
@@ -94,7 +92,7 @@ class EODService {
     // Refunds: include partially/fully refunded amounts (real cash returned to customers)
     final totalRefunds = allDayOrders.fold<double>(0.0, (sum, order) {
       final status = order.orderStatus?.toUpperCase() ?? '';
-      if (status.contains('VOID') || status == 'CANCELLED') return sum;
+      if (status == 'CANCELLED') return sum;
       return sum + (order.refundAmount ?? 0.0);
     });
     final totalOrderCount = activeDayOrders.length; // Count only active orders
@@ -218,6 +216,7 @@ class EODService {
       roundOff: double.parse(roundOffSum.toStringAsFixed(2)),
       cancelledOrderCount: cancelledOrderCount,
       cancelledOrderAmount: cancelledOrderAmount,
+      sessionId: targetSessionId,
     );
   }
 
@@ -406,8 +405,13 @@ class EODService {
   }
 
   static Future<void> saveEODReport(EndOfDayReport report) async {
-    // Replace any existing report for the same date (handles safe retry on failure)
-    final existing = await eodStore.getEODByDate(report.date);
+    // De-duplicate by SESSION, not date: a retry of the same close reuses the
+    // same session, so replace only that session's report. Genuinely different
+    // sessions on the same date are each kept. Retail has no session
+    // (sessionId == null) so it keeps the original one-per-date replace.
+    final existing = report.sessionId != null
+        ? await eodStore.getEODBySession(report.sessionId!)
+        : await eodStore.getEODByDate(report.date);
     if (existing != null) {
       await eodStore.deleteEODReport(existing.reportId);
     }

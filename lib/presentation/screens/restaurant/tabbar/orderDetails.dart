@@ -13,6 +13,7 @@ import '../../../../core/plan/plan_enforcement.dart';
 import '../util/restaurant_print_helper.dart';
 import '../start order/cart/customerdetails.dart';
 import 'partial_refund_dialog.dart';
+import '../../../../util/restaurant/refund_state.dart';
 import '../../../../util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -51,8 +52,13 @@ class _OrderdetailsState extends State<Orderdetails> {
     final items = currentOrder.items ?? <CartItem>[];
     final String status = currentOrder.orderStatus?.toUpperCase() ?? 'COMPLETED';
     final bool isVoid = status == 'VOID' || status == 'VOIDED';
-    final bool isFullyRefunded = status == 'FULLY_REFUNDED';
-    final bool isPartiallyRefunded = status == 'PARTIALLY_REFUNDED';
+    final bool isFullyRefunded = RefundInfo.isFullyRefunded(currentOrder);
+    final bool isPartiallyRefunded = RefundInfo.state(currentOrder) == RefundState.partial;
+    // A "paid void": an order that was settled and THEN voided still holds
+    // collected money, so a refund can be issued. An unpaid void (deleted
+    // before payment → paymentmode 'N/A') has no money to return.
+    final String _pm = currentOrder.paymentmode ?? '';
+    final bool isPaidVoid = isVoid && _pm.isNotEmpty && _pm != 'N/A';
 
     bool isRefundEligible = false;
     if (!isFullyRefunded && currentOrder.orderAt != null) {
@@ -88,11 +94,11 @@ class _OrderdetailsState extends State<Orderdetails> {
                 onTap: () => _printBill(context),
               ),
             ),
-            if (!isFullyRefunded && !isVoid && AppSettings.refundsEnabled && PlanEnforce.allows(EntKeys.billingReturns))
+            if (!isFullyRefunded && (!isVoid || isPaidVoid) && AppSettings.refundsEnabled && PlanEnforce.allows(EntKeys.billingReturns))
               const SizedBox(width: 12),
             // Refund option is hidden entirely when refunds are turned off in
             // settings. When on, it stays subject to the refund-window check.
-            if (!isFullyRefunded && !isVoid && AppSettings.refundsEnabled && PlanEnforce.allows(EntKeys.billingReturns))
+            if (!isFullyRefunded && (!isVoid || isPaidVoid) && AppSettings.refundsEnabled && PlanEnforce.allows(EntKeys.billingReturns))
               Expanded(
                 child: Tooltip(
                   message: isRefundEligible ? '' : AppSettings.refundWindowMinutes == 0 ? '' : 'Refund window has passed',
@@ -121,25 +127,27 @@ class _OrderdetailsState extends State<Orderdetails> {
                 margin: const EdgeInsets.fromLTRB(16, 16, 16, 4),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  border: Border.all(color: Colors.red.shade300),
+                  color: isPaidVoid ? Colors.orange.shade50 : Colors.red.shade50,
+                  border: Border.all(color: isPaidVoid ? Colors.orange.shade300 : Colors.red.shade300),
                   borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.cancel_outlined, color: Colors.red.shade700, size: AppResponsive.getValue(context, mobile: 20.0, tablet: 22.0, desktop: 24.0)),
+                    Icon(isPaidVoid ? Icons.info_outline : Icons.cancel_outlined, color: isPaidVoid ? Colors.orange.shade700 : Colors.red.shade700, size: AppResponsive.getValue(context, mobile: 20.0, tablet: 22.0, desktop: 24.0)),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'This order was voided (deleted before payment). No refund is applicable.',
+                            isPaidVoid
+                                ? 'This order was voided after payment. You can issue a refund to return the collected money.'
+                                : 'This order was voided (deleted before payment). No refund is applicable.',
                             style: GoogleFonts.poppins(
                               fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0),
                               fontWeight: FontWeight.w500,
-                              color: Colors.red.shade700,
+                              color: isPaidVoid ? Colors.orange.shade800 : Colors.red.shade700,
                             ),
                           ),
                           if ((currentOrder.voidedBy ?? '').isNotEmpty) ...[
@@ -148,7 +156,7 @@ class _OrderdetailsState extends State<Orderdetails> {
                               'Voided by: ${currentOrder.voidedBy}',
                               style: GoogleFonts.poppins(
                                 fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0),
-                                color: Colors.red.shade600,
+                                color: isPaidVoid ? Colors.orange.shade700 : Colors.red.shade600,
                               ),
                             ),
                           ],

@@ -65,6 +65,12 @@ class AppTextField extends StatefulWidget {
   final bool enableSuggestions;
   final bool autocorrect;
 
+  /// When to auto-validate. Defaults to [AutovalidateMode.onUserInteraction] so
+  /// a shown "… is required" error clears as soon as the user fills the field
+  /// (and re-appears if they clear it) — instead of lingering until the next
+  /// full-form validation. Pass [AutovalidateMode.disabled] to opt out.
+  final AutovalidateMode autovalidateMode;
+
   const AppTextField({
     super.key,
     this.controller,
@@ -91,6 +97,7 @@ class AppTextField extends StatefulWidget {
     this.prefixWidget,
     this.enableSuggestions = true,
     this.autocorrect = true,
+    this.autovalidateMode = AutovalidateMode.onUserInteraction,
   });
 
   @override
@@ -157,6 +164,7 @@ class _AppTextFieldState extends State<AppTextField> {
       enableSuggestions: widget.enableSuggestions,
       autocorrect: widget.autocorrect,
       validator: widget.validator,
+      autovalidateMode: widget.autovalidateMode,
       onChanged: useVK ? null : widget.onChanged,
       onFieldSubmitted: widget.onFieldSubmitted,
       textInputAction: widget.textInputAction,

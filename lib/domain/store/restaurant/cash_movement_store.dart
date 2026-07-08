@@ -81,6 +81,12 @@ abstract class _CashMovementStore with Store {
     String? note,
   }) async {
     try {
+      final strictlyPending = await DayManagementService.isEodStrictlyPending();
+      if (strictlyPending) {
+        errorMessage = 'Day has ended. Complete End of Day to unlock.';
+        return false;
+      }
+
       final currentSessionId = await DayManagementService.getCurrentSessionId();
       
       final movement = CashMovementModel(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/restaurant/order_status_filter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
@@ -103,7 +104,7 @@ class _ComparisonByYearState extends State<ComparisonByYear> {
 
     for (final order in pastOrderStore.pastOrders) {
       final status = order.orderStatus ?? '';
-      if (status == 'VOID' || status == 'VOIDED' || status == 'FULLY_REFUNDED') continue;
+      if (OrderStatusFilter.isExcludedFromRevenue(status)) continue;
       if (order.orderAt == null) continue;
 
       final netAmount = order.totalPrice - (order.refundAmount ?? 0.0);

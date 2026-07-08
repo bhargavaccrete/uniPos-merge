@@ -1,5 +1,6 @@
 /*
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/restaurant/order_status_filter.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
@@ -44,7 +45,8 @@ class _ThisWeekbyComparisonState extends State<ThisWeekbyComparison> {
     Map<String, int> previousWeekQuantities = {};
 
     for (final order in allOrders) {
-      if (order.orderStatus == 'FULLY_REFUNDED') continue;
+      final orderStatus = order.orderStatus?.toUpperCase() ?? '';
+      if (OrderStatusFilter.isExcludedFromItemCounts(orderStatus)) continue;
       if (order.orderAt == null) continue;
 
       // Check if current week

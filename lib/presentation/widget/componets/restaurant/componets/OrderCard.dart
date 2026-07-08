@@ -142,7 +142,7 @@ class OrderCard extends StatelessWidget {
                   Text(order.customerName.isEmpty ? 'Guest' : order.customerName, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
                   Row(
                     children: [
-                      Text(order.paymentStatus ?? 'unPaid', style: GoogleFonts.poppins(color: order.isPaid == true ? AppColors.success : AppColors.danger, fontWeight: FontWeight.bold)),
+                      Text(order.paymentStatus ?? 'unPaid', style: GoogleFonts.poppins(color: order.isFullyPaid ? AppColors.success : (order.hasPartialPayment ? Colors.orange.shade700 : AppColors.danger), fontWeight: FontWeight.bold)),
                       const SizedBox(width: 8),
 
                       InkWell(
@@ -173,25 +173,29 @@ class OrderCard extends StatelessWidget {
                         : order.orderType,
                     style: GoogleFonts.poppins(),
                   ),
-                  // PAID badge when payment recorded but order still active
-                  if (order.isPaid == true) ...[
+                  // PAID / PARTIAL badge when payment recorded but order still active
+                  if (order.isFullyPaid || order.hasPartialPayment) ...[
                     const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.success.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: AppColors.success.withOpacity(0.4)),
-                      ),
-                      child: Text(
-                        'PAID',
-                        style: GoogleFonts.poppins(
-                          color: AppColors.success,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+                    Builder(builder: (_) {
+                      final bool paid = order.isFullyPaid;
+                      final Color c = paid ? AppColors.success : Colors.orange.shade700;
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: c.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: c.withOpacity(0.4)),
                         ),
-                      ),
-                    ),
+                        child: Text(
+                          paid ? 'PAID' : 'PARTIAL',
+                          style: GoogleFonts.poppins(
+                            color: c,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      );
+                    }),
                   ],
                   const Spacer(),
                   // Print Bill button

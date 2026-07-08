@@ -17,6 +17,8 @@ import 'package:billberrylite/data/models/restaurant/db/variantmodel_305.dart';
 import 'package:billberrylite/data/models/restaurant/db/taxmodel_314.dart';
 import 'package:uuid/uuid.dart';
 import 'package:billberrylite/core/constants/item_units.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'import_template_builder.dart';
 
 /// Restaurant bulk import service.
@@ -1078,11 +1080,23 @@ class RestaurantBulkImportService {
           editCount: existingItem?.editCount ?? 0,
         );
 
-        final success = existingItem != null
-            ? await itemStore.updateItem(item)
-            : await itemStore.addItem(item);
+        final bool isNewItem = existingItem == null;
+        // Plan item cap — once the limit is hit, skip remaining NEW items and
+        // count them distinctly, so the summary can say "only N added, the rest
+        // were skipped" instead of burying the reason in the row-error list.
+        // (Updating an existing item doesn't grow the count, so it's exempt.)
+        if (isNewItem &&
+            !PlanEnforce.withinLimit(
+                EntKeys.manageMenuItemsMax, itemStore.items.length)) {
+          result.itemsSkippedByLimit++;
+          result.itemLimitMax = PlanEnforce.limit(EntKeys.manageMenuItemsMax) ?? 0;
+          continue;
+        }
+        final success = isNewItem
+            ? await itemStore.addItem(item)
+            : await itemStore.updateItem(item);
         if (success) {
-          if (existingItem != null) {
+          if (!isNewItem) {
             result.warnings.add(
                 'Row ${i + 1}: Item "${item.name}" already existed — updated from import');
           }
@@ -1261,6 +1275,8 @@ class ImportResult {
   int choicesImported = 0;
   int choiceOptionsImported = 0;
   int itemsImported = 0;
+  int itemsSkippedByLimit = 0; // NEW items rejected because the plan item cap was hit
+  int itemLimitMax = 0; // the plan's item cap (for the skip message)
   int itemVariantsImported = 0;
   int imagesDownloaded = 0;
 
@@ -1270,6 +1286,10 @@ class ImportResult {
     sb.writeln(success ? '✅ Import completed successfully!' : '❌ Import completed with errors');
     sb.writeln('\n📊 Import Statistics:');
     sb.writeln('  Total Items: $itemsImported');
+    if (itemsSkippedByLimit > 0) {
+      sb.writeln(
+          '  ⚠️ Skipped (plan item limit $itemLimitMax): $itemsSkippedByLimit');
+    }
     sb.writeln('  Categories: $categoriesImported (+ $categoriesAutoCreated auto-created)');
     sb.writeln('  Taxes: $taxesAutoCreated auto-created');
     sb.writeln('  Variants: $variantsImported');

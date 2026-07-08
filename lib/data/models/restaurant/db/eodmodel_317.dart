@@ -67,6 +67,9 @@ class EndOfDayReport extends HiveObject{
   @HiveField(19)
   final double cancelledOrderAmount; // Total value of those cancelled orders
 
+  @HiveField(20)
+  final String? sessionId; // The POS session this close belongs to (null = retail/legacy)
+
   EndOfDayReport({
     required this.date,
     required this.openingBalance,
@@ -88,6 +91,7 @@ class EndOfDayReport extends HiveObject{
     this.roundOff = 0,
     this.cancelledOrderCount = 0,
     this.cancelledOrderAmount = 0,
+    this.sessionId,
   });
 
   Map<String, dynamic> toMap() {
@@ -112,6 +116,7 @@ class EndOfDayReport extends HiveObject{
       'roundOff': roundOff,
       'cancelledOrderCount': cancelledOrderCount,
       'cancelledOrderAmount': cancelledOrderAmount,
+      'sessionId': sessionId,
     };
   }
 
@@ -137,6 +142,7 @@ class EndOfDayReport extends HiveObject{
       roundOff: (map['roundOff'] ?? 0).toDouble(),
       cancelledOrderCount: map['cancelledOrderCount'] ?? 0,
       cancelledOrderAmount: (map['cancelledOrderAmount'] ?? 0).toDouble(),
+      sessionId: map['sessionId'],
     );
   }
 

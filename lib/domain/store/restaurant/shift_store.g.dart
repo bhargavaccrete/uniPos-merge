@@ -193,6 +193,16 @@ mixin _$ShiftStore on _ShiftStore, Store {
     return _$closeShiftAsyncAction.run(() => super.closeShift(shiftId));
   }
 
+  late final _$closeStaleShiftWithLatestActivityAsyncAction = AsyncAction(
+      '_ShiftStore.closeStaleShiftWithLatestActivity',
+      context: context);
+
+  @override
+  Future<ShiftModel?> closeStaleShiftWithLatestActivity(String shiftId) {
+    return _$closeStaleShiftWithLatestActivityAsyncAction
+        .run(() => super.closeStaleShiftWithLatestActivity(shiftId));
+  }
+
   late final _$refreshAsyncAction =
       AsyncAction('_ShiftStore.refresh', context: context);
 

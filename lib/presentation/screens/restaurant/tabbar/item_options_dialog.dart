@@ -244,6 +244,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
       showDialog(
         context: context,
         builder: (ctx) => Dialog(
+          backgroundColor: AppColors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: Padding(
             padding: const EdgeInsets.all(20),

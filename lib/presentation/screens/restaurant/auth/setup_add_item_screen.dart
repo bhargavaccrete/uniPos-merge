@@ -30,6 +30,7 @@ import 'package:billberrylite/domain/services/restaurant/stock_adjust_service.da
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/presentation/screens/restaurant/auth/setup_items_list_screen.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/componets/filterButton.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/add_item_form_state.dart';
@@ -1107,30 +1108,17 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       ),
       child: Column(
         children: [
-          SwitchListTile(
-            title: Text(
-              'Track Inventory',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            subtitle: Text(
-              'Monitor stock levels for this item',
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                color: Colors.grey[600],
-              ),
-            ),
+          _yesNoRow(
+            title: 'Track Inventory',
+            subtitle: 'Monitor stock levels for this item',
             value: _trackInventory,
-            activeColor: AppColors.primary,
             onChanged: (value) => setState(() {
               _trackInventory = value;
               if (!value) {
                 _allowOrderWhenOutOfStock = false;
                 _stockController.clear();
-      _lowStockController.clear();
-      _lowStockAlertEnabled = false;
+                _lowStockController.clear();
+                _lowStockAlertEnabled = false;
               }
             }),
           ),
@@ -1152,15 +1140,11 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
             else
               Text('Stock is set per variant in More Info.',
                   style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600])),
-            const SizedBox(height: 10),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text('Low-stock alert',
-                  style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
-              subtitle: Text('Warn when this item runs low',
-                  style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600])),
+            const SizedBox(height: 14),
+            _yesNoRow(
+              title: 'Low-stock alert',
+              subtitle: 'Warn when this item runs low',
               value: _lowStockAlertEnabled,
-              activeColor: AppColors.primary,
               onChanged: (v) => setState(() => _lowStockAlertEnabled = v),
             ),
             if (_lowStockAlertEnabled) ...[
@@ -1181,29 +1165,72 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                 );
               }),
             ],
-            const SizedBox(height: 10),
-            SwitchListTile(
-              title: Text(
-                'Allow Order When Out of Stock',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              subtitle: Text(
-                'Customers can order even when stock is 0',
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-              ),
+            const SizedBox(height: 14),
+            _yesNoRow(
+              title: 'Allow Order When Out of Stock',
+              subtitle: 'Customers can order even when stock is 0',
               value: _allowOrderWhenOutOfStock,
-              activeColor: AppColors.primary,
-              onChanged: (value) => setState(() => _allowOrderWhenOutOfStock = value),
+              onChanged: (value) =>
+                  setState(() => _allowOrderWhenOutOfStock = value),
             ),
           ],
         ],
       ),
+    );
+  }
+
+  /// Label (+ subtitle) with a YES/NO button pair on the right — the shared
+  /// inventory-toggle pattern (matches the Edit Item screen). Responsive:
+  /// the label flexes, the buttons are scaled so the row fits any width.
+  Widget _yesNoRow({
+    required String title,
+    String? subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    final selected = value ? 'YES' : 'NO';
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  style: GoogleFonts.poppins(
+                      fontSize: 14, fontWeight: FontWeight.w500)),
+              if (subtitle != null) ...[
+                const SizedBox(height: 2),
+                Text(subtitle,
+                    style: GoogleFonts.poppins(
+                        fontSize: 12, color: Colors.grey[600])),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Transform.scale(
+              scale: 0.8,
+              child: Filterbutton(
+                title: 'YES',
+                selectedFilter: selected,
+                onpressed: () => onChanged(true),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Transform.scale(
+              scale: 0.8,
+              child: Filterbutton(
+                title: 'NO',
+                selectedFilter: selected,
+                onpressed: () => onChanged(false),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 

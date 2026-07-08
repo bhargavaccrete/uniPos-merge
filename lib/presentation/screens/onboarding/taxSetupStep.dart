@@ -508,6 +508,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
   Future<void> _showCustomTaxDialog() async {
     _taxNameController.clear();
     _taxRateController.clear();
+    final formKey = GlobalKey<FormState>();
     await showDialog(
       context: context,
       builder: (ctx) => AppDialogShell(
@@ -515,25 +516,42 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
         subtitle: 'Add a tax rate for your menu',
         accent: AppColors.primary,
         icon: Icons.receipt_long_rounded,
-        body: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AppTextField(
-              controller: _taxNameController,
-              label: 'Tax Name',
-              hint: 'e.g. GST, VAT',
-              icon: Icons.label_outline,
-            ),
-            const SizedBox(height: 12),
-            AppTextField(
-              controller: _taxRateController,
-              label: 'Rate %',
-              hint: '18',
-              icon: Icons.percent,
-              keyboardType: TextInputType.number,
-            ),
-          ],
+        body: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppTextField(
+                controller: _taxNameController,
+                label: 'Tax Name',
+                hint: 'e.g. GST, VAT',
+                icon: Icons.label_outline,
+                required: true,
+                validator: (v) => (v == null || v.trim().isEmpty)
+                    ? 'Tax name is required'
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              AppTextField(
+                controller: _taxRateController,
+                label: 'Rate %',
+                hint: '18',
+                icon: Icons.percent,
+                required: true,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                validator: (v) {
+                  final t = v?.trim() ?? '';
+                  if (t.isEmpty) return 'Rate is required';
+                  final r = double.tryParse(t);
+                  if (r == null) return 'Enter a valid number';
+                  if (r < 0) return 'Rate cannot be negative';
+                  return null;
+                },
+              ),
+            ],
+          ),
         ),
         actions: [
           appDialogCancelButton(ctx),
@@ -541,9 +559,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
           appDialogPrimaryButton(
             label: 'Add',
             onPressed: () {
-              final name = _taxNameController.text.trim();
-              final rate = double.tryParse(_taxRateController.text.trim());
-              if (name.isEmpty || rate == null) return;
+              if (!(formKey.currentState?.validate() ?? false)) return;
               _addTax();
               Navigator.pop(ctx);
             },

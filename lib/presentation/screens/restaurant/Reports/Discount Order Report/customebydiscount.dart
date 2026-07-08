@@ -1,5 +1,6 @@
 /*
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/restaurant/order_status_filter.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -51,7 +52,7 @@ class _CustomByDiscountState extends State<CustomByDiscount> {
       if (order.orderAt == null) return false;
       // Exclude refunded and voided orders
       final status = order.orderStatus?.toUpperCase() ?? '';
-      if (status == 'FULLY_REFUNDED' || status == 'VOIDED') return false;
+      if (OrderStatusFilter.isExcludedFromRevenue(status)) return false;
 
       return order.orderAt!.isAfter(start) &&
           order.orderAt!.isBefore(end);

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/restaurant/order_status_filter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
@@ -234,7 +235,7 @@ class _SalesDataViewState extends State<SalesDataView> {
       }
 
       final status = order.orderStatus ?? '';
-      if (status == 'VOID' || status == 'VOIDED' || status == 'FULLY_REFUNDED') {
+      if (OrderStatusFilter.isExcludedFromRevenue(status)) {
         continue;
       }
 

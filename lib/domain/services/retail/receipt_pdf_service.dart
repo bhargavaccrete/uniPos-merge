@@ -12,11 +12,13 @@ import '../../../data/models/retail/hive_model/sale_model_203.dart';
 import '../../../data/models/retail/printer_settings_model.dart';
 import '../../../util/restaurant/print_settings.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/plan/plan_gate.dart';
 import '../../../core/di/service_locator.dart' show taxStore;
 import '../../../util/restaurant/staticswitch.dart';
 import '../restaurant/tax_breakdown.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
+import 'package:billberrylite/util/common/loyalty_points.dart';
 import 'retail_printer_settings_service.dart';
 
 /// Data class to hold all receipt information
@@ -239,11 +241,11 @@ class ReceiptPdfService {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
-        // Store Logo
+        // Store Logo — larger on restaurant receipts for better brand visibility.
         if (showLogo && data.logoBytes != null) ...[
           pw.Container(
-            width: 60,
-            height: 60,
+            width: AppConfig.isRestaurant ? 100 : 60,
+            height: AppConfig.isRestaurant ? 100 : 60,
             child: pw.Image(
               pw.MemoryImage(data.logoBytes!),
               fit: pw.BoxFit.contain,
@@ -636,32 +638,49 @@ class ReceiptPdfService {
 
           pw.SizedBox(height: 8),
           _buildDashedLine(),
-          pw.SizedBox(height: 4),
 
-          // Split Payment Breakdown
-          if (showPaymentPaid)
+          // Split Payment Breakdown + its own divider — only when the sale
+          // actually has a multi-method / split payment. (A single payment used
+          // to leave two empty dashed lines stacked under the total.)
+          if (showPaymentPaid &&
+              (data.sale.paymentList.length > 1 ||
+                  data.sale.isSplitPayment == true)) ...[
+            pw.SizedBox(height: 4),
             ..._buildSplitPaymentSection(data.sale),
-
-          if (showPaymentPaid) ...[
             pw.SizedBox(height: 4),
             _buildDashedLine(),
-            pw.SizedBox(height: 8),
-          ] else ...[
-            pw.SizedBox(height: 8),
           ],
+          pw.SizedBox(height: 8),
 
           // UPI "Scan & Pay" — only on UNPAID bills with UPI configured.
           ..._buildUpiPaySection(data),
 
           // Footer
-          if (showFooter) ...[
-            if (AppConfig.isRestaurant && (data.isTaxInclusive ?? false))
+          if (AppConfig.isRestaurant) ...[
+            if (data.isTaxInclusive ?? false)
               pw.Text(
                 'All prices include GST',
                 style: const pw.TextStyle(fontSize: 10),
                 textAlign: pw.TextAlign.center,
               ),
-            if (isRetail && footerText.isNotEmpty) ...[
+            // Dynamic footer / "Thank You" message (owner-editable, multi-line).
+            if (PrintSettings.footerMessage.trim().isNotEmpty)
+              pw.Text(
+                PrintSettings.footerMessage.trim(),
+                style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                textAlign: pw.TextAlign.center,
+              ),
+            // "Powered by" — forced on for Free, toggleable for Premium.
+            if (PlanGate.isFree || PrintSettings.showPoweredBy) ...[
+              pw.SizedBox(height: 4),
+              pw.Text(
+                'Powered by Bill Berry Lite',
+                style: const pw.TextStyle(fontSize: 9),
+                textAlign: pw.TextAlign.center,
+              ),
+            ],
+          ] else if (showFooter) ...[
+            if (footerText.isNotEmpty) ...[
               pw.Text(
                 footerText,
                 style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
@@ -669,13 +688,7 @@ class ReceiptPdfService {
               ),
             ] else ...[
               pw.Text(
-                AppConfig.isRestaurant
-                    ? (data.orderType?.toLowerCase().contains('dine') == true
-                        ? 'Thank you for dining with us!'
-                        : data.orderType?.toLowerCase().contains('delivery') == true
-                            ? 'Thank you for your order!'
-                            : 'Thank you! Enjoy your meal!')
-                    : 'Thank you for your purchase!',
+                'Thank you for your purchase!',
                 style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
               ),
               pw.SizedBox(height: 4),
@@ -688,7 +701,7 @@ class ReceiptPdfService {
           pw.SizedBox(height: 8),
 
           // Points earned (if customer)
-          if (data.customer != null) ...[
+          if (!AppConfig.isRestaurant && data.customer != null) ...[
             pw.Container(
               padding: const pw.EdgeInsets.all(4),
               decoration: pw.BoxDecoration(
@@ -697,7 +710,7 @@ class ReceiptPdfService {
               child: pw.Column(
                 children: [
                   pw.Text(
-                    'Points Earned: ${(data.sale.totalAmount / 10).floor()}',
+                    'Points Earned: ${LoyaltyPoints.earnedFor(data.sale.totalAmount)}',
                     style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
                   ),
                   pw.Text(
@@ -757,11 +770,11 @@ class ReceiptPdfService {
               child: pw.Row(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  // Logo (Both retail and restaurant)
+                  // Logo — larger on restaurant invoices for brand visibility.
                   if (showLogo && data.logoBytes != null) ...[
                     pw.Container(
-                      width: 80,
-                      height: 80,
+                      width: AppConfig.isRestaurant ? 120 : 80,
+                      height: AppConfig.isRestaurant ? 120 : 80,
                       child: pw.Image(
                         pw.MemoryImage(data.logoBytes!),
                         fit: pw.BoxFit.contain,
@@ -1079,7 +1092,7 @@ class ReceiptPdfService {
         pw.SizedBox(height: 16),
 
         // Customer Points Section
-        if (showLoyaltyPoints && data.customer != null) ...[
+        if (!AppConfig.isRestaurant && showLoyaltyPoints && data.customer != null) ...[
           pw.Container(
             padding: const pw.EdgeInsets.all(12),
             decoration: pw.BoxDecoration(
@@ -1094,7 +1107,7 @@ class ReceiptPdfService {
                   style: const pw.TextStyle(fontSize: 10),
                 ),
                 pw.Text(
-                  '${(data.sale.totalAmount / 10).floor()} points',
+                  '${LoyaltyPoints.earnedFor(data.sale.totalAmount)} points',
                   style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
                 ),
               ],
@@ -1111,12 +1124,17 @@ class ReceiptPdfService {
           child: pw.Column(
             children: [
               pw.Text(
-                'Thank you for your business!',
+                // Restaurant: owner-editable footer message. Retail: unchanged.
+                AppConfig.isRestaurant &&
+                        PrintSettings.footerMessage.trim().isNotEmpty
+                    ? PrintSettings.footerMessage.trim()
+                    : 'Thank you for your business!',
                 style: pw.TextStyle(
                   fontSize: 12,
                   fontWeight: pw.FontWeight.bold,
                   color: PdfColors.green800,
                 ),
+                textAlign: pw.TextAlign.center,
               ),
               pw.SizedBox(height: 4),
               if (AppConfig.isRestaurant && (data.isTaxInclusive ?? false))
@@ -1128,6 +1146,15 @@ class ReceiptPdfService {
                 'This is a computer-generated invoice.',
                 style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
               ),
+              // "Powered by" — restaurant only; forced on for Free.
+              if (AppConfig.isRestaurant &&
+                  (PlanGate.isFree || PrintSettings.showPoweredBy)) ...[
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  'Powered by Bill Berry Lite',
+                  style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+                ),
+              ],
             ],
           ),
         ),
@@ -1143,10 +1170,14 @@ class ReceiptPdfService {
   /// totals stay right-aligned. Mirrors the thermal receipt's UPI logic.
   pw.Widget _buildInvoiceUpiBox(ReceiptData data) {
     if (!PrintSettings.showUpiQr) return pw.SizedBox(); // customization toggle
-    final unpaid = data.sale.paymentType == 'NOT PAID';
     final hasUpiId = (data.upiId?.trim().isNotEmpty ?? false);
     final hasQrImage = data.upiQrImageBytes != null;
-    if (!unpaid || (!hasUpiId && !hasQrImage)) return pw.SizedBox();
+    if (!hasUpiId && !hasQrImage) return pw.SizedBox();
+
+    final unpaid = data.sale.paymentType == 'NOT PAID';
+    // Restaurant prints the QR on every invoice (paid or unpaid); retail keeps
+    // it to unpaid invoices only.
+    if (!AppConfig.isRestaurant && !unpaid) return pw.SizedBox();
 
     pw.Widget qr;
     if (hasQrImage) {
@@ -1155,10 +1186,13 @@ class ReceiptPdfService {
       final payee = (data.upiPayeeName?.trim().isNotEmpty ?? false)
           ? data.upiPayeeName!.trim()
           : (data.storeName ?? 'Merchant');
-      final amount = data.sale.totalAmount.toStringAsFixed(2);
+      // Encode the exact amount only while unpaid, so a QR on an already-paid
+      // bill can't prompt a duplicate payment — it becomes a generic
+      // "pay this merchant" QR instead.
+      final amountParam =
+          unpaid ? '&am=${data.sale.totalAmount.toStringAsFixed(2)}' : '';
       final link = 'upi://pay?pa=${data.upiId!.trim()}'
-          '&pn=${Uri.encodeComponent(payee)}'
-          '&am=$amount&cu=INR';
+          '&pn=${Uri.encodeComponent(payee)}$amountParam&cu=INR';
       qr = pw.BarcodeWidget(
           barcode: pw.Barcode.qrCode(), data: link, width: 76, height: 76);
     }
@@ -1384,10 +1418,11 @@ class ReceiptPdfService {
   /// Build item row for thermal receipt
   pw.Widget _buildThermalItemRow(SaleItemModel item) {
     final name = item.productName ?? 'Unknown';
-    final displayNameText = item.size != null && item.size!.isNotEmpty
+    // Full name + variant — let it WRAP (no truncation) so variant/extra details
+    // in parentheses aren't hidden behind an ellipsis.
+    final displayName = item.size != null && item.size!.isNotEmpty
         ? '$name (${item.size})'
         : name;
-    final displayName = displayNameText.length > 28 ? '${displayNameText.substring(0, 26)}...' : displayNameText;
 
     // Calculate unit price (total / quantity)
     final unitPrice = item.qty > 0 ? item.total / item.qty : item.total;
@@ -1398,6 +1433,9 @@ class ReceiptPdfService {
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Row(
+            // Top-align so Qty/Price/Amount stay on the first line when the
+            // name wraps to two lines.
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Expanded(
                 flex: 3,
@@ -1444,10 +1482,14 @@ class ReceiptPdfService {
   /// dynamic UPI QR with the amount pre-filled. Returns [] when it shouldn't show.
   List<pw.Widget> _buildUpiPaySection(ReceiptData data) {
     if (!PrintSettings.showUpiQr) return []; // customization toggle
-    final unpaid = data.sale.paymentType == 'NOT PAID';
     final hasUpiId = (data.upiId?.trim().isNotEmpty ?? false);
     final hasQrImage = data.upiQrImageBytes != null;
-    if (!unpaid || (!hasUpiId && !hasQrImage)) return [];
+    if (!hasUpiId && !hasQrImage) return [];
+
+    final unpaid = data.sale.paymentType == 'NOT PAID';
+    // Restaurant prints the QR on EVERY bill (paid, cash or unpaid); retail
+    // keeps it to unpaid bills only.
+    if (!AppConfig.isRestaurant && !unpaid) return [];
 
     pw.Widget qr;
     if (hasQrImage) {
@@ -1457,17 +1499,20 @@ class ReceiptPdfService {
       final payee = (data.upiPayeeName?.trim().isNotEmpty ?? false)
           ? data.upiPayeeName!.trim()
           : (data.storeName ?? 'Merchant');
-      final amount = data.sale.totalAmount.toStringAsFixed(2);
+      // Encode the exact amount only while unpaid, so a QR on an already-paid
+      // bill can't prompt a duplicate payment — it becomes a generic
+      // "pay this merchant" QR instead.
+      final amountParam =
+          unpaid ? '&am=${data.sale.totalAmount.toStringAsFixed(2)}' : '';
       final link = 'upi://pay?pa=${data.upiId!.trim()}'
-          '&pn=${Uri.encodeComponent(payee)}'
-          '&am=$amount&cu=INR';
+          '&pn=${Uri.encodeComponent(payee)}$amountParam&cu=INR';
       qr = pw.BarcodeWidget(
           barcode: pw.Barcode.qrCode(), data: link, width: 80, height: 80);
     }
 
     return [
-      _buildDashedLine(),
-      pw.SizedBox(height: 6),
+      // No leading divider — the section is always preceded by the divider
+      // printed after the TOTAL, so adding one here doubled the dashed line.
       pw.Text('Scan & Pay via UPI',
           style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
           textAlign: pw.TextAlign.center),

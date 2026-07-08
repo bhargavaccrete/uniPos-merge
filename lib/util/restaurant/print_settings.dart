@@ -47,6 +47,21 @@ class PrintSettings {
     await prefs.setString(_billFormatKey, value);
   }
 
+  /// Owner-editable footer / "Thank You" message printed at the bottom of bills.
+  /// Supports multiple lines (split on \n). Blank prints no footer message.
+  static const String _footerMessageKey = 'print_footer_message';
+  static const String _footerMessageDefault = 'Thank you! Visit us again!';
+  static final ValueNotifier<String> footerMessageNotifier =
+      ValueNotifier(_footerMessageDefault);
+
+  static String get footerMessage => footerMessageNotifier.value;
+
+  static Future<void> setFooterMessage(String value) async {
+    footerMessageNotifier.value = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_footerMessageKey, value);
+  }
+
   /// ---- Public Getters ----
   static Map<String, bool> get values => settingsNotifier.value;
 
@@ -81,6 +96,7 @@ class PrintSettings {
   static Future<void> resetToDefaults() async {
     settingsNotifier.value = Map.from(_defaultPrintSettings);
     await setBillFormat(_billFormatDefault);
+    await setFooterMessage(_footerMessageDefault);
     await _save();
   }
 
@@ -103,5 +119,7 @@ class PrintSettings {
     settingsNotifier.value = loaded;
     billFormatNotifier.value =
         prefs.getString(_billFormatKey) ?? _billFormatDefault;
+    footerMessageNotifier.value =
+        prefs.getString(_footerMessageKey) ?? _footerMessageDefault;
   }
 }

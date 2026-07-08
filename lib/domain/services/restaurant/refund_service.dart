@@ -70,7 +70,9 @@ class RefundService {
         return refundedQty >= originalQty;
       });
 
-      final newStatus = allItemsRefunded ? 'FULLY_REFUNDED' : 'PARTIALLY_REFUNDED';
+      final newStatus = order.orderStatus == 'VOIDED'
+          ? 'VOIDED'
+          : (allItemsRefunded ? 'FULLY_REFUNDED' : 'PARTIALLY_REFUNDED');
 
       final _staffLabel = RestaurantSession.isAdmin
           ? 'Admin'

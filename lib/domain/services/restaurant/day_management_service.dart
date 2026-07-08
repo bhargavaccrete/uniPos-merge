@@ -6,6 +6,11 @@ import 'package:billberrylite/core/constants/hive_box_names.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/restaurant/db/cash_movement_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/session_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/shift_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
+import 'package:billberrylite/data/models/restaurant/db/ordermodel_309.dart';
+import 'package:billberrylite/data/models/restaurant/db/expensel_316.dart';
+import 'package:billberrylite/util/restaurant/staticswitch.dart';
 
 class DayManagementService {
   static const String _boxName = 'dayManagementBox';
@@ -181,5 +186,155 @@ class DayManagementService {
 
   static Future<void> resetDay() async {
     await endSession();
+  }
+
+  static Future<bool> isEodStrictlyPending() async {
+    final session = await getCurrentSession();
+    if (session == null || session.isClosed) return false;
+
+    // Check configuration from AppSettings
+    final isAutoCloseEnabled = AppSettings.autoCloseStaleShift;
+    final maxDurationHours = AppSettings.maxSessionDurationHours;
+
+    if (!isAutoCloseEnabled) return false;
+
+    final today = DateTime.now();
+    final sessionDuration = today.difference(session.startTime);
+
+    return sessionDuration.inHours >= maxDurationHours;
+  }
+
+  static Future<DateTime> calculateLatestBusinessActivity(dynamic shift) async {
+    DateTime latestTime = shift.startTime;
+
+    // 1. Orders
+    try {
+      if (Hive.isBoxOpen(HiveBoxNames.restaurantPastOrders)) {
+        final pastOrderBox = Hive.box<PastOrderModel>(HiveBoxNames.restaurantPastOrders);
+        final allOrders = pastOrderBox.values.toList();
+        final end = shift.endTime ?? DateTime.now();
+
+        final shiftOrders = allOrders.where((o) {
+          if (o.shiftId == shift.id) return true;
+          if (o.shiftId != null) return false;
+          return o.orderAt != null &&
+              o.orderAt!.isAfter(shift.startTime.subtract(const Duration(seconds: 1))) &&
+              o.orderAt!.isBefore(end.add(const Duration(seconds: 1)));
+        }).toList();
+
+        for (final o in shiftOrders) {
+          if (o.orderAt != null && o.orderAt!.isAfter(latestTime)) {
+            latestTime = o.orderAt!;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching orders for shift activity: $e');
+    }
+
+    // 1b. Active (unsettled) orders — a session frozen with open tables still
+    // had recent work; their creation/last-update time counts as activity.
+    // (KOT status changes aren't separately timestamped, so timeStamp/completedAt
+    // is the available proxy for "last order update".)
+    try {
+      if (Hive.isBoxOpen(HiveBoxNames.restaurantOrders)) {
+        final orderBox = Hive.box<OrderModel>(HiveBoxNames.restaurantOrders);
+        final end = shift.endTime ?? DateTime.now();
+        final windowStart = shift.startTime.subtract(const Duration(seconds: 1));
+        final windowEnd = end.add(const Duration(seconds: 1));
+        for (final o in orderBox.values) {
+          for (final ts in [o.timeStamp, o.completedAt]) {
+            if (ts != null &&
+                ts.isAfter(windowStart) &&
+                ts.isBefore(windowEnd) &&
+                ts.isAfter(latestTime)) {
+              latestTime = ts;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching active orders for shift activity: $e');
+    }
+
+    // 2. Cash Movements
+    try {
+      if (Hive.isBoxOpen(HiveBoxNames.restaurantCashMovements)) {
+        final cashBox = Hive.box<CashMovementModel>(HiveBoxNames.restaurantCashMovements);
+        final end = shift.endTime ?? DateTime.now();
+        final movements = cashBox.values.where((m) =>
+            m.timestamp.isAfter(shift.startTime) &&
+            m.timestamp.isBefore(end)).toList();
+
+        for (final m in movements) {
+          if (m.timestamp.isAfter(latestTime)) {
+            latestTime = m.timestamp;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching cash movements for shift activity: $e');
+    }
+
+    // 3. Expenses
+    try {
+      if (Hive.isBoxOpen(HiveBoxNames.restaurantExpense)) {
+        final expenseBox = Hive.box<Expense>(HiveBoxNames.restaurantExpense);
+        final end = shift.endTime ?? DateTime.now();
+        final expenses = expenseBox.values.where((e) =>
+            e.dateandTime.isAfter(shift.startTime) &&
+            e.dateandTime.isBefore(end)).toList();
+
+        for (final e in expenses) {
+          if (e.dateandTime.isAfter(latestTime)) {
+            latestTime = e.dateandTime;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching expenses for shift activity: $e');
+    }
+
+    return latestTime;
+  }
+
+  /// Latest business activity across the WHOLE current session (not one shift) —
+  /// used to freeze ORPHAN attendance (open records whose shift is already
+  /// closed) at the real end of work instead of DateTime.now().
+  static Future<DateTime> calculateSessionLastActivity() async {
+    final session = await getCurrentSession();
+    final start = session?.startTime ?? DateTime.now();
+    final now = DateTime.now();
+    DateTime latest = start;
+    void bump(DateTime? t) {
+      if (t != null && t.isAfter(latest) && !t.isAfter(now)) latest = t;
+    }
+
+    try {
+      if (Hive.isBoxOpen(HiveBoxNames.restaurantPastOrders)) {
+        for (final o in Hive.box<PastOrderModel>(HiveBoxNames.restaurantPastOrders).values) {
+          if (o.orderAt != null && !o.orderAt!.isBefore(start)) bump(o.orderAt);
+        }
+      }
+      if (Hive.isBoxOpen(HiveBoxNames.restaurantOrders)) {
+        for (final o in Hive.box<OrderModel>(HiveBoxNames.restaurantOrders).values) {
+          bump(o.timeStamp);
+          bump(o.completedAt);
+        }
+      }
+      if (Hive.isBoxOpen(HiveBoxNames.restaurantCashMovements)) {
+        for (final m in Hive.box<CashMovementModel>(HiveBoxNames.restaurantCashMovements).values) {
+          if (!m.timestamp.isBefore(start)) bump(m.timestamp);
+        }
+      }
+      if (Hive.isBoxOpen(HiveBoxNames.restaurantExpense)) {
+        for (final e in Hive.box<Expense>(HiveBoxNames.restaurantExpense).values) {
+          if (!e.dateandTime.isBefore(start)) bump(e.dateandTime);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error computing session last activity: $e');
+    }
+    return latest;
   }
 }

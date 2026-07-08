@@ -1,6 +1,8 @@
 import 'package:mobx/mobx.dart';
 import '../../../data/models/restaurant/db/table_Model_311.dart';
 import '../../../data/repositories/restaurant/table_repository.dart';
+import '../../../core/plan/entitlement_keys.dart';
+import '../../../core/plan/plan_enforcement.dart';
 
 part 'table_store.g.dart';
 
@@ -83,6 +85,16 @@ abstract class _TableStore with Store {
   @action
   Future<bool> addTable(TableModel table) async {
     try {
+      // Plan gate — table creation flag + table cap.
+      if (!PlanEnforce.allows(EntKeys.billingTablesCreate)) {
+        errorMessage = "Creating tables isn't available on your current plan.";
+        return false;
+      }
+      if (!PlanEnforce.withinLimit(EntKeys.billingTablesMax, tables.length)) {
+        final max = PlanEnforce.limit(EntKeys.billingTablesMax);
+        errorMessage = 'Table limit reached (max $max). Upgrade to add more.';
+        return false;
+      }
       await _repository.addTable(table);
       tables.add(table);
       return true;

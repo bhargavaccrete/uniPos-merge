@@ -20,7 +20,13 @@ import 'package:billberrylite/data/models/restaurant/db/attendance_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:billberrylite/data/models/restaurant/db/cartmodel_308.dart';
+import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../start order/startorder.dart';
+import '../start order/cart/cart.dart';
+import '../tabbar/orderDetails.dart';
+import 'package:billberrylite/util/restaurant/staticswitch.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'package:billberrylite/domain/services/restaurant/data_clear_service.dart';
 import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
 import 'package:billberrylite/domain/services/restaurant/eod_service.dart';
@@ -55,11 +61,29 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
   double cashExpenses = 0.0;
   double _cashIn = 0.0;
   double _cashOut = 0.0;
+  bool _isCompletingEOD = false;
 
   @override
   void initState() {
     super.initState();
-    _loadEODData();
+    // Resolve running orders BEFORE the cash reconciliation (post-frame so a
+    // dialog can show): a paid-but-unserved order's cash is in the drawer, but
+    // the expected total excludes it until it's completed — resolving first
+    // keeps the counts consistent instead of showing a false discrepancy.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _loadEODData();
+      await _promptResolveActiveOrders();
+    });
+  }
+
+  /// Force the manager to resolve every RUNNING order before reconciling cash;
+  /// afterwards expected cash is recomputed so paid-order cash is reflected.
+  Future<void> _promptResolveActiveOrders() async {
+    if (!mounted || !_hasActiveSession) return;
+    await orderStore.loadOrders();
+    if (_activeUnresolvedOrders().isEmpty) return;
+    await _showActiveOrderResolutionDialog();
+    if (mounted) await _loadEODData();
   }
 
   Future<void> _loadEODData() async {
@@ -168,39 +192,463 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     final status = o.status.toLowerCase();
     if (status == 'voided' || status == 'cancelled' || status == 'completed') return false;
     if (o.isPaid == true || o.paymentStatus?.toLowerCase() == 'paid') return false;
+    if (o is OrderModel && o.isFullyPaid) return false;
+    // Any money collected (fully OR partially paid) is NOT "unsettled" — it must
+    // never be voided as 'N/A' (that discards the sale + drops it from EOD).
+    // Paid orders are resolved by the manager (complete-service / refund), never
+    // auto-completed or voided — see the resolution dialog below.
+    if ((o.totalPaid ?? 0) > 0) return false;
     return true;
   }
 
+  // ── Manager-driven active-order resolution (paid orders never auto-resolved) ──
+
+  /// Active orders that still block EOD (anything not void/cancelled/completed).
+  List<OrderModel> _activeUnresolvedOrders() {
+    return orderStore.orders.where((o) {
+      final s = o.status.toLowerCase();
+      return s != 'void' && s != 'voided' && s != 'cancelled' && s != 'completed';
+    }).toList();
+  }
+
+  bool _orderIsPaid(OrderModel o) =>
+      o.isPaid == true ||
+      o.paymentStatus?.toLowerCase() == 'paid' ||
+      o.isFullyPaid ||
+      (o.totalPaid ?? 0) > 0;
+
+  /// UNPAID | PAID · UNSERVED | PAID · PARTIALLY SERVED | PAID · SERVED
+  String _classifyActive(OrderModel o) {
+    if (!_orderIsPaid(o)) return 'UNPAID';
+    final served = o.kotNumbers.where((k) => o.getKotStatus(k) == 'Served').length;
+    if (o.kotNumbers.isEmpty || served == 0) return 'PAID · UNSERVED';
+    if (served < o.kotNumbers.length) return 'PAID · PARTIALLY SERVED';
+    return 'PAID · SERVED';
+  }
+
+  /// Blocking dialog: the manager must resolve every active order before EOD.
+  Future<void> _showActiveOrderResolutionDialog() async {
+    final bool refundAvailable =
+        AppSettings.refundsEnabled && PlanEnforce.allows(EntKeys.billingReturns);
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dctx) => PopScope(
+        canPop: false,
+        child: StatefulBuilder(
+          builder: (dctx, setDialog) {
+            final orders = _activeUnresolvedOrders();
+
+            Future<void> refresh() async {
+              await orderStore.loadOrders();
+              setDialog(() {});
+            }
+
+            if (orders.isEmpty) {
+              return AppDialogShell(
+                title: 'All Orders Resolved',
+                accent: AppColors.success,
+                icon: Icons.check_circle_rounded,
+                body: Text(
+                  'All active orders are resolved. You can now complete End of Day.',
+                  style: GoogleFonts.poppins(
+                      fontSize: 13, color: AppColors.textSecondary),
+                ),
+                actions: [
+                  appDialogPrimaryButton(
+                    label: 'Continue',
+                    onPressed: () => Navigator.of(dctx).pop(),
+                  ),
+                ],
+              );
+            }
+
+            final hasUnpaid = orders.any((o) => !_orderIsPaid(o));
+
+            return AppDialogShell(
+              title: 'Resolve ${orders.length} Active Order(s)',
+              subtitle: 'Every order must be resolved before End of Day.',
+              accent: Colors.orange,
+              icon: Icons.receipt_long_rounded,
+              body: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 460,
+                  maxHeight: MediaQuery.of(dctx).size.height * 0.5,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: orders
+                        .map((o) => _resolutionCard(o, refundAvailable, refresh))
+                        .toList(),
+                  ),
+                ),
+              ),
+              actions: [
+                if (hasUnpaid)
+                  TextButton(
+                    onPressed: () async {
+                      final reason = await _promptVoidReason();
+                      if (reason == null) return;
+                      for (final o
+                          in orders.where((x) => !_orderIsPaid(x)).toList()) {
+                        await _voidOrderAtEod(o, reason);
+                      }
+                      await refresh();
+                    },
+                    child: Text('Void All Unpaid',
+                        style: GoogleFonts.poppins(
+                            color: AppColors.danger,
+                            fontWeight: FontWeight.w600)),
+                  ),
+                TextButton(
+                  onPressed: () => Navigator.of(dctx).pop(),
+                  child: Text('Cancel EOD',
+                      style: GoogleFonts.poppins(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600)),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  /// Amber = paid but not (fully) served → needs attention; green = served/ready;
+  /// red = unpaid.
+  Color _classColor(String cls) {
+    if (cls == 'UNPAID') return AppColors.danger;
+    if (cls == 'PAID · SERVED') return AppColors.success;
+    return Colors.orange.shade700;
+  }
+
+  Widget _resolutionCard(
+      OrderModel o, bool refundAvailable, Future<void> Function() refresh) {
+    final cls = _classifyActive(o);
+    final paid = _orderIsPaid(o);
+    final clsColor = _classColor(cls);
+    final label = (o.tableNo != null && o.tableNo!.isNotEmpty)
+        ? 'Table ${o.tableNo}'
+        : (o.orderType ?? 'Order');
+
+    Future<void> openTable() async {
+      await Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) =>
+                  CartScreen(existingOrder: o, selectedTableNo: o.tableNo)));
+      await refresh();
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header strip — table/order + amount, tinted by classification.
+          Container(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            decoration: BoxDecoration(
+              color: clsColor.withOpacity(0.07),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(12)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                    paid
+                        ? Icons.table_restaurant_rounded
+                        : Icons.receipt_long_rounded,
+                    size: 18,
+                    color: clsColor),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(label,
+                      style: GoogleFonts.poppins(
+                          fontSize: 14, fontWeight: FontWeight.w700)),
+                ),
+                Text(
+                  '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(o.totalPrice)}',
+                  style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                      color: clsColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(6)),
+                  child: Text(cls,
+                      style: GoogleFonts.poppins(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: clsColor)),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: paid
+                      ? [
+                          // Recommended resolution for a paid table = serve it.
+                          _resAction('Complete Service',
+                              Icons.check_circle_rounded, AppColors.success,
+                              () async {
+                            await _completeServiceForOrder(o);
+                            await refresh();
+                          }, filled: true),
+                          _resAction('Open Table', Icons.open_in_new_rounded,
+                              AppColors.primary, openTable),
+                          if (refundAvailable)
+                            _resAction('Refund',
+                                Icons.currency_exchange_rounded,
+                                Colors.orange.shade800, () async {
+                              await _refundOrderAtEod(o);
+                              await refresh();
+                            }),
+                        ]
+                      : [
+                          // Unpaid: settling is preferred; void is the fallback.
+                          _resAction('Open / Settle',
+                              Icons.point_of_sale_rounded, AppColors.primary,
+                              openTable,
+                              filled: true),
+                          _resAction('Void', Icons.block_rounded,
+                              AppColors.danger, () async {
+                            final reason = await _promptVoidReason();
+                            if (reason == null) return;
+                            await _voidOrderAtEod(o, reason);
+                            await refresh();
+                          }),
+                        ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _resAction(String label, IconData icon, Color color, VoidCallback onTap,
+      {bool filled = false}) {
+    if (filled) {
+      return ElevatedButton.icon(
+        onPressed: onTap,
+        icon: Icon(icon, size: 16, color: Colors.white),
+        label: Text(label,
+            style: GoogleFonts.poppins(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: Colors.white)),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+        ),
+      );
+    }
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 15, color: color),
+      label: Text(label,
+          style: GoogleFonts.poppins(
+              fontSize: 12.5, fontWeight: FontWeight.w600, color: color)),
+      style: OutlinedButton.styleFrom(
+        side: BorderSide(color: color.withOpacity(0.45)),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+      ),
+    );
+  }
+
+  Future<String?> _promptVoidReason() {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (rc) => AppDialogShell(
+        title: 'Void Reason',
+        accent: AppColors.danger,
+        icon: Icons.block_rounded,
+        body: AppTextField(
+          controller: controller,
+          hint: 'Why is this order being voided?',
+          icon: Icons.edit_note_rounded,
+        ),
+        actions: [
+          appDialogCancelButton(rc),
+          const SizedBox(width: 12),
+          appDialogPrimaryButton(
+            label: 'Void',
+            color: AppColors.danger,
+            onPressed: () {
+              final r = controller.text.trim();
+              if (r.isEmpty) return;
+              Navigator.of(rc).pop(r);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Mark the order served + move it to past as COMPLETED (payment preserved).
+  /// No inventory change (stock already deducted). Returns the past record.
+  Future<PastOrderModel> _completeServiceForOrder(OrderModel o) async {
+    final int billNumber = o.billNumber ?? await orderStore.getNextBillNumber();
+    final pastOrder = PastOrderModel(
+      id: o.id,
+      customerName: o.customerName,
+      totalPrice: o.totalPrice,
+      items: o.items,
+      orderAt: o.timeStamp,
+      orderType: o.orderType,
+      paymentmode: o.paymentMethod ?? 'Cash',
+      subTotal: o.subTotal,
+      Discount: o.discount,
+      gstRate: o.gstRate,
+      gstAmount: o.gstAmount,
+      kotNumbers: o.kotNumbers,
+      kotBoundaries: o.kotBoundaries,
+      billNumber: billNumber,
+      isTaxInclusive: o.isTaxInclusive,
+      shiftId: RestaurantSession.currentShiftId,
+      sessionId: o.sessionId,
+      orderStatus: 'COMPLETED',
+      paymentListJson: o.paymentListJson,
+      isSplitPayment: o.isSplitPayment,
+      totalPaid: o.totalPaid,
+      changeReturn: o.changeReturn,
+      tableNo: o.tableNo,
+      customerId: o.customerId,
+      serviceCharge: o.serviceCharge,
+    );
+    await pastOrderStore.addOrder(pastOrder);
+    await orderStore.deleteOrder(o.id);
+    if (o.tableNo != null && o.tableNo!.isNotEmpty) {
+      await tableStore.updateTableStatus(o.tableNo!, 'Available');
+    }
+    return pastOrder;
+  }
+
+  /// Void a ZERO-payment order (VOID, N/A). Restores stock only if the kitchen
+  /// hadn't started (`Processing`). Records reason for audit.
+  Future<void> _voidOrderAtEod(OrderModel o, String reason) async {
+    final sessionId = await DayManagementService.getCurrentSessionId();
+    final staff = RestaurantSession.isAdmin
+        ? 'Admin'
+        : (RestaurantSession.staffName ?? 'Staff');
+    final voidRecord = PastOrderModel(
+      id: o.id,
+      customerName: o.customerName,
+      totalPrice: o.totalPrice,
+      items: o.items,
+      orderAt: o.timeStamp,
+      orderType: o.orderType,
+      paymentmode: 'N/A',
+      subTotal: o.subTotal,
+      gstAmount: o.gstAmount,
+      tableNo: o.tableNo,
+      orderStatus: 'VOID',
+      kotNumbers: o.kotNumbers,
+      kotBoundaries: o.kotBoundaries,
+      sessionId: sessionId ?? o.sessionId,
+      voidedBy: 'EOD by $staff',
+      voidReason: reason,
+    );
+    await pastOrderStore.addOrder(voidRecord);
+    if (o.status == 'Processing') {
+      final itemsToRestock = <CartItem, int>{};
+      for (final item in o.items) {
+        if (item.quantity > 0) itemsToRestock[item] = item.quantity;
+      }
+      if (itemsToRestock.isNotEmpty) {
+        await InventoryService.restoreStockForRefund(itemsToRestock);
+      }
+    }
+    await orderStore.deleteOrder(o.id);
+    if (o.tableNo != null && o.tableNo!.isNotEmpty) {
+      await tableStore.updateTableStatus(o.tableNo!, 'Available');
+    }
+  }
+
+  /// Refund a PAID order: finalize it (→ past COMPLETED, refundable), then open
+  /// Order Details where the existing Refund flow handles it (gating + audit).
+  Future<void> _refundOrderAtEod(OrderModel o) async {
+    final past = await _completeServiceForOrder(o);
+    if (mounted) {
+      await Navigator.push(context,
+          MaterialPageRoute(builder: (_) => Orderdetails(Order: past)));
+    }
+  }
+
   Future<void> _completeEndOfDay() async {
+    if (_isCompletingEOD) return;
+    _isCompletingEOD = true;
+
     if (_actualCashController.text.isEmpty) {
       _showError('Please enter actual cash amount');
+      _isCompletingEOD = false;
       return;
     }
 
     await orderStore.loadOrders();
 
-    final activeOrders = orderStore.orders.where(_isUnsettledOrder).toList();
-
-    if (activeOrders.isNotEmpty) {
-      final isPendingEOD = await DayManagementService.hasPendingEOD();
-      if (isPendingEOD) {
-        // Previous day pending — user is stuck, offer Void All
-        await _showPendingEODOrdersDialog(activeOrders);
-        // Re-check after voiding (user may have voided all)
-        await orderStore.loadOrders();
-        final stillActive = orderStore.orders.where(_isUnsettledOrder).toList();
-        if (stillActive.isNotEmpty) return;
-      } else {
-        // Same day — user can navigate to orders freely
-        await _showActiveOrdersError(activeOrders.length);
+    // Every active order must be explicitly resolved by the MANAGER before EOD.
+    // Paid orders are NEVER auto-completed or voided here — the manager chooses
+    // complete-service / open-table / refund; only zero-payment orders may be
+    // voided. EOD cannot continue while any active order remains.
+    if (_activeUnresolvedOrders().isNotEmpty) {
+      await _showActiveOrderResolutionDialog();
+      await orderStore.loadOrders();
+      if (_activeUnresolvedOrders().isNotEmpty) {
+        // Manager cancelled, or left orders unresolved → EOD cannot continue.
+        _isCompletingEOD = false;
         return;
       }
     }
 
     final confirmed = await _showConfirmationDialog();
-    if (!confirmed) return;
+    if (!confirmed) {
+      _isCompletingEOD = false;
+      return;
+    }
 
-    // --- AUTO CLOCK-OUT CHECK ---
+    // Freeze stale shifts/attendance FIRST so a forgotten session's staff time
+    // is finalized at the last business activity — otherwise the blanket
+    // clock-out below closes it at DateTime.now() (→ ~24h shifts).
+    final bool staleSession =
+        await DayManagementService.isEodStrictlyPending() ||
+            await DayManagementService.hasPendingEOD();
+    if (staleSession) {
+      await shiftStore.freezeStaleShiftsAndAttendance();
+    }
+    // Any staff STILL open after the freeze (no matching shift) must also close
+    // at the session's last activity when stale — never DateTime.now().
+    final DateTime? staleClockOut = staleSession
+        ? await DayManagementService.calculateSessionLastActivity()
+        : null;
+
+    // --- AUTO CLOCK-OUT CHECK --- (only genuinely current staff remain here)
     try {
       final attendanceBox = Hive.box<AttendanceModel>(HiveBoxNames.restaurantAttendance);
       final openAttendance = attendanceBox.values.where((r) => r.isOpen).toList();
@@ -227,14 +675,20 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
           icon: Icons.people_alt_rounded,
         );
 
-        if (!confirmedAttendance) return;
+        if (!confirmedAttendance) {
+          _isCompletingEOD = false;
+          return;
+        }
         
         }
 
         // Clock out the remaining open staff — the self-only silent case, or
-        // everyone after the confirm dialog above.
+        // everyone after the confirm dialog above. Stale session → close at the
+        // frozen last-activity time; same-day → now (clockOutTime null).
         for (final r in openAttendance) {
-          await attendanceStore.clockOut(r.id);
+          DateTime? outAt = staleClockOut;
+          if (outAt != null && outAt.isBefore(r.clockIn)) outAt = r.clockIn;
+          await attendanceStore.clockOut(r.id, clockOutTime: outAt);
         }
       }
     } catch (e) {
@@ -271,8 +725,14 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       try {
         await shiftStore.loadShifts();
         final openShifts = shiftStore.shifts.where((s) => s.isOpen).toList();
+        final isStaleEOD = await DayManagementService.isEodStrictlyPending() || await DayManagementService.hasPendingEOD();
         for (final s in openShifts) {
-          await shiftStore.closeShift(s.id);
+          final isStaleShift = isStaleEOD || s.startTime.day != DateTime.now().day || s.startTime.month != DateTime.now().month || s.startTime.year != DateTime.now().year;
+          if (isStaleShift) {
+            await shiftStore.closeStaleShiftWithLatestActivity(s.id);
+          } else {
+            await shiftStore.closeShift(s.id);
+          }
         }
         await RestaurantSession.clearShiftSession();
         await DayManagementService.clearEODSnooze();
@@ -288,7 +748,9 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       if (mounted) {
         await _showSafeDropDialog(actualCashAmount, discrepancy: discrepancy);
       }
+      _isCompletingEOD = false;
     } catch (e) {
+      _isCompletingEOD = false;
       setState(() => _isGenerating = false);
 
       String errorMessage = 'Error completing End of Day';
@@ -404,6 +866,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
             return PopScope(
               canPop: false,
               child: Dialog(
+                backgroundColor: AppColors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                 insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
                 child: SingleChildScrollView(
@@ -673,98 +1136,6 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     withdrawalController.dispose();
   }
 
-  Future<void> _showPendingEODOrdersDialog(List<dynamic> activeOrders) async {
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => PopScope(
-        canPop: false,
-        child: AppDialogShell(
-          title: 'Previous Day · ${activeOrders.length} Pending Order(s)',
-          accent: Colors.orange,
-          icon: Icons.receipt_long_rounded,
-          body: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('These orders were not settled. Void them to complete End of Day.',
-                style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700)),
-              SizedBox(height: 12),
-              ...activeOrders.take(5).map((o) => Padding(
-                padding: EdgeInsets.only(bottom: 6),
-                child: Row(
-                  children: [
-                    Icon(Icons.receipt_long, size: 14, color: Colors.grey),
-                    SizedBox(width: 8),
-                    Expanded(child: Text(
-                      'KOT #${o.kotNumbers.isNotEmpty ? o.kotNumbers.first : "?"} • ${o.orderType ?? ""}${o.tableNo != null && o.tableNo!.isNotEmpty ? " • Table ${o.tableNo}" : ""}',
-                      style: GoogleFonts.poppins(fontSize: 12),
-                      overflow: TextOverflow.ellipsis,
-                    )),
-                  ],
-                ),
-              )),
-              if (activeOrders.length > 5)
-                Text('+${activeOrders.length - 5} more', style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey)),
-            ],
-          ),
-          actions: [
-            appDialogCancelButton(ctx),
-            const SizedBox(width: 12),
-            appDialogPrimaryButton(
-              label: 'Void All',
-              color: Colors.red,
-              onPressed: () async {
-                // Get current session ID
-                final currentSessionId = await DayManagementService.getCurrentSessionId();
-
-                // Void all stale orders
-                for (final order in activeOrders) {
-                  final voidRecord = PastOrderModel(
-                    id: order.id,
-                    customerName: order.customerName ?? '',
-                    totalPrice: order.totalPrice,
-                    items: order.items,
-                    orderAt: order.timeStamp,
-                    orderType: order.orderType,
-                    paymentmode: 'N/A',
-                    subTotal: order.subTotal,
-                    gstAmount: order.gstAmount,
-                    tableNo: order.tableNo,
-                    orderStatus: 'VOID',
-                    kotNumbers: order.kotNumbers,
-                    kotBoundaries: order.kotBoundaries,
-                    sessionId: currentSessionId ?? order.sessionId,
-                    voidedBy: 'EOD Auto-void by ${RestaurantSession.isAdmin ? 'Admin' : RestaurantSession.staffName ?? 'Staff'}',
-                  );
-                  await pastOrderStore.addOrder(voidRecord);
-
-                  // Only restore stock if kitchen hadn't started (Processing = ingredients not yet used)
-                  if (order.status == 'Processing') {
-                    final itemsToRestock = <CartItem, int>{};
-                    for (final item in order.items) {
-                      if (item.quantity > 0) itemsToRestock[item] = item.quantity;
-                    }
-                    if (itemsToRestock.isNotEmpty) {
-                      await InventoryService.restoreStockForRefund(itemsToRestock);
-                    }
-                  }
-
-                  await orderStore.deleteOrder(order.id);
-                  if (order.tableNo != null && order.tableNo!.isNotEmpty) {
-                    await tableStore.updateTableStatus(order.tableNo!, 'Available');
-                  }
-                }
-                if (ctx.mounted) Navigator.of(ctx).pop();
-                NotificationService.instance.showSuccess('${activeOrders.length} order(s) voided');
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _safeDropRow(String label, double amount, Color color) {
     final isNeg = amount < 0;
     return Padding(
@@ -781,57 +1152,6 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
           ),
         ],
       ),
-    );
-  }
-
-  Future<void> _showActiveOrdersError(int count) async {
-    final activeOrders = orderStore.orders.where(_isUnsettledOrder).toList();
-
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AppDialogShell(
-          title: '$count Active Order(s)',
-          accent: AppColors.primary,
-          icon: Icons.receipt_long_rounded,
-          body: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Settle or void these orders to end the day:', style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700)),
-              SizedBox(height: 12),
-              ...activeOrders.take(5).map((o) => Padding(
-                padding: EdgeInsets.only(bottom: 6),
-                child: Row(
-                  children: [
-                    Icon(Icons.receipt_long, size: 14, color: Colors.grey),
-                    SizedBox(width: 8),
-                    Expanded(child: Text(
-                      'KOT #${o.kotNumbers.isNotEmpty ? o.kotNumbers.first : "?"} • ${o.orderType}${o.tableNo != null && o.tableNo!.isNotEmpty ? " • Table ${o.tableNo}" : ""} • ${o.status}',
-                      style: GoogleFonts.poppins(fontSize: 12),
-                      overflow: TextOverflow.ellipsis,
-                    )),
-                  ],
-                ),
-              )),
-              if (activeOrders.length > 5)
-                Text('+${activeOrders.length - 5} more', style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey)),
-            ],
-          ),
-          actions: [
-            appDialogCancelButton(context, label: 'Later'),
-            const SizedBox(width: 12),
-            appDialogPrimaryButton(
-              label: 'Go to Orders',
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.pushNamed(context, RouteNames.restaurantActiveOrders);
-              },
-            ),
-          ],
-        );
-      },
     );
   }
 
@@ -852,6 +1172,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       barrierDismissible: false,
       builder: (BuildContext context) {
         return Dialog(
+          backgroundColor: AppColors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -904,7 +1225,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                     children: [
                       _confirmInfoRow(Icons.save_rounded, 'Save EOD report', Colors.green),
                       const SizedBox(height: 10),
-                      _confirmInfoRow(Icons.delete_sweep_rounded, 'Clear cart & active orders', Colors.red),
+                      _confirmInfoRow(Icons.delete_sweep_rounded, 'Clear the current cart', Colors.orange),
                       const SizedBox(height: 10),
                       _confirmInfoRow(Icons.history_rounded, 'Keep past orders & expenses', Colors.blue),
                     ],
@@ -2049,4 +2370,5 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       ),
     );
   }
+
 }

@@ -13,6 +13,7 @@ import '../../../../../core/plan/plan_enforcement.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../tabbar/orderDetails.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import '../../../../../util/restaurant/refund_state.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
 
 enum VoidOrderPeriod { Today, ThisWeek, Month, Year, Custom }
@@ -187,6 +188,34 @@ class VoidOrderDataView extends StatefulWidget {
 }
 
 class _VoidOrderDataViewState extends State<VoidOrderDataView> {
+  String _getRefundStatusText(PastOrderModel order) {
+    final state = RefundInfo.state(order);
+    switch (state) {
+      case RefundState.full:
+        return 'Fully Refunded';
+      case RefundState.partial:
+        return 'Partially Refunded';
+      case RefundState.none:
+        final pm = order.paymentmode ?? '';
+        final isPaidVoid = pm.isNotEmpty && pm != 'N/A';
+        return isPaidVoid ? 'Refund Pending' : '—';
+    }
+  }
+
+  Color _getRefundStatusColor(PastOrderModel order) {
+    final state = RefundInfo.state(order);
+    switch (state) {
+      case RefundState.full:
+        return Colors.red.shade700;
+      case RefundState.partial:
+        return Colors.orange.shade800;
+      case RefundState.none:
+        final pm = order.paymentmode ?? '';
+        final isPaidVoid = pm.isNotEmpty && pm != 'N/A';
+        return isPaidVoid ? Colors.blue.shade700 : AppColors.textSecondary;
+    }
+  }
+
   List<PastOrderModel> _voidOrders = [];
   double _totalVoidAmount = 0.0;
   int _totalVoidCount = 0;
@@ -1030,6 +1059,16 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
                   ),
                   DataColumn(
                     label: Text(
+                      'Refund Status',
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600,
+                        fontSize: AppResponsive.getValue(context, mobile: 13.0, desktop: 14.0),
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  DataColumn(
+                    label: Text(
                       'Voided By',
                       style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w600,
@@ -1125,8 +1164,18 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
                               ),
                             ),
                           );
-                        }),
-                      ),
+                         }),
+                       ),
+                       DataCell(
+                         Text(
+                           _getRefundStatusText(order),
+                           style: GoogleFonts.poppins(
+                             fontSize: AppResponsive.getValue(context, mobile: 13.0, desktop: 14.0),
+                             fontWeight: FontWeight.w500,
+                             color: _getRefundStatusColor(order),
+                           ),
+                         ),
+                       ),
                       DataCell(
                         Text(
                           order.voidedBy ?? '—',
@@ -1172,6 +1221,7 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
       'Customer',
       'Payment Method',
       'Amount',
+      'Refund Status',
       'Voided By',
       'Reason',
     ];
@@ -1183,6 +1233,7 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
       order.customerName ?? 'Guest',
       order.paymentmode ?? 'N/A',
       ReportExportService.formatCurrency(order.totalPrice ?? 0.0),
+      _getRefundStatusText(order),
       order.voidedBy ?? '—',
       order.voidReason ?? '—',
     ]).toList();

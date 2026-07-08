@@ -37,13 +37,14 @@ class EndOfDayReportAdapter extends TypeAdapter<EndOfDayReport> {
       roundOff: fields[17] as double,
       cancelledOrderCount: fields[18] as int,
       cancelledOrderAmount: fields[19] as double,
+      sessionId: fields[20] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, EndOfDayReport obj) {
     writer
-      ..writeByte(20)
+      ..writeByte(21)
       ..writeByte(0)
       ..write(obj.date)
       ..writeByte(1)
@@ -83,7 +84,9 @@ class EndOfDayReportAdapter extends TypeAdapter<EndOfDayReport> {
       ..writeByte(18)
       ..write(obj.cancelledOrderCount)
       ..writeByte(19)
-      ..write(obj.cancelledOrderAmount);
+      ..write(obj.cancelledOrderAmount)
+      ..writeByte(20)
+      ..write(obj.sessionId);
   }
 
   @override

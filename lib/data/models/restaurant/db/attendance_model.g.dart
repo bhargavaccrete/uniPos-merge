@@ -27,13 +27,14 @@ class AttendanceModelAdapter extends TypeAdapter<AttendanceModel> {
       sessionId: fields[7] as String?,
       breakStartTime: fields[8] as DateTime?,
       breakTotalMinutes: fields[9] as int?,
+      staffId: fields[10] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, AttendanceModel obj) {
     writer
-      ..writeByte(10)
+      ..writeByte(11)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -53,7 +54,9 @@ class AttendanceModelAdapter extends TypeAdapter<AttendanceModel> {
       ..writeByte(8)
       ..write(obj.breakStartTime)
       ..writeByte(9)
-      ..write(obj.breakTotalMinutes);
+      ..write(obj.breakTotalMinutes)
+      ..writeByte(10)
+      ..write(obj.staffId);
   }
 
   @override

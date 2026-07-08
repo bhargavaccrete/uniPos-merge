@@ -33,6 +33,12 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
   Map<String, TextEditingController> priceControllers = {};
   Map<String, TextEditingController> stockControllers = {};
 
+  /// The "Add New Variant" dialog's name field is owned HERE (State), not by the
+  /// dialog, so it's disposed on screen unmount. Disposing a dialog-local
+  /// controller in showDialog().then() crashed on back-dismiss
+  /// (`_dependents.isEmpty` assertion at framework.dart).
+  final TextEditingController _variantNameController = TextEditingController();
+
   /// Existing selections are applied once (first load), not on every reload —
   /// re-applying would re-add just-deleted variants and re-touch controllers.
   bool _initialized = false;
@@ -198,6 +204,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
 
   @override
   void dispose() {
+    _variantNameController.dispose();
     for (var controller in priceControllers.values) {
       controller.dispose();
     }
@@ -506,7 +513,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
   }
 
   void _showAddVariantDialog() {
-    final variantNameController = TextEditingController();
+    _variantNameController.clear();
 
     showDialog(
       context: context,
@@ -528,7 +535,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
               ),
               SizedBox(height: 15),
               AppTextField(
-                controller: variantNameController,
+                controller: _variantNameController,
                 label: 'Variant Name',
                 hint: 'e.g. Small, Medium, Large',
                 icon: Icons.tune_rounded,
@@ -573,7 +580,7 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
             appDialogPrimaryButton(
               label: 'Add',
               onPressed: () async {
-                final String name = variantNameController.text.trim();
+                final String name = _variantNameController.text.trim();
 
                 if (name.isEmpty) {
                   NotificationService.instance.showError('Please enter a variant name');
@@ -601,13 +608,9 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
         );
       },
     ).then((variantName) {
-      // CRITICAL: Dispose controller AFTER dialog is completely closed
-      // Wait one frame to ensure dialog animation is complete
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        variantNameController.dispose();
-      });
-
-      // Handle success case
+      // The controller is owned by the State (disposed in dispose()), NOT here —
+      // disposing a dialog-local controller in .then() crashed on a back-button
+      // dismiss (`_dependents.isEmpty` assertion at framework.dart).
       if (variantName != null && variantName is String) {
         // Wait for dialog to fully close before updating UI
         Future.delayed(const Duration(milliseconds: 100), () {

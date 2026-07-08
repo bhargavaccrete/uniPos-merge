@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/restaurant/order_status_filter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
@@ -233,7 +234,7 @@ class _DiscountDataViewState extends State<DiscountDataView> {
       if ((order.Discount ?? 0) <= 0) continue;
 
       final status = order.orderStatus?.toUpperCase() ?? '';
-      if (status == 'VOID' || status == 'VOIDED' || status == 'FULLY_REFUNDED') continue;
+      if (OrderStatusFilter.isExcludedFromRevenue(status)) continue;
 
       final orderDate = order.orderAt;
       if (orderDate == null) continue;

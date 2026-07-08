@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/restaurant/order_status_filter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
@@ -66,7 +67,7 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
 
     for (final order in pastOrderStore.pastOrders) {
       final status = order.orderStatus?.toUpperCase() ?? '';
-      if (status == 'VOID' || status == 'VOIDED' || status == 'FULLY_REFUNDED') continue;
+      if (OrderStatusFilter.isExcludedFromRevenue(status)) continue;
       if (cutoff != null && order.orderAt != null && order.orderAt!.isBefore(cutoff)) continue;
 
       // Period filter — orders without a timestamp can't be placed in a range.

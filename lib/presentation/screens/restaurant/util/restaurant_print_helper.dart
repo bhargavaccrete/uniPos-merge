@@ -12,6 +12,8 @@ import 'package:billberrylite/domain/services/retail/store_settings_service.dart
 import 'package:billberrylite/domain/services/restaurant/cart_calculation_service.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/core/config/app_config.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/presentation/screens/restaurant/start%20order/cart/customerdetails.dart'; // Import for DiscountType
 import 'package:billberrylite/util/restaurant/staticswitch.dart'; // Import for AppSettings
 import 'package:billberrylite/util/restaurant/print_settings.dart';
@@ -30,6 +32,10 @@ class RestaurantPrintHelper {
     bool autoPrint = false,
     String? cancelReference,
   }) async {
+    // Plan gate — KOT generation (on/off). When off, no ticket prints anywhere
+    // (UI + server/captain handlers). Order still keeps its KOT numbers for
+    // structure; only the printed ticket is suppressed.
+    if (!PlanEnforce.allows(EntKeys.billingKot)) return;
     try {
       final storeSettings = StoreSettingsService();
 
@@ -460,6 +466,20 @@ class RestaurantPrintHelper {
           order.customerName.trim().toLowerCase() == 'quick settle';
       CustomerModel? customerModel;
       if (!isAnonymous) {
+        // Look up the real customer's current (post-award) loyalty balance so the
+        // bill's "Total Points" is accurate, instead of a hardcoded 0. Match by
+        // linked customerId first, else by phone number.
+        int realPoints = 0;
+        for (final c in restaurantCustomerStore.customers) {
+          final byId = (order.customerId?.isNotEmpty ?? false) &&
+              c.customerId == order.customerId;
+          final byPhone =
+              order.customerNumber.isNotEmpty && c.phone == order.customerNumber;
+          if (byId || byPhone) {
+            realPoints = c.loyaltyPoints;
+            break;
+          }
+        }
         customerModel = CustomerModel(
           customerId: 'GUEST',
           name: order.customerName,
@@ -467,7 +487,7 @@ class RestaurantPrintHelper {
           email: order.customerEmail,
           address: '',
           totalPurchaseAmount: 0, // Fixed: totalSales -> totalPurchaseAmount
-          pointsBalance: 0,
+          pointsBalance: realPoints,
           // creditBalance: 0, // Removed: Not in constructor or named parameter default is 0.0
           createdAt: DateTime.now().toIso8601String(),
           updatedAt: DateTime.now().toIso8601String(),

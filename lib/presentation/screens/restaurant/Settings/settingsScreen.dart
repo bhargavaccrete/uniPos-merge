@@ -36,6 +36,7 @@ class _settingsScreenState extends State<Settingsscreen> {
   bool _isRefundWindowExpanded = false;
   bool _isTimeoutExpanded = false;
   bool _isLowStockExpanded = false;
+  bool _isMaxSessionDurationExpanded = false;
   bool _showCustomThreshold = false;
   final TextEditingController _customThresholdController = TextEditingController();
 
@@ -745,6 +746,53 @@ class _settingsScreenState extends State<Settingsscreen> {
                 },
               ),
               _tileDivider(),
+              ValueListenableBuilder<Map<String, bool>>(
+                valueListenable: AppSettings.settingsNotifier,
+                builder: (context, settings, ___) {
+                  final autoServe =
+                      settings["Auto Serve Dine In On Payment"] ?? false;
+                  return SwitchListTile(
+                    contentPadding: EdgeInsets.symmetric(
+                        horizontal: AppResponsive.largeSpacing(context),
+                        vertical: AppResponsive.smallSpacing(context) * 0.5),
+                    secondary: Container(
+                      padding:
+                          EdgeInsets.all(AppResponsive.mediumSpacing(context)),
+                      decoration: BoxDecoration(
+                        color: (autoServe
+                                ? AppColors.primary
+                                : AppColors.textSecondary)
+                            .withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(
+                            AppResponsive.borderRadius(context)),
+                      ),
+                      child: Icon(Icons.room_service_rounded,
+                          size: AppResponsive.iconSize(context),
+                          color: autoServe
+                              ? AppColors.primary
+                              : AppColors.textSecondary),
+                    ),
+                    title: Text('Auto-Serve Dine-In on Payment',
+                        style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textPrimary)),
+                    subtitle: Text(
+                      autoServe
+                          ? 'Paying a dine-in table instantly serves & completes it'
+                          : 'Dine-in stays active after payment until marked Served (default)',
+                      style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.smallFontSize(context),
+                          color: AppColors.textSecondary),
+                    ),
+                    value: autoServe,
+                    activeColor: AppColors.primary,
+                    onChanged: (val) => AppSettings.updateSetting(
+                        "Auto Serve Dine In On Payment", val),
+                  );
+                },
+              ),
+              _tileDivider(),
               ValueListenableBuilder<double>(
                 valueListenable: AppSettings.lowStockThresholdNotifier,
                 builder: (context, threshold, __) {
@@ -886,6 +934,78 @@ class _settingsScreenState extends State<Settingsscreen> {
                     }).toList(),
                   ),
                 ),
+              ),
+              _tileDivider(),
+              ValueListenableBuilder<Map<String, bool>>(
+                valueListenable: AppSettings.settingsNotifier,
+                builder: (context, settings, __) {
+                  final autoCloseOn = settings["Auto Close Stale Shift"] ?? true;
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.symmetric(
+                            horizontal: AppResponsive.largeSpacing(context),
+                            vertical: AppResponsive.smallSpacing(context) * 0.5),
+                        secondary: Container(
+                          padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
+                          decoration: BoxDecoration(
+                            color: (autoCloseOn ? Colors.blue : AppColors.textSecondary)
+                                .withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                          ),
+                          child: Icon(Icons.history_toggle_off_rounded,
+                              size: AppResponsive.iconSize(context),
+                              color: autoCloseOn ? Colors.blue : AppColors.textSecondary),
+                        ),
+                        title: Text('Auto Close Stale Shift',
+                            style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.bodyFontSize(context),
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textPrimary)),
+                        subtitle: Text(
+                          'Automatically close open shifts and attendance when the daily session exceeds the max duration limit',
+                          style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.smallFontSize(context),
+                              color: AppColors.textSecondary),
+                        ),
+                        value: autoCloseOn,
+                        activeColor: AppColors.primary,
+                        onChanged: (val) =>
+                            AppSettings.updateSetting("Auto Close Stale Shift", val),
+                      ),
+                      if (autoCloseOn) ...[
+                        _tileDivider(),
+                        ValueListenableBuilder<int>(
+                          valueListenable: AppSettings.maxSessionDurationHoursNotifier,
+                          builder: (context, hours, __) => _expandableTile(
+                            context: context,
+                            title: 'Maximum Session Duration',
+                            subtitle: 'Current: $hours Hours',
+                            icon: Icons.timer_outlined,
+                            color: Colors.blue,
+                            isExpanded: _isMaxSessionDurationExpanded,
+                            onTap: () => setState(() =>
+                                _isMaxSessionDurationExpanded =
+                                    !_isMaxSessionDurationExpanded),
+                            expandedChild: Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [12, 18, 24, 36, 48]
+                                  .map((h) => _optionChip(
+                                        label: '$h Hours',
+                                        selected: hours == h,
+                                        onTap: () => AppSettings
+                                            .updateMaxSessionDurationHours(h),
+                                      ))
+                                  .toList(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  );
+                },
               ),
             ]),
             SizedBox(height: AppResponsive.largeSpacing(context)),

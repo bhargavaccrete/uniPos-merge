@@ -801,7 +801,7 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
                 flex: 2,
                 child: ElevatedButton.icon(
                   onPressed: hasEnabled ? widget.onNext : null,
-                  icon: const Icon(Icons.arrow_forward, size: 16),
+                  icon: const Icon(Icons.arrow_forward, size: 16, color: AppColors.white),
                   label: Text('Continue',
                       style: GoogleFonts.poppins(
                           fontSize: 14,

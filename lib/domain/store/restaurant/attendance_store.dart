@@ -2,6 +2,7 @@ import 'package:mobx/mobx.dart';
 import 'package:uuid/uuid.dart';
 import '../../../data/models/restaurant/db/attendance_model.dart';
 import '../../../data/repositories/restaurant/attendance_repository.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
 
 part 'attendance_store.g.dart';
 
@@ -40,13 +41,20 @@ abstract class _AttendanceStore with Store {
   // ── Get open record for the current staff (null if not clocked in) ────────
 
   @action
-  AttendanceModel? getActiveRecord(String staffName) {
+  AttendanceModel? getActiveRecord(String staffName, {String? staffId}) {
     try {
       return todayRecords.firstWhere(
-        (r) => r.staffName == staffName && r.isOpen,
+        (r) => (staffId != null && r.staffId == staffId && r.isOpen) ||
+               (staffId == null && r.staffName == staffName && r.isOpen),
       );
     } catch (_) {
-      return null;
+      try {
+        return todayRecords.firstWhere(
+          (r) => r.staffName == staffName && r.isOpen,
+        );
+      } catch (_) {
+        return null;
+      }
     }
   }
 
@@ -57,6 +65,7 @@ abstract class _AttendanceStore with Store {
     required String staffName,
     required String staffRole,
     String? sessionId,
+    String? staffId,
   }) async {
     final now = DateTime.now();
     final record = AttendanceModel(
@@ -66,6 +75,7 @@ abstract class _AttendanceStore with Store {
       clockIn: now,
       date: _todayKey(),
       sessionId: sessionId,
+      staffId: staffId,
     );
     await _repository.addRecord(record);
     todayRecords.add(record);
@@ -75,19 +85,23 @@ abstract class _AttendanceStore with Store {
   // ── Clock Out ────────────────────────────────────────────────────────────
 
   @action
-  Future<void> clockOut(String recordId) async {
+  Future<void> clockOut(String recordId, {DateTime? clockOutTime}) async {
     final record = _repository.getRecordById(recordId);
     if (record == null) return;
+
+    // Idempotency: if already clocked out, do nothing
+    if (record.clockOut != null) return;
 
     // Auto-end break if they were on break
     if (record.isOnBreak) {
       await endBreak(recordId);
     }
 
-    final now = DateTime.now();
-    record.clockOut = now;
-    final grossMinutes = now.difference(record.clockIn).inMinutes;
+    final outTime = clockOutTime ?? DateTime.now();
+    record.clockOut = outTime;
+    final grossMinutes = outTime.difference(record.clockIn).inMinutes;
     record.totalMinutes = grossMinutes - (record.breakTotalMinutes ?? 0);
+    if (record.totalMinutes! < 0) record.totalMinutes = 0;
     await _repository.updateRecord(record);
 
     // Refresh list
@@ -146,8 +160,14 @@ abstract class _AttendanceStore with Store {
 
   @action
   Future<void> deleteRecord(String recordId) async {
+    // Capture the record BEFORE deleting so the Shift Report can be reconciled.
+    final record = _repository.getRecordById(recordId);
     await _repository.deleteRecord(recordId);
     todayRecords.removeWhere((r) => r.id == recordId);
+    // Reflect the deletion in the Shift Report (never wipes a shift's sales).
+    if (record != null) {
+      await shiftStore.reconcileShiftOnAttendanceDelete(record);
+    }
   }
 
   @action
@@ -171,6 +191,9 @@ abstract class _AttendanceStore with Store {
     }
     
     await _repository.updateRecord(record);
+
+    // Keep the Shift Report / Staff Performance aligned with the corrected times.
+    await shiftStore.syncShiftTimesFromAttendance(record);
 
     // Refresh list if it's today's record
     final idx = todayRecords.indexWhere((r) => r.id == recordId);

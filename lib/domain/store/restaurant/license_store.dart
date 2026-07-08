@@ -56,8 +56,9 @@ abstract class _LicenseStore with Store {
   // when licenseInfo changes, by which point this is already loaded.
   int _trustedNowMs = 0;
 
-  /// When true, the app behaves as licensed without an actual activation.
-  /// Set via [skipLicense]; cleared via [clearBypass].
+  /// DEPRECATED escape hatch. License-skip was removed — the app is key-only —
+  /// so this is now permanently false (forced off in [loadBypassFlag]). Retained
+  /// only because entitlement checks read it as `bypassed || <real check>`.
   @observable
   bool licenseBypassed = false;
 
@@ -310,29 +311,27 @@ abstract class _LicenseStore with Store {
 
   // ── Load & Validate ───────────────────────────────────────────────────────
 
-  // ── License bypass (skip) ─────────────────────────────────────────────────
+  // ── License bypass (REMOVED — app is key-only) ─────────────────────────────
 
-  /// Loads the persisted bypass flag. Call at startup before guarding routes.
+  /// Startup: force license-bypass OFF. Skip was removed, so the app only runs
+  /// with a valid key. This also clears any `true` persisted by older builds —
+  /// healing a device that had "Skip for now" stuck on (which silently disabled
+  /// every entitlement cap). Call before guarding routes.
   @action
   Future<void> loadBypassFlag() async {
+    licenseBypassed = false;
     try {
       final prefs = await SharedPreferences.getInstance();
-      licenseBypassed = prefs.getBool(_bypassKey) ?? false;
+      await prefs.remove(_bypassKey);
     } catch (_) {}
   }
 
-  /// Bypass the license requirement so the app is not locked. Persists across
-  /// restarts. Used as a temporary "Skip for now" escape hatch.
+  /// No-op. License-skip was removed (the app is key-only). Retained only so the
+  /// generated MobX binding still resolves; it can never re-enable bypass.
   @action
-  Future<void> skipLicense() async {
-    licenseBypassed = true;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_bypassKey, true);
-    } catch (_) {}
-  }
+  Future<void> skipLicense() async {}
 
-  /// Re-enables the license gate (clears the skip).
+  /// Re-enables the license gate (clears the skip). Still used defensively.
   @action
   Future<void> clearBypass() async {
     licenseBypassed = false;

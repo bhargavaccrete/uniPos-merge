@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/restaurant/order_status_filter.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -230,8 +231,7 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
 
     for (final order in allOrders) {
       final orderStatus = order.orderStatus?.toUpperCase() ?? '';
-      if (orderStatus == 'FULLY_REFUNDED') continue;
-      if (orderStatus == 'VOID' || orderStatus == 'VOIDED') continue;
+      if (OrderStatusFilter.isExcludedFromRevenue(orderStatus)) continue;
       if (order.orderAt == null) continue;
       if (cutoff != null && order.orderAt!.isBefore(cutoff)) continue;
 

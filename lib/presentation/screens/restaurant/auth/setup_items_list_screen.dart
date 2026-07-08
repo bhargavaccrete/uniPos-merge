@@ -304,26 +304,26 @@ class _ItemCard extends StatelessWidget {
                 if ((item.variant?.isNotEmpty ?? false))
                   _chip(
                     icon: Icons.tune,
-                    label: '${item.variant!.length} Variants',
-                    color: Colors.deepPurple,
+                    label: _countLabel(item.variant!.length, 'Variant'),
+                    color: AppColors.primary,
                   ),
                 if ((item.choiceIds?.isNotEmpty ?? false))
                   _chip(
                     icon: Icons.checklist,
-                    label: '${item.choiceIds!.length} Choices',
-                    color: Colors.teal,
+                    label: _countLabel(item.choiceIds!.length, 'Choice'),
+                    color: AppColors.primary,
                   ),
                 if ((item.extraId?.isNotEmpty ?? false))
                   _chip(
                     icon: Icons.add_circle_outline,
-                    label: '${item.extraId!.length} Extras',
-                    color: Colors.orange,
+                    label: _countLabel(item.extraId!.length, 'Extra'),
+                    color: AppColors.primary,
                   ),
                 if (item.isSoldByWeight)
                   _chip(
                     icon: Icons.scale,
                     label: 'By Weight (${item.unit ?? ''})',
-                    color: Colors.brown,
+                    color: AppColors.textSecondary,
                   ),
                 if (!item.isEnabled)
                   _chip(
@@ -384,16 +384,15 @@ class _ItemCard extends StatelessWidget {
             padding:
                 const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: Colors.deepPurple.withValues(alpha: 0.08),
+              color: AppColors.surfaceLight,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                  color: Colors.deepPurple.withValues(alpha: 0.2)),
+              border: Border.all(color: AppColors.divider),
             ),
             child: Text(
               price.isNotEmpty ? '$name · $price' : name,
               style: GoogleFonts.poppins(
                   fontSize: 11,
-                  color: Colors.deepPurple,
+                  color: AppColors.textPrimary,
                   fontWeight: FontWeight.w500),
             ),
           );
@@ -401,6 +400,10 @@ class _ItemCard extends StatelessWidget {
       ),
     );
   }
+
+  /// "1 Variant" / "2 Variants" — correct singular vs plural.
+  String _countLabel(int n, String singular) =>
+      '$n ${n == 1 ? singular : '${singular}s'}';
 
   Widget _chip(
       {required IconData icon,

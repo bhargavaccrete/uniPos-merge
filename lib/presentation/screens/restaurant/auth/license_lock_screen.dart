@@ -46,10 +46,6 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
   bool get _isExpired => _status == LicenseStatus.expired;
   bool get _isDeactivated => _status == LicenseStatus.suspended;
 
-  // Skip is only ever allowed on a fresh device. An expired or deactivated
-  // license must be renewed or resolved with support — it cannot be bypassed.
-  bool get _canSkip => _isNotActivated;
-
   void _contactSupport() =>
       Navigator.pushNamed(context, RouteNames.restaurantNeedHelp);
 
@@ -115,10 +111,6 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
                     ],
                     SizedBox(height: AppResponsive.largeSpacing(context)),
                     _keyInputCard(isTablet),
-                    if (_canSkip) ...[
-                      SizedBox(height: AppResponsive.mediumSpacing(context)),
-                      _skipButton(isTablet),
-                    ],
                     SizedBox(height: AppResponsive.largeSpacing(context)),
                     _supportNote(isTablet),
                   ],
@@ -388,27 +380,6 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Future<void> _skip() async {
-    await _store.skipLicense();
-    widget.onActivated();
-  }
-
-  Widget _skipButton(bool isTablet) {
-    return TextButton.icon(
-      onPressed: _loading ? null : _skip,
-      icon: Icon(Icons.skip_next_rounded,
-          size: isTablet ? 20 : 18, color: AppColors.textSecondary),
-      label: Text(
-        'Skip for now',
-        style: GoogleFonts.poppins(
-          fontSize: isTablet ? 14 : 13,
-          fontWeight: FontWeight.w500,
-          color: AppColors.textSecondary,
-        ),
       ),
     );
   }

@@ -35,6 +35,9 @@ class AttendanceModel extends HiveObject {
   @HiveField(9)
   int? breakTotalMinutes;
 
+  @HiveField(10)
+  String? staffId;
+
   AttendanceModel({
     required this.id,
     required this.staffName,
@@ -46,6 +49,7 @@ class AttendanceModel extends HiveObject {
     this.sessionId,
     this.breakStartTime,
     this.breakTotalMinutes,
+    this.staffId,
   });
 
   bool get isOpen => clockOut == null;
@@ -86,6 +90,7 @@ class AttendanceModel extends HiveObject {
         'sessionId': sessionId,
         'breakStartTime': breakStartTime?.toIso8601String(),
         'breakTotalMinutes': breakTotalMinutes,
+        'staffId': staffId,
       };
 
   factory AttendanceModel.fromMap(Map<String, dynamic> map) => AttendanceModel(
@@ -99,5 +104,6 @@ class AttendanceModel extends HiveObject {
         sessionId: map['sessionId'] as String?,
         breakStartTime: map['breakStartTime'] != null ? DateTime.parse(map['breakStartTime']) : null,
         breakTotalMinutes: map['breakTotalMinutes'] as int?,
+        staffId: map['staffId'] as String?,
       );
 }

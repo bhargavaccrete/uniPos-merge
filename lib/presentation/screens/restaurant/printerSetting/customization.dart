@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/core/plan/plan_gate.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../util/restaurant/print_settings.dart';
@@ -15,11 +17,23 @@ class CustomizationPrinter extends StatefulWidget {
 }
 
 class _CustomizationPrinterState extends State<CustomizationPrinter> {
+  final _footerController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
-    // Load print settings when screen opens
-    PrintSettings.load();
+    // Load print settings when screen opens, then seed the footer field.
+    PrintSettings.load().then((_) {
+      if (mounted) {
+        setState(() => _footerController.text = PrintSettings.footerMessage);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _footerController.dispose();
+    super.dispose();
   }
 
   // Group settings by category
@@ -60,9 +74,74 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
 
     if (confirmed == true) {
       await PrintSettings.resetToDefaults();
-      setState(() {});
+      setState(() => _footerController.text = PrintSettings.footerMessage);
       NotificationService.instance.showSuccess('Settings reset to defaults');
     }
+  }
+
+  /// Editable footer / "Thank You" message that prints at the bottom of bills.
+  Widget _buildFooterMessageCard(BuildContext context, bool isTablet) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(isTablet ? 16 : 14),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.chat_bubble_outline_rounded,
+                    color: AppColors.primary, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Footer Message',
+                      style: GoogleFonts.poppins(
+                        fontSize: isTablet ? 15 : 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'The "Thank You" note printed at the bottom of every bill',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          AppTextField(
+            controller: _footerController,
+            hint: 'e.g. Thank you! Visit us again!',
+            icon: Icons.edit_note_rounded,
+            maxLines: 2,
+            minLines: 1,
+            maxLength: 120,
+            onChanged: (v) => PrintSettings.setFooterMessage(v),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -163,6 +242,11 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
 
                 SizedBox(height: 24),
 
+                // Dynamic footer / "Thank You" message
+                _buildFooterMessageCard(context, isTablet),
+
+                SizedBox(height: 24),
+
                 // Settings Groups
                 ..._settingGroups.entries.map((group) {
                   return _buildSettingGroup(
@@ -254,6 +338,10 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
           final icon = setting['icon'] as IconData;
           final description = setting['description'] as String;
           final isEnabled = currentSettings[key] ?? false;
+          // Free plan: the "Powered By" watermark is forced ON and cannot be
+          // turned off. `shown` drives the visuals; `locked` disables input.
+          final bool locked = key == 'Powered By' && PlanGate.isFree;
+          final bool shown = locked ? true : isEnabled;
 
           return Container(
             margin: EdgeInsets.only(bottom: 12),
@@ -261,15 +349,15 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
               color: AppColors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: isEnabled ? AppColors.primary.withOpacity(0.3) : AppColors.divider,
-                width: isEnabled ? 1.5 : 1,
+                color: shown ? AppColors.primary.withOpacity(0.3) : AppColors.divider,
+                width: shown ? 1.5 : 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: isEnabled
+                  color: shown
                       ? AppColors.primary.withOpacity(0.1)
                       : Colors.black.withOpacity(0.03),
-                  blurRadius: isEnabled ? 8 : 4,
+                  blurRadius: shown ? 8 : 4,
                   offset: Offset(0, 2),
                 ),
               ],
@@ -278,6 +366,11 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
               color: Colors.transparent,
               child: InkWell(
                 onTap: () async {
+                  if (locked) {
+                    NotificationService.instance.showInfo(
+                        'Upgrade to Premium to remove the "Powered by Bill Berry Lite" footer.');
+                    return;
+                  }
                   await PrintSettings.updateSetting(key, !isEnabled);
                 },
                 borderRadius: BorderRadius.circular(12),
@@ -289,14 +382,14 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
                       Container(
                         padding: EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: isEnabled
+                          color: shown
                               ? AppColors.primary.withOpacity(0.1)
                               : AppColors.surfaceMedium,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
                           icon,
-                          color: isEnabled ? AppColors.primary : AppColors.textSecondary,
+                          color: shown ? AppColors.primary : AppColors.textSecondary,
                           size: 22,
                         ),
                       ),
@@ -307,17 +400,30 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              key,
-                              style: GoogleFonts.poppins(
-                                fontSize: isTablet ? 15 : 14,
-                                fontWeight: FontWeight.w600,
-                                color: isEnabled ? AppColors.textPrimary : AppColors.textSecondary,
-                              ),
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    key,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: isTablet ? 15 : 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: shown ? AppColors.textPrimary : AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                                if (locked) ...[
+                                  const SizedBox(width: 6),
+                                  Icon(Icons.lock_rounded,
+                                      size: 14, color: AppColors.textSecondary),
+                                ],
+                              ],
                             ),
                             SizedBox(height: 3),
                             Text(
-                              description,
+                              locked
+                                  ? 'Included on the Free plan — upgrade to Premium to hide'
+                                  : description,
                               style: GoogleFonts.poppins(
                                 fontSize: 12,
                                 color: AppColors.textSecondary,
@@ -327,14 +433,16 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
                         ),
                       ),
 
-                      // Toggle Switch
+                      // Toggle Switch (disabled when locked)
                       Transform.scale(
                         scale: 0.9,
                         child: Switch(
-                          value: isEnabled,
-                          onChanged: (value) async {
-                            await PrintSettings.updateSetting(key, value);
-                          },
+                          value: shown,
+                          onChanged: locked
+                              ? null
+                              : (value) async {
+                                  await PrintSettings.updateSetting(key, value);
+                                },
                           activeColor: AppColors.primary,
                           activeTrackColor: AppColors.primary.withOpacity(0.5),
                         ),

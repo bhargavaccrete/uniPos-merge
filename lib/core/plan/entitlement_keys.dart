@@ -33,6 +33,12 @@ class EntKeys {
   static const billingInvoice = 'billing.invoice';
   static const billingReturns = 'billing.returns';
   static const billingTables = 'billing.tables';
+  static const billingKot = 'billing.kot'; // KOT generation (on/off)
+
+  // Table actions (finer control within dine-in)
+  static const billingTablesCreate = 'billing.tables.create';
+  static const billingTablesMerge = 'billing.tables.merge';
+  static const billingTablesTransfer = 'billing.tables.transfer';
 
   static const manageMenuItems = 'manage_menu.items';
   static const manageMenuCategories = 'manage_menu.categories';
@@ -94,6 +100,7 @@ class EntKeys {
   static const customersMax = 'customers.max';
   static const usersMax = 'users.max';
   static const manageMenuItemsMax = 'manage_menu.items.max';
+  static const billingTablesMax = 'billing.tables.max';
 
   // ── Data scopes ──────────────────────────────────────────────────────────────
   static const reportsHistoryLimitDays = 'reports.history_limit_days';
@@ -121,6 +128,12 @@ const Map<String, Object> kEntitlementDefaults = {
   EntKeys.billingInvoice: false,
   EntKeys.billingReturns: false,
   EntKeys.billingTables: false,
+  // Table/KOT capabilities default PERMISSIVE — these are existing features, so
+  // admin RESTRICTS by sending false / a cap (like settings/shifts default-on).
+  EntKeys.billingKot: true,
+  EntKeys.billingTablesCreate: true,
+  EntKeys.billingTablesMerge: true,
+  EntKeys.billingTablesTransfer: true,
   EntKeys.manageMenuItems: false,
   EntKeys.manageMenuCategories: false,
   EntKeys.manageMenuVariants: false,
@@ -174,6 +187,7 @@ const Map<String, Object> kEntitlementDefaults = {
   EntKeys.customersMax: 0,
   EntKeys.usersMax: 2,
   EntKeys.manageMenuItemsMax: 0,
+  EntKeys.billingTablesMax: 0, // 0 = unlimited
 
   // Data scopes — 'all' = unlimited history by default
   EntKeys.reportsHistoryLimitDays: 'all',

@@ -203,16 +203,6 @@ class _LicenseActivationStepState extends State<LicenseActivationStep> {
                             ),
                     ),
                   ),
-                  SizedBox(height: AppResponsive.smallSpacing(context)),
-                  TextButton(
-                    onPressed: widget.onNext,
-                    child: Text(
-                      'Skip for now',
-                      style: TextStyle(
-                          fontSize: AppResponsive.smallFontSize(context),
-                          color: Colors.grey[500]),
-                    ),
-                  ),
                 ],
               ],
             ),

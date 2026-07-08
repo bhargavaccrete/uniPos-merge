@@ -635,6 +635,25 @@ class _RestaurantBulkImportScreenState extends State<RestaurantBulkImportScreen>
                 '${result.itemsImported}',
                 AppColors.primary,
               ),
+              if (result.itemsSkippedByLimit > 0) ...[
+                _buildResultItem(
+                  context,
+                  Icons.lock_outline,
+                  'Skipped (plan limit ${result.itemLimitMax})',
+                  '${result.itemsSkippedByLimit}',
+                  Colors.orange.shade800,
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Text(
+                    'Only ${result.itemsImported} item(s) were added — your plan '
+                    'allows a maximum of ${result.itemLimitMax} items. '
+                    '${result.itemsSkippedByLimit} item(s) were skipped. '
+                    'Upgrade to add more.',
+                    style: TextStyle(fontSize: 12, color: Colors.orange.shade900),
+                  ),
+                ),
+              ],
               if (result.categoriesAutoCreated > 0)
                 _buildResultItem(
                   context,
@@ -687,6 +706,8 @@ class _RestaurantBulkImportScreenState extends State<RestaurantBulkImportScreen>
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
         tilePadding: EdgeInsets.zero,
+        // ExpansionTile centres its children by default — force left-align.
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
         childrenPadding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
         title: Text(
           'View failed rows',
@@ -742,6 +763,8 @@ class _RestaurantBulkImportScreenState extends State<RestaurantBulkImportScreen>
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
         tilePadding: EdgeInsets.zero,
+        // ExpansionTile centres its children by default — force left-align.
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
         childrenPadding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
         title: Text(
           'View notices',

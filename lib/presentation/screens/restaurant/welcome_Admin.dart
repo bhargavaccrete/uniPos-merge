@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
@@ -33,6 +34,8 @@ class _AdminWelcomeState extends State<AdminWelcome> {
   String _storeName = '';
   bool _hasPendingEOD = false;
   bool _dayNotStarted = false; // day closed/not started → show a non-blocking banner
+  bool _isEodStrictlyPending = false;
+  int _openTableCount = 0; // active orders awaiting resolution (locked state)
 
   DateTime? _snoozeDayStartUntil;
   DateTime? _snoozeEodUntil;
@@ -100,6 +103,27 @@ class _AdminWelcomeState extends State<AdminWelcome> {
   }
 
   Future<void> _checkDayStarted() async {
+    final isStrictlyPending = await DayManagementService.isEodStrictlyPending();
+    if (mounted) {
+      setState(() => _isEodStrictlyPending = isStrictlyPending);
+    }
+    if (isStrictlyPending) {
+      // Session went stale → freeze staff hours NOW (once) at the latest business
+      // activity, so completing EOD later can never extend them. Idempotent and
+      // exits fast when no shift is open.
+      await shiftStore.freezeStaleShiftsAndAttendance();
+      await orderStore.loadOrders();
+      final count = orderStore.orders.where((o) {
+        final s = o.status.toLowerCase();
+        return s != 'void' &&
+            s != 'voided' &&
+            s != 'cancelled' &&
+            s != 'completed';
+      }).length;
+      if (mounted) setState(() => _openTableCount = count);
+      return;
+    }
+
     // Check if there's a pending EOD from yesterday (midnight crossed without completing EOD)
     final pendingEOD = await DayManagementService.hasPendingEOD();
     if (pendingEOD && mounted) {
@@ -119,6 +143,9 @@ class _AdminWelcomeState extends State<AdminWelcome> {
   }
 
   Future<void> _startShiftIfNeeded() async {
+    final isStrictlyPending = await DayManagementService.isEodStrictlyPending();
+    if (isStrictlyPending) return;
+
     // Shifts are a licensed module — skip auto-start when the plan omits it.
     if (!PlanEnforce.allows(EntKeys.shifts)) return;
     final staffId = RestaurantSession.isAdmin
@@ -151,9 +178,10 @@ class _AdminWelcomeState extends State<AdminWelcome> {
     final isDesktop = AppResponsive.isDesktop(context);
 
     return PopScope(
-      canPop: false,
+      canPop: !_isEodStrictlyPending,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
+        if (_isEodStrictlyPending) return;
         final now = DateTime.now();
         if (_lastBackPress != null &&
             now.difference(_lastBackPress!) < const Duration(seconds: 2)) {
@@ -184,8 +212,12 @@ class _AdminWelcomeState extends State<AdminWelcome> {
       },
       child: Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      drawer: const Drawerr(showClearCart: false, showGridDuplicates: false, showChangePin: true),
-      appBar: buildPrimaryAppBar(
+      drawer: _isEodStrictlyPending
+          ? null
+          : const Drawerr(showClearCart: false, showGridDuplicates: false, showChangePin: true),
+      appBar: _isEodStrictlyPending
+          ? null
+          : buildPrimaryAppBar(
         titleWidget: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -259,8 +291,9 @@ class _AdminWelcomeState extends State<AdminWelcome> {
           ),
         ],
       ),
-      body: Column(
-          children: [
+      body: Stack(children: [
+          Column(
+              children: [
           // License expiry warning banner (7 days or less remaining)
           Observer(
             builder: (_) {
@@ -563,6 +596,9 @@ class _AdminWelcomeState extends State<AdminWelcome> {
           ),
           ],
         ), // Column / body
+        if (_isEodStrictlyPending)
+          Positioned.fill(child: _buildLockedOverlay(context)),
+      ]),
       ), // PopScope closing
     );
   }
@@ -869,6 +905,202 @@ class _AdminWelcomeState extends State<AdminWelcome> {
           ),
         ),
       ),
+    );
+  }
+
+  /// The lock as a DIALOG over the (blurred, non-interactive) dashboard.
+  Widget _buildLockedOverlay(BuildContext context) {
+    return GestureDetector(
+      // Opaque → absorbs taps on the scrim so the blurred dashboard behind is
+      // non-interactive (the card's own buttons still receive their taps).
+      behavior: HitTestBehavior.opaque,
+      onTap: () {},
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+        child: Container(
+          color: Colors.black.withOpacity(0.30),
+          alignment: Alignment.center,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: _buildLockedDashboardLayout(context),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLockedDashboardLayout(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 400),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.18),
+            blurRadius: 30,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.lock_clock_rounded,
+                  size: 56,
+                  color: Colors.orange.shade700,
+                ),
+              ),
+              const SizedBox(height: 28),
+              Text(
+                'End of Day Required',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                constraints: const BoxConstraints(maxWidth: 360),
+                child: Text(
+                  "Your daily session has exceeded the maximum allowed duration. Complete End of Day to unlock — you'll be prompted to resolve any open orders.",
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    height: 1.5,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 28),
+              // Context card — so the lock screen isn't a bare wall.
+              Container(
+                constraints: const BoxConstraints(maxWidth: 340),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.schedule_rounded,
+                            size: 18, color: Colors.orange.shade800),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Session exceeded the maximum allowed duration.',
+                            style: GoogleFonts.poppins(
+                                fontSize: 12.5, color: Colors.orange.shade900),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_openTableCount > 0) ...[
+                      Divider(height: 18, color: Colors.orange.shade200),
+                      Row(
+                        children: [
+                          Icon(Icons.table_restaurant_rounded,
+                              size: 18, color: Colors.orange.shade800),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              '$_openTableCount open table(s) still need settling.',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.orange.shade900),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Container(
+                constraints: const BoxConstraints(maxWidth: 320),
+                child: Column(
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          await Navigator.pushNamed(context, RouteNames.restaurantEndDay);
+                          _checkDayStarted();
+                        },
+                        icon: const Icon(Icons.wb_sunny_rounded, color: Colors.white, size: 20),
+                        label: Text(
+                          'Complete End Day',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade600,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          await _clearLoginState();
+                          if (context.mounted) {
+                            Navigator.pushNamedAndRemoveUntil(
+                              context,
+                              RouteNames.restaurantLogin,
+                              (route) => false,
+                            );
+                          }
+                        },
+                        icon: Icon(Icons.logout_rounded, color: Colors.grey.shade700, size: 20),
+                        label: Text(
+                          'Logout',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.grey.shade300, width: 1.5),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
     );
   }
 

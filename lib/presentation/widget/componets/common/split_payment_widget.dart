@@ -217,6 +217,21 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
         : 'cash';
 
     setState(() {
+      // Single → split: if the sole cash entry was only partially tendered
+      // (received < its bill amount), lock its allocation to the received
+      // amount. Otherwise the cash row keeps showing the full bill total once
+      // the "Cash Received" field is hidden in split mode, and the new method
+      // adds the remaining on top — inflating the displayed total.
+      if (_payments.length == 1) {
+        final first = _payments.first;
+        if (first.isCash &&
+            first.cashReceived > 0 &&
+            first.cashReceived < first.amount) {
+          first.amount = first.cashReceived;
+          first.amountController.text = first.amount.toStringAsFixed(2);
+          first.cashChange = 0;
+        }
+      }
       final entry = PaymentEntry(method: defaultMethod, amount: initialAmount);
       if (initialAmount > 0) {
         entry.amountController.text = initialAmount.toStringAsFixed(2);
@@ -231,6 +246,17 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
       setState(() {
         _payments[index].dispose();
         _payments.removeAt(index);
+        // Back to single mode → the lone entry covers the full bill again
+        // (its `amount` may have been locked to a partial cash allocation).
+        if (_payments.length == 1) {
+          final only = _payments.first;
+          only.amount = widget.billTotal;
+          only.amountController.text =
+              widget.billTotal > 0 ? widget.billTotal.toStringAsFixed(2) : '';
+          only.cashChange = only.cashReceived > widget.billTotal
+              ? only.cashReceived - widget.billTotal
+              : 0;
+        }
         _notifyChanges();
       });
     }

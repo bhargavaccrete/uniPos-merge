@@ -290,6 +290,24 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
     );
   }
 
+  /// Confirm + delete a payment method (shared by the card overflow menu).
+  Future<void> _confirmDelete(PaymentMethod method) async {
+    final confirm = await showAppConfirmDialog(
+      context: context,
+      title: 'Delete Payment Method',
+      message: 'Are you sure you want to delete ${method.name}?',
+      confirmLabel: 'Delete',
+      accent: Colors.red,
+      icon: Icons.delete_rounded,
+    );
+    if (confirm) {
+      await _paymentStore.deletePaymentMethod(method.id);
+      if (mounted) {
+        NotificationService.instance.showSuccess('${method.name} deleted');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isTablet = !AppResponsive.isMobile(context);
@@ -335,73 +353,15 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddDialog,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        tooltip: 'Add Payment Method',
+        child: const Icon(Icons.add),
+      ),
       body: Column(
         children: [
-          // Action Buttons Section
-          Container(
-            color: AppColors.white,
-            padding: EdgeInsets.all(isTablet ? 20 : 16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      // Force re-initialization
-                      await _paymentStore.init();
-                      if (mounted) {
-                        final count = _paymentStore.paymentMethods.length;
-                        NotificationService.instance.showSuccess('Refreshed: Found $count payment methods');
-                      }
-                    },
-                    icon: Icon(Icons.sync_rounded, size: isTablet ? 20 : 18),
-                    label: Text(
-                      'Sync',
-                      style: GoogleFonts.poppins(
-                        fontSize: isTablet ? 16 : 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: EdgeInsets.symmetric(
-                        vertical: isTablet ? 14 : 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _showAddDialog,
-                    icon: Icon(Icons.add_circle_rounded, size: isTablet ? 20 : 18),
-                    label: Text(
-                      'Add New',
-                      style: GoogleFonts.poppins(
-                        fontSize: isTablet ? 16 : 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: EdgeInsets.symmetric(
-                        vertical: isTablet ? 14 : 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
           Expanded(
             child: Observer(
               builder: (_) {
@@ -450,217 +410,202 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
                   );
                 }
 
-                return SingleChildScrollView(
-                  child: Padding(
-                    padding: EdgeInsets.all(isTablet ? 20 : 16),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 10,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            return SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  minWidth: constraints.maxWidth,
-                                ),
-                                child: DataTable(
-                            headingRowColor: WidgetStateProperty.all(AppColors.primary),
-                            headingRowHeight: isTablet ? 56 : 50,
-                            dataRowMinHeight: isTablet ? 60 : 56,
-                            dataRowMaxHeight: isTablet ? 70 : 65,
-                            columnSpacing: isTablet ? 20 : 10,
-                            horizontalMargin: isTablet ? 16 : 10,
-                            columns: [
-                              DataColumn(
-                                label: Text(
-                                  "Sr No",
-                                  style: GoogleFonts.poppins(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: isTablet ? 15 : 14,
-                                  ),
-                                ),
-                              ),
-                              DataColumn(
-                                label: Text(
-                                  "Icon",
-                                  style: GoogleFonts.poppins(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: isTablet ? 15 : 14,
-                                  ),
-                                ),
-                              ),
-                              DataColumn(
-                                label: Text(
-                                  "Method Name",
-                                  style: GoogleFonts.poppins(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: isTablet ? 15 : 14,
-                                  ),
-                                ),
-                              ),
-                              DataColumn(
-                                label: Text(
-                                  "Status",
-                                  style: GoogleFonts.poppins(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: isTablet ? 15 : 14,
-                                  ),
-                                ),
-                              ),
-                              DataColumn(
-                                label: Text(
-                                  "Actions",
-                                  style: GoogleFonts.poppins(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: isTablet ? 15 : 14,
-                                  ),
-                                ),
-                              ),
-                            ],
-                            rows: _paymentStore.paymentMethods
-                                .asMap()
-                                .entries
-                                .map((entry) {
-                              final index = entry.key;
-                              final method = entry.value;
-
-                              return DataRow(
-                                color: WidgetStateProperty.all(
-                                  index % 2 == 0 ? AppColors.white : AppColors.surfaceLight,
-                                ),
-                                cells: [
-                                  DataCell(
-                                    Text(
-                                      "${index + 1}",
-                                      style: GoogleFonts.poppins(
-                                        fontSize: isTablet ? 15 : 14,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                  DataCell(
-                                    Container(
-                                      padding: EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: method.isEnabled
-                                            ? Colors.green.withValues(alpha: 0.1)
-                                            : AppColors.textSecondary.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Icon(
-                                        _getIcon(method.iconName),
-                                        color: method.isEnabled ? Colors.green : AppColors.textSecondary,
-                                        size: isTablet ? 24 : 22,
-                                      ),
-                                    ),
-                                  ),
-                                  DataCell(
-                                    Text(
-                                      method.name,
-                                      style: GoogleFonts.poppins(
-                                        fontSize: isTablet ? 15 : 14,
-                                        fontWeight: FontWeight.w500,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
-                                  ),
-                                  DataCell(
-                                    Switch(
-                                      value: method.isEnabled,
-                                      onChanged: (value) async {
-                                        await _paymentStore.togglePaymentMethod(method.id);
-                                        if (mounted) {
-                                          NotificationService.instance.showSuccess('${method.name} ${value ? 'enabled' : 'disabled'}');
-                                        }
-                                      },
-                                      activeColor: Colors.green,
-                                    ),
-                                  ),
-                                  DataCell(
-                                    Row(
-                                      children: [
-                                        Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.blue.withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: IconButton(
-                                            onPressed: () => _showEditDialog(method),
-                                            icon: Icon(
-                                              Icons.edit_rounded,
-                                              color: Colors.blue,
-                                              size: isTablet ? 22 : 20,
-                                            ),
-                                            tooltip: 'Edit',
-                                          ),
-                                        ),
-                                        SizedBox(width: 8),
-                                        Container(
-                                          decoration: BoxDecoration(
-                                            color: Colors.red.withValues(alpha: 0.1),
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: IconButton(
-                                            onPressed: () async {
-                                              final confirm = await showAppConfirmDialog(
-                                                context: context,
-                                                title: 'Delete Payment Method',
-                                                message: 'Are you sure you want to delete ${method.name}?',
-                                                confirmLabel: 'Delete',
-                                                accent: Colors.red,
-                                                icon: Icons.delete_rounded,
-                                              );
-                                              if (confirm) {
-                                                await _paymentStore.deletePaymentMethod(method.id);
-                                                if (mounted) {
-                                                  NotificationService.instance.showSuccess('${method.name} deleted');
-                                                }
-                                              }
-                                            },
-                                            icon: Icon(
-                                              Icons.delete_rounded,
-                                              color: Colors.red,
-                                              size: isTablet ? 22 : 20,
-                                            ),
-                                            tooltip: 'Delete',
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      );
-                    },
+                // Card list — mobile-friendly replacement for the old DataTable.
+                // Each method is a card: colored icon, name + status, an enable
+                // switch, and a ⋮ overflow menu (Edit / Delete).
+                return ListView.builder(
+                  // Extra bottom padding so the FAB never covers the last card.
+                  padding: EdgeInsets.fromLTRB(
+                    isTablet ? 20 : 16,
+                    isTablet ? 20 : 16,
+                    isTablet ? 20 : 16,
+                    88,
                   ),
-                ),
-              ),
-            ),
-          );
+                  itemCount: _paymentStore.paymentMethods.length,
+                  itemBuilder: (context, index) {
+                    return _buildMethodCard(
+                      context,
+                      _paymentStore.paymentMethods[index],
+                      isTablet,
+                    );
+                  },
+                );
               },
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// A styled row for the card overflow menu: tinted icon chip + colored label.
+  PopupMenuItem<String> _menuItem({
+    required String value,
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return PopupMenuItem<String>(
+      value: value,
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 18, color: color),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: color == Colors.red ? Colors.red : AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// One payment method rendered as a card row.
+  Widget _buildMethodCard(
+    BuildContext context,
+    PaymentMethod method,
+    bool isTablet,
+  ) {
+    final enabled = method.isEnabled;
+    final statusColor = enabled ? Colors.green : AppColors.textSecondary;
+
+    return Container(
+      margin: EdgeInsets.only(bottom: isTablet ? 14 : 12),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.divider),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(isTablet ? 16 : 14),
+        child: Row(
+          children: [
+            // Colored icon tile
+            Container(
+              padding: EdgeInsets.all(isTablet ? 12 : 10),
+              decoration: BoxDecoration(
+                color: statusColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                _getIcon(method.iconName),
+                color: statusColor,
+                size: isTablet ? 26 : 24,
+              ),
+            ),
+            SizedBox(width: isTablet ? 16 : 14),
+
+            // Name + status
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    method.name,
+                    style: GoogleFonts.poppins(
+                      fontSize: isTablet ? 16 : 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: statusColor,
+                        ),
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        enabled ? 'Enabled' : 'Disabled',
+                        style: GoogleFonts.poppins(
+                          fontSize: isTablet ? 13 : 12,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // Enable switch
+            Switch(
+              value: enabled,
+              activeColor: Colors.green,
+              onChanged: (value) async {
+                await _paymentStore.togglePaymentMethod(method.id);
+                if (mounted) {
+                  NotificationService.instance.showSuccess(
+                      '${method.name} ${value ? 'enabled' : 'disabled'}');
+                }
+              },
+            ),
+
+            // Overflow menu — Edit / Delete
+            PopupMenuButton<String>(
+              icon: Icon(Icons.more_vert_rounded,
+                  color: AppColors.textSecondary, size: isTablet ? 24 : 22),
+              // White sheet — kill the Material 3 elevation tint (the purple wash).
+              color: AppColors.white,
+              surfaceTintColor: Colors.transparent,
+              elevation: 4,
+              shadowColor: Colors.black.withValues(alpha: 0.15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: AppColors.divider),
+              ),
+              padding: EdgeInsets.zero,
+              onSelected: (value) {
+                if (value == 'edit') {
+                  _showEditDialog(method);
+                } else if (value == 'delete') {
+                  _confirmDelete(method);
+                }
+              },
+              itemBuilder: (_) => [
+                _menuItem(
+                  value: 'edit',
+                  icon: Icons.edit_rounded,
+                  label: 'Edit',
+                  color: AppColors.primary,
+                ),
+                _menuItem(
+                  value: 'delete',
+                  icon: Icons.delete_rounded,
+                  label: 'Delete',
+                  color: Colors.red,
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

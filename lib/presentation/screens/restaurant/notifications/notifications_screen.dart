@@ -12,6 +12,8 @@ import 'package:billberrylite/domain/services/restaurant/notification_sync_servi
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/domain/services/common/notification_service.dart';
 import 'package:billberrylite/data/models/restaurant/dashboard_alert.dart';
 import 'package:billberrylite/data/models/restaurant/db/app_notification_model.dart';
 import 'package:billberrylite/data/models/restaurant/notification_presenter.dart';
@@ -45,6 +47,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       default:
         return null;
     }
+  }
+
+  Future<void> _confirmClearAll() async {
+    final ok = await showAppConfirmDialog(
+      context: context,
+      title: 'Clear All Notifications',
+      message: 'Remove all notifications? This cannot be undone.',
+      confirmLabel: 'Clear All',
+      accent: AppColors.danger,
+      icon: Icons.delete_sweep_rounded,
+    );
+    if (!ok) return;
+    await notificationStore.clearAll();
+    NotificationService.instance.showSuccess('Notifications cleared');
   }
 
   @override
@@ -90,6 +106,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               'Mark All Read',
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
+          ),
+          // Clear All — removes every notification (hidden when the list is empty).
+          Observer(
+            builder: (_) {
+              final hasAny = notificationStore.critical.isNotEmpty ||
+                  notificationStore.warning.isNotEmpty ||
+                  notificationStore.info.isNotEmpty;
+              if (!hasAny) return const SizedBox.shrink();
+              return TextButton(
+                onPressed: _confirmClearAll,
+                child: const Text(
+                  'Clear All',
+                  style:
+                      TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              );
+            },
           ),
         ],
       ),

@@ -70,6 +70,12 @@ class _AddexpenceState extends State<Addexpence> {
   Future<void> _addExpense() async {
     if (_isSaving) return;
 
+    final strictlyPending = await DayManagementService.isEodStrictlyPending();
+    if (strictlyPending) {
+      NotificationService.instance.showError('Day has ended. Complete End of Day to unlock.');
+      return;
+    }
+
     // Validate category separately (not an AppTextField)
     setState(() {
       _categoryError = selectedCategoryId == null ? 'Please select a category' : null;

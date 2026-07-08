@@ -223,6 +223,12 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Future<void> _handleItemTap(Items item) async {
+    final strictlyPending = await DayManagementService.isEodStrictlyPending();
+    if (strictlyPending) {
+      NotificationService.instance.showError('Day has ended. Complete End of Day to unlock.');
+      return;
+    }
+
     if (item.isSoldByWeight) {
       final CartItem? weightCartItem = await showWeightItemDialog(context, item);
       if (weightCartItem != null) {
@@ -273,6 +279,7 @@ class _MenuScreenState extends State<MenuScreen> {
         result = await showDialog<CartItem>(
           context: context,
           builder: (_) => Dialog(
+            backgroundColor: AppColors.white,
             insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 40),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             clipBehavior: Clip.antiAlias,

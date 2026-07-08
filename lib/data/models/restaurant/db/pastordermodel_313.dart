@@ -169,6 +169,13 @@ class PastOrderModel extends HiveObject{
         assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
         assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
 
+  // Payment completion derived from totalPaid vs totalPrice (mirrors OrderModel).
+  // Finalized past orders are settled, so an untracked totalPaid counts as paid.
+  double get amountDue {
+    if ((totalPaid ?? 0) == 0) return 0;
+    return (totalPrice - (totalPaid ?? 0)).clamp(0, double.infinity);
+  }
+  bool get isFullyPaid => amountDue < 0.01;
 
   PastOrderModel copyWith({
     String? id,
@@ -259,10 +266,28 @@ class PastOrderModel extends HiveObject{
 
     int startIndex = 0;
     for (int i = 0; i < kotNumbers.length; i++) {
-      int endIndex = kotBoundaries[i];
-      int kotNum = kotNumbers[i];
+      if (i >= kotBoundaries.length) {
+        int kotNum = kotNumbers[i];
+        if (startIndex < items.length) {
+          itemsByKot[kotNum] = items.sublist(startIndex);
+        } else {
+          itemsByKot[kotNum] = [];
+        }
+        break;
+      }
 
-      // Get items for this KOT
+      int endIndex = kotBoundaries[i];
+      if (endIndex > items.length) {
+        endIndex = items.length;
+      }
+      if (startIndex > items.length) {
+        startIndex = items.length;
+      }
+      if (startIndex > endIndex) {
+        startIndex = endIndex;
+      }
+
+      int kotNum = kotNumbers[i];
       List<CartItem> kotItems = items.sublist(startIndex, endIndex);
       itemsByKot[kotNum] = kotItems;
 

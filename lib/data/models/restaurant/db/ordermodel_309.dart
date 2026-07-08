@@ -168,6 +168,17 @@ class OrderModel extends HiveObject {
         assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
         assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
 
+  // --- Payment completion is derived from totalPaid vs totalPrice ---
+  // `isPaid` is a convenience flag; the source of truth is the outstanding
+  // balance, so adding items to a settled order correctly reopens it.
+  double get amountDue {
+    // Legacy safety: an order flagged paid before totalPaid was tracked counts as settled.
+    if (isPaid == true && (totalPaid ?? 0) == 0) return 0;
+    return (totalPrice - (totalPaid ?? 0)).clamp(0, double.infinity);
+  }
+  bool get isFullyPaid => amountDue < 0.01;
+  bool get hasPartialPayment => (totalPaid ?? 0) > 0 && !isFullyPaid;
+
   // --- A COMPLETE AND MORE FLEXIBLE copyWith METHOD ---
   OrderModel copyWith({
     String? id,

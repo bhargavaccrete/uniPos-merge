@@ -3,6 +3,7 @@ import 'package:billberrylite/domain/services/retail/receipt_pdf_service.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/restaurant/print_settings.dart';
+import 'package:billberrylite/core/plan/plan_gate.dart';
 import 'package:billberrylite/domain/services/restaurant/tax_breakdown.dart';
 import 'package:billberrylite/core/di/service_locator.dart' show taxStore;
 
@@ -459,17 +460,17 @@ class EscPosReceiptBuilder {
     if (isTaxInclusive) {
       bytes.addAll(_text('All prices include GST'));
     }
-    // Order-type-aware thank you message
-    final orderType = receiptData.orderType?.toLowerCase() ?? '';
-    if (orderType.contains('dine')) {
-      bytes.addAll(_text('Thank you for dining with us!'));
-    } else if (orderType.contains('delivery')) {
-      bytes.addAll(_text('Thank you for your order!'));
-    } else {
-      bytes.addAll(_text('Thank you! Enjoy your meal!'));
+    // Custom footer / "Thank You" message — owner-editable in Print
+    // Customization. Multi-line via \n; blank prints nothing.
+    final footer = PrintSettings.footerMessage.trim();
+    if (footer.isNotEmpty) {
+      for (final line in footer.split('\n')) {
+        bytes.addAll(_text(line));
+      }
     }
-    bytes.addAll(_text('Visit us again!'));
-    if (PrintSettings.showPoweredBy) {
+    // "Powered by Bill Berry Lite" — Premium may hide it via the toggle, but it
+    // is FORCED ON for Free plans regardless of the setting.
+    if (PlanGate.isFree || PrintSettings.showPoweredBy) {
       bytes.addAll(_text('Powered by Bill Berry Lite'));
     }
 

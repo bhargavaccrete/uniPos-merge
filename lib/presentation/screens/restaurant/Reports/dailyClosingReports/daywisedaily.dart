@@ -33,14 +33,144 @@ class _DayWisebyDailyState extends State<DayWisebyDaily> {
   EndOfDayReport? _getReportForDate() {
     if (_fromDate == null) return null;
 
-    // Filter reports from store for the selected date
+    // All reports whose session STARTED on the selected date (a day can be
+    // opened/closed more than once, producing several EOD reports).
     final reports = eodStore.eodReports.where((report) {
       return report.date.year == _fromDate!.year &&
           report.date.month == _fromDate!.month &&
           report.date.day == _fromDate!.day;
     }).toList();
 
-    return reports.isNotEmpty ? reports.first : null;
+    if (reports.isEmpty) return null;
+    if (reports.length == 1) return reports.first;
+    // Multiple sessions on this date — merge them so the report shows the whole
+    // day's totals, not just one session.
+    return _mergeReports(reports);
+  }
+
+  /// Combines several same-date EOD reports into one aggregate: scalar totals
+  /// are summed, list summaries are merged by key (order type / payment method
+  /// / category / tax), opening balance comes from the earliest session and
+  /// closing from the latest.
+  EndOfDayReport _mergeReports(List<EndOfDayReport> reports) {
+    final sorted = [...reports]..sort((a, b) => a.date.compareTo(b.date));
+
+    double sum(double Function(EndOfDayReport) f) =>
+        sorted.fold<double>(0, (s, r) => s + f(r));
+    int sumInt(int Function(EndOfDayReport) f) =>
+        sorted.fold<int>(0, (s, r) => s + f(r));
+
+    // Order summaries — merge by orderType (recompute average).
+    final orderMap = <String, OrderTypeSummary>{};
+    for (final r in sorted) {
+      for (final o in r.orderSummaries) {
+        final e = orderMap[o.orderType];
+        final count = (e?.orderCount ?? 0) + o.orderCount;
+        final amount = (e?.totalAmount ?? 0) + o.totalAmount;
+        orderMap[o.orderType] = OrderTypeSummary(
+          orderType: o.orderType,
+          orderCount: count,
+          totalAmount: amount,
+          averageOrderValue: count > 0 ? amount / count : 0,
+        );
+      }
+    }
+
+    // Payment summaries — merge by paymentType (recompute percentage).
+    final payMap = <String, PaymentSummary>{};
+    for (final r in sorted) {
+      for (final p in r.paymentSummaries) {
+        final e = payMap[p.paymentType];
+        payMap[p.paymentType] = PaymentSummary(
+          paymentType: p.paymentType,
+          totalAmount: (e?.totalAmount ?? 0) + p.totalAmount,
+          transactionCount: (e?.transactionCount ?? 0) + p.transactionCount,
+          percentage: 0,
+        );
+      }
+    }
+    final paySum = payMap.values.fold<double>(0, (s, p) => s + p.totalAmount);
+    final payments = payMap.values
+        .map((p) => PaymentSummary(
+              paymentType: p.paymentType,
+              totalAmount: p.totalAmount,
+              transactionCount: p.transactionCount,
+              percentage: paySum > 0 ? (p.totalAmount / paySum) * 100 : 0,
+            ))
+        .toList();
+
+    // Category sales — merge by categoryName (recompute percentage).
+    final catMap = <String, CategorySales>{};
+    for (final r in sorted) {
+      for (final c in r.categorySales) {
+        final e = catMap[c.categoryName];
+        catMap[c.categoryName] = CategorySales(
+          categoryName: c.categoryName,
+          totalAmount: (e?.totalAmount ?? 0) + c.totalAmount,
+          itemsSold: (e?.itemsSold ?? 0) + c.itemsSold,
+          percentage: 0,
+        );
+      }
+    }
+    final catSum = catMap.values.fold<double>(0, (s, c) => s + c.totalAmount);
+    final categories = catMap.values
+        .map((c) => CategorySales(
+              categoryName: c.categoryName,
+              totalAmount: c.totalAmount,
+              itemsSold: c.itemsSold,
+              percentage: catSum > 0 ? (c.totalAmount / catSum) * 100 : 0,
+            ))
+        .toList();
+
+    // Tax summaries — merge by taxName (rate is constant per tax).
+    final taxMap = <String, TaxSummary>{};
+    for (final r in sorted) {
+      for (final t in r.taxSummaries) {
+        final e = taxMap[t.taxName];
+        taxMap[t.taxName] = TaxSummary(
+          taxName: t.taxName,
+          taxRate: t.taxRate,
+          taxAmount: (e?.taxAmount ?? 0) + t.taxAmount,
+          taxableAmount: (e?.taxableAmount ?? 0) + t.taxableAmount,
+        );
+      }
+    }
+
+    final expectedCash =
+        sum((r) => r.cashReconciliation.systemExpectedCash);
+    final actualCash = sum((r) => r.cashReconciliation.actualCash);
+    final diff = actualCash - expectedCash;
+
+    return EndOfDayReport(
+      date: sorted.first.date,
+      openingBalance: sorted.first.openingBalance,
+      closingBalance: sorted.last.closingBalance,
+      orderSummaries: orderMap.values.toList(),
+      paymentSummaries: payments,
+      categorySales: categories,
+      taxSummaries: taxMap.values.toList(),
+      totalDiscount: sum((r) => r.totalDiscount),
+      totalTax: sum((r) => r.totalTax),
+      totalSales: sum((r) => r.totalSales),
+      totalRefunds: sum((r) => r.totalRefunds),
+      totalExpenses: sum((r) => r.totalExpenses),
+      cashExpenses: sum((r) => r.cashExpenses),
+      roundOff: sum((r) => r.roundOff),
+      cancelledOrderAmount: sum((r) => r.cancelledOrderAmount),
+      totalOrderCount: sumInt((r) => r.totalOrderCount),
+      cancelledOrderCount: sumInt((r) => r.cancelledOrderCount),
+      cashReconciliation: CashReconciliation(
+        systemExpectedCash: expectedCash,
+        actualCash: actualCash,
+        difference: diff,
+        reconciliationStatus: diff.abs() < 0.01
+            ? 'Balanced'
+            : (diff > 0 ? 'Overage' : 'Shortage'),
+        remarks: 'Merged ${sorted.length} sessions',
+      ),
+      reportId: 'merged_${_fromDate!.toIso8601String()}',
+      mode: sorted.first.mode,
+    );
   }
 
   Future<void> _pickDate(BuildContext context) async {

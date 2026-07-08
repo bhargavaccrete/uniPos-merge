@@ -19,6 +19,7 @@ import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/restaurant/order_status_filter.dart';
 
 // ─── Entry type for the merged activity log ───────────────────────────────────
 
@@ -68,6 +69,16 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
   double _openingBalance = 0.0;
   double _cashSales = 0.0;
   double _cashExpenses = 0.0;
+  // Digital (non-cash) collections for the active session — powers the
+  // "Shift Sales Summary" card. Same source of truth (paymentListJson) as the
+  // cash total, so these always match the End-of-Day report.
+  double _upiSales = 0.0;
+  double _cardSales = 0.0;
+  double _otherDigitalSales = 0.0;
+  double get _digitalTotal => _upiSales + _cardSales + _otherDigitalSales;
+  double get _combinedRevenue => _cashSales + _digitalTotal;
+  // "Shift Sales Summary" card starts collapsed — staff open it only to check.
+  bool _digitalSummaryExpanded = false;
   DateTime? _dayStart;
   List<_LogEntry> _log = [];
   List<CashHandoverModel> _handovers = [];
@@ -145,7 +156,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     final cashOrders = pastOrderStore.pastOrders.where((o) {
       // Skip voided orders — no money changed hands
       final status = (o.orderStatus ?? '').toUpperCase();
-      if (status == 'VOIDED' || status.contains('VOID')) return false;
+      if (OrderStatusFilter.isVoided(status)) return false;
 
       // Filter by session ID
       if (targetSessionId != null) {
@@ -170,6 +181,18 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
       return false;
     }).toList();
     _cashSales = cashOrders.fold(0.0, (s, o) => s + _cashComponentOf(o));
+
+    // Digital (non-cash) collections for the SAME session — identical void /
+    // session filter as the cash total, so Cash + Digital form one coherent
+    // shift figure that reconciles with the End-of-Day report.
+    final sessionOrders = pastOrderStore.pastOrders.where((o) {
+      final status = (o.orderStatus ?? '').toUpperCase();
+      if (OrderStatusFilter.isVoided(status)) return false;
+      if (targetSessionId != null) return o.sessionId == targetSessionId;
+      return o.orderAt != null &&
+          o.orderAt!.isAfter(dayStart.subtract(const Duration(seconds: 1)));
+    }).toList();
+    _computeDigitalTotals(sessionOrders);
 
     // 4. Load cash expenses (today only, paymentType == 'cash')
     await expenseStore.loadExpenses();
@@ -229,6 +252,49 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
       return (o.totalPrice - refund).clamp(0.0, double.infinity);
     }
     return 0.0;
+  }
+
+  /// Aggregates the session's NON-cash collections into UPI / Card / Others.
+  /// Mirrors [_cashComponentOf]'s source of truth (paymentListJson, else
+  /// paymentmode) and is net of refunds. Cash is excluded — it's shown as the
+  /// drawer balance. (No credit/pay-later on the restaurant side, so every
+  /// non-cash amount here is money actually collected.)
+  void _computeDigitalTotals(List<PastOrderModel> orders) {
+    double upi = 0, card = 0, others = 0;
+    for (final o in orders) {
+      final refund = o.refundAmount ?? 0.0;
+      final ratio = (refund > 0 && o.totalPrice > 0)
+          ? ((o.totalPrice - refund) / o.totalPrice)
+          : 1.0;
+      if (o.paymentListJson != null && o.paymentListJson!.isNotEmpty) {
+        for (final p in o.paymentList) {
+          final m = (p['method'] as String? ?? '').toLowerCase().trim();
+          if (m == 'cash' || m.isEmpty) continue;
+          final amt = ((p['amount'] as num?)?.toDouble() ?? 0.0) * ratio;
+          if (m == 'upi') {
+            upi += amt;
+          } else if (m == 'card') {
+            card += amt;
+          } else {
+            others += amt;
+          }
+        }
+      } else {
+        final m = (o.paymentmode ?? '').toLowerCase().trim();
+        if (m == 'cash' || m.isEmpty) continue;
+        final amt = (o.totalPrice - refund).clamp(0.0, double.infinity);
+        if (m == 'upi') {
+          upi += amt;
+        } else if (m == 'card') {
+          card += amt;
+        } else {
+          others += amt;
+        }
+      }
+    }
+    _upiSales = upi;
+    _cardSales = card;
+    _otherDigitalSales = others;
   }
 
   /// Returns the staff name whose shift was active at [time].
@@ -598,6 +664,8 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
         if (_dayEnded) SizedBox(height: AppResponsive.mediumSpacing(context)),
         _buildBalanceCard(context, currency),
         SizedBox(height: AppResponsive.largeSpacing(context)),
+        _buildDigitalSummaryCard(context, currency),
+        SizedBox(height: AppResponsive.largeSpacing(context)),
         if (!_dayEnded) _buildActionButtons(context),
         if (!_dayEnded) SizedBox(height: AppResponsive.largeSpacing(context)),
         _buildBreakdownRow(context, currency),
@@ -717,6 +785,145 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
               color: Colors.white.withValues(alpha: 0.7)),
         ),
       ]),
+    );
+  }
+
+  // ── Digital & Total sales summary ─────────────────────────────────────────
+
+  /// Separate from the physical cash-drawer balance: shows what was COLLECTED
+  /// this shift by method (Cash + digital) and the combined revenue. Reuses the
+  /// same session data, so nothing new is tracked — it just surfaces existing
+  /// payment data that was otherwise only visible in the End-of-Day report.
+  Widget _buildDigitalSummaryCard(BuildContext context, String currency) {
+    String money(double v) =>
+        '$currency${v.toStringAsFixed(DecimalSettings.precision)}';
+    final pad = AppResponsive.largeSpacing(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+        border: Border.all(color: AppColors.divider),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Tappable header — collapsed by default; tap to reveal the breakdown.
+          InkWell(
+            borderRadius:
+                BorderRadius.circular(AppResponsive.borderRadius(context)),
+            onTap: () => setState(
+                () => _digitalSummaryExpanded = !_digitalSummaryExpanded),
+            child: Padding(
+              padding: EdgeInsets.all(pad),
+              child: Row(
+                children: [
+                  Icon(Icons.account_balance_wallet_rounded,
+                      color: AppColors.primary,
+                      size: AppResponsive.iconSize(context)),
+                  SizedBox(width: AppResponsive.mediumSpacing(context)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Shift Sales Summary',
+                            style: GoogleFonts.poppins(
+                                fontSize:
+                                    AppResponsive.subheadingFontSize(context),
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary)),
+                        SizedBox(height: AppResponsive.smallSpacing(context) / 2),
+                        Text(
+                            _digitalSummaryExpanded
+                                ? 'Collected this shift, by payment method'
+                                : 'Tap to view collections by method',
+                            style: GoogleFonts.poppins(
+                                fontSize:
+                                    AppResponsive.captionFontSize(context),
+                                color: AppColors.textSecondary)),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: AppResponsive.mediumSpacing(context)),
+                  AnimatedRotation(
+                    turns: _digitalSummaryExpanded ? 0.5 : 0.0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(Icons.keyboard_arrow_down_rounded,
+                        color: AppColors.textSecondary,
+                        size: AppResponsive.iconSize(context)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Expandable body — animates open/closed.
+          AnimatedCrossFade(
+            firstChild: const SizedBox(width: double.infinity, height: 0),
+            secondChild: Padding(
+              padding: EdgeInsets.fromLTRB(pad, 0, pad, pad),
+              child: Column(
+                children: [
+                  Divider(height: 1, color: AppColors.divider),
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
+                  _summaryLine(context, 'Cash', money(_cashSales)),
+                  _summaryLine(context, 'UPI', money(_upiSales)),
+                  _summaryLine(context, 'Card', money(_cardSales)),
+                  if (_otherDigitalSales > 0)
+                    _summaryLine(context, 'Others', money(_otherDigitalSales)),
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                        vertical: AppResponsive.smallSpacing(context)),
+                    child: Divider(height: 1, color: AppColors.divider),
+                  ),
+                  _summaryLine(context, 'Combined Shift Revenue',
+                      money(_combinedRevenue),
+                      emphasize: true),
+                ],
+              ),
+            ),
+            crossFadeState: _digitalSummaryExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 200),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryLine(BuildContext context, String label, String value,
+      {bool emphasize = false}) {
+    return Padding(
+      padding: EdgeInsets.symmetric(
+          vertical: AppResponsive.smallSpacing(context) / 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: GoogleFonts.poppins(
+                  fontSize: emphasize
+                      ? AppResponsive.bodyFontSize(context)
+                      : AppResponsive.smallFontSize(context),
+                  fontWeight: emphasize ? FontWeight.w700 : FontWeight.w500,
+                  color: emphasize
+                      ? AppColors.textPrimary
+                      : AppColors.textSecondary)),
+          Text(value,
+              style: GoogleFonts.poppins(
+                  fontSize: emphasize
+                      ? AppResponsive.subheadingFontSize(context)
+                      : AppResponsive.bodyFontSize(context),
+                  fontWeight: emphasize ? FontWeight.w800 : FontWeight.w600,
+                  color:
+                      emphasize ? AppColors.primary : AppColors.textPrimary)),
+        ],
+      ),
     );
   }
 

@@ -16,6 +16,8 @@ import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import '../../../../core/plan/entitlement_keys.dart';
+import '../../../../core/plan/plan_guard.dart';
 
 class TableScreen extends StatefulWidget {
   final bool? isfromcart;
@@ -35,6 +37,16 @@ class _TableScreenState extends State<TableScreen> {
   // ── Add ────────────────────────────────────────────────────────────────────
 
   void _addTable() {
+    // Plan gate — table creation flag + table cap (shows the upgrade sheet).
+    if (!PlanGuard.allowedOr(context, EntKeys.billingTablesCreate,
+        featureName: 'Table creation')) {
+      return;
+    }
+    if (!PlanGuard.withinLimitOr(
+        context, EntKeys.billingTablesMax, tableStore.tables.length,
+        unit: 'tables')) {
+      return;
+    }
     final controller = TextEditingController();
     showDialog(
       context: context,
@@ -508,43 +520,65 @@ class _TableScreenState extends State<TableScreen> {
                               );
                             } else {
                               // Orphaned table — status is occupied but no order exists
-                              final orphanHInset = !AppResponsive.isMobile(context)
-                                  ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-                                  : 24.0;
                               showDialog(
                                 context: context,
-                                builder: (ctx) => AlertDialog(
-                                  insetPadding: EdgeInsets.symmetric(horizontal: orphanHInset, vertical: 24),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16)),
-                                  title: Text(
-                                    'No Active Order Found',
-                                    style: GoogleFonts.poppins(
-                                        fontWeight: FontWeight.w700),
-                                  ),
-                                  content: Text(
-                                    'Table "${table.id}" shows as ${table.status} but has no linked order.\n\nWhat would you like to do?',
-                                    style: GoogleFonts.poppins(fontSize: 14),
+                                builder: (ctx) => AppDialogShell(
+                                  title: 'No Active Order',
+                                  subtitle:
+                                      'Table "${table.id}" is marked ${table.status} but has no linked order.',
+                                  accent: AppColors.warning,
+                                  icon: Icons.warning_amber_rounded,
+                                  body: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'This can happen if an order was cleared unexpectedly. Reset the table to free it for new orders, or delete it.',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 13,
+                                          height: 1.5,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 14),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: OutlinedButton.icon(
+                                          onPressed: () async {
+                                            Navigator.pop(ctx);
+                                            await tableStore
+                                                .deleteTable(table.id);
+                                            NotificationService.instance
+                                                .showSuccess(
+                                                    'Table "${table.id}" deleted.');
+                                          },
+                                          icon: Icon(Icons.delete_outline,
+                                              size: 18,
+                                              color: AppColors.danger),
+                                          label: Text('Delete Table',
+                                              style: GoogleFonts.poppins(
+                                                  fontWeight: FontWeight.w600,
+                                                  color: AppColors.danger)),
+                                          style: OutlinedButton.styleFrom(
+                                            side: BorderSide(
+                                                color: AppColors.danger
+                                                    .withOpacity(0.4)),
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 12),
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(10)),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                   actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(ctx),
-                                      child: Text('Cancel',
-                                          style: GoogleFonts.poppins(
-                                              color: AppColors.textSecondary)),
-                                    ),
-                                    TextButton(
-                                      onPressed: () async {
-                                        Navigator.pop(ctx);
-                                        await tableStore.deleteTable(table.id);
-                                        NotificationService.instance.showSuccess(
-                                            'Table "${table.id}" deleted.');
-                                      },
-                                      child: Text('Delete Table',
-                                          style: GoogleFonts.poppins(
-                                              color: Colors.red)),
-                                    ),
-                                    ElevatedButton(
+                                    appDialogCancelButton(ctx),
+                                    const SizedBox(width: 12),
+                                    appDialogPrimaryButton(
+                                      label: 'Reset to Available',
                                       onPressed: () async {
                                         Navigator.pop(ctx);
                                         await tableStore.updateTableStatus(
@@ -552,15 +586,6 @@ class _TableScreenState extends State<TableScreen> {
                                         NotificationService.instance.showSuccess(
                                             'Table "${table.id}" reset to Available.');
                                       },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppColors.primary,
-                                        shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(10)),
-                                      ),
-                                      child: Text('Reset to Available',
-                                          style: GoogleFonts.poppins(
-                                              color: Colors.white)),
                                     ),
                                   ],
                                 ),

@@ -20,6 +20,7 @@ import '../../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/common/app_responsive.dart';
 import '../../../../../util/common/currency_helper.dart';
+import '../../../../../util/common/loyalty_points.dart';
 import '../../../../../util/restaurant/staticswitch.dart';
 import '../../../../../util/restaurant/restaurant_session.dart';
 import '../../../../../stores/payment_method_store.dart';
@@ -100,7 +101,6 @@ class _CustomerdetailsState extends State<Customerdetails> {
   final List<String> remarkList = [
     'Old Customer',
     'Regular Customer',
-    'police',
     'know (known person)',
     'other'
   ];
@@ -217,6 +217,12 @@ class _CustomerdetailsState extends State<Customerdetails> {
         ? availablePoints.clamp(0, calculations.grandTotal.floor())
         : 0;
     final double netPayable = calculations.grandTotal - pointsDiscount;
+    // Balance-due: if this order was already partly settled (e.g. items added
+    // after a prior payment), collect ONLY the outstanding balance — never the
+    // full bill again. alreadyPaid = 0 for a fresh order.
+    final double alreadyPaid = widget.existingModel?.totalPaid ?? 0;
+    final double balanceToCollect =
+        (netPayable - alreadyPaid).clamp(0, double.infinity);
 
     // ✅ Step 4: Build the UI using the final, calculated values.
     final height = MediaQuery.of(context).size.height;
@@ -874,42 +880,57 @@ class _CustomerdetailsState extends State<Customerdetails> {
                           ),
                         ),
                         SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: remarkList.map((reason) {
-                            final isSelected = SelectedRemark == reason;
-                            return GestureDetector(
-                              onTap: () =>
-                                  setState(() => SelectedRemark = reason),
-                              child: Container(
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? AppColors.primary
-                                      : Colors.white,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? AppColors.primary
-                                        : AppColors.divider,
-                                    width: 1.5,
-                                  ),
-                                ),
-                                child: Text(
-                                  reason,
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : AppColors.textPrimary,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
+                        DropdownButtonFormField<String>(
+                          initialValue: SelectedRemark,
+                          isExpanded: true,
+                          icon: const Icon(Icons.arrow_drop_down_rounded,
+                              color: AppColors.primary),
+                          // Clean white rounded menu instead of the default
+                          // theme-tinted (lavender) square popup.
+                          dropdownColor: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          elevation: 3,
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textPrimary,
+                          ),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 6),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide:
+                                  const BorderSide(color: AppColors.divider),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide:
+                                  const BorderSide(color: AppColors.divider),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                  color: AppColors.primary, width: 1.5),
+                            ),
+                          ),
+                          items: remarkList
+                              .map((reason) => DropdownMenuItem(
+                                    value: reason,
+                                    child: Text(
+                                      reason,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                  ))
+                              .toList(),
+                          onChanged: (value) =>
+                              setState(() => SelectedRemark = value),
                         ),
                       ],
                       SizedBox(height: 5),
@@ -972,10 +993,30 @@ class _CustomerdetailsState extends State<Customerdetails> {
                     ],
                   ),
                   children: [
+                    if (alreadyPaid > 0)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Already Paid',
+                                style: GoogleFonts.poppins(
+                                    fontSize: 13, color: AppColors.textSecondary)),
+                            Text(
+                                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(alreadyPaid)}',
+                                style: GoogleFonts.poppins(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textSecondary)),
+                          ],
+                        ),
+                      ),
                     Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: SplitPaymentWidget(
-                        billTotal: netPayable,
+                        // Collect only the outstanding balance (full bill for a
+                        // fresh order; the remaining delta for a re-settle).
+                        billTotal: balanceToCollect,
                         onPaymentChanged: _onPaymentChanged,
                         onValidationChanged: _onValidationChanged,
                       ),
@@ -1197,9 +1238,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
       return;
     }
-    // Prepare split payment data
+    // Prepare split payment data (this settle's entries; merged with prior below)
     final paymentList = _paymentEntries.map((e) => e.toMap()).toList();
-    final isSplit = _paymentEntries.length > 1;
 
     // Check if new items were added (settle without update)
     final List<CartItem> itemsToSettle = widget.cartitems ?? widget.existingModel!.items;
@@ -1250,6 +1290,25 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
     final String calculatedStatus = hasNewItems ? 'Cooking' : widget.existingModel!.status;
 
+    // Balance-due settlement: ACCUMULATE onto any prior payment instead of
+    // overwriting it, so a re-settle collects only the delta and the full
+    // payment history is preserved. priorPaid = 0 for a first settle.
+    final double priorPaid = widget.existingModel!.totalPaid ?? 0;
+    final List<Map<String, dynamic>> priorPayments =
+        (widget.existingModel!.paymentListJson != null &&
+                widget.existingModel!.paymentListJson!.isNotEmpty)
+            ? List<Map<String, dynamic>>.from(
+                jsonDecode(widget.existingModel!.paymentListJson!))
+            : <Map<String, dynamic>>[];
+    final List<Map<String, dynamic>> mergedPaymentList = [
+      ...priorPayments,
+      ...paymentList,
+    ];
+    final double newTotalPaid = priorPaid + _totalPaid;
+    final double targetTotal = calculations.grandTotal - pointsUsed;
+    final bool settledInFull = newTotalPaid >= targetTotal - 0.01;
+    final bool mergedIsSplit = mergedPaymentList.length > 1;
+
     final OrderModel completedOrder = widget.existingModel!.copyWith(
       items: itemsToSettle, // Use updated items if provided
       kotNumbers: finalKotNumbers, // Include new KOT if generated
@@ -1263,17 +1322,17 @@ class _CustomerdetailsState extends State<Customerdetails> {
       // serviceCharge: widget.orderType == 'Delivery'?calculations.deliveryCharge: calculations.serviceChargeAmount,
       serviceCharge: calculations.serviceChargeAmount,
       totalPrice: calculations.grandTotal - pointsUsed, // net payable after points
-      paymentMethod: isSplit ? 'Split Payment' : _paymentEntries.first.method,
+      paymentMethod: mergedIsSplit ? 'Split Payment' : _paymentEntries.first.method,
       completedAt: DateTime.now(),
       status: calculatedStatus,
       tableNo: widget.tableid,
-      isPaid: true,
-      paymentStatus: 'Paid',
+      isPaid: settledInFull,
+      paymentStatus: settledInFull ? 'Paid' : 'Partially Paid',
       customerId: selectedCustomer?.customerId, // Link to customer
-      // Split payment fields
-      paymentListJson: jsonEncode(paymentList),
-      isSplitPayment: isSplit,
-      totalPaid: _totalPaid,
+      // Split payment fields — merged prior + new so history is preserved.
+      paymentListJson: jsonEncode(mergedPaymentList),
+      isSplitPayment: mergedIsSplit,
+      totalPaid: newTotalPaid,
       changeReturn: _changeReturn,
       sessionId: currentSessionId ?? widget.existingModel!.sessionId, // Ensure sessionId is preserved/attached
     );
@@ -1285,6 +1344,35 @@ class _CustomerdetailsState extends State<Customerdetails> {
       final bool alreadyServed = (widget.existingModel!.status == 'Served');
 
       if (isDineIn && !alreadyServed) {
+        // Auto-Serve on Payment (settings flag): a FULLY-paid dine-in table is
+        // served + completed immediately — same disposition as Take-Away
+        // (→ pastOrders as COMPLETED, table freed). Off, or partially paid →
+        // fall through to the current stay-active-until-Served behavior.
+        if (AppSettings.autoServeDineInOnPayment && settledInFull) {
+          final int completedBillNumber =
+              await completeOrder(completedOrder, calculations, pointsUsed: pointsUsed);
+          if (selectedCustomer != null) {
+            if (pointsUsed > 0) {
+              await restaurantCustomerStore.updateCustomerVisit(
+                  customerId: selectedCustomer!.customerId,
+                  orderType: '',
+                  pointsToAdd: -pointsUsed);
+            }
+            final int earned =
+                LoyaltyPoints.earnedFor(calculations.grandTotal - pointsUsed);
+            await _updateCustomerStats(selectedCustomer!, 'Dine In',
+                pointsToEarn: earned);
+          }
+          await restaurantCartStore.clearCart();
+          if (widget.tableid != null && widget.tableid!.isNotEmpty) {
+            await tableStore.updateTableStatus(widget.tableid!, 'Available');
+          }
+          NotificationService.instance.showSuccess('Order served & completed');
+          await _showOrderSuccessDialog(completedOrder, calculations,
+              billNumber: completedBillNumber, pointsUsed: pointsUsed);
+          return;
+        }
+
         // Generate a bill number now so the receipt can show "Bill No" immediately
         final int billNumber = await orderStore.getNextBillNumber();
 
@@ -1297,7 +1385,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
             await restaurantCustomerStore.updateCustomerVisit(
               customerId: selectedCustomer!.customerId, orderType: '', pointsToAdd: -pointsUsed);
           }
-          final int earned = ((calculations.grandTotal - pointsUsed) / 100).floor();
+          final int earned =
+            LoyaltyPoints.earnedFor(calculations.grandTotal - pointsUsed);
           await _updateCustomerStats(selectedCustomer!, 'Dine In', pointsToEarn: earned);
         }
 
@@ -1315,7 +1404,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
           await restaurantCustomerStore.updateCustomerVisit(
             customerId: selectedCustomer!.customerId, orderType: '', pointsToAdd: -pointsUsed);
         }
-        final int earned = ((calculations.grandTotal - pointsUsed) / 100).floor();
+        final int earned =
+            LoyaltyPoints.earnedFor(calculations.grandTotal - pointsUsed);
         await _updateCustomerStats(selectedCustomer!, widget.orderType ?? 'Take Away', pointsToEarn: earned);
       }
 
@@ -1464,7 +1554,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
             await restaurantCustomerStore.updateCustomerVisit(
               customerId: selectedCustomer!.customerId, orderType: '', pointsToAdd: -pointsUsed);
           }
-          final int earned = ((calculations.grandTotal - pointsUsed) / 100).floor();
+          final int earned =
+            LoyaltyPoints.earnedFor(calculations.grandTotal - pointsUsed);
           await _updateCustomerStats(selectedCustomer!, widget.orderType ?? 'Take Away', pointsToEarn: earned);
         }
 
@@ -1659,6 +1750,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
     final sym = CurrencyHelper.currentSymbol;
     final paid = order.totalPaid ?? 0;
     final change = order.changeReturn ?? 0;
+    // Hide the "Paid" row when it equals the Total (fully paid, no change) — it's
+    // just a duplicate of the amount already shown above.
+    final showPaid = paid > 0 && (paid - order.totalPrice).abs() > 0.01;
     final method = (order.isSplitPayment ?? false)
         ? 'Split'
         : (order.paymentMethod ?? '').trim();
@@ -1672,6 +1766,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
         canPop: false,
         child: Dialog(
           insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+          backgroundColor: AppColors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           clipBehavior: Clip.antiAlias,
           child: ConstrainedBox(
@@ -1718,7 +1813,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            'Bill #INV$billNumber',
+                            'Bill No: INV$billNumber',
                             style: GoogleFonts.poppins(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -1741,7 +1836,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         decoration: BoxDecoration(
-                          color: AppColors.surfaceLight,
+                          color: AppColors.white,
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: AppColors.divider),
                         ),
@@ -1750,17 +1845,25 @@ class _CustomerdetailsState extends State<Customerdetails> {
                             _summaryRow('Total',
                                 '$sym${DecimalSettings.formatAmount(order.totalPrice)}',
                                 emphasize: true),
-                            if (paid > 0) ...[
-                              const SizedBox(height: 10),
-                              _summaryRow('Paid', '$sym${DecimalSettings.formatAmount(paid)}'),
-                            ],
-                            if (change > 0) ...[
-                              const SizedBox(height: 10),
-                              _summaryRow('Change', '$sym${DecimalSettings.formatAmount(change)}'),
-                            ],
-                            if (method.isNotEmpty) ...[
-                              const SizedBox(height: 10),
-                              _summaryRow('Payment', cap(method)),
+                            // Payment details — only what differs from the Total,
+                            // separated from the headline by a divider.
+                            if (showPaid || change > 0 || method.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              Divider(height: 1, color: AppColors.divider),
+                              const SizedBox(height: 12),
+                              if (showPaid)
+                                _summaryRow('Paid',
+                                    '$sym${DecimalSettings.formatAmount(paid)}'),
+                              if (change > 0) ...[
+                                if (showPaid) const SizedBox(height: 10),
+                                _summaryRow('Change',
+                                    '$sym${DecimalSettings.formatAmount(change)}'),
+                              ],
+                              if (method.isNotEmpty) ...[
+                                if (showPaid || change > 0)
+                                  const SizedBox(height: 10),
+                                _summaryRow('Payment', cap(method)),
+                              ],
                             ],
                           ],
                         ),
@@ -1987,6 +2090,15 @@ class _CustomerdetailsState extends State<Customerdetails> {
       return;
     }
 
+    // EOD lockout: block NEW orders, but ALLOW settling an EXISTING active order
+    // (existingModel != null) so the user can clear open tables before completing
+    // EOD — the collected payment then counts toward the End-of-Day totals.
+    final strictlyPending = await DayManagementService.isEodStrictlyPending();
+    if (strictlyPending && widget.existingModel == null) {
+      NotificationService.instance.showError('Day has ended. Complete End of Day to unlock.');
+      return;
+    }
+
     // No active day session yet → start the day (opening balance) right here,
     // then continue. The day begins at the first order/settlement.
     final bool sessionOpen = await DayManagementService.isSessionOpen();
@@ -2029,6 +2141,17 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
     if (selectedCustomer != null) {
     } else {
+    }
+
+    // Double-settlement guard: block only when the bill is FULLY paid (no
+    // balance due). A partially-paid order — e.g. items added after a prior
+    // payment — must still be settleable for the outstanding delta, so this
+    // uses the balance (isFullyPaid) rather than the raw isPaid flag.
+    if (widget.existingModel?.isFullyPaid == true) {
+      NotificationService.instance
+          .showError('This bill is already fully paid.');
+      if (mounted) Navigator.of(context).pop();
+      return;
     }
 
     if (widget.isSettle == true) {

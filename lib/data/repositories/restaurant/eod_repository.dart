@@ -34,6 +34,16 @@ class EodRepository {
     return reports.isNotEmpty ? reports.first : null;
   }
 
+  /// Get the EOD report belonging to a specific POS session, if any.
+  /// Used to replace only a retry of the SAME session — so genuinely
+  /// different sessions on the same date are each preserved.
+  Future<EndOfDayReport?> getEODBySession(String sessionId) async {
+    for (final report in _eodBox.values) {
+      if (report.sessionId == sessionId) return report;
+    }
+    return null;
+  }
+
   /// Get latest EOD report
   Future<EndOfDayReport?> getLatestEOD() async {
     if (_eodBox.isEmpty) return null;

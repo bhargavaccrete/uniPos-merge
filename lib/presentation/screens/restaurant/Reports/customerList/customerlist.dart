@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/restaurant/order_status_filter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/util/color.dart';
@@ -72,7 +73,7 @@ class _CustomerListReportState extends State<CustomerListReport> {
     for (final order in pastOrderStore.pastOrders) {
       final status = order.orderStatus ?? '';
       // Skip VOID/VOIDED — not valid sales
-      if (status == 'VOID' || status == 'VOIDED') continue;
+      if (OrderStatusFilter.isVoided(status)) continue;
       if (cutoff != null && order.orderAt != null && order.orderAt!.isBefore(cutoff)) continue;
 
       // Period filter — orders without a timestamp can't be placed in a range.

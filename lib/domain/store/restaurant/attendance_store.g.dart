@@ -56,17 +56,22 @@ mixin _$AttendanceStore on _AttendanceStore, Store {
   Future<AttendanceModel> clockIn(
       {required String staffName,
       required String staffRole,
-      String? sessionId}) {
+      String? sessionId,
+      String? staffId}) {
     return _$clockInAsyncAction.run(() => super.clockIn(
-        staffName: staffName, staffRole: staffRole, sessionId: sessionId));
+        staffName: staffName,
+        staffRole: staffRole,
+        sessionId: sessionId,
+        staffId: staffId));
   }
 
   late final _$clockOutAsyncAction =
       AsyncAction('_AttendanceStore.clockOut', context: context);
 
   @override
-  Future<void> clockOut(String recordId) {
-    return _$clockOutAsyncAction.run(() => super.clockOut(recordId));
+  Future<void> clockOut(String recordId, {DateTime? clockOutTime}) {
+    return _$clockOutAsyncAction
+        .run(() => super.clockOut(recordId, clockOutTime: clockOutTime));
   }
 
   late final _$startBreakAsyncAction =
@@ -126,11 +131,11 @@ mixin _$AttendanceStore on _AttendanceStore, Store {
       ActionController(name: '_AttendanceStore', context: context);
 
   @override
-  AttendanceModel? getActiveRecord(String staffName) {
+  AttendanceModel? getActiveRecord(String staffName, {String? staffId}) {
     final _$actionInfo = _$_AttendanceStoreActionController.startAction(
         name: '_AttendanceStore.getActiveRecord');
     try {
-      return super.getActiveRecord(staffName);
+      return super.getActiveRecord(staffName, staffId: staffId);
     } finally {
       _$_AttendanceStoreActionController.endAction(_$actionInfo);
     }

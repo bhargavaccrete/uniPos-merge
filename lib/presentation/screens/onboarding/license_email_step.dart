@@ -159,7 +159,6 @@ class _LicenseEmailStepState extends State<LicenseEmailStep> {
         if (_errorMsg != null) _errorText(_errorMsg!),
         SizedBox(height: AppResponsive.mediumSpacing(context)),
         _primaryButton(context, label: 'Email Me My Key', onPressed: _requestKey),
-        _skipButton(context),
       ],
     );
   }
@@ -298,21 +297,6 @@ class _LicenseEmailStepState extends State<LicenseEmailStep> {
                     fontSize: AppResponsive.buttonFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: Colors.white)),
-      ),
-    );
-  }
-
-  // Lets the user move past licensing during setup (mirrors the real wizard's
-  // "Skip for now" — the day/license can be handled later).
-  Widget _skipButton(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(top: AppResponsive.smallSpacing(context)),
-      child: TextButton(
-        onPressed: _loading ? null : widget.onNext,
-        child: Text('Skip for now',
-            style: TextStyle(
-                fontSize: AppResponsive.smallFontSize(context),
-                color: Colors.grey[500])),
       ),
     );
   }

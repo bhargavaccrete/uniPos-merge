@@ -615,14 +615,15 @@ class _EdititemScreenState extends State<EdititemScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            Icon(Icons.circle, color: selectedIMGCategory == 'Veg' ? Colors.green : Colors.red, size: 16),
-                            const SizedBox(width: 6),
-                            Text(selectedIMGCategory),
-                          ],
+                        Icon(Icons.circle, color: selectedIMGCategory == 'Veg' ? Colors.green : Colors.red, size: 16),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            selectedIMGCategory,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         const Icon(Icons.keyboard_arrow_down_rounded),
                       ],
@@ -665,15 +666,18 @@ class _EdititemScreenState extends State<EdititemScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.category_outlined, color: AppColors.primary, size: 20),
-                      const SizedBox(width: 10),
-                      Text(currentCategoryName, style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary)),
-                    ],
+                  const Icon(Icons.category_outlined, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      currentCategoryName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textSecondary),
                 ],
               ),
@@ -707,20 +711,20 @@ class _EdititemScreenState extends State<EdititemScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.percent_rounded, color: AppColors.primary, size: 20),
-                      const SizedBox(width: 10),
-                      Text(
-                        selectedTaxRate != null
-                            ? 'Tax: ${(selectedTaxRate! * 100).toStringAsFixed(2)}%'
-                            : 'No tax applied',
-                        style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
-                      ),
-                    ],
+                  const Icon(Icons.percent_rounded, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      selectedTaxRate != null
+                          ? 'Tax: ${(selectedTaxRate! * 100).toStringAsFixed(2)}%'
+                          : 'No tax applied',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textSecondary),
                 ],
               ),
@@ -744,38 +748,47 @@ class _EdititemScreenState extends State<EdititemScreen> {
               children: [
                 // Manage Inventory Row
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      "Manage Inventory",
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
+                    Expanded(
+                      child: Text(
+                        "Manage Inventory",
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 10),
                     Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Filterbutton(
-                          title: 'YES',
-                          selectedFilter: selectedFilter,
-                          onpressed: () {
-                            setState(() {
-                              selectedFilter = "YES";
-                              // Auto-set "Allow out of stock" to NO when enabling inventory management
-                              // This enforces stock limits by default (better UX)
-                              allowOutOfStockFilter = "NO";
-                            });
-                          },
+                        Transform.scale(
+                          scale: 0.8,
+                          child: Filterbutton(
+                            title: 'YES',
+                            selectedFilter: selectedFilter,
+                            onpressed: () {
+                              setState(() {
+                                selectedFilter = "YES";
+                                // Auto-set "Allow out of stock" to NO when enabling inventory management
+                                // This enforces stock limits by default (better UX)
+                                allowOutOfStockFilter = "NO";
+                              });
+                            },
+                          ),
                         ),
-                        SizedBox(width: 8),
-                        Filterbutton(
-                          title: 'NO',
-                          selectedFilter: selectedFilter,
-                          onpressed: () {
-                            setState(() {
-                              selectedFilter = "NO";
-                            });
-                          },
+                        const SizedBox(width: 6),
+                        Transform.scale(
+                          scale: 0.8,
+                          child: Filterbutton(
+                            title: 'NO',
+                            selectedFilter: selectedFilter,
+                            onpressed: () {
+                              setState(() {
+                                selectedFilter = "NO";
+                              });
+                            },
+                          ),
                         ),
                       ],
                     ),
@@ -793,6 +806,8 @@ class _EdititemScreenState extends State<EdititemScreen> {
                         Expanded(
                           child: Text(
                             "Current Stock (${_sellingMethod == SellingMethod.byWeight ? _selectedUnit : 'pcs'})",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.poppins(
                               fontWeight: FontWeight.w500,
                               fontSize: 13,
@@ -911,6 +926,8 @@ class _EdititemScreenState extends State<EdititemScreen> {
                         Expanded(
                           child: Text(
                             "Alert threshold (${_sellingMethod == SellingMethod.byWeight ? _selectedUnit : 'pcs'})",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.poppins(
                               fontWeight: FontWeight.w500,
                               fontSize: 13,
@@ -1230,15 +1247,26 @@ class _EdititemScreenState extends State<EdititemScreen> {
                 itemCount: variants.length,
                 itemBuilder: (context, index) {
                   final trackOn = selectedFilter.toLowerCase() == 'yes';
+                  // Flex-based layout so name/price/stock share the row width and
+                  // scale on any screen — fixed-width fields used to squeeze the
+                  // name column to nothing (e.g. "Half" wrapped to "Ha"/"lf").
                   return Row(
                     children: [
                       Checkbox(
                         value: _variantCheckedList[index],
                         onChanged: (value) => setState(() => _variantCheckedList[index] = value!),
                       ),
-                      Expanded(child: Text(variants[index].name)),
-                      SizedBox(
-                        width: trackOn ? 90 : 120,
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          variants[index].name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 3,
                         child: AppTextField(
                           controller: _variantPriceControllers[index],
                           hint: 'Price',
@@ -1251,8 +1279,8 @@ class _EdititemScreenState extends State<EdititemScreen> {
                       // Per-variant stock — only when inventory tracking is on.
                       if (trackOn && _variantCheckedList[index]) ...[
                         const SizedBox(width: 8),
-                        SizedBox(
-                          width: 90,
+                        Expanded(
+                          flex: 3,
                           child: AppTextField(
                             controller: _variantStockControllers[index],
                             hint: 'Stock',

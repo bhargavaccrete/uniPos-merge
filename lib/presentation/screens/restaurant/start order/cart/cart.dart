@@ -12,6 +12,7 @@ import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/restaurant/order_settings.dart';
 import '../../../../../core/plan/plan_enforcement.dart';
 import '../../../../../core/plan/entitlement_keys.dart';
+import '../../../../../core/plan/plan_guard.dart';
 import '../../tabbar/table.dart';
 import '../startorder.dart';
 import '../../../../../util/common/app_responsive.dart';
@@ -628,6 +629,8 @@ class _CartScreenState extends State<CartScreen>
                             SizedBox(width: 6),
                             InkWell(
                               onTap: () async {
+                                // Plan gate — transfer table (optional feature).
+                                if (!PlanGuard.allowedOr(context, EntKeys.billingTablesTransfer, featureName: 'Transfer table')) return;
                                 final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const TableScreen(isfromcart: true)));
                                 if (result is String && result != widget.existingOrder!.tableNo) {
                                   try {
@@ -662,21 +665,9 @@ class _CartScreenState extends State<CartScreen>
                   Expanded(child: _getBody()),
                 ],
               ),
-  
-              // Floating "Add Items" button when viewing an existing order.
-              if (_activeList.isNotEmpty)
-                Positioned(
-                  bottom: 170,
-                  right: 16,
-                  child: FloatingActionButton(
-                    heroTag: 'addItemsFab',
-                    onPressed: _navigateAndAddMoreItems,
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    tooltip: 'Add Items',
-                    child: const Icon(Icons.add),
-                  ),
-                ),
+              // NOTE: the "Add Items" FAB now lives inside Takeaway, floating
+              // just above its (variable-height) summary bar, so it can never
+              // overlap the Total / action buttons like the old fixed-offset one.
             ],
           ),
         ),
@@ -726,14 +717,18 @@ class _CartScreenState extends State<CartScreen>
   /// ------------------- MERGE TABLE FUNCTIONALITY ------------------- ///
   Future<void> _showMergeTableDialog() async {
     if (widget.existingOrder == null) return;
+    // Plan gate — merge table (optional feature).
+    if (!PlanGuard.allowedOr(context, EntKeys.billingTablesMerge, featureName: 'Merge table')) return;
 
     // Get all active orders with their table numbers
     await orderStore.loadOrders();
     final allOrders = orderStore.orders;
     final activeOrders = allOrders.where((order) =>
     (order.status == 'Cooking' || order.status == 'Processing') &&
-        (order.isPaid == null || order.isPaid == false) && // Exclude paid orders
-        (order.paymentStatus == null || order.paymentStatus != 'Paid') // Double-check payment status
+        // Only merge orders with NO payment yet — exclude fully- AND
+        // partially-paid orders so payment histories are never combined.
+        !order.isFullyPaid &&
+        ((order.totalPaid ?? 0) <= 0)
     ).toList();
 
     // Filter out the current table

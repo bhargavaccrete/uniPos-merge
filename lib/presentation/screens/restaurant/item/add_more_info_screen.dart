@@ -67,8 +67,8 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildHeader(),
-                  const SizedBox(height: 24),
+               /*   _buildHeader(),
+                  const SizedBox(height: 24),*/
 
                   // Add Variants Option
                   _buildOptionCard(
@@ -171,7 +171,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
   }
 
   /// Intro header shown above the option cards.
-  Widget _buildHeader() {
+/*  Widget _buildHeader() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -193,7 +193,7 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
         ),
       ],
     );
-  }
+  }*/
 
   /// Pinned bottom action bar with Back / Save & Continue.
   Widget _buildFooter() {

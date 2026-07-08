@@ -14,6 +14,7 @@ import '../../../../widget/componets/common/report_summary_card.dart';
 import '../../../../widget/componets/common/primary_app_bar.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../tabbar/orderDetails.dart';
+import '../../../../../util/restaurant/refund_state.dart';
 
 enum RefundPeriod { Today, ThisWeek, Month, Year, Custom }
 
@@ -219,7 +220,10 @@ class _RefundDataViewState extends State<RefundDataView> {
     // Single pass: date filter + status filter + accumulate totals + reason counts
     for (final order in pastOrderStore.pastOrders) {
       final status = order.orderStatus ?? '';
-      if (status != 'FULLY_REFUNDED' && status != 'PARTIALLY_REFUNDED') continue;
+      final hasRefund = RefundInfo.hasRefund(order);
+      final isRefundStatus = status == 'FULLY_REFUNDED' || status == 'PARTIALLY_REFUNDED';
+      final isRefundedVoided = status == 'VOIDED' && hasRefund;
+      if (!isRefundStatus && !isRefundedVoided) continue;
       if (order.refundedAt == null) continue;
       if (cutoff != null && order.refundedAt!.isBefore(cutoff)) continue;
       if (isCustom && !hasCustomRange) continue;

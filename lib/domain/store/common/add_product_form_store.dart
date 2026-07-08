@@ -497,7 +497,12 @@ abstract class _AddProductFormStore with Store {
       if (isRetail) {
         await _submitRetailProduct();
       } else {
-        await _submitRestaurantItem();
+        if (!await _submitRestaurantItem()) {
+          // addItem refused (plan item cap, duplicate name/code, etc.) without
+          // throwing — report it as a failure so the UI doesn't claim success.
+          errorMessage = itemStore.errorMessage ?? 'Could not save item.';
+          return false;
+        }
       }
 
       isSubmitted = true;
@@ -575,7 +580,7 @@ abstract class _AddProductFormStore with Store {
     }
   }
 
-  Future<void> _submitRestaurantItem() async {
+  Future<bool> _submitRestaurantItem() async {
     final itemId = _uuid.v4();
 
     // Create item variants if has portion sizes
@@ -636,7 +641,9 @@ abstract class _AddProductFormStore with Store {
       createdTime: DateTime.now(),
     );
 
-    await itemStore.addItem(item);
+    // Propagate the store result so a plan-cap / duplicate rejection surfaces as
+    // a real failure instead of a false "added successfully".
+    return await itemStore.addItem(item);
   }
 
   // ==================== RESET ====================

@@ -138,7 +138,14 @@ class _ActiveorderState extends State<Activeorder> {
     final order = orderStore.orders.where((o) => o.id == orderId).firstOrNull;
 
       if (order != null) {
-        // Save to past orders as VOID so it appears in the Void Order Report
+        // A settled dine-in order stays in the active list until served, so it
+        // can still be voided here. If it was already PAID, preserve the real
+        // payment (method + amount + split) and mark it 'VOIDED' — so the Void
+        // report shows it as paid (not "Unpaid") and a refund can be issued.
+        // An unpaid order deleted before payment stays 'VOID' with 'N/A'.
+        final bool wasPaid = order.isPaid == true ||
+            (order.paymentStatus?.toLowerCase() == 'paid');
+        // Save to past orders as VOID/VOIDED so it appears in the Void Order Report
         final voidRecord = PastOrderModel(
           id: order.id,
           customerName: order.customerName ?? '',
@@ -146,13 +153,16 @@ class _ActiveorderState extends State<Activeorder> {
           items: order.items,
           orderAt: order.timeStamp ?? DateTime.now(),
           orderType: order.orderType,
-          paymentmode: 'N/A',
+          paymentmode: wasPaid ? (order.paymentMethod ?? 'N/A') : 'N/A',
+          paymentListJson: wasPaid ? order.paymentListJson : null,
+          isSplitPayment: wasPaid ? order.isSplitPayment : null,
+          totalPaid: wasPaid ? order.totalPaid : null,
           subTotal: order.subTotal,
           gstAmount: order.gstAmount,
           Discount: order.discount,
           remark: order.remark,
           tableNo: order.tableNo,
-          orderStatus: 'VOID',
+          orderStatus: wasPaid ? 'VOIDED' : 'VOID',
           billNumber: order.billNumber,
           kotNumbers: order.kotNumbers,
           kotBoundaries: order.kotBoundaries,
@@ -215,6 +225,7 @@ class _ActiveorderState extends State<Activeorder> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialog) {
           return Dialog(
+            backgroundColor: AppColors.white,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 40),
             child: Padding(
@@ -402,7 +413,7 @@ class _ActiveorderState extends State<Activeorder> {
               if (newStatus == 'Served' && allServed) {
                 final latestOrder = orderStore.orders.firstWhere(
                   (o) => o.id == order.id, orElse: () => order);
-                if (latestOrder.paymentStatus == 'Paid') {
+                if (latestOrder.isFullyPaid) {
                   Navigator.pop(dialogContext);
                   await _moveOrderToPast(latestOrder);
                   return;
@@ -419,7 +430,7 @@ class _ActiveorderState extends State<Activeorder> {
               if (newStatus == 'Served') {
                 final latestOrder = orderStore.orders.firstWhere(
                   (o) => o.id == order.id, orElse: () => order);
-                if (latestOrder.paymentStatus == 'Paid') {
+                if (latestOrder.isFullyPaid) {
                   if (dialogContext.mounted) Navigator.pop(dialogContext);
                   await _moveOrderToPast(latestOrder);
                 }
@@ -433,6 +444,7 @@ class _ActiveorderState extends State<Activeorder> {
 
             // ── UI ─────────────────────────────────────────────────────
             return Dialog(
+              backgroundColor: AppColors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 440),
@@ -598,8 +610,18 @@ class _ActiveorderState extends State<Activeorder> {
                               final currentStatus = kotStatuses[kotNum] ?? order.status;
                               final currentIdx = _statusIndex(currentStatus);
                               final kotIndex = order.kotNumbers.indexOf(kotNum);
-                              final startIndex = kotIndex == 0 ? 0 : order.kotBoundaries[kotIndex - 1];
-                              final endIndex = order.kotBoundaries[kotIndex];
+                              // Defensive: KOT boundaries can drift past the item
+                              // count (e.g. items removed) — clamp so sublist()
+                              // never throws a RangeError while rendering.
+                              final int itemLen = order.items.length;
+                              final int endIndex = (kotIndex < order.kotBoundaries.length
+                                      ? order.kotBoundaries[kotIndex]
+                                      : itemLen)
+                                  .clamp(0, itemLen);
+                              final int startIndex = (kotIndex == 0
+                                      ? 0
+                                      : order.kotBoundaries[kotIndex - 1])
+                                  .clamp(0, endIndex);
                               final itemCount = endIndex - startIndex;
                               final isServed = currentStatus == 'Served';
                               final statusColor = _statusColors[currentStatus] ?? AppColors.textSecondary;
@@ -1213,9 +1235,16 @@ class _ActiveorderState extends State<Activeorder> {
               itemCount: order.kotNumbers.length,
               itemBuilder: (context, index) {
                 final kotNum = order.kotNumbers[index];
-                // Calculate item count for this KOT
-                final startIndex = index == 0 ? 0 : order.kotBoundaries[index - 1];
-                final endIndex = order.kotBoundaries[index];
+                // Calculate item count for this KOT (clamp against item count so
+                // a drifted boundary can't crash sublist/rendering).
+                final int itemLen = order.items.length;
+                final int endIndex = (index < order.kotBoundaries.length
+                        ? order.kotBoundaries[index]
+                        : itemLen)
+                    .clamp(0, itemLen);
+                final int startIndex =
+                    (index == 0 ? 0 : order.kotBoundaries[index - 1])
+                        .clamp(0, endIndex);
                 final itemCount = endIndex - startIndex;
 
                 return ListTile(
@@ -1430,7 +1459,7 @@ class _ActiveorderState extends State<Activeorder> {
                                 }
                               },
                               ontap: () async {
-                                if (order.isPaid != true) {
+                                if (!order.isFullyPaid) {
                                   await Navigator.push(
                                     context,
                                     MaterialPageRoute(

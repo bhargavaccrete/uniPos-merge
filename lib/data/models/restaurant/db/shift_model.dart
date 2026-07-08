@@ -41,6 +41,8 @@ class ShiftModel extends HiveObject {
   });
 
   bool get isOpen => status == 'open';
+  bool get isClosed => status.startsWith('closed');
+  bool get isAutoClosed => status.contains('auto_closed');
 
   Duration get duration =>
       (endTime ?? DateTime.now()).difference(startTime);

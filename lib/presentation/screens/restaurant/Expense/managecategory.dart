@@ -76,6 +76,90 @@ class _ManageCategoryState extends State<ManageCategory> {
     await expenseCategoryStore.deleteCategory(id);
   }
 
+  /// Rename dialog for [category]. Reuses the State-owned [categoryController]
+  /// (disposed on unmount, never in .then()) so there's no dialog-controller
+  /// lifecycle crash.
+  Future<void> _showEditCategoryDialog(ExpenseCategory category) async {
+    categoryController.text = category.name;
+    await showDialog(
+      context: context,
+      builder: (ctx) => AppDialogShell(
+        title: 'Edit Category',
+        accent: AppColors.primary,
+        icon: Icons.edit_rounded,
+        body: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Category Name',
+                style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary)),
+            const SizedBox(height: 10),
+            AppTextField(
+              controller: categoryController,
+              hint: 'Enter category name',
+              icon: Icons.category_outlined,
+            ),
+          ],
+        ),
+        actions: [
+          appDialogCancelButton(ctx),
+          const SizedBox(width: 12),
+          appDialogPrimaryButton(
+            label: 'Update',
+            onPressed: () => _updateCategoryName(category),
+          ),
+        ],
+      ),
+    );
+    categoryController.clear();
+  }
+
+  Future<void> _updateCategoryName(ExpenseCategory category) async {
+    final name = categoryController.text.trim();
+    if (name.isEmpty) {
+      NotificationService.instance.showError('Category name cannot be empty');
+      return;
+    }
+    final isDuplicate = expenseCategoryStore.categories.any(
+      (c) => c.id != category.id && c.name.toLowerCase() == name.toLowerCase(),
+    );
+    if (isDuplicate) {
+      NotificationService.instance
+          .showError('A category with this name already exists');
+      return;
+    }
+    final updated = ExpenseCategory(
+      id: category.id,
+      name: name,
+      isEnabled: category.isEnabled,
+    );
+    await expenseCategoryStore.updateCategory(updated);
+    NotificationService.instance.showSuccess('Category updated successfully');
+    if (mounted) Navigator.pop(context);
+  }
+
+  /// Compact icon button for the card's edit / delete actions — no oversized
+  /// touch target or coloured box.
+  Widget _cardAction({
+    required IconData icon,
+    required Color color,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return IconButton(
+      onPressed: onTap,
+      icon: Icon(icon, color: color, size: 20),
+      tooltip: tooltip,
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.all(6),
+      constraints: const BoxConstraints(),
+      splashRadius: 20,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isTablet = !AppResponsive.isMobile(context);
@@ -319,86 +403,100 @@ class _ManageCategoryState extends State<ManageCategory> {
                   itemBuilder: (context, index) {
                     final category = allcategory[index];
                     return Container(
-                      margin: EdgeInsets.only(bottom: 12),
-                      padding: EdgeInsets.all(16),
+                      margin: EdgeInsets.only(bottom: 10),
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: AppColors.white,
                         borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha:0.03),
-                            blurRadius: 8,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
+                        border: Border.all(color: AppColors.divider),
                       ),
                       child: Row(
                         children: [
                           Container(
-                            padding: EdgeInsets.all(12),
+                            padding: EdgeInsets.all(10),
                             decoration: BoxDecoration(
                               color: category.isEnabled
-                                  ? AppColors.primary.withValues(alpha:0.1)
-                                  : AppColors.textSecondary.withValues(alpha:0.1),
-                              borderRadius: BorderRadius.circular(12),
+                                  ? AppColors.primary.withValues(alpha: 0.1)
+                                  : AppColors.textSecondary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                             child: Icon(
                               Icons.category_rounded,
-                              color: category.isEnabled ? AppColors.primary : AppColors.textSecondary,
-                              size: 24,
+                              color: category.isEnabled
+                                  ? AppColors.primary
+                                  : AppColors.textSecondary,
+                              size: 20,
                             ),
                           ),
-                          SizedBox(width: 14),
+                          SizedBox(width: 12),
                           Expanded(
-                            child: Text(
-                              category.name,
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 16,
-                                color: AppColors.textPrimary,
-                              ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  category.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 15,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                if (!category.isEnabled)
+                                  Text(
+                                    'Disabled',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 11,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
-                          Switch(
-                            value: category.isEnabled,
-                            onChanged: (bool value) async {
-                              final updatedCategory = ExpenseCategory(
-                                id: category.id,
-                                name: category.name,
-                                isEnabled: value,
-                              );
-                              await expenseCategoryStore.updateCategory(updatedCategory);
-                            },
-                            activeColor: AppColors.primary,
-                          ),
-                          SizedBox(width: 8),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha:0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: IconButton(
-                              onPressed: () async {
-                                final confirm = await showAppConfirmDialog(
-                                  context: context,
-                                  title: 'Delete Category',
-                                  message:
-                                      'Are you sure you want to delete "${category.name}"?',
-                                  confirmLabel: 'Delete',
-                                  accent: AppColors.danger,
-                                  icon: Icons.delete_outline,
+                          // Compact enable/disable toggle
+                          Transform.scale(
+                            scale: 0.8,
+                            child: Switch(
+                              value: category.isEnabled,
+                              onChanged: (bool value) async {
+                                final updatedCategory = ExpenseCategory(
+                                  id: category.id,
+                                  name: category.name,
+                                  isEnabled: value,
                                 );
-                                if (confirm) {
-                                  await _delete(category.id);
-                                }
+                                await expenseCategoryStore
+                                    .updateCategory(updatedCategory);
                               },
-                              icon: Icon(
-                                Icons.delete_rounded,
-                                color: Colors.red,
-                                size: isTablet ? 22 : 20,
-                              ),
-                              tooltip: 'Delete',
+                              activeColor: AppColors.primary,
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
                             ),
+                          ),
+                          _cardAction(
+                            icon: Icons.edit_outlined,
+                            color: AppColors.primary,
+                            tooltip: 'Edit',
+                            onTap: () => _showEditCategoryDialog(category),
+                          ),
+                          _cardAction(
+                            icon: Icons.delete_outline_rounded,
+                            color: AppColors.danger,
+                            tooltip: 'Delete',
+                            onTap: () async {
+                              final confirm = await showAppConfirmDialog(
+                                context: context,
+                                title: 'Delete Category',
+                                message:
+                                    'Are you sure you want to delete "${category.name}"?',
+                                confirmLabel: 'Delete',
+                                accent: AppColors.danger,
+                                icon: Icons.delete_outline,
+                              );
+                              if (confirm) {
+                                await _delete(category.id);
+                              }
+                            },
                           ),
                         ],
                       ),

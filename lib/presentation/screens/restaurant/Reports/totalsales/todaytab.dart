@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/restaurant/order_status_filter.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -37,6 +38,9 @@ class _TodaytabState extends State<Todaytab> {
     final now = DateTime.now();
 
     return pastOrderStore.pastOrders.where((order) {
+      // Exclude voided orders from today's sales, count and export — matches
+      // the other Total Sales tabs (voided orders are not revenue).
+      if (OrderStatusFilter.isVoided(order.orderStatus)) return false;
       final orderDate = order.orderAt;
       if (orderDate == null) return false;
       return orderDate.year == now.year &&

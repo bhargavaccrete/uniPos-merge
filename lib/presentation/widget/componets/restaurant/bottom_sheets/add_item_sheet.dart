@@ -169,7 +169,16 @@ class _AddItemSheetState extends State<AddItemSheet> {
     setState(() => _isSaving = true);
     try {
       final item = await _formState.toItem();
-      await itemStore.addItem(item);
+      // Respect the store result — addItem returns false (without throwing) when
+      // the plan item cap is hit or a duplicate is rejected. Previously this was
+      // ignored, so the sheet claimed "added successfully" and closed while the
+      // item was never saved (it never appeared in the list).
+      final success = await itemStore.addItem(item);
+      if (!success) {
+        NotificationService.instance
+            .showError(itemStore.errorMessage ?? 'Could not add item.');
+        return; // keep the sheet open; don't fire onItemAdded / pop
+      }
       await StockAdjustService.recordOpeningStock(item);
       widget.onItemAdded?.call();
       if (mounted) {
@@ -452,12 +461,13 @@ class _AddItemSheetState extends State<AddItemSheet> {
     return AppTextField(
       controller: _formState.itemCodeController,
       label: 'Item Code',
-      hint: 'e.g. 100021',
+      hint: 'e.g. 10021',
       icon: Icons.qr_code_scanner_rounded,
       required: true,
       keyboardType: TextInputType.number,
       inputFormatters: [
         FilteringTextInputFormatter.digitsOnly,
+        LengthLimitingTextInputFormatter(5), // item code = max 5 digits
       ],
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/restaurant/order_status_filter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
@@ -267,7 +268,7 @@ class _CategoryDataViewState extends State<CategoryDataView> {
 
       // Skip voided and fully refunded orders
       final status = order.orderStatus ?? '';
-      if (status == 'FULLY_REFUNDED' || status == 'VOIDED' || status == 'VOID') continue;
+      if (OrderStatusFilter.isExcludedFromRevenue(status)) continue;
 
       final isTaxInclusive = order.isTaxInclusive ?? false;
 

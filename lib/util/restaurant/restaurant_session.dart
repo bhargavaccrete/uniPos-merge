@@ -184,14 +184,22 @@ class RestaurantSession {
 
   static Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-    _isLoggedIn = prefs.getBool(_isLoggedInKey) ?? false;
+    // SECURITY: load() runs only on a COLD START (fresh process launch). A full
+    // close / swipe-from-recents kills the process WITHOUT a graceful logout, so
+    // the persisted "logged in" flag is stale. Never auto-login from it — force
+    // re-authentication so a killed-and-relaunched app asks for the PIN again.
+    // (A background→resume does NOT re-run load(), so simply minimizing keeps the
+    // session alive, subject to the inactivity timeout.)
+    _isLoggedIn = false;
+    await prefs.setBool(_isLoggedInKey, false);
     loginTypeNotifier.value = prefs.getString(_loginTypeKey) ?? 'admin';
     staffRoleNotifier.value = prefs.getString(_staffRoleKey);
     staffNameNotifier.value = prefs.getString(_staffNameKey);
     _currentShiftId = prefs.getString(_currentShiftIdKey);
     timeoutMinutesNotifier.value =
         prefs.getInt(_timeoutMinutesKey) ?? _defaultTimeoutMinutes;
-    if (_isLoggedIn) resetInactivityTimer();
+    // Not logged in on cold start → no inactivity timer until the PIN is entered
+    // (saveAdminSession / saveStaffSession start it on successful login).
   }
 
   // ── Permission check ─────────────────────────────────────────────────────

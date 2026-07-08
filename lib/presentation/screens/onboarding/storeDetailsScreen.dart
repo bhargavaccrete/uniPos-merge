@@ -4,7 +4,9 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/stores/setup_wizard_store.dart';
 import '../../../presentation/widget/componets/common/app_text_field.dart';
-import 'package:country_state_city_picker/country_state_city_picker.dart';
+import '../../../presentation/widget/componets/common/location_dropdown_field.dart';
+import '../../../domain/services/restaurant/notification_service.dart';
+import '../../../util/common/country_state_city_data.dart';
 import '../../../util/color.dart';
 import '../../../util/common/app_responsive.dart';
 
@@ -46,17 +48,71 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
   final _phoneFocus = FocusNode();
   final _emailFocus = FocusNode();
   final _addressFocus = FocusNode();
-  final _cityFocus = FocusNode();
-  final _stateFocus = FocusNode();
-  final _countryFocus = FocusNode();
   final _pincodeFocus = FocusNode();
   final _gstFocus = FocusNode();
   final _panFocus = FocusNode();
+
+  // Cascading location options for the Country → State → City dropdowns.
+  final _location = CountryStateCityData.instance;
+  List<String> _countryOptions = [];
+  List<String> _stateOptions = [];
+  List<String> _cityOptions = [];
 
   @override
   void initState() {
     super.initState();
     _initializeControllers();
+    _initLocationOptions();
+  }
+
+  /// Loads the country list, plus the state/city lists for any values already
+  /// saved on the store (edit / returning to this step), so dropdowns pre-fill.
+  Future<void> _initLocationOptions() async {
+    final countries = await _location.countries();
+    final country = _countryController.text.trim();
+    final state = _stateController.text.trim();
+    final states =
+        country.isNotEmpty ? await _location.states(country) : <String>[];
+    final cities = (country.isNotEmpty && state.isNotEmpty)
+        ? await _location.cities(country, state)
+        : <String>[];
+    if (!mounted) return;
+    setState(() {
+      _countryOptions = countries;
+      _stateOptions = states;
+      _cityOptions = cities;
+    });
+  }
+
+  Future<void> _onCountrySelected(String country) async {
+    // Country changed → the old state/city no longer apply; reset both.
+    _countryController.text = country;
+    _stateController.clear();
+    _cityController.clear();
+    widget.store.setCountry(country);
+    widget.store.setState('');
+    widget.store.setCity('');
+    final states = await _location.states(country);
+    if (!mounted) return;
+    setState(() {
+      _stateOptions = states;
+      _cityOptions = [];
+    });
+  }
+
+  Future<void> _onStateSelected(String state) async {
+    _stateController.text = state;
+    _cityController.clear();
+    widget.store.setState(state);
+    widget.store.setCity('');
+    final cities = await _location.cities(_countryController.text.trim(), state);
+    if (!mounted) return;
+    setState(() => _cityOptions = cities);
+  }
+
+  void _onCitySelected(String city) {
+    setState(() => _cityController.text = city);
+    widget.store.setCity(city);
   }
 
   String _val(String? v, String fallback) =>
@@ -94,9 +150,6 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
     _phoneFocus.dispose();
     _emailFocus.dispose();
     _addressFocus.dispose();
-    _cityFocus.dispose();
-    _stateFocus.dispose();
-    _countryFocus.dispose();
     _pincodeFocus.dispose();
     _gstFocus.dispose();
     _panFocus.dispose();
@@ -549,6 +602,52 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
     return null;
   }
 
+  String? _validateEmail(String? v) {
+    if (v == null || v.isEmpty) return 'Email is required';
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(v)) {
+      return 'Enter a valid email address';
+    }
+    return null;
+  }
+
+  String? _validatePincode(String? v) {
+    final t = (v ?? '').trim();
+    if (t.isEmpty) return 'Pincode is required';
+    if (t.length != 6) return 'Pincode must be 6 digits';
+    return null;
+  }
+
+  /// First invalid required field, top-to-bottom → its focus node (null for the
+  /// Country/State/City dropdowns, which have none) + the message to show. Used
+  /// to notify + scroll-to-error when validation fails with an off-screen field.
+  ({FocusNode? focus, String message})? _firstInvalidField() {
+    if (_storeNameController.text.trim().isEmpty) {
+      return (focus: _storeNameFocus, message: 'Store name is required');
+    }
+    if (_ownerNameController.text.trim().isEmpty) {
+      return (focus: _ownerNameFocus, message: 'Owner name is required');
+    }
+    final phoneErr = _validatePhone(_phoneController.text);
+    if (phoneErr != null) return (focus: _phoneFocus, message: phoneErr);
+    final emailErr = _validateEmail(_emailController.text);
+    if (emailErr != null) return (focus: _emailFocus, message: emailErr);
+    if (_addressController.text.trim().isEmpty) {
+      return (focus: _addressFocus, message: 'Address is required');
+    }
+    if (_countryController.text.trim().isEmpty) {
+      return (focus: null, message: 'Country is required');
+    }
+    if (_stateController.text.trim().isEmpty) {
+      return (focus: null, message: 'State is required');
+    }
+    if (_cityController.text.trim().isEmpty) {
+      return (focus: null, message: 'City is required');
+    }
+    final pinErr = _validatePincode(_pincodeController.text);
+    if (pinErr != null) return (focus: _pincodeFocus, message: pinErr);
+    return null;
+  }
+
   // ── Contact section (phone + email + address) ─────────────────────────────────
 
   Widget _buildContactSection(BuildContext context, {required bool isTablet}) {
@@ -592,15 +691,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                   maxLength: 60,
                   keyboardType: TextInputType.emailAddress,
                   onChanged: (v) => widget.store.setEmail(v),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) {
-                      return 'Email is required';
-                    }
-                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(v)) {
-                      return 'Enter a valid email address';
-                    }
-                    return null;
-                  },
+                  validator: _validateEmail,
                 ),
               ),
             ],
@@ -610,7 +701,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
             controller: _addressController,
             focusNode: _addressFocus,
             textInputAction: TextInputAction.next,
-            onFieldSubmitted: (_) => _cityFocus.requestFocus(),
+            onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
             label: 'Store Address',
             hint: 'Street / Area',
             icon: Icons.location_on_rounded,
@@ -622,40 +713,51 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                 (v == null || v.isEmpty) ? 'Address is required' : null,
           ),
           SizedBox(height: AppResponsive.mediumSpacing(context)),
+          // Country → State → City cascading dropdowns (BA change: dropdowns for
+          // data consistency; City also accepts a typed value if not listed).
+          LocationDropdownField(
+            label: 'Country',
+            icon: Icons.public_rounded,
+            value: _countryController.text.isEmpty ? null : _countryController.text,
+            options: _countryOptions,
+            onSelected: _onCountrySelected,
+            validator: (v) =>
+                (v == null || v.trim().isEmpty) ? 'Country is required' : null,
+          ),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: AppTextField(
-                  controller: _cityController,
-                  focusNode: _cityFocus,
-                  textInputAction: TextInputAction.next,
-                  onFieldSubmitted: (_) => _stateFocus.requestFocus(),
-                  label: 'City',
-                  hint: 'e.g. Gandhinagar',
-                  icon: Icons.location_city_rounded,
-                  required: true,
-                  maxLength: 50,
-                  onChanged: (v) => widget.store.setCity(v),
+                child: LocationDropdownField(
+                  label: 'State',
+                  icon: Icons.map_rounded,
+                  value:
+                      _stateController.text.isEmpty ? null : _stateController.text,
+                  options: _stateOptions,
+                  ready: _countryController.text.trim().isNotEmpty,
+                  onBlocked: () => NotificationService.instance
+                      .showError('Please select the country first'),
+                  onSelected: _onStateSelected,
                   validator: (v) =>
-                      (v == null || v.isEmpty) ? 'City is required' : null,
+                      (v == null || v.trim().isEmpty) ? 'State is required' : null,
                 ),
               ),
               SizedBox(width: AppResponsive.mediumSpacing(context)),
               Expanded(
-                child: AppTextField(
-                  controller: _stateController,
-                  focusNode: _stateFocus,
-                  textInputAction: TextInputAction.next,
-                  onFieldSubmitted: (_) => _countryFocus.requestFocus(),
-                  label: 'State',
-                  hint: 'e.g. Gujarat',
-                  icon: Icons.map_rounded,
-                  required: true,
-                  maxLength: 50,
-                  onChanged: (v) => widget.store.setState(v),
+                child: LocationDropdownField(
+                  label: 'City',
+                  icon: Icons.location_city_rounded,
+                  value:
+                      _cityController.text.isEmpty ? null : _cityController.text,
+                  options: _cityOptions,
+                  ready: _stateController.text.trim().isNotEmpty,
+                  allowCustom: true,
+                  onBlocked: () => NotificationService.instance
+                      .showError('Please select the state first'),
+                  onSelected: _onCitySelected,
                   validator: (v) =>
-                      (v == null || v.isEmpty) ? 'State is required' : null,
+                      (v == null || v.trim().isEmpty) ? 'City is required' : null,
                 ),
               ),
             ],
@@ -664,23 +766,6 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: AppTextField(
-                  controller: _countryController,
-                  focusNode: _countryFocus,
-                  textInputAction: TextInputAction.next,
-                  onFieldSubmitted: (_) => _pincodeFocus.requestFocus(),
-                  label: 'Country',
-                  hint: 'e.g. India',
-                  icon: Icons.public_rounded,
-                  required: true,
-                  maxLength: 50,
-                  onChanged: (v) => widget.store.setCountry(v),
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Country is required' : null,
-                ),
-              ),
-              SizedBox(width: AppResponsive.mediumSpacing(context)),
               Expanded(
                 child: AppTextField(
                   controller: _pincodeController,
@@ -695,8 +780,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                   maxLength: 6,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   onChanged: (v) => widget.store.setPincode(v),
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Pincode is required' : null,
+                  validator: _validatePincode,
                 ),
               ),
             ],
@@ -789,7 +873,14 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                   _syncToStore();
                   widget.store.saveBusinessDetails();
                   widget.onNext();
+                  return;
                 }
+                // Validation failed — the invalid field may be scrolled off-screen,
+                // so surface the reason and take the user straight to it.
+                final first = _firstInvalidField();
+                first?.focus?.requestFocus(); // focusing a field auto-scrolls it in
+                NotificationService.instance.showError(
+                    first?.message ?? 'Please fill all required fields correctly');
               },
               icon: widget.store.isLoading
                   ? const SizedBox(

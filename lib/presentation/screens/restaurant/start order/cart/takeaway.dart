@@ -460,9 +460,11 @@ class _TakeawayState extends State<Takeaway> {
                   child: Text('${item.quantity}x', style: GoogleFonts.poppins(fontSize: qtyFs, fontWeight: FontWeight.w600)),
                 ),
                 SizedBox(width: 8),
-                if (isCooked)
+                if (isCooked || (widget.existingModel?.isFullyPaid ?? false))
                   Tooltip(
-                    message: 'Cannot cancel cooked items',
+                    message: isCooked
+                        ? 'Cannot cancel cooked items'
+                        : 'Order is paid — start a new order to change items',
                     child: Container(
                       padding: EdgeInsets.all(btnPad),
                       decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(6)),
@@ -1070,6 +1072,11 @@ class _TakeawayState extends State<Takeaway> {
   // NEW ORDER
   Future<void> _placeOrder(CartCalculationService calculations) async {
     if (!_stockOkToOrder()) return;
+    final strictlyPending = await DayManagementService.isEodStrictlyPending();
+    if (strictlyPending) {
+      NotificationService.instance.showError('Day has ended. Complete End of Day to unlock.');
+      return;
+    }
     // No active day session yet → start the day right here (opening balance),
     // then continue placing this order. The day begins at the first order.
     final bool sessionOpen = await DayManagementService.isSessionOpen();
@@ -1353,6 +1360,13 @@ class _TakeawayState extends State<Takeaway> {
 
     final currentSessionId = await DayManagementService.getCurrentSessionId();
 
+    // Adding/removing items changes the total, so re-derive payment state from
+    // the new balance. Existing payments (totalPaid / paymentListJson /
+    // paymentMethod) are preserved by copyWith — we only recompute the flags,
+    // so a settled order that gets new items correctly reopens as pending.
+    final double alreadyPaid = existingModel.totalPaid ?? 0;
+    final bool nowFullyPaid = (calculations.grandTotal - alreadyPaid) < 0.01;
+
     final updateOrder = existingModel.copyWith(
       items: allCurrentItems,
       totalPrice: calculations.grandTotal,
@@ -1369,6 +1383,9 @@ class _TakeawayState extends State<Takeaway> {
       kotStatuses: updatedKotStatuses,
       kotTimestamps: updatedKotTimestamps,
       sessionId: currentSessionId ?? existingModel.sessionId,
+      isPaid: nowFullyPaid,
+      paymentStatus:
+          nowFullyPaid ? 'Paid' : (alreadyPaid > 0 ? 'Partially Paid' : 'Unpaid'),
     );
 
     await orderStore.updateOrder(updateOrder);
@@ -1575,7 +1592,9 @@ class _TakeawayState extends State<Takeaway> {
       children: [
         // Cart items
         Expanded(
-          child: widget.cartItems.isEmpty
+          child: Stack(
+            children: [
+              widget.cartItems.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -1637,6 +1656,27 @@ class _TakeawayState extends State<Takeaway> {
                     Expanded(child: _buildGroupedCartItems()),
                   ],
                 ),
+              // Floating "Add Items" button — sits just above the summary bar
+              // (inside the list area), so it adapts to the bar's height and can
+              // never overlap the Total / action buttons.
+              // Hidden once the order is fully paid: a paid order is locked —
+              // to add items, start a new order (avoids balance-due/refund edge cases).
+              if (widget.onAddItems != null &&
+                  !(widget.existingModel?.isFullyPaid ?? false))
+                Positioned(
+                  bottom: 12,
+                  right: 16,
+                  child: FloatingActionButton(
+                    heroTag: 'addItemsFab',
+                    onPressed: widget.onAddItems,
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    tooltip: 'Add Items',
+                    child: const Icon(Icons.add),
+                  ),
+                ),
+            ],
+          ),
         ),
 
         // Bottom: total + buttons
@@ -1700,19 +1740,28 @@ class _TakeawayState extends State<Takeaway> {
         Row(
           children: [
             Expanded(
+              // Once the bill is paid the order stays active (kitchen still
+              // serves it) — disable Settle so it can't be settled a second time.
               child: _buildActionButton(
-                'Settle (${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calculations.grandTotal)})',
+                (widget.existingModel?.isFullyPaid ?? false)
+                    ? 'Settled'
+                    : ((widget.existingModel?.hasPartialPayment ?? false)
+                        ? 'Settle Balance (${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(widget.existingModel!.amountDue)})'
+                        : 'Settle (${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calculations.grandTotal)})'),
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => Customerdetails(
                   tableid: widget.tableid, existingModel: widget.existingModel,
                   cartitems: plainItems, totalPrice: calculations.grandTotal,
                 ))),
                 icon: Icons.payments_outlined,
+                enabled: !(widget.existingModel?.isFullyPaid ?? false),
               ),
             ),
             SizedBox(width: 8),
             Expanded(
               child: _buildActionButton('Place Order', () => _updateExistingOrder(calculations),
-                  icon: Icons.check_circle_outline),
+                  icon: Icons.check_circle_outline,
+                  // A fully-paid order is locked — no item changes.
+                  enabled: !(widget.existingModel?.isFullyPaid ?? false)),
             ),
           ],
         ),
@@ -2120,7 +2169,6 @@ class _TakeawayState extends State<Takeaway> {
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                                flex: 2,
                                 child: _buildActionButton('Place Order',
                                     () => _placeOrder(calculations))),
                           ],
@@ -2178,6 +2226,7 @@ class _TakeawayState extends State<Takeaway> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialog) {
           return Dialog(
+            backgroundColor: AppColors.white,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
             child: Container(
@@ -2316,6 +2365,11 @@ class _TakeawayState extends State<Takeaway> {
 
 // Replace your entire _qucikSettleNewOrder function with this one.
   Future<void> _qucikSettleNewOrder(CartCalculationService calculations, String paymentMethod) async {
+    final strictlyPending = await DayManagementService.isEodStrictlyPending();
+    if (strictlyPending) {
+      NotificationService.instance.showError('Day has ended. Complete End of Day to unlock.');
+      return;
+    }
     // No active day session yet → start the day (opening balance) before the
     // sale is recorded, so it's never excluded from EOD.
     if (!await DayManagementService.isSessionOpen()) {
@@ -2532,6 +2586,7 @@ class _TakeawayState extends State<Takeaway> {
         canPop: false,
         child: Dialog(
           insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+          backgroundColor: AppColors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           clipBehavior: Clip.antiAlias,
           child: ConstrainedBox(
