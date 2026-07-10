@@ -68,12 +68,16 @@ class EntKeys {
   static const reportsAttendance = 'reports.attendance';
   static const reportsCashDrawerHistory = 'reports.cash_drawer_history';
   static const reportsPerformanceStatistics = 'reports.performance_statistics';
+  static const reportsPaymentMode = 'reports.payment_mode';
 
   // ── Actions ──────────────────────────────────────────────────────────────────
   static const billingInvoiceCreate = 'billing.invoice.create';
   static const billingInvoiceEdit = 'billing.invoice.edit';
   static const billingInvoiceExport = 'billing.invoice.export';
   static const billingInvoiceVoid = 'billing.invoice.void';
+  // Admin-controlled: print the "Powered by Bill Berry Lite" footer on bills.
+  // true ⇒ shown (default), false ⇒ hidden. Sole control — no shop-side toggle.
+  static const billingInvoicePrint = 'billing.invoice.print';
 
   static const manageMenuItemsAdd = 'manage_menu.items.add';
   static const manageMenuItemsEdit = 'manage_menu.items.edit';
@@ -160,12 +164,15 @@ const Map<String, Object> kEntitlementDefaults = {
   EntKeys.reportsAttendance: false,
   EntKeys.reportsCashDrawerHistory: false,
   EntKeys.reportsPerformanceStatistics: false,
+  EntKeys.reportsPaymentMode: false,
 
   // Actions
   EntKeys.billingInvoiceCreate: false,
   EntKeys.billingInvoiceEdit: false,
   EntKeys.billingInvoiceExport: false,
   EntKeys.billingInvoiceVoid: false,
+  // Powered-by footer: shown by default; admin sends false to hide it.
+  EntKeys.billingInvoicePrint: true,
   EntKeys.manageMenuItemsAdd: false,
   EntKeys.manageMenuItemsEdit: false,
   EntKeys.manageMenuItemsDelete: false,

@@ -10,6 +10,7 @@ import 'package:billberrylite/data/models/restaurant/db/cash_handover_model.dart
 import 'package:billberrylite/data/repositories/restaurant/cash_handover_repository.dart';
 import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:billberrylite/data/models/restaurant/db/expensel_316.dart';
+import 'package:billberrylite/domain/services/common/notification_service.dart';
 import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
@@ -549,10 +550,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                 final amount =
                     double.tryParse(amountCtrl.text.trim()) ?? 0;
                 if (amount <= 0) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(
-                        content: Text('Enter a valid amount')),
-                  );
+                  NotificationService.instance.showError('Enter a valid amount');
                   return;
                 }
                 // Guard: warn if Cash Out would make the drawer go negative.
@@ -1510,8 +1508,7 @@ class _CashHandoverCloseDialogState extends State<CashHandoverCloseDialog> {
   Future<void> _save() async {
     final amount = double.tryParse(_amountCtrl.text.trim()) ?? 0;
     if (amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Enter the cash amount')));
+      NotificationService.instance.showError('Enter the cash amount');
       return;
     }
     setState(() => _isSaving = true);
@@ -1894,14 +1891,12 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
 
   Future<void> _confirm() async {
     if (_amountCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Count the cash and enter the amount first')));
+      NotificationService.instance.showError('Count the cash and enter the amount first');
       return;
     }
     final amount = double.tryParse(_amountCtrl.text.trim()) ?? 0;
     if (amount < 0) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Amount cannot be negative')));
+      NotificationService.instance.showError('Amount cannot be negative');
       return;
     }
     setState(() => _isSaving = true);

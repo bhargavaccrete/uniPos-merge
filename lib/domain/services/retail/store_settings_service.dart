@@ -211,8 +211,8 @@ class StoreSettingsService {
         return false;
       }
 
-      // Update with null logo
-      final updatedDetails = currentDetails.copyWith(logo: null);
+      // `logo: null` is a no-op through copyWith's `??` — clearLogo is required.
+      final updatedDetails = currentDetails.copyWith(clearLogo: true);
       await _businessDetailsRepo.save(updatedDetails);
       return true;
     } catch (e) {

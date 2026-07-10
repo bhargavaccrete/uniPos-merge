@@ -5,13 +5,18 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
-import 'package:billberrylite/core/plan/entitlement_keys.dart';
-import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import '../../../../widget/componets/common/report_summary_card.dart';
-import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_body.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_export_button.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_filter_bar.dart';
+import 'package:billberrylite/widgets/upgrade_sheet.dart';
+import 'package:billberrylite/util/restaurant/report_history_window.dart';
 
 enum ComparisonPeriod { Today, ThisWeek, MonthWise, YearWise }
 
@@ -31,102 +36,75 @@ class _ComparisonByProductState extends State<ComparisonByProduct> {
     pastOrderStore.loadPastOrders();
   }
 
+  /// A product comparison reaches back to its PREVIOUS window's start — that is
+  /// the date the plan's history must cover.
+  static DateTime _earliestDate(ComparisonPeriod p) {
+    final now = DateTime.now();
+    switch (p) {
+      case ComparisonPeriod.Today:
+        return DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1));
+      case ComparisonPeriod.ThisWeek:
+        final weekStart =
+            DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+        return weekStart.subtract(const Duration(days: 7));
+      case ComparisonPeriod.MonthWise:
+        return DateTime(now.year, now.month - 1, 1);
+      case ComparisonPeriod.YearWise:
+        return DateTime(now.year - 1, 1, 1);
+    }
+  }
+
+  static IconData _periodIcon(ComparisonPeriod p) {
+    switch (p) {
+      case ComparisonPeriod.Today:
+        return Icons.today;
+      case ComparisonPeriod.ThisWeek:
+        return Icons.view_week;
+      case ComparisonPeriod.MonthWise:
+        return Icons.calendar_month;
+      case ComparisonPeriod.YearWise:
+        return Icons.calendar_today;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: buildPrimaryAppBar(
-        titleWidget: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Comparison By Product',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-            Text(
-              'Compare product sales trends',
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                color: Colors.white70,
-              ),
-            ),
-          ],
-        ),
+      appBar: reportAppBar(
+        title: 'Comparison By Product',
+        subtitle: 'Compare product sales trends',
       ),
-      body: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            // Period Filter Bar
-            Container(
-              width: double.infinity,
-              padding: AppResponsive.padding(context),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
+      body: Column(
+        children: [
+          AppResponsive.verticalSpace(context, size: SpacingSize.small),
+          ReportFilterBar<ComparisonPeriod>(
+            selected: _selectedPeriod,
+            onSelected: (p) => setState(() => _selectedPeriod = p),
+            options: [
+              for (final p in ComparisonPeriod.values)
+                ReportFilterOption(
+                  value: p,
+                  label: _getPeriodLabel(p),
+                  icon: _periodIcon(p),
+                  locked: !ReportHistoryWindow.allows(_earliestDate(p)),
+                  onLockedTap: () => UpgradeSheet.showHistoryLimit(
+                    context,
+                    featureName: '${_getPeriodLabel(p)} product comparison',
+                    neededDays: ReportHistoryWindow.requiredDays(_earliestDate(p)),
+                    allowedDays: ReportHistoryWindow.limitDays ?? 0,
                   ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Period Filter Chips
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: ComparisonPeriod.values.map((period) {
-                        final isSelected = _selectedPeriod == period;
-                        return Padding(
-                          padding: EdgeInsets.only(right: AppResponsive.smallSpacing(context)),
-                          child: FilterChip(
-                            selected: isSelected,
-                            label: Center(
-                              child: Text(
-                                _getPeriodLabel(period),
-                                style: GoogleFonts.poppins(
-                                  fontSize: AppResponsive.bodyFontSize(context),
-                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                                  color: isSelected ? Colors.white : AppColors.primary,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                            backgroundColor: Colors.white,
-                            selectedColor: AppColors.primary,
-                            side: BorderSide(color: AppColors.primary),
-                            onSelected: (selected) {
-                              if (selected) {
-                                setState(() {
-                                  _selectedPeriod = period;
-                                });
-                              }
-                            },
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+            ],
+          ),
+          AppResponsive.verticalSpace(context, size: SpacingSize.small),
+          Expanded(
+            child: ComparisonReportView(
+              key: ValueKey(_selectedPeriod),
+              period: _selectedPeriod,
             ),
-            // Content
-            Expanded(
-              child: ComparisonReportView(
-                key: ValueKey(_selectedPeriod),
-                period: _selectedPeriod,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -165,9 +143,16 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
     _loadData();
   }
 
+  /// Only offer years the plan's history window can reach — the comparison also
+  /// needs the year BEFORE the selected one.
   void _initializeYears() {
     final currentYear = DateTime.now().year;
-    _years = List.generate(11, (index) => currentYear - index);
+    final cutoffYear = ReportHistoryWindow.cutoff?.year;
+    final earliest = cutoffYear == null ? currentYear - 10 : cutoffYear + 1;
+    _years = [
+      for (int y = currentYear; y >= earliest; y--) y,
+    ];
+    if (_years.isEmpty) _years = [currentYear];
   }
 
   Future<void> _loadData() async {
@@ -227,7 +212,7 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
     Map<String, int> previousQuantities = {};
 
     // Plan data-scope: clamp the visible history window (reports.history_limit_days).
-    final cutoff = PlanEnforce.windowCutoff(EntKeys.reportsHistoryLimitDays);
+    final cutoff = ReportHistoryWindow.cutoff;
 
     for (final order in allOrders) {
       final orderStatus = order.orderStatus?.toUpperCase() ?? '';
@@ -355,11 +340,7 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
   Widget build(BuildContext context) {
     return Observer(
       builder: (_) {
-        if (pastOrderStore.isLoading) {
-          return Center(
-            child: CircularProgressIndicator(color: AppColors.primary),
-          );
-        }
+        if (pastOrderStore.isLoading) return const ReportLoading();
 
         final comparisonData = _calculateComparisonData();
 
@@ -372,10 +353,8 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
             ? comparisonData.where((p) => p.difference < 0).reduce((a, b) => a.difference < b.difference ? a : b)
             : null;
 
-        return SingleChildScrollView(
-          child: Padding(
-            padding: AppResponsive.padding(context),
-            child: Column(
+        return ReportBody(
+          child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Year Selector (for YearWise only)
@@ -477,37 +456,17 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
                 SizedBox(height: AppResponsive.mediumSpacing(context)),
 
                 // Export Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: comparisonData.isNotEmpty ? _exportReport : null,
-                    icon: const Icon(Icons.file_download_outlined),
-                    label: Text(
-                      'Export Report',
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.buttonFontSize(context),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(
-                        vertical: AppResponsive.mediumSpacing(context),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
-                      ),
-                      elevation: 0,
-                    ),
-                  ),
-                ),
+                ReportExportButton(onPressed: _exportReport),
 
                 SizedBox(height: AppResponsive.mediumSpacing(context)),
 
                 // Data Table or Empty State
                 if (comparisonData.isEmpty)
-                  _buildEmptyState(context, 'No comparison data available for selected period')
+                  const ReportEmptyState(
+                    icon: Icons.trending_up,
+                    title: 'No Comparison Data',
+                    message: 'No comparison data available for selected period',
+                  )
                 else
                   Container(
                     decoration: BoxDecoration(
@@ -574,7 +533,7 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
                                     headingRowHeight: AppResponsive.tableHeadingHeight(context),
                                     dataRowMinHeight: AppResponsive.tableRowMinHeight(context),
                                     dataRowMaxHeight: AppResponsive.tableRowMaxHeight(context),
-                                    headingRowColor: WidgetStateProperty.all(Colors.grey[100]),
+                                    headingRowColor: WidgetStateProperty.all(AppColors.surfaceLight),
                                     columns: [
                                       DataColumn(
                                         label: Text(
@@ -706,7 +665,6 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
                     ),
                   ),
               ],
-            ),
           ),
         );
       },
@@ -714,41 +672,6 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
   }
 
 
-  Widget _buildEmptyState(BuildContext context, String message) {
-    return Container(
-      width: double.infinity,
-      padding: AppResponsive.padding(context),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(
-            Icons.trending_up,
-            size: AppResponsive.largeIconSize(context) * 2,
-            color: Colors.grey[400],
-          ),
-          SizedBox(height: AppResponsive.mediumSpacing(context)),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
-              fontSize: AppResponsive.bodyFontSize(context),
-              color: Colors.grey[600],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class ProductComparisonData {

@@ -4,8 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
-import 'package:billberrylite/core/plan/entitlement_keys.dart';
-import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
@@ -13,7 +11,17 @@ import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import '../../../../widget/componets/common/report_summary_card.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
-import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_body.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_export_button.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_filter_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_pagination.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_period.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_summary_row.dart';
+import 'package:billberrylite/widgets/upgrade_sheet.dart';
+import 'package:billberrylite/util/restaurant/report_history_window.dart';
 
 enum _CustPeriod { all, today, week, month, year, custom }
 
@@ -66,7 +74,7 @@ class _CustomerListReportState extends State<CustomerListReport> {
     final (start, end) = _periodBounds();
 
     // Plan data-scope: clamp the visible history window (reports.history_limit_days).
-    final cutoff = PlanEnforce.windowCutoff(EntKeys.reportsHistoryLimitDays);
+    final cutoff = ReportHistoryWindow.cutoff;
 
     // Step 1: Build indexed lookup — O(orders)
     final ordersByName = <String, List<_OrderStats>>{};
@@ -219,29 +227,59 @@ class _CustomerListReportState extends State<CustomerListReport> {
 
   /// Half-open [start, end) bounds for the selected period; (null, null) for
   /// all-time or an incomplete custom range.
+  /// null bounds = no date restriction ('All'; or Custom before a range is set).
   (DateTime?, DateTime?) _periodBounds() {
     final now = DateTime.now();
-    switch (_period) {
-      case _CustPeriod.all:
-        return (null, null);
+    final standard = _standardPeriod(_period);
+    if (standard != null) {
+      return (reportPeriodStartBound(standard, now), reportPeriodEndBound(standard, now));
+    }
+    if (_period == _CustPeriod.custom && _fromDate != null && _toDate != null) {
+      return (
+        DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day),
+        DateTime(_toDate!.year, _toDate!.month, _toDate!.day).add(const Duration(days: 1)),
+      );
+    }
+    return (null, null);
+  }
+
+  /// The kit period this maps to, or null for 'all' / 'custom' (unbounded).
+  static ReportPeriod? _standardPeriod(_CustPeriod p) {
+    switch (p) {
       case _CustPeriod.today:
-        final s = DateTime(now.year, now.month, now.day);
-        return (s, s.add(const Duration(days: 1)));
+        return ReportPeriod.today;
       case _CustPeriod.week:
-        final s = DateTime(now.year, now.month, now.day)
-            .subtract(Duration(days: now.weekday - 1));
-        return (s, s.add(const Duration(days: 7)));
+        return ReportPeriod.thisWeek;
       case _CustPeriod.month:
-        return (DateTime(now.year, now.month, 1), DateTime(now.year, now.month + 1, 1));
+        return ReportPeriod.thisMonth;
       case _CustPeriod.year:
-        return (DateTime(now.year, 1, 1), DateTime(now.year + 1, 1, 1));
+        return ReportPeriod.thisYear;
+      case _CustPeriod.all:
       case _CustPeriod.custom:
-        if (_fromDate == null || _toDate == null) return (null, null);
-        return (
-          DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day),
-          DateTime(_toDate!.year, _toDate!.month, _toDate!.day)
-              .add(const Duration(days: 1)),
-        );
+        return null;
+    }
+  }
+
+  bool _periodAllowed(_CustPeriod p) {
+    final standard = _standardPeriod(p);
+    if (standard == null) return true; // 'all'/'custom' are clamped by the cutoff
+    return ReportHistoryWindow.allows(reportPeriodStartBound(standard, DateTime.now()));
+  }
+
+  IconData _periodIcon(_CustPeriod p) {
+    switch (p) {
+      case _CustPeriod.all:
+        return Icons.all_inclusive;
+      case _CustPeriod.today:
+        return Icons.today;
+      case _CustPeriod.week:
+        return Icons.view_week;
+      case _CustPeriod.month:
+        return Icons.calendar_month;
+      case _CustPeriod.year:
+        return Icons.calendar_today;
+      case _CustPeriod.custom:
+        return Icons.date_range;
     }
   }
 
@@ -249,7 +287,7 @@ class _CustomerListReportState extends State<CustomerListReport> {
     if (p == _CustPeriod.custom) {
       final range = await showDateRangePicker(
         context: context,
-        firstDate: DateTime(2020),
+        firstDate: ReportHistoryWindow.cutoff ?? DateTime(2020),
         lastDate: DateTime.now(),
         initialDateRange: (_fromDate != null && _toDate != null)
             ? DateTimeRange(start: _fromDate!, end: _toDate!)
@@ -289,45 +327,25 @@ class _CustomerListReportState extends State<CustomerListReport> {
   }
 
   Widget _buildPeriodFilter(BuildContext context) {
-    Widget chip(_CustPeriod p) {
-      final selected = _period == p;
-      return Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: ChoiceChip(
-          label: Text(_periodLabel(p)),
-          selected: selected,
-          showCheckmark: false,
-          onSelected: (_) => _onPeriodSelected(p),
-          selectedColor: AppColors.primary,
-          backgroundColor: Colors.white,
-          labelStyle: GoogleFonts.poppins(
-            fontSize: AppResponsive.smallFontSize(context),
-            fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : AppColors.textPrimary,
+    return ReportFilterBar<_CustPeriod>(
+      selected: _period,
+      onSelected: _onPeriodSelected,
+      options: [
+        for (final p in _CustPeriod.values)
+          ReportFilterOption(
+            value: p,
+            label: _periodLabel(p),
+            icon: _periodIcon(p),
+            locked: !_periodAllowed(p),
+            onLockedTap: () => UpgradeSheet.showHistoryLimit(
+              context,
+              featureName: '${_periodLabel(p)} customers',
+              neededDays: ReportHistoryWindow.requiredDays(
+                  reportPeriodStartBound(_standardPeriod(p)!, DateTime.now())),
+              allowedDays: ReportHistoryWindow.limitDays ?? 0,
+            ),
           ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-            side: BorderSide(color: selected ? AppColors.primary : AppColors.divider),
-          ),
-        ),
-      );
-    }
-
-    return SizedBox(
-      height: 40,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            chip(_CustPeriod.all),
-            chip(_CustPeriod.today),
-            chip(_CustPeriod.week),
-            chip(_CustPeriod.month),
-            chip(_CustPeriod.year),
-            chip(_CustPeriod.custom),
-          ],
-        ),
-      ),
+      ],
     );
   }
 
@@ -385,213 +403,119 @@ class _CustomerListReportState extends State<CustomerListReport> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: buildPrimaryAppBar(
-        titleWidget: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Customer List Report',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-            Text(
-              'View all registered customers',
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                color: Colors.white70,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'ADMIN',
-                  style: GoogleFonts.poppins(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
+      appBar: reportAppBar(
+        title: 'Customer List Report',
+        subtitle: 'View all registered customers',
+      ),
+      body: Column(
+        children: [
+          AppResponsive.verticalSpace(context, size: SpacingSize.small),
+          _buildPeriodFilter(context),
+          AppResponsive.verticalSpace(context, size: SpacingSize.small),
+          Expanded(
+            child: _isLoading
+                ? const ReportLoading()
+                : ReportBody(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ReportSummaryRow(cards: [
+                          ReportSummaryCard(
+                            title: 'Total Customers',
+                            value: _totalCustomers.toString(),
+                            icon: Icons.people_outline,
+                            color: Colors.blue,
+                          ),
+                          ReportSummaryCard(
+                            title: 'Active Customers',
+                            value: _activeCustomers.toString(),
+                            icon: Icons.shopping_bag_outlined,
+                            color: Colors.green,
+                          ),
+                        ]),
+                        AppResponsive.verticalSpace(context, size: SpacingSize.small),
+                        ReportSummaryCard(
+                          title: 'Total Revenue',
+                          value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalRevenue)}',
+                          icon: Icons.monetization_on_outlined,
+                          color: Colors.orange,
+                        ),
+                        AppResponsive.verticalSpace(context),
+                        _buildSearchAndSortCard(),
+                        AppResponsive.verticalSpace(context),
+                        ReportExportButton(onPressed: _exportReport),
+                        AppResponsive.verticalSpace(context),
+                        if (_filteredData.isEmpty)
+                          ReportEmptyState(
+                            icon: Icons.people_outline,
+                            title: 'No Customers',
+                            message: _searchQuery.isNotEmpty
+                                ? 'No customers found matching "$_searchQuery"'
+                                : 'No customers registered yet',
+                          )
+                        else
+                          _buildCustomerTable(),
+                        ReportPagination(
+                          currentPage: _currentPage,
+                          rowsPerPage: _rowsPerPage,
+                          totalCount: _filteredData.length,
+                          onPageChanged: (page) => setState(() => _currentPage = page),
+                          unit: 'customers',
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ),
-            ),
           ),
         ],
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Content
-            Expanded(
-              child: _isLoading
-                  ? Center(child: CircularProgressIndicator(color: AppColors.primary))
-                  : SingleChildScrollView(
-                      padding: AppResponsive.padding(context),
-                      child: AppResponsive.constrainedContent(
-                        context: context,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Period filter
-                            _buildPeriodFilter(context),
-                            SizedBox(height: AppResponsive.smallSpacing(context)),
+    );
+  }
 
-                            // Summary Cards
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: ReportSummaryCard(
-                                    title: 'Total Customers',
-                                    value: _totalCustomers.toString(),
-                                    icon: Icons.people_outline,
-                                    color: Colors.blue,
-                                  ),
-                                ),
-                                SizedBox(width: AppResponsive.smallSpacing(context)),
-                                Expanded(
-                                  child: ReportSummaryCard(
-                                    title: 'Active Customers',
-                                    value: _activeCustomers.toString(),
-                                    icon: Icons.shopping_bag_outlined,
-                                    color: Colors.green,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: AppResponsive.smallSpacing(context)),
-                            ReportSummaryCard(
-                              title: 'Total Revenue',
-                              value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalRevenue)}',
-                              icon: Icons.monetization_on_outlined,
-                              color: Colors.orange,
-                            ),
-
-                            SizedBox(height: AppResponsive.mediumSpacing(context)),
-
-                            // Search and Sort Bar
-                            Container(
-                              padding: AppResponsive.cardPadding(context),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.05),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                children: [
-                                  AppTextField(
-                                    onChanged: (value) {
-                                      _searchQuery = value;
-                                      _applyFilterAndSort();
-                                    },
-                                    hint: 'Search by name or phone',
-                                    icon: Icons.search,
-                                  ),
-                                  SizedBox(height: AppResponsive.smallSpacing(context)),
-                                  Row(
-                                    children: [
-                                      Text(
-                                        'Sort by:',
-                                        style: GoogleFonts.poppins(
-                                          fontSize: AppResponsive.bodyFontSize(context),
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      SizedBox(width: AppResponsive.smallSpacing(context)),
-                                      Expanded(
-                                        child: SingleChildScrollView(
-                                          scrollDirection: Axis.horizontal,
-                                          child: Row(
-                                            children: [
-                                              _buildSortChip('Name', 'name'),
-                                              _buildSortChip('Orders', 'orders'),
-                                              _buildSortChip('Spent', 'spent'),
-                                              _buildSortChip('Last Order', 'date'),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            SizedBox(height: AppResponsive.mediumSpacing(context)),
-
-                            // Export Button
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: _filteredData.isNotEmpty ? _exportReport : null,
-                                icon: const Icon(Icons.file_download_outlined),
-                                label: Text(
-                                  'Export Report',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: AppResponsive.buttonFontSize(context),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: AppResponsive.getValue(context, mobile: 14.0, tablet: 16.0, desktop: 18.0),
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            SizedBox(height: AppResponsive.mediumSpacing(context)),
-
-                            // Data Table or Empty State
-                            if (_filteredData.isEmpty)
-                              _buildEmptyState(
-                                context,
-                                _searchQuery.isNotEmpty
-                                    ? 'No customers found matching "$_searchQuery"'
-                                    : 'No customers registered yet',
-                              )
-                            else
-                              _buildCustomerTable(),
-
-                            if (_filteredData.length > _rowsPerPage)
-                              _buildPaginationControls(),
-                          ],
-                        ),
-                      ),
-                    ),
-            ),
-          ],
-        ),
+  Widget _buildSearchAndSortCard() {
+    return ReportCard(
+      child: Column(
+        children: [
+          AppTextField(
+            onChanged: (value) {
+              _searchQuery = value;
+              _applyFilterAndSort();
+            },
+            hint: 'Search by name or phone',
+            icon: Icons.search,
+          ),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+          Row(
+            children: [
+              Text(
+                'Sort by:',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildSortChip('Name', 'name'),
+                      _buildSortChip('Orders', 'orders'),
+                      _buildSortChip('Spent', 'spent'),
+                      _buildSortChip('Last Order', 'date'),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildCustomerTable() {
-    final pageData = _filteredData.length <= _rowsPerPage
-        ? _filteredData
-        : _filteredData.skip(_currentPage * _rowsPerPage).take(_rowsPerPage).toList();
+    final pageData = ReportPagination.pageSlice(_filteredData, _currentPage, _rowsPerPage);
 
     return Container(
       decoration: BoxDecoration(
@@ -643,12 +567,11 @@ class _CustomerListReportState extends State<CustomerListReport> {
           ),
           ClipRRect(
             borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-            child: SingleChildScrollView(
+            child: LayoutBuilder(
+              builder: (context, box) => SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minWidth: AppResponsive.screenWidth(context) - AppResponsive.getValue(context, mobile: 32.0, tablet: 40.0),
-                ),
+                constraints: BoxConstraints(minWidth: box.maxWidth),
                 child: DataTable(
                   columnSpacing: AppResponsive.tableColumnSpacing(context),
                   headingRowHeight: AppResponsive.tableHeadingHeight(context),
@@ -702,64 +625,12 @@ class _CustomerListReportState extends State<CustomerListReport> {
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPaginationControls() {
-    final totalPages = (_filteredData.length / _rowsPerPage).ceil();
-    final start = _currentPage * _rowsPerPage + 1;
-    final end = ((_currentPage + 1) * _rowsPerPage).clamp(1, _filteredData.length);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            'Showing $start–$end of ${_filteredData.length} customers',
-            style: GoogleFonts.poppins(
-              fontSize: AppResponsive.smallFontSize(context),
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w500,
             ),
           ),
-          Row(
-            children: [
-              IconButton(
-                onPressed: _currentPage > 0 ? () => setState(() => _currentPage--) : null,
-                icon: const Icon(Icons.chevron_left),
-                iconSize: 24,
-                color: AppColors.primary,
-                disabledColor: AppColors.divider,
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '${_currentPage + 1} / $totalPages',
-                  style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary),
-                ),
-              ),
-              IconButton(
-                onPressed: _currentPage < totalPages - 1 ? () => setState(() => _currentPage++) : null,
-                icon: const Icon(Icons.chevron_right),
-                iconSize: 24,
-                color: AppColors.primary,
-                disabledColor: AppColors.divider,
-              ),
-            ],
-          ),
         ],
       ),
     );
   }
-
 
   Widget _buildSortChip(String label, String value) {
     final isSelected = _sortBy == value;
@@ -788,41 +659,6 @@ class _CustomerListReportState extends State<CustomerListReport> {
     );
   }
 
-  Widget _buildEmptyState(BuildContext context, String message) {
-    return Container(
-      width: double.infinity,
-      padding: AppResponsive.padding(context),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(
-            Icons.people_outline,
-            size: AppResponsive.largeIconSize(context) * 2,
-            color: Colors.grey[400],
-          ),
-          SizedBox(height: AppResponsive.mediumSpacing(context)),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
-              fontSize: AppResponsive.bodyFontSize(context),
-              color: Colors.grey[600],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _OrderStats {

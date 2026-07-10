@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:billberrylite/presentation/screens/restaurant/Reports/pos%20End%20Day%20Report/posenddayreport.dart';
-import 'package:billberrylite/presentation/screens/restaurant/Reports/customer%20list%20by%20revenue/customerlistbyrevenue.dart';
-import 'package:billberrylite/presentation/screens/restaurant/Reports/expenseReport/expensereport.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/comparison/comparison.dart' show kComparisonPeriodEntitlements;
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
@@ -25,12 +23,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
     required Color iconColor,
     required bool isTablet,
     String? entitlementKey,
+    List<String>? entitlementAnyOf,
   }) {
     return GestureDetector(
       onTap: () {
         // Entitlement denied → upgrade blocker instead of opening the report.
         if (entitlementKey != null &&
             !PlanGuard.allowedOr(context, entitlementKey, featureName: title)) {
+          return;
+        }
+        if (entitlementAnyOf != null &&
+            !PlanGuard.allowedAnyOf(context, entitlementAnyOf, featureName: title)) {
           return;
         }
         onTap();
@@ -138,28 +141,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         entitlementKey: EntKeys.reportsCustomerList,
                       ),
                       _buildReportCard(
-                        icon: Icons.view_week,
-                        title: 'Comparison BY Week',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsComparisionByWeek),
+                        icon: Icons.trending_up,
+                        title: 'Sales Comparison',
+                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsSalesComparison),
                         iconColor: AppColors.primary,
                         isTablet: isTablet,
-                        entitlementKey: EntKeys.reportsComparisonWeek,
-                      ),
-                      _buildReportCard(
-                        icon: Icons.calendar_month,
-                        title: 'Comparison BY Month',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsComparisionByMonth),
-                        iconColor: AppColors.primary,
-                        isTablet: isTablet,
-                        entitlementKey: EntKeys.reportsComparisonMonth,
-                      ),
-                      _buildReportCard(
-                        icon: Icons.calendar_today,
-                        title: 'Comparison BY Year',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsComparisionByYear),
-                        iconColor: AppColors.primary,
-                        isTablet: isTablet,
-                        entitlementKey: EntKeys.reportsComparisonYear,
+                        entitlementAnyOf: kComparisonPeriodEntitlements,
                       ),
                       _buildReportCard(
                         icon: Icons.inventory_2_outlined,
@@ -204,7 +191,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       _buildReportCard(
                         icon: Icons.event_available,
                         title: 'Pos End Day',
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => Posenddayreport())),
+                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsPosOrder),
                         iconColor: AppColors.primary,
                         isTablet: isTablet,
                         entitlementKey: EntKeys.reportsPosEndDay,
@@ -212,7 +199,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       _buildReportCard(
                         icon: Icons.monetization_on_outlined,
                         title: 'Customer List BY Revenue',
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => CustomerListByRevenue())),
+                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsCustomerListByRevenue),
                         iconColor: Colors.deepOrangeAccent,
                         isTablet: isTablet,
                         entitlementKey: EntKeys.reportsCustomerRevenue,
@@ -220,10 +207,18 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       _buildReportCard(
                         icon: Icons.receipt_long,
                         title: 'Expense Report',
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ExpenseReport())),
+                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsExpense),
                         iconColor: Colors.red,
                         isTablet: isTablet,
                         entitlementKey: EntKeys.reportsExpense,
+                      ),
+                      _buildReportCard(
+                        icon: Icons.account_balance_wallet_outlined,
+                        title: 'Sales by Payment Mode',
+                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsPaymentMode),
+                        iconColor: Colors.teal,
+                        isTablet: isTablet,
+                        entitlementKey: EntKeys.reportsPaymentMode,
                       ),
                       _buildReportCard(
                         icon: Icons.analytics,

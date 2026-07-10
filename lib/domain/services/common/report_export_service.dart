@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
+import 'package:billberrylite/domain/services/common/notification_service.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:universal_html/html.dart' as html;
@@ -296,6 +297,16 @@ class ReportExportService {
     _loadingOverlay = null;
   }
 
+  /// A truncated PDF holds incomplete data — warn rather than report success.
+  static void _notifyPdfExported(bool wasTruncated, String successMessage) {
+    if (wasTruncated) {
+      NotificationService.instance
+          .showWarning('PDF exported — first $_maxPdfRows rows only. Use Excel for all data.');
+    } else {
+      NotificationService.instance.showSuccess(successMessage);
+    }
+  }
+
   // ── Font byte cache ─────────────────────────────────────────────────
   // Loaded once from bundled assets (no network). Stored as raw Uint8List
   // so they can be passed efficiently to compute() isolates.
@@ -388,41 +399,36 @@ class ReportExportService {
           ..click();
         html.Url.revokeObjectUrl(url);
 
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Excel file downloaded: $fullFileName')),
-          );
-        }
+        NotificationService.instance.showSuccess('Excel exported');
       } else {
         final directory = await getApplicationDocumentsDirectory();
         final filePath = '${directory.path}/$fullFileName';
         final file = File(filePath);
         await file.writeAsBytes(fileBytes);
 
-        await Share.shareXFiles(
+        final result = await Share.shareXFiles(
           [XFile(filePath)],
           subject: fileName,
           text: 'Exported report: $fileName',
         );
 
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Excel file saved and shared: $fullFileName')),
-          );
+        // The file is saved either way; only the SHARE can be dismissed.
+        switch (result.status) {
+          case ShareResultStatus.success:
+            NotificationService.instance.showSuccess('Excel exported and shared');
+            break;
+          case ShareResultStatus.dismissed:
+            NotificationService.instance.showSuccess('Excel exported');
+            break;
+          case ShareResultStatus.unavailable:
+            NotificationService.instance.showSuccess('Excel exported — sharing unavailable');
+            break;
         }
       }
     } catch (e, stackTrace) {
       _hideLoading();
       debugPrint('Error exporting to Excel: $e\n$stackTrace');
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error exporting to Excel: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      NotificationService.instance.showError('Could not export Excel. Please try again.');
     }
   }
 
@@ -499,45 +505,36 @@ class ReportExportService {
           ..click();
         html.Url.revokeObjectUrl(url);
 
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('PDF downloaded: $fullFileName')),
-          );
-        }
+        _notifyPdfExported(wasTruncated, 'PDF exported');
       } else {
         final directory = await getApplicationDocumentsDirectory();
         final filePath = '${directory.path}/$fullFileName';
         final file = File(filePath);
         await file.writeAsBytes(bytes);
 
-        await Share.shareXFiles(
+        final result = await Share.shareXFiles(
           [XFile(filePath)],
           subject: fileName,
           text: 'Exported report: $fileName',
         );
 
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(wasTruncated
-                  ? 'PDF exported (first $_maxPdfRows rows). Use Excel for full data.'
-                  : 'PDF exported: $fullFileName'),
-            ),
-          );
+        // The file is saved either way; only the SHARE can be dismissed.
+        switch (result.status) {
+          case ShareResultStatus.success:
+            _notifyPdfExported(wasTruncated, 'PDF exported and shared');
+            break;
+          case ShareResultStatus.dismissed:
+            _notifyPdfExported(wasTruncated, 'PDF exported');
+            break;
+          case ShareResultStatus.unavailable:
+            _notifyPdfExported(wasTruncated, 'PDF exported — sharing unavailable');
+            break;
         }
       }
     } catch (e, stackTrace) {
       _hideLoading();
       debugPrint('Error exporting to PDF: $e\n$stackTrace');
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error exporting to PDF: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      NotificationService.instance.showError('Could not export PDF. Please try again.');
     }
   }
 

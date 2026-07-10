@@ -12,6 +12,9 @@ class ReportSummaryCard extends StatelessWidget {
   final Color color;
   final String? subtitle;
 
+  /// Optional widget rendered under [subtitle] — e.g. a growth badge.
+  final Widget? footer;
+
   const ReportSummaryCard({
     super.key,
     required this.title,
@@ -19,6 +22,7 @@ class ReportSummaryCard extends StatelessWidget {
     required this.icon,
     required this.color,
     this.subtitle,
+    this.footer,
   });
 
   @override
@@ -95,6 +99,14 @@ class ReportSummaryCard extends StatelessWidget {
                 fontSize: AppResponsive.getValue(context, mobile: 10.0, tablet: 11.0, desktop: 12.0),
                 color: AppColors.textSecondary,
               ),
+            ),
+          ],
+          if (footer != null) ...[
+            SizedBox(height: isMobile ? 4 : 6),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: footer!,
             ),
           ],
         ],

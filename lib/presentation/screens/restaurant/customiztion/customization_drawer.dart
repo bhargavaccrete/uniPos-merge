@@ -17,6 +17,8 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
   static const Map<String, IconData> _icons = {
     'Item Image': Icons.image_outlined,
     'Item Price': Icons.sell_outlined,
+    'Menu Grid View': Icons.grid_view_rounded,
+    'Keep Categories Open': Icons.unfold_more_rounded,
     'Round Off': Icons.calculate_outlined,
     'Visual Keyboard': Icons.keyboard_outlined,
     'Generate KOT': Icons.receipt_long_outlined,
@@ -27,6 +29,8 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
   static const Map<String, String> _descriptions = {
     'Item Image': 'Show item photos in the menu grid',
     'Item Price': 'Show price on menu items',
+    'Menu Grid View': 'Show menu items as a grid instead of a list',
+    'Keep Categories Open': "Opening a category won't close the others (list view)",
     'Round Off': 'Round bill totals to the nearest value',
     'Visual Keyboard': 'On-screen number pad for inputs',
     'Generate KOT': 'Auto-print kitchen order tickets',
@@ -50,7 +54,7 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Setting & Customization',
+              'Personalization',
               style: GoogleFonts.poppins(
                 color: Colors.white,
                 fontSize: AppResponsive.headingFontSize(context),
@@ -58,7 +62,7 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
               ),
             ),
             Text(
-              'Configure app preferences',
+              'Customize menu display & behavior',
               style: GoogleFonts.poppins(
                 color: Colors.white.withOpacity(0.9),
                 fontSize: AppResponsive.smallFontSize(context),
@@ -82,8 +86,8 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _infoBanner(isTablet),
-                    const SizedBox(height: 24),
+                   /* _infoBanner(isTablet),
+                    const SizedBox(height: 24),*/
                     ...AppSettings.groupedSettings.entries.map((group) {
                       return _buildSettingGroup(
                           group.key, group.value, settings, isTablet);
@@ -101,7 +105,7 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
   }
 
   // ── Info banner ──────────────────────────────────────────────────────────
-  Widget _infoBanner(bool isTablet) {
+/*  Widget _infoBanner(bool isTablet) {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(isTablet ? 16 : 14),
@@ -147,7 +151,7 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
         ],
       ),
     );
-  }
+  }*/
 
   // ── Group ────────────────────────────────────────────────────────────────
   Widget _buildSettingGroup(String groupTitle, List<String> keys,
@@ -183,7 +187,15 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
         ),
 
         // Cards
-        ...keys.map((key) {
+        ...keys.where((key) {
+          // "Keep Categories Open" only applies to the LIST menu — hide it when
+          // grid view is on (grid has no expandable categories).
+          if (key == 'Keep Categories Open' &&
+              (settings['Menu Grid View'] ?? false)) {
+            return false;
+          }
+          return true;
+        }).map((key) {
           final isEnabled = settings[key] ?? false;
           return _settingCard(key, isEnabled, isTablet);
         }),

@@ -64,16 +64,13 @@ class RouteNames {
 
   // Restaurant - Reports
   static const restaurantReports = '/restaurant-reports';
-  static const restaurantFilterOrders = '/restaurant-filter-orders';
   static const restaurantPerformanceStats = '/restaurant-performance-stats';
   static const restaurantReportsTotalSales = '/restaurant-report-totalsales';
   static const restaurantReportsSalesBYItem = '/restaurant-report-salebyitem';
   static const restaurantReportsSalesByCategory = '/restaurant-report-salebycatgeory';
   static const restaurantReportsDailyClosingReport = '/restaurant-report-dailyclosingreport';
   static const restaurantReportsCustomerList = '/restaurant-report-customerlist';
-  static const restaurantReportsComparisionByWeek = '/restaurant-report-comparisionbyweek';
-  static const restaurantReportsComparisionByMonth  = '/restaurant-report-comparisionbymonth';
-  static const restaurantReportsComparisionByYear  = '/restaurant-report-comparisionbyyear';
+  static const restaurantReportsSalesComparison = '/restaurant-report-sales-comparison';
   static const restaurantReportsComparisionByProduct  = '/restaurant-report-comparisionbyproduct';
   static const restaurantReportsRefundDetails  = '/restaurant-report-refunddetails';
   static const restaurantReportsVoidOrderReport  = '/restaurant-report-voidorderreport';
@@ -82,6 +79,7 @@ class RouteNames {
   static const restaurantReportsPosOrder  = '/restaurant-report-posorderreport';
   static const restaurantReportsCustomerListByRevenue = '/restaurant-report-customerlistbyrevenue';
   static const restaurantReportsExpense  = '/restaurant-report-expensereport';
+  static const restaurantReportsPaymentMode = '/restaurant-report-paymentmode';
   static const restaurantShiftReport = '/restaurant-shift-report';
   static const restaurantStaffPerformance = '/restaurant-staff-performance';
   static const restaurantCashDrawer = '/restaurant-cash-drawer';

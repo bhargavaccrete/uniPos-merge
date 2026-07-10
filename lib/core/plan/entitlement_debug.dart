@@ -33,6 +33,7 @@ class EntitlementDebug {
     EntKeys.reportsItemCancellation, EntKeys.reportsPosEndDay, EntKeys.reportsExpense,
     EntKeys.reportsShift, EntKeys.reportsStaffPerformance, EntKeys.reportsAttendance,
     EntKeys.reportsCashDrawerHistory, EntKeys.reportsPerformanceStatistics,
+    EntKeys.reportsPaymentMode,
   ];
   static const _actions = [
     EntKeys.billingInvoiceCreate, EntKeys.billingInvoiceEdit,

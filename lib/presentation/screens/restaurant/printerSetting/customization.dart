@@ -1,7 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/core/plan/plan_gate.dart';
+import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
@@ -18,6 +22,10 @@ class CustomizationPrinter extends StatefulWidget {
 
 class _CustomizationPrinterState extends State<CustomizationPrinter> {
   final _footerController = TextEditingController();
+  final _storeSettings = StoreSettingsService();
+
+  Uint8List? _logoBytes;
+  bool _isLogoBusy = false;
 
   @override
   void initState() {
@@ -28,6 +36,7 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
         setState(() => _footerController.text = PrintSettings.footerMessage);
       }
     });
+    _loadLogo();
   }
 
   @override
@@ -36,9 +45,73 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
     super.dispose();
   }
 
+  Future<void> _loadLogo() async {
+    final bytes = await _storeSettings.getStoreLogo();
+    if (mounted) setState(() => _logoBytes = bytes);
+  }
+
+  Future<void> _pickLogo() async {
+    setState(() => _isLogoBusy = true);
+    try {
+      final image = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      if (image == null) return;
+
+      final bytes = await image.readAsBytes();
+      if (bytes.length > 2 * 1024 * 1024) {
+        NotificationService.instance.showError('Logo must be under 2 MB');
+        return;
+      }
+
+      final saved = await _storeSettings.setStoreLogo(bytes);
+      if (!saved) {
+        NotificationService.instance.showError('Could not save logo. Please try again.');
+        return;
+      }
+      if (mounted) setState(() => _logoBytes = bytes);
+      NotificationService.instance.showSuccess('Logo updated');
+    } catch (e) {
+      debugPrint('Error picking logo: $e');
+      NotificationService.instance.showError('Could not open the gallery.');
+    } finally {
+      if (mounted) setState(() => _isLogoBusy = false);
+    }
+  }
+
+  Future<void> _removeLogo() async {
+    final confirmed = await showAppConfirmDialog(
+      context: context,
+      title: 'Remove Logo?',
+      message: 'The logo will no longer print on receipts. You can add it again anytime.',
+      confirmLabel: 'Remove',
+      accent: AppColors.danger,
+      icon: Icons.delete_outline_rounded,
+    );
+    if (confirmed != true) return;
+
+    setState(() => _isLogoBusy = true);
+    final removed = await _storeSettings.deleteStoreLogo();
+    if (!mounted) return;
+    setState(() {
+      _isLogoBusy = false;
+      if (removed) _logoBytes = null;
+    });
+
+    if (removed) {
+      NotificationService.instance.showSuccess('Logo removed');
+    } else {
+      NotificationService.instance.showError('Could not remove logo. Please try again.');
+    }
+  }
+
   // Group settings by category
   final Map<String, List<Map<String, dynamic>>> _settingGroups = {
     'Store Information': [
+      {'key': 'Restaurant Logo', 'icon': Icons.image_outlined, 'description': 'Show store logo at the top of receipts'},
       {'key': 'Restaurant Name', 'icon': Icons.restaurant, 'description': 'Show restaurant name on receipts'},
       {'key': 'Restaurant Address', 'icon': Icons.location_on, 'description': 'Show restaurant address'},
       {'key': 'Restaurant Mobile No', 'icon': Icons.phone, 'description': 'Show contact number'},
@@ -56,9 +129,8 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
       {'key': 'Payment Paid', 'icon': Icons.money, 'description': 'Show cash received and change'},
       {'key': 'UPI QR', 'icon': Icons.qr_code_2, 'description': 'Show UPI Scan & Pay QR on unpaid bills'},
     ],
-    'Additional Options': [
-      {'key': 'Powered By', 'icon': Icons.info_outline, 'description': 'Show "Powered by Bill Berry Lite" footer'},
-    ],
+    // "Powered by Bill Berry Lite" is no longer a shop toggle — it is controlled
+    // by the admin via the `billing.invoice.print` license entitlement.
   };
 
   Future<void> _resetSettings() async {
@@ -77,6 +149,131 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
       setState(() => _footerController.text = PrintSettings.footerMessage);
       NotificationService.instance.showSuccess('Settings reset to defaults');
     }
+  }
+
+  /// Store logo shown at the top of receipts. Saved to `BusinessDetails` in Hive,
+  /// which is what the receipt builders read at print time.
+  Widget _buildLogoCard(BuildContext context, bool isTablet) {
+    final hasLogo = _logoBytes != null;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(isTablet ? 16 : 14),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.image_outlined, color: AppColors.primary, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Store Logo',
+                      style: GoogleFonts.poppins(
+                        fontSize: isTablet ? 15 : 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'The image printed at the top of every bill',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceLight,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.divider),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: _isLogoBusy
+                    ? const Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : hasLogo
+                        ? Image.memory(_logoBytes!, fit: BoxFit.contain)
+                        : Icon(Icons.storefront_outlined,
+                            color: AppColors.textSecondary, size: 28),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _isLogoBusy ? null : _pickLogo,
+                        icon: const Icon(Icons.upload_outlined, size: 18),
+                        label: Text(
+                          hasLogo ? 'Change' : 'Add Logo',
+                          style: GoogleFonts.poppins(
+                              fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: BorderSide(color: AppColors.primary),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ),
+                    if (hasLogo) ...[
+                      const SizedBox(width: 10),
+                      IconButton(
+                        onPressed: _isLogoBusy ? null : _removeLogo,
+                        icon: const Icon(Icons.delete_outline_rounded),
+                        color: AppColors.danger,
+                        tooltip: 'Remove logo',
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (!PrintSettings.showRestaurantLogo && hasLogo) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Logo printing is turned off below — this image will not appear on receipts.',
+              style: GoogleFonts.poppins(fontSize: 11, color: AppColors.warning),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   /// Editable footer / "Thank You" message that prints at the bottom of bills.
@@ -194,7 +391,7 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Info Banner
-                Container(
+              /*  Container(
                   width: double.infinity,
                   padding: EdgeInsets.all(isTablet ? 16 : 14),
                   decoration: BoxDecoration(
@@ -240,7 +437,12 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
                   ),
                 ),
 
-                SizedBox(height: 24),
+                SizedBox(height: 24),*/
+
+                // Store logo (image itself — the on/off toggle is below)
+                _buildLogoCard(context, isTablet),
+
+                SizedBox(height: 16),
 
                 // Dynamic footer / "Thank You" message
                 _buildFooterMessageCard(context, isTablet),
@@ -338,9 +540,10 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
           final icon = setting['icon'] as IconData;
           final description = setting['description'] as String;
           final isEnabled = currentSettings[key] ?? false;
-          // Free plan: the "Powered By" watermark is forced ON and cannot be
-          // turned off. `shown` drives the visuals; `locked` disables input.
-          final bool locked = key == 'Powered By' && PlanGate.isFree;
+          // Watermark is forced ON unless the plan is entitled to remove it
+          // (`removeWatermark` → PlanGate.showWatermark). `shown` drives the
+          // visuals; `locked` disables input.
+          final bool locked = key == 'Powered By' && PlanGate.showWatermark;
           final bool shown = locked ? true : isEnabled;
 
           return Container(

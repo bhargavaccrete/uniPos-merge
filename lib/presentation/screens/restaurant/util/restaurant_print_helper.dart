@@ -438,7 +438,7 @@ class RestaurantPrintHelper {
         discountAmount: calculations.discountAmount, // regular discount only (points shown separately)
         totalTaxableAmount: calculations.subtotal - calculations.discountAmount,
         totalGstAmount: calculations.totalGST,
-        grandTotal: calculations.grandTotal - loyaltyPointsDiscount, // net payable after points
+        grandTotal: calculations.grandTotal, // net (points folded into the calc's GST base)
         paymentType: paymentType,
         isReturn: false,
       );
@@ -677,6 +677,9 @@ class RestaurantPrintHelper {
         isDeliveryOrder: true,
         deliveryCharge: pastOrder.serviceCharge ?? 0,
         isTaxInclusive: pastOrder.isTaxInclusive,
+        // Fold redeemed points back into the taxable base so the reprint's GST
+        // matches the original bill (post-redemption).
+        loyaltyRedemption: (pastOrder.loyaltyPointsUsed ?? 0).toDouble(),
       );
 
       await printOrderReceipt(

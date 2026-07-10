@@ -214,7 +214,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
       backgroundColor: AppColors.surfaceLight,
       drawer: _isEodStrictlyPending
           ? null
-          : const Drawerr(showClearCart: false, showGridDuplicates: false, showChangePin: true),
+          : const Drawerr(showClearCart: false, showGridDuplicates: false, showChangePin: true, showHome: false),
       appBar: _isEodStrictlyPending
           ? null
           : buildPrimaryAppBar(

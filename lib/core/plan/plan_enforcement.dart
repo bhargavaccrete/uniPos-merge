@@ -16,6 +16,11 @@ class PlanEnforce {
   /// Action / module / submodule permission (add/edit/delete/export/view/create…).
   static bool allows(String key) => _bypassed || Entitlements.instance.can(key);
 
+  /// True if ANY of [keys] is granted. For a screen fronting several sub-keys
+  /// (e.g. Sales Comparison, whose periods each carry their own key).
+  static bool allowsAny(Iterable<String> keys) =>
+      _bypassed || keys.any(Entitlements.instance.can);
+
   /// True if ONE more record fits under [maxKey] given the current [count].
   /// A limit of **0 or absent means NO cap** (unlimited) — availability is
   /// governed by the module/action flag, not the limit. The limit only caps

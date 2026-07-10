@@ -9,6 +9,7 @@ import '../../../core/constants/hive_box_names.dart';
 import '../../../data/models/restaurant/db/cash_movement_model.dart';
 import 'package:hive/hive.dart';
 import 'package:billberrylite/util/restaurant/order_status_filter.dart';
+import 'package:billberrylite/util/restaurant/payment_mode_summary.dart';
 
 class EODService {
   static const _uuid = Uuid();
@@ -66,7 +67,7 @@ class EODService {
     // Use activeDayOrders for count-based statistics (excludes fully refunded orders)
     final orderSummaries = _calculateOrderTypeSummaries(activeDayOrders);
     final categorySales = _calculateCategorySales(activeDayOrders);
-    final paymentSummaries = _calculatePaymentSummaries(activeDayOrders);
+    final paymentSummaries = PaymentModeSummary.summarize(activeDayOrders);
     final taxSummaries = _calculateTaxSummaries(activeDayOrders);
 
     final totalSales = allDayOrders.fold<double>(0.0, (sum, order) {
@@ -285,81 +286,6 @@ class EODService {
         percentage: percentage,
       );
     }).toList()..sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
-  }
-
-  static List<PaymentSummary> _calculatePaymentSummaries(List<PastOrderModel> orders) {
-    final Map<String, double> paymentTotals = {};
-    final Map<String, int> paymentCounts = {};
-
-    double grandTotal = 0.0;
-
-    for (final order in orders) {
-      final status = order.orderStatus?.toUpperCase() ?? '';
-      if (_isExcluded(status)) continue;
-
-      final netAmount = order.totalPrice - (order.refundAmount ?? 0.0);
-
-      // Always decode paymentListJson if present — it's the source of truth.
-      // Avoid relying on isSplitPayment flag which can be null for legacy orders.
-      if (order.paymentListJson != null && order.paymentListJson!.isNotEmpty) {
-        final refundRatio =
-            order.totalPrice > 0 ? netAmount / order.totalPrice : 1.0;
-        for (final entry in order.paymentList) {
-          // Normalise so 'Cash'/'cash'/'CASH' collapse into one bucket.
-          final method = _normalizePaymentMethod(entry['method'] as String?);
-          final amt =
-              ((entry['amount'] as num?)?.toDouble() ?? 0.0) * refundRatio;
-          paymentTotals[method] = (paymentTotals[method] ?? 0.0) + amt;
-          paymentCounts[method] = (paymentCounts[method] ?? 0) + 1;
-          grandTotal += amt;
-        }
-      } else {
-        final paymentType = _normalizePaymentMethod(order.paymentmode);
-        paymentTotals[paymentType] =
-            (paymentTotals[paymentType] ?? 0.0) + netAmount;
-        paymentCounts[paymentType] = (paymentCounts[paymentType] ?? 0) + 1;
-        grandTotal += netAmount;
-      }
-    }
-
-    return paymentTotals.entries.map((entry) {
-      final paymentType = entry.key;
-      final totalAmount = entry.value;
-      final transactionCount = paymentCounts[paymentType] ?? 0;
-      final percentage = grandTotal > 0 ? (totalAmount / grandTotal) * 100 : 0.0;
-
-      return PaymentSummary(
-        paymentType: paymentType,
-        totalAmount: totalAmount,
-        transactionCount: transactionCount,
-        percentage: percentage,
-      );
-    }).toList()..sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
-  }
-
-  /// Canonical display label for a payment method so case/spacing variants
-  /// (e.g. 'Cash', 'cash', 'CASH ') collapse into one bucket in summaries.
-  static String _normalizePaymentMethod(String? raw) {
-    final m = (raw ?? '').trim().toLowerCase();
-    if (m.isEmpty) return 'Unknown';
-    switch (m) {
-      case 'cash':
-        return 'Cash';
-      case 'upi':
-        return 'UPI';
-      case 'card':
-        return 'Card';
-      case 'wallet':
-        return 'Wallet';
-      case 'credit':
-        return 'Credit';
-      case 'split':
-      case 'split payment':
-        return 'Split Payment';
-      default:
-        // Title-case unknown/custom methods for a tidy label.
-        return m[0].toUpperCase() + m.substring(1);
-    }
   }
 
   static List<TaxSummary> _calculateTaxSummaries(List<PastOrderModel> orders) {

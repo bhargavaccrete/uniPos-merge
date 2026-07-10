@@ -6,15 +6,21 @@ import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import '../../../../widget/componets/common/report_summary_card.dart';
-import '../../../../widget/componets/common/primary_app_bar.dart';
+import '../../../../widget/componets/common/report_app_bar.dart';
+import '../../../../widget/componets/common/report_card.dart';
+import '../../../../widget/componets/common/report_empty_state.dart';
+import '../../../../widget/componets/common/report_export_button.dart';
+import '../../../../widget/componets/common/report_filter_bar.dart';
+import '../../../../widget/componets/common/report_pagination.dart';
+import '../../../../widget/componets/common/report_summary_row.dart';
+import '../../../../widget/componets/common/report_table.dart';
 import '../../../../../core/di/service_locator.dart';
-import '../../../../../core/plan/entitlement_keys.dart';
-import '../../../../../core/plan/plan_enforcement.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../tabbar/orderDetails.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import '../../../../../util/restaurant/refund_state.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
+import 'package:billberrylite/util/restaurant/report_history_window.dart';
 
 enum VoidOrderPeriod { Today, ThisWeek, Month, Year, Custom }
 
@@ -32,91 +38,30 @@ class _VoidOrderReportState extends State<VoidOrderReport> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: buildPrimaryAppBar(
-        titleWidget: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Void Order Report',
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 20,
-              ),
-            ),
-            Text(
-              'Track and analyze void orders',
-              style: GoogleFonts.poppins(
-                color: Colors.white70,
-                fontWeight: FontWeight.w500,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
+      appBar: reportAppBar(
+        title: 'Void Order Report',
+        subtitle: 'Orders voided across periods',
       ),
       body: Column(
         children: [
-          // Period Selection Buttons
-          Container(
-            width: double.infinity,
-            color: AppColors.white,
-            padding: EdgeInsets.symmetric(
-              horizontal: AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0),
-              vertical: 12,
-            ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minWidth: MediaQuery.of(context).size.width -
-                      AppResponsive.getValue(context, mobile: 32.0, tablet: 40.0),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _buildPeriodButton(
-                      context,
-                      'Today',
-                      Icons.today,
-                      VoidOrderPeriod.Today,
-                    ),
-                    SizedBox(width: AppResponsive.getValue(context, mobile: 8.0, tablet: 12.0)),
-                    _buildPeriodButton(
-                      context,
-                      'This Week',
-                      Icons.date_range,
-                      VoidOrderPeriod.ThisWeek,
-                    ),
-                    SizedBox(width: AppResponsive.getValue(context, mobile: 8.0, tablet: 12.0)),
-                    _buildPeriodButton(
-                      context,
-                      'Month',
-                      Icons.calendar_month,
-                      VoidOrderPeriod.Month,
-                    ),
-                    SizedBox(width: AppResponsive.getValue(context, mobile: 8.0, tablet: 12.0)),
-                    _buildPeriodButton(
-                      context,
-                      'Year',
-                      Icons.calendar_today,
-                      VoidOrderPeriod.Year,
-                    ),
-                    SizedBox(width: AppResponsive.getValue(context, mobile: 8.0, tablet: 12.0)),
-                    _buildPeriodButton(
-                      context,
-                      'Custom',
-                      Icons.tune,
-                      VoidOrderPeriod.Custom,
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          AppResponsive.verticalSpace(context, size: SpacingSize.small),
+          ReportFilterBar<VoidOrderPeriod>(
+            selected: _selectedPeriod,
+            onSelected: (p) => setState(() => _selectedPeriod = p),
+            options: const [
+              ReportFilterOption(
+                  value: VoidOrderPeriod.Today, label: 'Today', icon: Icons.today),
+              ReportFilterOption(
+                  value: VoidOrderPeriod.ThisWeek, label: 'This Week', icon: Icons.view_week),
+              ReportFilterOption(
+                  value: VoidOrderPeriod.Month, label: 'Month', icon: Icons.calendar_month),
+              ReportFilterOption(
+                  value: VoidOrderPeriod.Year, label: 'Year', icon: Icons.calendar_today),
+              ReportFilterOption(
+                  value: VoidOrderPeriod.Custom, label: 'Custom', icon: Icons.date_range),
+            ],
           ),
-
-          // Data View
+          AppResponsive.verticalSpace(context, size: SpacingSize.small),
           Expanded(
             child: VoidOrderDataView(period: _selectedPeriod),
           ),
@@ -124,56 +69,7 @@ class _VoidOrderReportState extends State<VoidOrderReport> {
       ),
     );
   }
-
-  Widget _buildPeriodButton(
-    BuildContext context,
-    String title,
-    IconData icon,
-    VoidOrderPeriod period,
-  ) {
-    final isSelected = _selectedPeriod == period;
-
-    return ElevatedButton.icon(
-      icon: Icon(
-        icon,
-        size: AppResponsive.smallIconSize(context),
-      ),
-      label: Text(
-        title,
-        style: GoogleFonts.poppins(
-          fontSize: AppResponsive.smallFontSize(context),
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      style: ElevatedButton.styleFrom(
-        padding: EdgeInsets.symmetric(
-          horizontal: AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0),
-          vertical: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0),
-        ),
-        backgroundColor: isSelected ? AppColors.primary : AppColors.white,
-        foregroundColor: isSelected ? AppColors.white : AppColors.textPrimary,
-        elevation: isSelected ? 2 : 0,
-        shadowColor: isSelected ? AppColors.primary.withValues(alpha: 0.3) : Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(
-            AppResponsive.getValue(context, mobile: 10.0, desktop: 12.0),
-          ),
-          side: BorderSide(
-            color: isSelected ? AppColors.primary : AppColors.divider,
-            width: isSelected ? 0 : 1,
-          ),
-        ),
-      ),
-      onPressed: () {
-        setState(() {
-          _selectedPeriod = period;
-        });
-      },
-    );
-  }
 }
-
-// ==================== SEPARATE DATA VIEW WIDGET ====================
 
 class VoidOrderDataView extends StatefulWidget {
   final VoidOrderPeriod period;
@@ -264,9 +160,14 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
     }
   }
 
+  /// Only offer years the plan's history window can actually reach. Otherwise
+  /// picking 2019 on a 30-day plan silently yields an empty table.
   void _initializeYears() {
     final currentYear = DateTime.now().year;
-    _years = List.generate(10, (index) => currentYear - index);
+    final earliest = ReportHistoryWindow.cutoff?.year ?? (currentYear - 9);
+    _years = [
+      for (int y = currentYear; y >= earliest; y--) y,
+    ];
   }
 
   Future<void> _loadAndFilter() async {
@@ -319,7 +220,7 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
     }
 
     // Plan data-scope: clamp the visible history window (reports.history_limit_days).
-    final cutoff = PlanEnforce.windowCutoff(EntKeys.reportsHistoryLimitDays);
+    final cutoff = ReportHistoryWindow.cutoff;
 
     final reasonCounts = <String, int>{};
     for (final order in pastOrderStore.pastOrders) {
@@ -371,11 +272,12 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
 
 
   Widget _buildContent(BuildContext context) {
-    final isDesktop = AppResponsive.isDesktop(context);
-    final isTablet = AppResponsive.isTablet(context);
-
+    // Not ReportBody: each section carries its own horizontal padding already,
+    // so only the desktop width cap is needed.
     return SingleChildScrollView(
-      child: Column(
+      child: AppResponsive.constrainedContent(
+        context: context,
+        child: Column(
         children: [
           // Date/Month/Year Selector
           if (widget.period == VoidOrderPeriod.Custom) _buildCustomDateSelector(context),
@@ -388,15 +290,11 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
               horizontal: AppResponsive.getValue(context, mobile: 16.0, tablet: 24.0),
               vertical: AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0),
             ),
-            child: Row(
-                    children: [
-                      Expanded(child: ReportSummaryCard(title: 'Total Voids', value: _totalVoidCount.toString(), icon: Icons.cancel_outlined, color: Colors.red)),
-                      AppResponsive.horizontalSpace(context),
-                      Expanded(child: ReportSummaryCard(title: 'Total Amount', value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalVoidAmount)}', icon: Icons.attach_money, color: Colors.orange)),
-                      AppResponsive.horizontalSpace(context),
-                      Expanded(child: ReportSummaryCard(title: 'Average', value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_averageVoidAmount)}', icon: Icons.analytics, color: AppColors.primary)),
-                    ],
-                  ),
+            child: ReportSummaryRow(cards: [
+              ReportSummaryCard(title: 'Total Voids', value: _totalVoidCount.toString(), icon: Icons.cancel_outlined, color: Colors.red),
+              ReportSummaryCard(title: 'Total Amount', value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalVoidAmount)}', icon: Icons.attach_money, color: Colors.orange),
+              ReportSummaryCard(title: 'Average', value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_averageVoidAmount)}', icon: Icons.analytics, color: AppColors.primary),
+            ]),
           ),
 
           // Most common void reason — full width so the reason text has room.
@@ -422,58 +320,39 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
               padding: EdgeInsets.symmetric(
                 horizontal: AppResponsive.getValue(context, mobile: 16.0, tablet: 24.0),
               ),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  icon: Icon(
-                    Icons.download,
-                    size: AppResponsive.getValue(context, mobile: 20.0, desktop: 22.0),
-                  ),
-                  label: Text(
-                    'Export Report',
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.getValue(context, mobile: 15.0, desktop: 16.0),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: AppColors.white,
-                    padding: EdgeInsets.symmetric(
-                      vertical: isDesktop ? 18 : (isTablet ? 16 : 14),
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  onPressed: _exportReport,
-                ),
-              ),
+              child: ReportExportButton(onPressed: _exportReport),
             ),
 
           SizedBox(height: AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0)),
 
           // Orders List or Empty State
           if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.all(50.0),
-              child: CircularProgressIndicator(),
-            )
+            const Padding(padding: EdgeInsets.all(50.0), child: ReportLoading())
           else if (_voidOrders.isEmpty)
-            _buildEmptyState(context)
+            const ReportEmptyState(
+              icon: Icons.cancel_outlined,
+              title: 'No Void Orders Found',
+              message: 'There are no void orders for the selected period',
+            )
           else
             _buildOrdersTable(context),
 
-          if (_voidOrders.length > _rowsPerPage)
-            Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: AppResponsive.getValue(context, mobile: 16.0, tablet: 24.0),
-              ),
-              child: _buildPaginationControls(),
+          Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: AppResponsive.getValue(context, mobile: 16.0, tablet: 24.0),
             ),
+            child: ReportPagination(
+              currentPage: _currentPage,
+              rowsPerPage: _rowsPerPage,
+              totalCount: _voidOrders.length,
+              onPageChanged: (page) => setState(() => _currentPage = page),
+              unit: 'void orders',
+            ),
+          ),
 
           SizedBox(height: AppResponsive.getValue(context, mobile: 20.0, tablet: 24.0)),
         ],
+        ),
       ),
     );
   }
@@ -875,220 +754,26 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
   }
 
 
-  Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.all(
-          AppResponsive.getValue(context, mobile: 40.0, desktop: 60.0),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: EdgeInsets.all(
-                AppResponsive.getValue(context, mobile: 24.0, desktop: 32.0),
-              ),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceLight,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.cancel_outlined,
-                size: AppResponsive.getValue(context, mobile: 60.0, desktop: 80.0),
-                color: AppColors.textSecondary,
-              ),
-            ),
-            SizedBox(height: AppResponsive.getValue(context, mobile: 20.0, desktop: 24.0)),
-            Text(
-              'No Void Orders Found',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.getValue(context, mobile: 18.0, desktop: 20.0),
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            SizedBox(height: AppResponsive.getValue(context, mobile: 8.0, desktop: 12.0)),
-            Text(
-              'There are no void orders for the selected period',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.getValue(context, mobile: 14.0, desktop: 15.0),
-                color: AppColors.textSecondary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPaginationControls() {
-    final totalPages = (_voidOrders.length / _rowsPerPage).ceil();
-    final start = _currentPage * _rowsPerPage + 1;
-    final end = ((_currentPage + 1) * _rowsPerPage).clamp(1, _voidOrders.length);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            'Showing $start–$end of ${_voidOrders.length} orders',
-            style: GoogleFonts.poppins(
-              fontSize: AppResponsive.smallFontSize(context),
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          Row(
-            children: [
-              IconButton(
-                onPressed: _currentPage > 0 ? () => setState(() => _currentPage--) : null,
-                icon: const Icon(Icons.chevron_left),
-                iconSize: 24,
-                color: AppColors.primary,
-                disabledColor: AppColors.divider,
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '${_currentPage + 1} / $totalPages',
-                  style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary),
-                ),
-              ),
-              IconButton(
-                onPressed: _currentPage < totalPages - 1 ? () => setState(() => _currentPage++) : null,
-                icon: const Icon(Icons.chevron_right),
-                iconSize: 24,
-                color: AppColors.primary,
-                disabledColor: AppColors.divider,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildOrdersTable(BuildContext context) {
-    final isDesktop = AppResponsive.isDesktop(context);
-    final isTablet = AppResponsive.isTablet(context);
-    final pageOrders = _voidOrders.length <= _rowsPerPage
-        ? _voidOrders
-        : _voidOrders.skip(_currentPage * _rowsPerPage).take(_rowsPerPage).toList();
+    final pageOrders = ReportPagination.pageSlice(_voidOrders, _currentPage, _rowsPerPage);
 
     return Padding(
       padding: EdgeInsets.symmetric(
         horizontal: AppResponsive.getValue(context, mobile: 16.0, tablet: 24.0),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.divider),
-          ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: MediaQuery.of(context).size.width - (isDesktop ? 48 : (isTablet ? 48 : 32)),
-              ),
-              child: DataTable(
-                showCheckboxColumn: false,
-                columnSpacing: AppResponsive.tableColumnSpacing(context),
-                headingRowHeight: AppResponsive.tableHeadingHeight(context),
-                dataRowMinHeight: AppResponsive.tableRowMinHeight(context),
-                dataRowMaxHeight: AppResponsive.tableRowMaxHeight(context),
-                headingRowColor: WidgetStateProperty.all(AppColors.surfaceLight),
-                columns: [
-                  DataColumn(
-                    label: Text(
-                      'Order ID',
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w600,
-                        fontSize: AppResponsive.getValue(context, mobile: 13.0, desktop: 14.0),
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  DataColumn(
-                    label: Text(
-                      'Date',
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w600,
-                        fontSize: AppResponsive.getValue(context, mobile: 13.0, desktop: 14.0),
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  DataColumn(
-                    label: Text(
-                      'Time',
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w600,
-                        fontSize: AppResponsive.getValue(context, mobile: 13.0, desktop: 14.0),
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  DataColumn(
-                    label: Text(
-                      'Amount',
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w600,
-                        fontSize: AppResponsive.getValue(context, mobile: 13.0, desktop: 14.0),
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  DataColumn(
-                    label: Text(
-                      'Payment',
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w600,
-                        fontSize: AppResponsive.getValue(context, mobile: 13.0, desktop: 14.0),
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  DataColumn(
-                    label: Text(
-                      'Refund Status',
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w600,
-                        fontSize: AppResponsive.getValue(context, mobile: 13.0, desktop: 14.0),
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  DataColumn(
-                    label: Text(
-                      'Voided By',
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w600,
-                        fontSize: AppResponsive.getValue(context, mobile: 13.0, desktop: 14.0),
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  DataColumn(
-                    label: Text(
-                      'Reason',
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w600,
-                        fontSize: AppResponsive.getValue(context, mobile: 13.0, desktop: 14.0),
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                ],
-                rows: pageOrders.map((order) {
+      child: ReportTable(
+        showCheckboxColumn: false,
+        columns: [
+          ReportTable.column(context, 'Order ID'),
+          ReportTable.column(context, 'Date'),
+          ReportTable.column(context, 'Time'),
+          ReportTable.column(context, 'Amount', numeric: true),
+          ReportTable.column(context, 'Payment'),
+          ReportTable.column(context, 'Refund Status'),
+          ReportTable.column(context, 'Voided By'),
+          ReportTable.column(context, 'Reason'),
+        ],
+        rows: pageOrders.map((order) {
                   // FIX 1 & 3: orderAt guarded; totalPrice used directly.
                   final orderDate = order.orderAt ?? DateTime.now();
                   final formattedDate = DateFormat('dd/MM/yyyy').format(orderDate);
@@ -1199,11 +884,7 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
                       ),
                     ],
                   );
-                }).toList(),
-              ),
-            ),
-          ),
-        ),
+        }).toList(),
       ),
     );
   }

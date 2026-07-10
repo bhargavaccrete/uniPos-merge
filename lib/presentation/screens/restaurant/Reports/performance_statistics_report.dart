@@ -30,18 +30,11 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
         _stats = stats;
         _fileSizes = sizes;
       });
-    } catch (e) {
-      _showSnackBar('Error loading stats: $e', isError: true);
+    } catch (e, stackTrace) {
+      debugPrint('Error loading performance stats: $e\n$stackTrace');
+      NotificationService.instance.showError('Could not load statistics. Please try again.');
     } finally {
       setState(() => _isLoadingStats = false);
-    }
-  }
-
-  void _showSnackBar(String message, {required bool isError}) {
-    if (isError) {
-      NotificationService.instance.showError(message);
-    } else {
-      NotificationService.instance.showSuccess(message);
     }
   }
 

@@ -3,19 +3,26 @@ import 'package:billberrylite/util/restaurant/order_status_filter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
-import 'package:billberrylite/core/plan/entitlement_keys.dart';
-import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_body.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_date_range_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_export_button.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_pagination.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_period.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_period_filter_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_summary_row.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_table.dart';
 import '../../../../widget/componets/common/report_summary_card.dart';
-import '../../../../widget/componets/common/primary_app_bar.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
-
-enum DiscountPeriod { Today, ThisWeek, Month, Year, Custom }
+import 'package:billberrylite/util/restaurant/report_history_window.dart';
 
 class DiscountOrderReport extends StatefulWidget {
   const DiscountOrderReport({super.key});
@@ -25,110 +32,34 @@ class DiscountOrderReport extends StatefulWidget {
 }
 
 class _DiscountOrderReportState extends State<DiscountOrderReport> {
-  DiscountPeriod _selectedPeriod = DiscountPeriod.Today;
+  ReportPeriod _selectedPeriod = ReportPeriod.today;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: buildPrimaryAppBar(
-        titleWidget: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Discount Orders',
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 20,
-              ),
-            ),
-            Text(
-              'Track orders with discounts',
-              style: GoogleFonts.poppins(
-                color: Colors.white70,
-                fontWeight: FontWeight.w500,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
+      appBar: reportAppBar(
+        title: 'Discount Order Report',
+        subtitle: 'Orders with discounts applied',
       ),
       body: Column(
         children: [
-          // Filter Buttons
-          Container(
-            color: AppColors.white,
-            padding: AppResponsive.horizontalPadding(context).copyWith(top: 12, bottom: 12),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _filterButton(DiscountPeriod.Today, 'Today', Icons.today),
-                  AppResponsive.horizontalSpace(context, size: SpacingSize.small),
-                  _filterButton(DiscountPeriod.ThisWeek, 'This Week', Icons.view_week),
-                  AppResponsive.horizontalSpace(context, size: SpacingSize.small),
-                  _filterButton(DiscountPeriod.Month, 'This Month', Icons.calendar_month),
-                  AppResponsive.horizontalSpace(context, size: SpacingSize.small),
-                  _filterButton(DiscountPeriod.Year, 'This Year', Icons.calendar_today),
-                  AppResponsive.horizontalSpace(context, size: SpacingSize.small),
-                  _filterButton(DiscountPeriod.Custom, 'Custom', Icons.date_range),
-                ],
-              ),
-            ),
-          ),
-
           AppResponsive.verticalSpace(context, size: SpacingSize.small),
-
-          Expanded(
-            child: DiscountDataView(
-              period: _selectedPeriod,
-            ),
+          ReportPeriodFilterBar(
+            selected: _selectedPeriod,
+            onSelected: (p) => setState(() => _selectedPeriod = p),
+            featureNoun: 'discount orders',
           ),
+          AppResponsive.verticalSpace(context, size: SpacingSize.small),
+          Expanded(child: DiscountDataView(period: _selectedPeriod)),
         ],
-      ),
-    );
-  }
-
-  Widget _filterButton(DiscountPeriod period, String title, IconData icon) {
-    bool isSelected = _selectedPeriod == period;
-    return ElevatedButton.icon(
-      onPressed: () {
-        setState(() {
-          _selectedPeriod = period;
-        });
-      },
-      icon: Icon(icon, size: AppResponsive.smallIconSize(context)),
-      label: Text(
-        title,
-        style: GoogleFonts.poppins(
-          fontSize: AppResponsive.smallFontSize(context),
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      style: ElevatedButton.styleFrom(
-        padding: EdgeInsets.symmetric(
-          horizontal: AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0),
-          vertical: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0),
-        ),
-        backgroundColor: isSelected ? AppColors.primary : AppColors.white,
-        foregroundColor: isSelected ? AppColors.white : AppColors.textPrimary,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-          side: BorderSide(
-            color: isSelected ? AppColors.primary : AppColors.divider,
-            width: 1,
-          ),
-        ),
       ),
     );
   }
 }
 
 class DiscountDataView extends StatefulWidget {
-  final DiscountPeriod period;
+  final ReportPeriod period;
   const DiscountDataView({super.key, required this.period});
 
   @override
@@ -182,7 +113,7 @@ class _DiscountDataViewState extends State<DiscountDataView> {
     late DateTime rangeStart;
     late DateTime rangeEnd;
 
-    if (widget.period == DiscountPeriod.Custom) {
+    if (widget.period == ReportPeriod.custom) {
       if (_startDate == null || _endDate == null) {
         setState(() {
           _filteredOrders = [];
@@ -199,27 +130,9 @@ class _DiscountDataViewState extends State<DiscountDataView> {
       rangeStart = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
       rangeEnd = DateTime(_endDate!.year, _endDate!.month, _endDate!.day + 1);
     } else {
-      switch (widget.period) {
-        case DiscountPeriod.Today:
-          rangeStart = DateTime(now.year, now.month, now.day);
-          rangeEnd = DateTime(now.year, now.month, now.day + 1);
-          break;
-        case DiscountPeriod.ThisWeek:
-          final weekDay = now.subtract(Duration(days: now.weekday - 1));
-          rangeStart = DateTime(weekDay.year, weekDay.month, weekDay.day);
-          rangeEnd = rangeStart.add(const Duration(days: 7));
-          break;
-        case DiscountPeriod.Month:
-          rangeStart = DateTime(now.year, now.month, 1);
-          rangeEnd = DateTime(now.year, now.month + 1, 1);
-          break;
-        case DiscountPeriod.Year:
-          rangeStart = DateTime(now.year, 1, 1);
-          rangeEnd = DateTime(now.year + 1, 1, 1);
-          break;
-        case DiscountPeriod.Custom:
-          break;
-      }
+      // Same helper the filter's history lock uses - they cannot disagree.
+      rangeStart = reportPeriodStartBound(widget.period, now);
+      rangeEnd = reportPeriodEndBound(widget.period, now);
     }
 
     final List<PastOrderModel> results = [];
@@ -228,7 +141,7 @@ class _DiscountDataViewState extends State<DiscountDataView> {
     double netAmountSum = 0.0;
 
     // Plan data-scope: clamp the visible history window (reports.history_limit_days).
-    final cutoff = PlanEnforce.windowCutoff(EntKeys.reportsHistoryLimitDays);
+    final cutoff = ReportHistoryWindow.cutoff;
 
     for (final order in pastOrderStore.pastOrders) {
       if ((order.Discount ?? 0) <= 0) continue;
@@ -317,418 +230,123 @@ class _DiscountDataViewState extends State<DiscountDataView> {
   }
 
   String _getPeriodDisplayName() {
-    switch (widget.period) {
-      case DiscountPeriod.Today:
-        return 'Today';
-      case DiscountPeriod.ThisWeek:
-        return 'This Week';
-      case DiscountPeriod.Month:
-        return 'This Month';
-      case DiscountPeriod.Year:
-        return 'This Year';
-      case DiscountPeriod.Custom:
-        if (_startDate != null && _endDate != null) {
-          return '${DateFormat('dd MMM yyyy').format(_startDate!)} - ${DateFormat('dd MMM yyyy').format(_endDate!)}';
-        }
-        return 'Custom Period';
+    if (widget.period != ReportPeriod.custom) return widget.period.label;
+    if (_startDate != null && _endDate != null) {
+      return '${DateFormat('dd MMM yyyy').format(_startDate!)} - ${DateFormat('dd MMM yyyy').format(_endDate!)}';
     }
-  }
-
-  Future<void> _selectDate(BuildContext context, bool isStartDate) {
-    return showDatePicker(
-      context: context,
-      initialDate: (isStartDate ? _startDate : _endDate) ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: AppColors.primary,
-              onPrimary: AppColors.white,
-              surface: AppColors.white,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    ).then((picked) {
-      if (picked != null) {
-        setState(() {
-          if (isStartDate) {
-            _startDate = picked;
-          } else {
-            _endDate = picked;
-          }
-        });
-      }
-    });
+    return 'Custom Period';
   }
 
   @override
   Widget build(BuildContext context) {
-    final isTablet = !AppResponsive.isMobile(context);
+    if (_isLoading) return const ReportLoading();
 
-    if (_isLoading) {
-      return Center(child: CircularProgressIndicator(color: AppColors.primary));
+    if (widget.period == ReportPeriod.custom) {
+      return _buildCustomDateSelector();
     }
 
-    if (widget.period == DiscountPeriod.Custom) {
-      return _buildCustomDateSelector(isTablet);
-    }
-
-    return _buildReportUI(isTablet);
+    return _buildReportUI();
   }
 
-  Widget _buildCustomDateSelector(bool isTablet) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 1200;
-
-    String formatDate(DateTime? date) {
-      if (date == null) return 'Select Date';
-      return DateFormat('dd MMM, yyyy').format(date);
-    }
-
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(isTablet ? 20 : 16),
-      child: Center(
-        child: Container(
-          constraints: BoxConstraints(maxWidth: isDesktop ? 1400 : 1000),
-          child: Column(
-            children: [
-              Container(
-                padding: EdgeInsets.all(isTablet ? 20 : 16),
-                decoration: BoxDecoration(
-                  color: AppColors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
-                      blurRadius: 8,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Select Date Range',
-                      style: GoogleFonts.poppins(
-                        fontSize: isDesktop ? 20 : (isTablet ? 18 : 16),
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(child: _buildDatePickerButton('Start Date', formatDate(_startDate), () => _selectDate(context, true), isTablet)),
-                        SizedBox(width: 16),
-                        Expanded(child: _buildDatePickerButton('End Date', formatDate(_endDate), () => _selectDate(context, false), isTablet)),
-                      ],
-                    ),
-                    SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: (_startDate != null && _endDate != null) ? _filterFromMemory : null,
-                        icon: Icon(Icons.filter_list, size: isTablet ? 20 : 18),
-                        label: Text(
-                          'Apply Filter',
-                          style: GoogleFonts.poppins(fontSize: isTablet ? 16 : 15, fontWeight: FontWeight.w600),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: AppColors.white,
-                          padding: EdgeInsets.symmetric(vertical: isTablet ? 16 : 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          disabledBackgroundColor: AppColors.divider,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (_startDate != null && _endDate != null) ...[
-                SizedBox(height: 16),
-                _filteredOrders.isNotEmpty
-                    ? _buildReportContent(isTablet)
-                    : Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 32),
-                        child: Center(
-                          child: Text(
-                            'No discount orders found for this period',
-                            style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.bodyFontSize(context),
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ),
-              ],
-            ],
+  Widget _buildCustomDateSelector() {
+    return ReportBody(
+      child: Column(
+        children: [
+          ReportDateRangeCard(
+            initialStart: _startDate,
+            initialEnd: _endDate,
+            onApply: (start, end) {
+              setState(() {
+                _startDate = start;
+                _endDate = end;
+              });
+              _loadAndFilter();
+            },
           ),
-        ),
+          if (_startDate != null && _endDate != null) ...[
+            AppResponsive.verticalSpace(context),
+            if (_filteredOrders.isNotEmpty)
+              _buildReportContent()
+            else
+              const ReportEmptyState(
+                icon: Icons.discount,
+                title: 'No Discount Orders',
+                message: 'No discount orders found for the selected date range',
+              ),
+          ],
+        ],
       ),
     );
   }
 
-  Widget _buildDatePickerButton(String label, String value, VoidCallback onPressed, bool isTablet) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.poppins(fontSize: isTablet ? 14 : 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-        ),
-        SizedBox(height: 8),
-        InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            padding: EdgeInsets.all(isTablet ? 14 : 12),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceLight,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.divider),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  value,
-                  style: GoogleFonts.poppins(
-                    fontSize: isTablet ? 14 : 13,
-                    color: value == 'Select Date' ? AppColors.textSecondary : AppColors.textPrimary,
-                  ),
-                ),
-                Icon(Icons.calendar_today, size: isTablet ? 20 : 18, color: AppColors.primary),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildReportUI(bool isTablet) {
+  Widget _buildReportUI() {
     if (_filteredOrders.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 20.0, tablet: 24.0)),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceMedium,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.discount,
-                size: AppResponsive.getValue(context, mobile: 56.0, tablet: 64.0),
-                color: AppColors.textSecondary,
-              ),
-            ),
-            AppResponsive.verticalSpace(context, size: SpacingSize.large),
-            Text(
-              'No Discount Orders',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.headingFontSize(context),
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            AppResponsive.verticalSpace(context, size: SpacingSize.small),
-            Text(
-              'No discount orders found for this period',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.bodyFontSize(context),
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
+      return const ReportEmptyState(
+        icon: Icons.discount,
+        title: 'No Discount Orders',
+        message: 'No discount orders found for this period',
       );
     }
 
-    return SingleChildScrollView(
-      padding: AppResponsive.padding(context),
-      child: AppResponsive.constrainedContent(
-        context: context,
-        child: _buildReportContent(isTablet),
-      ),
-    );
+    return ReportBody(child: _buildReportContent());
   }
 
-  Widget _buildReportContent(bool isTablet) {
+  Widget _buildReportContent() {
     return Column(
       children: [
-        _buildSummaryCards(isTablet),
-        SizedBox(height: 16),
-        _buildExportButton(isTablet),
-        SizedBox(height: 16),
-        _buildDataTable(isTablet),
-        if (_filteredOrders.length > _rowsPerPage) _buildPaginationControls(),
+        _buildSummaryCards(),
+        AppResponsive.verticalSpace(context),
+        ReportExportButton(onPressed: _exportReport),
+        AppResponsive.verticalSpace(context),
+        _buildDataTable(),
+        ReportPagination(
+          currentPage: _currentPage,
+          rowsPerPage: _rowsPerPage,
+          totalCount: _filteredOrders.length,
+          onPageChanged: (page) => setState(() => _currentPage = page),
+        ),
       ],
     );
   }
 
-  Widget _buildPaginationControls() {
-    final totalPages = (_filteredOrders.length / _rowsPerPage).ceil();
-    final start = _currentPage * _rowsPerPage + 1;
-    final end = ((_currentPage + 1) * _rowsPerPage).clamp(1, _filteredOrders.length);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            'Showing $start\u2013$end of ${_filteredOrders.length} orders',
-            style: GoogleFonts.poppins(
-              fontSize: AppResponsive.smallFontSize(context),
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          Row(
-            children: [
-              IconButton(
-                onPressed: _currentPage > 0 ? () => setState(() => _currentPage--) : null,
-                icon: const Icon(Icons.chevron_left),
-                iconSize: 24,
-                color: AppColors.primary,
-                disabledColor: AppColors.divider,
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '${_currentPage + 1} / $totalPages',
-                  style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary),
-                ),
-              ),
-              IconButton(
-                onPressed: _currentPage < totalPages - 1 ? () => setState(() => _currentPage++) : null,
-                icon: const Icon(Icons.chevron_right),
-                iconSize: 24,
-                color: AppColors.primary,
-                disabledColor: AppColors.divider,
-              ),
-            ],
-          ),
-        ],
+  Widget _buildSummaryCards() {
+    return ReportSummaryRow(cards: [
+      ReportSummaryCard(
+        title: 'Total Orders',
+        value: _totalOrdersCount.toString(),
+        icon: Icons.shopping_cart,
+        color: AppColors.primary,
       ),
-    );
+      ReportSummaryCard(
+        title: 'Total Discount',
+        value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalDiscountAmount)}',
+        icon: Icons.discount,
+        color: Colors.orange,
+      ),
+      ReportSummaryCard(
+        title: 'Avg Discount',
+        value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_averageDiscount)}',
+        icon: Icons.analytics,
+        color: Colors.green,
+      ),
+    ]);
   }
 
-  Widget _buildSummaryCards(bool isTablet) {
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: ReportSummaryCard(
-              title: 'Total Orders',
-              value: _totalOrdersCount.toString(),
-              icon: Icons.shopping_cart,
-              color: AppColors.primary,
-            ),
-          ),
-          AppResponsive.horizontalSpace(context),
-          Expanded(
-            child: ReportSummaryCard(
-              title: 'Total Discount',
-              value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalDiscountAmount)}',
-              icon: Icons.discount,
-              color: Colors.orange,
-            ),
-          ),
-          AppResponsive.horizontalSpace(context),
-          Expanded(
-            child: ReportSummaryCard(
-              title: 'Avg Discount',
-              value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_averageDiscount)}',
-              icon: Icons.analytics,
-              color: Colors.green,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildExportButton(bool isTablet) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth > 1200;
-
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: _exportReport,
-        icon: Icon(Icons.file_download_outlined, size: isDesktop ? 22 : (isTablet ? 20 : 18)),
-        label: Text(
-          'Export Report',
-          style: GoogleFonts.poppins(fontSize: isDesktop ? 17 : (isTablet ? 16 : 15), fontWeight: FontWeight.w600),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.green,
-          foregroundColor: AppColors.white,
-          padding: EdgeInsets.symmetric(vertical: isDesktop ? 18 : (isTablet ? 16 : 14)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDataTable(bool isTablet) {
-    final pageOrders = _filteredOrders.length <= _rowsPerPage
-        ? _filteredOrders
-        : _filteredOrders.skip(_currentPage * _rowsPerPage).take(_rowsPerPage).toList();
-    final screenWidth = AppResponsive.screenWidth(context);
+  Widget _buildDataTable() {
+    final pageOrders = ReportPagination.pageSlice(_filteredOrders, _currentPage, _rowsPerPage);
     final cellFontSize = AppResponsive.smallFontSize(context);
-    final headerFontSize = AppResponsive.bodyFontSize(context);
 
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-        border: Border.all(color: AppColors.divider, width: 0.5),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: Offset(0, 2)),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minWidth: screenWidth - AppResponsive.getValue(context, mobile: 32.0, tablet: 40.0),
-            ),
-            child: DataTable(
-              columnSpacing: AppResponsive.tableColumnSpacing(context),
-              headingRowColor: WidgetStateProperty.all(AppColors.surfaceLight),
-              headingRowHeight: AppResponsive.tableHeadingHeight(context),
-              dataRowMinHeight: AppResponsive.tableRowMinHeight(context),
-              dataRowMaxHeight: AppResponsive.tableRowMaxHeight(context),
-              columns: [
-                DataColumn(label: Text('Date', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize))),
-                DataColumn(label: Text('Invoice', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize))),
-                DataColumn(label: Text('Customer', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize))),
-                DataColumn(label: Text('Payment', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize))),
-                DataColumn(label: Text('Type', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize))),
-                DataColumn(label: Text('Discount', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize)), numeric: true),
-                DataColumn(label: Text('Total', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize)), numeric: true),
-              ],
-              rows: pageOrders.map((order) {
+    return ReportTable(
+      columns: [
+        ReportTable.column(context, 'Date'),
+        ReportTable.column(context, 'Invoice'),
+        ReportTable.column(context, 'Customer'),
+        ReportTable.column(context, 'Payment'),
+        ReportTable.column(context, 'Type'),
+        ReportTable.column(context, 'Discount', numeric: true),
+        ReportTable.column(context, 'Total', numeric: true),
+      ],
+      rows: pageOrders.map((order) {
                 final discount = order.Discount ?? 0.0;
                 // FIX 2: Net amount deducts any partial refund from totalPrice.
                 final netTotal = order.totalPrice - (order.refundAmount ?? 0.0);
@@ -767,11 +385,7 @@ class _DiscountDataViewState extends State<DiscountDataView> {
                     DataCell(Text('${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(netTotal)}', style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary, fontWeight: FontWeight.w600))),
                   ],
                 );
-              }).toList(),
-            ),
-          ),
-        ),
-      ),
+      }).toList(),
     );
   }
 }

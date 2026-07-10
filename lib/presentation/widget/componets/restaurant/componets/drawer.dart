@@ -31,12 +31,15 @@ class Drawerr extends StatefulWidget {
   final bool showGridDuplicates;
   // Change PIN is shown on the Dashboard for staff.
   final bool showChangePin;
+  // Redundant on the Dashboard (that screen IS Home).
+  final bool showHome;
 
   const Drawerr({
     super.key,
     this.showClearCart = true,
     this.showGridDuplicates = true,
     this.showChangePin = false,
+    this.showHome = true,
   });
 
   @override
@@ -129,16 +132,17 @@ class _DrawerrState extends State<Drawerr> {
                     horizontal: AppResponsive.getValue(context, mobile: 8, tablet: 12),
                   ),
                   children: [
-                  _buildDrawerItem(
-                    context: context,
-                    icon: Icons.home_rounded,
-                    title: 'Home',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, RouteNames.restaurantAdminWelcome);
-                    },
-                    isTablet: isTablet,
-                  ),
+                  if (widget.showHome)
+                    _buildDrawerItem(
+                      context: context,
+                      icon: Icons.home_rounded,
+                      title: 'Home',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.pushNamed(context, RouteNames.restaurantAdminWelcome);
+                      },
+                      isTablet: isTablet,
+                    ),
 
                   if (widget.showClearCart && cartStore.isNotEmpty)
                     _buildDrawerItem(

@@ -5,6 +5,8 @@ import 'package:billberrylite/util/color.dart';
 /// Shared empty-state placeholder — use anywhere a list/search/screen has
 /// nothing to show, instead of leaving a blank area or hand-rolling a one-off.
 ///
+/// Report screens use [ReportEmptyState] instead — same idea, report styling.
+///
 /// ```dart
 /// const AppEmptyState(
 ///   icon: Icons.search_off_rounded,

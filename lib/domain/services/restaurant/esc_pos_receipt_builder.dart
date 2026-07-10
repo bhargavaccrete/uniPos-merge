@@ -3,7 +3,8 @@ import 'package:billberrylite/domain/services/retail/receipt_pdf_service.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/restaurant/print_settings.dart';
-import 'package:billberrylite/core/plan/plan_gate.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'package:billberrylite/domain/services/restaurant/tax_breakdown.dart';
 import 'package:billberrylite/core/di/service_locator.dart' show taxStore;
 
@@ -87,15 +88,8 @@ class EscPosReceiptBuilder {
       bytes.addAll(_text('\n'));
     }
 
-    // ── HEADER: Store name + KOT number ──
+    // ── HEADER: KOT number ──
     bytes.addAll(_alignCenter);
-    if (PrintSettings.showRestaurantName && receiptData.storeName != null) {
-      bytes.addAll(_boldOn);
-      bytes.addAll(_sizeDouble);
-      bytes.addAll(_text(receiptData.storeName!));
-      bytes.addAll(_sizeNormal);
-      bytes.addAll(_boldOff);
-    }
 
     // KOT number — always shown (critical for kitchen)
     bytes.addAll(_boldOn);
@@ -468,10 +462,12 @@ class EscPosReceiptBuilder {
         bytes.addAll(_text(line));
       }
     }
-    // "Powered by Bill Berry Lite" — Premium may hide it via the toggle, but it
-    // is FORCED ON for Free plans regardless of the setting.
-    if (PlanGate.isFree || PrintSettings.showPoweredBy) {
+    // "Powered by Bill Berry Lite" + company line — printed only when the admin
+    // grants `billing.invoice.print` in the license manifest (shown by default).
+    if (PlanEnforce.allows(EntKeys.billingInvoicePrint)) {
       bytes.addAll(_text('Powered by Bill Berry Lite'));
+      bytes.addAll(_text('Accrete Infosolution Technologies Private Limited'));
+      bytes.addAll(_text('Ph: 7041046049'));
     }
 
     // Feed paper and cut

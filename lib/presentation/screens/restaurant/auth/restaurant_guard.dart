@@ -23,11 +23,16 @@ class RestaurantGuard extends StatefulWidget {
   final Widget child;
   final String? permissionKey;
   final String? entitlementKey;
+
+  /// Screen fronts several individually-gated parts — allowed if ANY is granted.
+  /// The parts gate themselves inside the screen.
+  final List<String>? entitlementAnyOf;
   const RestaurantGuard({
     super.key,
     required this.child,
     this.permissionKey,
     this.entitlementKey,
+    this.entitlementAnyOf,
   });
 
   @override
@@ -84,6 +89,12 @@ class _RestaurantGuardState extends State<RestaurantGuard> {
             // Entitlement (plan) denied → upgrade blocker (vs role-denied below).
             return const _UpgradeRequiredScreen();
           }
+        }
+
+        if (widget.entitlementAnyOf != null) {
+          final hasAny = licStore.licenseBypassed ||
+              widget.entitlementAnyOf!.any(Entitlements.instance.can);
+          if (!hasAny) return const _UpgradeRequiredScreen();
         }
 
         if (_state == 'denied') return const _AccessDeniedScreen();

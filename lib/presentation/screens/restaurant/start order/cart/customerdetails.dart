@@ -199,24 +199,33 @@ class _CustomerdetailsState extends State<Customerdetails> {
         servicechargeapply ? _toDouble(_serviceChargeController) : 0.0;
     final bool isDelivery = widget.orderType == 'Delivery';
 
-    // ✅ Step 2: Create the service to do all the math.
-    final calculations = CartCalculationService(
-      items: widget.cartitems ?? widget.existingModel?.items ?? [],
-      discountType: _selectedDiscountType,
-      discountValue: discountInputValue,
-      serviceChargePercentage: isDelivery ? 0.0 : serviceChargeValue,
-      deliveryCharge: isDelivery ? serviceChargeValue : 0.0,
-      isDeliveryOrder: isDelivery,
-      // Use stored tax mode from existing order; fall back to app setting for new orders
-      isTaxInclusive: widget.existingModel?.isTaxInclusive ?? AppSettings.isTaxInclusive,
-    );
+    // ✅ Step 2: Create the service to do all the math. `redemption` folds any
+    // redeemed loyalty points into the taxable base BEFORE GST (like a discount).
+    CartCalculationService buildCalc(double redemption) => CartCalculationService(
+          items: widget.cartitems ?? widget.existingModel?.items ?? [],
+          discountType: _selectedDiscountType,
+          discountValue: discountInputValue,
+          serviceChargePercentage: isDelivery ? 0.0 : serviceChargeValue,
+          deliveryCharge: isDelivery ? serviceChargeValue : 0.0,
+          isDeliveryOrder: isDelivery,
+          // Use stored tax mode from existing order; fall back to app setting.
+          isTaxInclusive:
+              widget.existingModel?.isTaxInclusive ?? AppSettings.isTaxInclusive,
+          loyaltyRedemption: redemption,
+        );
 
-    // ✅ Step 3: Loyalty points discount
+    var calculations = buildCalc(0);
+
+    // ✅ Step 3: Loyalty points — cap to the (pre-redemption) bill, then rebuild
+    // so GST is charged on the post-redemption amount. grandTotal is then net.
     final int availablePoints = selectedCustomer?.loyaltyPoints ?? 0;
     final int pointsDiscount = (_usePoints && availablePoints > 0)
         ? availablePoints.clamp(0, calculations.grandTotal.floor())
         : 0;
-    final double netPayable = calculations.grandTotal - pointsDiscount;
+    if (pointsDiscount > 0) {
+      calculations = buildCalc(pointsDiscount.toDouble());
+    }
+    final double netPayable = calculations.grandTotal;
     // Balance-due: if this order was already partly settled (e.g. items added
     // after a prior payment), collect ONLY the outstanding balance — never the
     // full bill again. alreadyPaid = 0 for a fresh order.
@@ -1046,7 +1055,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                onPressed: (_isPaymentValid && !_isProcessing) ? () => _submitOrder(calculations) : null,
+                onPressed: (_isPaymentValid && !_isProcessing) ? () => _submitOrder(calculations, pointsUsed: pointsDiscount) : null,
                 child: _isProcessing
                     ? const SizedBox(
                         height: 22,
@@ -1167,7 +1176,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
           // Net Payable
           _buildSummaryRow(
               pointsDiscount > 0 ? 'Net Payable:' : 'Grand Total:',
-              '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.grandTotal - pointsDiscount)}',
+              '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.grandTotal)}',
               isBold: true),
         ],
       ),
@@ -1305,7 +1314,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       ...paymentList,
     ];
     final double newTotalPaid = priorPaid + _totalPaid;
-    final double targetTotal = calculations.grandTotal - pointsUsed;
+    final double targetTotal = calculations.grandTotal;
     final bool settledInFull = newTotalPaid >= targetTotal - 0.01;
     final bool mergedIsSplit = mergedPaymentList.length > 1;
 
@@ -1321,7 +1330,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       discount: calculations.discountAmount,
       // serviceCharge: widget.orderType == 'Delivery'?calculations.deliveryCharge: calculations.serviceChargeAmount,
       serviceCharge: calculations.serviceChargeAmount,
-      totalPrice: calculations.grandTotal - pointsUsed, // net payable after points
+      totalPrice: calculations.grandTotal, // net payable (points folded into GST base)
       paymentMethod: mergedIsSplit ? 'Split Payment' : _paymentEntries.first.method,
       completedAt: DateTime.now(),
       status: calculatedStatus,
@@ -1359,7 +1368,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                   pointsToAdd: -pointsUsed);
             }
             final int earned =
-                LoyaltyPoints.earnedFor(calculations.grandTotal - pointsUsed);
+                LoyaltyPoints.earnedFor(calculations.grandTotal);
             await _updateCustomerStats(selectedCustomer!, 'Dine In',
                 pointsToEarn: earned);
           }
@@ -1386,7 +1395,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
               customerId: selectedCustomer!.customerId, orderType: '', pointsToAdd: -pointsUsed);
           }
           final int earned =
-            LoyaltyPoints.earnedFor(calculations.grandTotal - pointsUsed);
+            LoyaltyPoints.earnedFor(calculations.grandTotal);
           await _updateCustomerStats(selectedCustomer!, 'Dine In', pointsToEarn: earned);
         }
 
@@ -1405,7 +1414,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
             customerId: selectedCustomer!.customerId, orderType: '', pointsToAdd: -pointsUsed);
         }
         final int earned =
-            LoyaltyPoints.earnedFor(calculations.grandTotal - pointsUsed);
+            LoyaltyPoints.earnedFor(calculations.grandTotal);
         await _updateCustomerStats(selectedCustomer!, widget.orderType ?? 'Take Away', pointsToEarn: earned);
       }
 
@@ -1512,7 +1521,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       final pastOrder = PastOrderModel(
         id: newId,
         customerName: _nameController.text.trim(),
-        totalPrice: calculations.grandTotal - pointsUsed, // net payable after points
+        totalPrice: calculations.grandTotal, // net payable (points folded into GST base)
         items: orderItems,
         orderAt: DateTime.now(),
         orderType: widget.orderType ?? 'Take Away',
@@ -1555,7 +1564,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
               customerId: selectedCustomer!.customerId, orderType: '', pointsToAdd: -pointsUsed);
           }
           final int earned =
-            LoyaltyPoints.earnedFor(calculations.grandTotal - pointsUsed);
+            LoyaltyPoints.earnedFor(calculations.grandTotal);
           await _updateCustomerStats(selectedCustomer!, widget.orderType ?? 'Take Away', pointsToEarn: earned);
         }
 
@@ -2068,17 +2077,17 @@ class _CustomerdetailsState extends State<Customerdetails> {
     }
   }
 
-  Future<void> _submitOrder(CartCalculationService calculations) async {
+  Future<void> _submitOrder(CartCalculationService calculations, {int pointsUsed = 0}) async {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
     try {
-      await _doSubmitOrder(calculations);
+      await _doSubmitOrder(calculations, pointsUsed: pointsUsed);
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
   }
 
-  Future<void> _doSubmitOrder(CartCalculationService calculations) async {
+  Future<void> _doSubmitOrder(CartCalculationService calculations, {int pointsUsed = 0}) async {
     // Plan gate — billing.invoice.create + per-day bill cap. Checked first, so a
     // blocked plan can't even open a day it has no right to bill into.
     if (!PlanGuard.allowedOr(context, EntKeys.billingInvoiceCreate, featureName: 'Billing')) {
@@ -2123,14 +2132,10 @@ class _CustomerdetailsState extends State<Customerdetails> {
     }
     setState(() => _mobileError = null);
 
-    // Compute points usage
-    final int availablePoints = selectedCustomer?.loyaltyPoints ?? 0;
-    final int pointsUsed = (_usePoints && availablePoints > 0)
-        ? availablePoints.clamp(0, calculations.grandTotal.floor())
-        : 0;
-
-    // Guard: re-check payment validity. Skip when bill is fully covered by loyalty points.
-    final bool fullyCoveredByPoints = (calculations.grandTotal - pointsUsed) <= 0;
+    // Points usage is passed in — already capped on the PRE-redemption bill and
+    // folded into `calculations` so GST reflects the post-redemption amount.
+    // Guard: re-check payment validity. Skip when the bill is fully covered by points.
+    final bool fullyCoveredByPoints = calculations.grandTotal <= 0.009;
     if (!_isPaymentValid && !fullyCoveredByPoints) {
       NotificationService.instance.showError('Please complete payment details before proceeding.');
       return;

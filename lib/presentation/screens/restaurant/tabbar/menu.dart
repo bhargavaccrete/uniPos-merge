@@ -1122,8 +1122,11 @@ class _MenuScreenState extends State<MenuScreen> {
   /// A single pill in the horizontal quick-nav strip. Shared by the Favorites
   /// chip and the per-category chips.
   void _selectStripCategory(String categoryId) {
-    // Collapse the previously active category
-    if (activeCategory != null && activeCategory != categoryId) {
+    // Collapse the previously active category — unless the user opted to keep
+    // every opened category expanded (Customization → Keep Categories Open).
+    if (!AppSettings.keepCategoriesOpen &&
+        activeCategory != null &&
+        activeCategory != categoryId) {
       final prev = _expansionControllers[activeCategory];
       if (prev != null) {
         try {

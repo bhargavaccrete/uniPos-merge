@@ -95,6 +95,9 @@ class BusinessDetails extends HiveObject {
     String? pincode,
     Uint8List? logo,
     bool? isSetupComplete,
+    /// `logo: null` cannot clear the logo — `??` falls back to the old value.
+    /// Pass `clearLogo: true` to remove it.
+    bool clearLogo = false,
   }) {
     return BusinessDetails(
       businessTypeId: businessTypeId ?? this.businessTypeId,
@@ -110,7 +113,7 @@ class BusinessDetails extends HiveObject {
       state: state ?? this.state,
       country: country ?? this.country,
       pincode: pincode ?? this.pincode,
-      logo: logo ?? this.logo,
+      logo: clearLogo ? null : (logo ?? this.logo),
       isSetupComplete: isSetupComplete ?? this.isSetupComplete,
       createdAt: createdAt,
       updatedAt: DateTime.now(),

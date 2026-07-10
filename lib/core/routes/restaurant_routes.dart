@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:billberrylite/core/routes/routes_name.dart';
 import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'package:billberrylite/presentation/screens/restaurant/Reports/Discount%20Order%20Report/dicountOrderReport.dart';
-import 'package:billberrylite/presentation/screens/restaurant/Reports/comparison/comparisonbymonth.dart';
-import 'package:billberrylite/presentation/screens/restaurant/Reports/comparison/comparisonbyweek.dart';
-import 'package:billberrylite/presentation/screens/restaurant/Reports/comparison/comparisonbyyear.dart';
 import 'package:billberrylite/presentation/screens/restaurant/Reports/comparisonbyproduct/comparisonproduct.dart';
 import 'package:billberrylite/presentation/screens/restaurant/Reports/dailyClosingReports/dailyclosing.dart';
 import 'package:billberrylite/presentation/screens/restaurant/Reports/pos%20End%20Day%20Report/posenddayreport.dart';
@@ -80,7 +77,6 @@ import 'package:billberrylite/presentation/screens/restaurant/Expense/managecate
 
 // Restaurant - Reports
 import 'package:billberrylite/presentation/screens/restaurant/Reports/reports.dart';
-import 'package:billberrylite/presentation/screens/restaurant/Reports/filterOrders.dart';
 import 'package:billberrylite/presentation/screens/restaurant/Reports/performance_statistics_report.dart';
 
 // Restaurant - Settings
@@ -110,6 +106,7 @@ import '../../presentation/screens/restaurant/Reports/comparison/comparison.dart
 import '../../presentation/screens/restaurant/Reports/customer list by revenue/customerlistbyrevenue.dart';
 import '../../presentation/screens/restaurant/Reports/customerList/customerlist.dart';
 import '../../presentation/screens/restaurant/Reports/expenseReport/expensereport.dart';
+import '../../presentation/screens/restaurant/Reports/paymentMode/payment_mode_report.dart';
 import '../../presentation/screens/restaurant/Reports/void Order Report/voidOrderReport.dart';
 import '../../presentation/screens/restaurant/Reports/item Cancellation Report/itemCancellationReport.dart';
 import '../../presentation/screens/restaurant/printerSetting/addprinter/addprinter.dart';
@@ -203,15 +200,19 @@ class RestaurantRoutes {
     RouteNames.restaurantReportsSalesByCategory: _guard(SalesByCategory(), 'reports', EntKeys.reportsSaleByCategory),
     RouteNames.restaurantReportsDailyClosingReport: _guard(DailyClosingReport(), 'reports', EntKeys.reportsDailyClosing),
     RouteNames.restaurantReportsCustomerList: _guard(CustomerListReport(), 'reports', EntKeys.reportsCustomerList),
-    RouteNames.restaurantReportsComparisionByWeek: _guard(ComparisonByWeek(), 'reports', EntKeys.reportsComparisonWeek),
-    RouteNames.restaurantReportsComparisionByMonth: _guard(ComparisonByMonth(), 'reports', EntKeys.reportsComparisonMonth),
-    RouteNames.restaurantReportsComparisionByYear: _guard(ComparisonByYear(), 'reports', EntKeys.reportsComparisonYear),
+    // Periods gate themselves inside the screen; the route opens if any is granted.
+    RouteNames.restaurantReportsSalesComparison: (_) => RestaurantGuard(
+          permissionKey: 'reports',
+          entitlementAnyOf: kComparisonPeriodEntitlements,
+          child: const SalesComparison(),
+        ),
     RouteNames.restaurantReportsComparisionByProduct: _guard(ComparisonByProduct(), 'reports', EntKeys.reportsComparisonProduct),
     RouteNames.restaurantReportsRefundDetails: _guard(RefundDetails(), 'reports', EntKeys.reportsRefundDetails),
     RouteNames.restaurantReportsDiscountOrderReport: _guard(DiscountOrderReport(), 'reports', EntKeys.reportsDiscountOrders),
     RouteNames.restaurantReportsPosOrder: _guard(Posenddayreport(), 'reports', EntKeys.reportsPosEndDay),
     RouteNames.restaurantReportsCustomerListByRevenue: _guard(CustomerListByRevenue(), 'reports', EntKeys.reportsCustomerRevenue),
     RouteNames.restaurantReportsExpense: _guard(ExpenseReport(), 'reports', EntKeys.reportsExpense),
+    RouteNames.restaurantReportsPaymentMode: _guard(const PaymentModeReport(), 'reports', EntKeys.reportsPaymentMode),
     RouteNames.restaurantReportsVoidOrderReport: _guard(VoidOrderReport(), 'reports', EntKeys.reportsVoidOrders),
     RouteNames.restaurantReportsItemCancellation: _guard(const ItemCancellationReport(), 'reports', EntKeys.reportsItemCancellation),
     RouteNames.restaurantShiftReport: _guard(const ShiftReportScreen(), 'reports', EntKeys.reportsShift),

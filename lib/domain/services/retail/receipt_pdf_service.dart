@@ -12,7 +12,8 @@ import '../../../data/models/retail/hive_model/sale_model_203.dart';
 import '../../../data/models/retail/printer_settings_model.dart';
 import '../../../util/restaurant/print_settings.dart';
 import '../../../core/config/app_config.dart';
-import '../../../core/plan/plan_gate.dart';
+import '../../../core/plan/plan_enforcement.dart';
+import '../../../core/plan/entitlement_keys.dart';
 import '../../../core/di/service_locator.dart' show taxStore;
 import '../../../util/restaurant/staticswitch.dart';
 import '../restaurant/tax_breakdown.dart';
@@ -219,12 +220,13 @@ class ReceiptPdfService {
     final retailSettings = _getRetailSettings();
     final isRetail = AppConfig.isRetail;
 
-    // Determine what to show based on mode
-    final showLogo = isRetail ? (retailSettings?.showLogo ?? true) : true;
-    final showStoreName = isRetail ? (retailSettings?.showStoreName ?? true) : PrintSettings.showRestaurantName;
-    final showStoreAddress = isRetail ? (retailSettings?.showStoreAddress ?? true) : PrintSettings.showRestaurantAddress;
-    final showStorePhone = isRetail ? (retailSettings?.showStorePhone ?? true) : PrintSettings.showRestaurantMobile;
-    final showGST = isRetail ? (retailSettings?.showGSTNumber ?? true) : true;
+    // Determine what to show based on mode (suppress store details for KOTs)
+    final isKot = data.kotNumber != null;
+    final showLogo = isKot ? false : (isRetail ? (retailSettings?.showLogo ?? true) : PrintSettings.showRestaurantLogo);
+    final showStoreName = isKot ? false : (isRetail ? (retailSettings?.showStoreName ?? true) : PrintSettings.showRestaurantName);
+    final showStoreAddress = isKot ? false : (isRetail ? (retailSettings?.showStoreAddress ?? true) : PrintSettings.showRestaurantAddress);
+    final showStorePhone = isKot ? false : (isRetail ? (retailSettings?.showStorePhone ?? true) : PrintSettings.showRestaurantMobile);
+    final showGST = isKot ? false : (isRetail ? (retailSettings?.showGSTNumber ?? true) : true);
     final showInvoiceNumber = isRetail ? (retailSettings?.showInvoiceNumber ?? true) : PrintSettings.showOrderId;
     final showInvoiceDate = isRetail ? (retailSettings?.showInvoiceDate ?? true) : PrintSettings.showOrderedTime;
     final showPaymentMethod = isRetail ? (retailSettings?.showPaymentMethod ?? true) : PrintSettings.showPaymentType;
@@ -670,12 +672,23 @@ class ReceiptPdfService {
                 style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
                 textAlign: pw.TextAlign.center,
               ),
-            // "Powered by" — forced on for Free, toggleable for Premium.
-            if (PlanGate.isFree || PrintSettings.showPoweredBy) ...[
+            // "Powered by" + company line — printed only when the admin grants
+            // `billing.invoice.print` in the license manifest (shown by default).
+            if (PlanEnforce.allows(EntKeys.billingInvoicePrint)) ...[
               pw.SizedBox(height: 4),
               pw.Text(
                 'Powered by Bill Berry Lite',
                 style: const pw.TextStyle(fontSize: 9),
+                textAlign: pw.TextAlign.center,
+              ),
+              pw.Text(
+                'Accrete Infosolution Technologies Private Limited',
+                style: const pw.TextStyle(fontSize: 8),
+                textAlign: pw.TextAlign.center,
+              ),
+              pw.Text(
+                'Ph: 7041046049',
+                style: const pw.TextStyle(fontSize: 8),
                 textAlign: pw.TextAlign.center,
               ),
             ],
@@ -741,7 +754,7 @@ class ReceiptPdfService {
     final isRetail = AppConfig.isRetail;
 
     // Determine what to show based on mode
-    final showLogo = isRetail ? (retailSettings?.showLogo ?? true) : true;
+    final showLogo = isRetail ? (retailSettings?.showLogo ?? true) : PrintSettings.showRestaurantLogo;
     final showStoreName = isRetail ? (retailSettings?.showStoreName ?? true) : true;
     final showStoreAddress = isRetail ? (retailSettings?.showStoreAddress ?? true) : true;
     final showStorePhone = isRetail ? (retailSettings?.showStorePhone ?? true) : true;
@@ -1146,13 +1159,24 @@ class ReceiptPdfService {
                 'This is a computer-generated invoice.',
                 style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
               ),
-              // "Powered by" — restaurant only; forced on for Free.
+              // "Powered by" + company line — restaurant only; printed when the
+              // admin grants `billing.invoice.print` (shown by default).
               if (AppConfig.isRestaurant &&
-                  (PlanGate.isFree || PrintSettings.showPoweredBy)) ...[
+                  PlanEnforce.allows(EntKeys.billingInvoicePrint)) ...[
                 pw.SizedBox(height: 4),
                 pw.Text(
                   'Powered by Bill Berry Lite',
                   style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+                ),
+                pw.Text(
+                  'Accrete Infosolution Technologies Private Limited',
+                  style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+                  textAlign: pw.TextAlign.center,
+                ),
+                pw.Text(
+                  'Ph: 7041046049',
+                  style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+                  textAlign: pw.TextAlign.center,
                 ),
               ],
             ],

@@ -14,6 +14,11 @@ class AppSettings {
     "Item Image": true,
     "Item Price": true,
     "Round Off": false,
+    // Menu tab layout: false = list (default), true = grid view.
+    "Menu Grid View": false,
+    // List view only: keep every opened category expanded (don't auto-collapse
+    // the previous). OFF (default) = accordion, one category open at a time.
+    "Keep Categories Open": false,
 
     // Input & Interaction
     "Visual Keyboard": false,
@@ -62,6 +67,8 @@ class AppSettings {
     "Layout Settings": [
       "Item Image",
       "Item Price",
+      "Menu Grid View",
+      "Keep Categories Open",
       "Round Off",
     ],
     "Input & Interaction": [
@@ -215,6 +222,9 @@ class AppSettings {
   static bool get generateKOT => values["Generate KOT"] ?? false;
   static bool get autoServeDineInOnPayment =>
       values["Auto Serve Dine In On Payment"] ?? false;
+  static bool get menuGridView => values["Menu Grid View"] ?? false;
+  static bool get keepCategoriesOpen =>
+      values["Keep Categories Open"] ?? false;
 
   static bool get showPaymentMethod => values["Show Payment Method"] ?? false;
   static bool get isTaxInclusive => values["Tax Is Inclusive"] ?? false;

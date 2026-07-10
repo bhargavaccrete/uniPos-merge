@@ -9,8 +9,15 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_body.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_export_button.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_pagination.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_summary_row.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_table.dart';
 import '../../../../widget/componets/common/report_summary_card.dart';
-import '../../../../widget/componets/common/primary_app_bar.dart';
 
 class Posenddayreport extends StatefulWidget {
   const Posenddayreport({super.key});
@@ -190,29 +197,9 @@ class _PosenddayreportState extends State<Posenddayreport> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: buildPrimaryAppBar(
-        titleWidget: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'End of Day Reports',
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 20,
-              ),
-            ),
-            Text(
-              'View daily closing reports',
-              style: GoogleFonts.poppins(
-                color: Colors.white70,
-                fontWeight: FontWeight.w500,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
+      appBar: reportAppBar(
+        title: 'End of Day Reports',
+        subtitle: 'View daily closing reports',
       ),
       body: _buildContent(context),
     );
@@ -222,26 +209,11 @@ class _PosenddayreportState extends State<Posenddayreport> {
     final isTablet = !AppResponsive.isMobile(context);
     final isDesktop = AppResponsive.isDesktop(context);
 
-    return SingleChildScrollView(
-      padding: AppResponsive.padding(context),
-      child: AppResponsive.constrainedContent(
-        context: context,
-        child: Column(
-          children: [
+    return ReportBody(
+      child: Column(
+        children: [
             // Date Filter Card
-            Container(
-              padding: EdgeInsets.all(isTablet ? 20 : 16),
-              decoration: BoxDecoration(
-                color: AppColors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
+            ReportCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -348,218 +320,78 @@ class _PosenddayreportState extends State<Posenddayreport> {
             SizedBox(height: 16),
 
             if (_isLoading)
-              Center(
-                child: Padding(
-                  padding: EdgeInsets.all(50),
-                  child: CircularProgressIndicator(color: AppColors.primary),
-                ),
-              )
+              const Padding(padding: EdgeInsets.all(50), child: ReportLoading())
             else if (_filteredReports.isEmpty)
-              _buildEmptyState(context)
+              const ReportEmptyState(
+                icon: Icons.event_available,
+                title: 'No EOD Reports',
+                message: 'No End of Day Report found for selected date',
+              )
             else ...[
               _buildSummaryCards(context),
-              SizedBox(height: 16),
-              _buildExportButton(context, isTablet, isDesktop),
-              SizedBox(height: 16),
+              AppResponsive.verticalSpace(context),
+              ReportExportButton(onPressed: _exportReport),
+              AppResponsive.verticalSpace(context),
               _buildReportsTable(context, isTablet),
-              if (_filteredReports.length > _rowsPerPage) ...[
-                SizedBox(height: 16),
-                _buildPaginationControls(),
-              ],
+              ReportPagination(
+                currentPage: _currentPage,
+                rowsPerPage: _rowsPerPage,
+                totalCount: _filteredReports.length,
+                onPageChanged: (page) => setState(() => _currentPage = page),
+                unit: 'reports',
+              ),
             ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 40.0, desktop: 60.0)),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 20.0, tablet: 24.0)),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceMedium,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.event_available,
-                size: AppResponsive.getValue(context, mobile: 56.0, tablet: 64.0),
-                color: AppColors.textSecondary,
-              ),
-            ),
-            AppResponsive.verticalSpace(context, size: SpacingSize.large),
-            Text(
-              'No EOD Reports',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.headingFontSize(context),
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            AppResponsive.verticalSpace(context, size: SpacingSize.small),
-            Text(
-              _selectedDate != null
-                  ? 'No End of Day Report found for selected date'
-                  : 'Complete End Day process to see reports here',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.bodyFontSize(context),
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w500,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildSummaryCards(BuildContext context) {
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: ReportSummaryCard(
-              title: 'Reports',
-              value: _filteredReports.length.toString(),
-              icon: Icons.event_note,
-              color: AppColors.primary,
-            ),
-          ),
-          AppResponsive.horizontalSpace(context),
-          Expanded(
-            child: ReportSummaryCard(
-              title: 'Opening Bal.',
-              value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalOpeningBalance)}',
-              icon: Icons.account_balance_wallet,
-              color: Colors.blue,
-            ),
-          ),
-          AppResponsive.horizontalSpace(context),
-          Expanded(
-            child: ReportSummaryCard(
-              title: 'Closing Bal.',
-              value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalClosingBalance)}',
-              icon: Icons.monetization_on,
-              color: Colors.green,
-            ),
-          ),
-          AppResponsive.horizontalSpace(context),
-          Expanded(
-            child: ReportSummaryCard(
-              title: 'Discount',
-              value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalDiscount)}',
-              icon: Icons.percent_rounded,
-              color: Colors.orange,
-            ),
-          ),
-        ],
+    return ReportSummaryRow(cards: [
+      ReportSummaryCard(
+        title: 'Reports',
+        value: _filteredReports.length.toString(),
+        icon: Icons.event_note,
+        color: AppColors.primary,
       ),
-    );
-  }
-
-  Widget _buildExportButton(BuildContext context, bool isTablet, bool isDesktop) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: _exportReport,
-        icon: Icon(Icons.file_download_outlined, size: isDesktop ? 22 : (isTablet ? 20 : 18)),
-        label: Text(
-          'Export Report',
-          style: GoogleFonts.poppins(
-            fontSize: isDesktop ? 17 : (isTablet ? 16 : 15),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.green,
-          foregroundColor: AppColors.white,
-          padding: EdgeInsets.symmetric(vertical: isDesktop ? 18 : (isTablet ? 16 : 14)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
+      ReportSummaryCard(
+        title: 'Opening Bal.',
+        value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalOpeningBalance)}',
+        icon: Icons.account_balance_wallet,
+        color: Colors.blue,
       ),
-    );
-  }
-
-  Widget _buildPaginationControls() {
-    final totalPages = (_filteredReports.length / _rowsPerPage).ceil();
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        IconButton(
-          onPressed: _currentPage > 0 ? () => setState(() => _currentPage--) : null,
-          icon: Icon(Icons.chevron_left),
-          color: AppColors.primary,
-        ),
-        Text(
-          'Page ${_currentPage + 1} of $totalPages',
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.bodyFontSize(context),
-            fontWeight: FontWeight.w500,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        IconButton(
-          onPressed: _currentPage < totalPages - 1 ? () => setState(() => _currentPage++) : null,
-          icon: Icon(Icons.chevron_right),
-          color: AppColors.primary,
-        ),
-      ],
-    );
+      ReportSummaryCard(
+        title: 'Closing Bal.',
+        value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalClosingBalance)}',
+        icon: Icons.monetization_on,
+        color: Colors.green,
+      ),
+      ReportSummaryCard(
+        title: 'Discount',
+        value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalDiscount)}',
+        icon: Icons.percent_rounded,
+        color: Colors.orange,
+      ),
+    ]);
   }
 
   Widget _buildReportsTable(BuildContext context, bool isTablet) {
-    final screenWidth = AppResponsive.screenWidth(context);
     final cellFontSize = AppResponsive.smallFontSize(context);
-    final headerFontSize = AppResponsive.bodyFontSize(context);
 
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-        border: Border.all(color: AppColors.divider, width: 0.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minWidth: screenWidth - AppResponsive.getValue(context, mobile: 32.0, tablet: 40.0),
-            ),
-            child: DataTable(
-              columnSpacing: AppResponsive.getValue(context, mobile: 12.0, tablet: 20.0),
-              headingRowColor: WidgetStateProperty.all(AppColors.surfaceLight),
-              headingRowHeight: AppResponsive.tableHeadingHeight(context),
-              dataRowMinHeight: AppResponsive.tableRowMinHeight(context),
-              dataRowMaxHeight: AppResponsive.tableRowMaxHeight(context),
-              columns: [
-                // FIX 1: 'Closing Date' was fabricated (date + 8 hours); replaced with 'Total Sales'.
-                DataColumn(label: Text('Date', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary))),
-                DataColumn(label: Text('Total Sales', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
-                DataColumn(label: Text('Opening', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
-                DataColumn(label: Text('Closing', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
-                DataColumn(label: Text('Actual Cash', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
-                DataColumn(label: Text('Difference', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
-                DataColumn(label: Text('Cash', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
-                DataColumn(label: Text('Card', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
-                DataColumn(label: Text('Online', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: headerFontSize, color: AppColors.textPrimary)), numeric: true),
-              ],
-              rows: _filteredReports.skip(_currentPage * _rowsPerPage).take(_rowsPerPage).map((report) {
+    return ReportTable(
+      columns: [
+        // 'Closing Date' was fabricated (date + 8 hours); replaced with 'Total Sales'.
+        ReportTable.column(context, 'Date'),
+        ReportTable.column(context, 'Total Sales', numeric: true),
+        ReportTable.column(context, 'Opening', numeric: true),
+        ReportTable.column(context, 'Closing', numeric: true),
+        ReportTable.column(context, 'Actual Cash', numeric: true),
+        ReportTable.column(context, 'Difference', numeric: true),
+        ReportTable.column(context, 'Cash', numeric: true),
+        ReportTable.column(context, 'Card', numeric: true),
+        ReportTable.column(context, 'Online', numeric: true),
+      ],
+      rows: ReportPagination.pageSlice(_filteredReports, _currentPage, _rowsPerPage).map((report) {
                 final dateFormatter = DateFormat('dd/MM/yyyy');
                 final timeFormatter = DateFormat('HH:mm');
 
@@ -700,11 +532,7 @@ class _PosenddayreportState extends State<Posenddayreport> {
                     ),
                   ],
                 );
-              }).toList(),
-            ),
-          ),
-        ),
-      ),
+      }).toList(),
     );
   }
 }

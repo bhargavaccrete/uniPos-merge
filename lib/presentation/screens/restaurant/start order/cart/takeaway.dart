@@ -21,6 +21,7 @@ import '../../../../../util/restaurant/restaurant_session.dart';
 import '../../../../../data/models/restaurant/db/customer_model_125.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../core/plan/plan_enforcement.dart';
+import '../../../../../core/plan/plan_guard.dart';
 import '../../../../../core/plan/entitlement_keys.dart';
 import '../../../../../data/models/restaurant/db/item_cancellation_model_134.dart';
 import '../../../../../data/repositories/restaurant/item_cancellation_repository.dart';
@@ -2365,6 +2366,19 @@ class _TakeawayState extends State<Takeaway> {
 
 // Replace your entire _qucikSettleNewOrder function with this one.
   Future<void> _qucikSettleNewOrder(CartCalculationService calculations, String paymentMethod) async {
+    // Plan gate — Quick Settle creates a bill from nothing, so it must clear the
+    // same gates as Settle & Print (customerdetails `_doSubmitOrder`). Checked
+    // first, so a blocked plan can't even open a day it has no right to bill into.
+    if (!PlanGuard.allowedOr(context, EntKeys.billingInvoiceCreate, featureName: 'Billing')) {
+      return;
+    }
+    final billsToday = (await pastOrderStore.getTodaysPastOrders()).length;
+    if (!mounted) return;
+    if (!PlanGuard.withinLimitOr(context, EntKeys.billingInvoicePerDayMax, billsToday,
+        unit: 'bills per day')) {
+      return;
+    }
+
     final strictlyPending = await DayManagementService.isEodStrictlyPending();
     if (strictlyPending) {
       NotificationService.instance.showError('Day has ended. Complete End of Day to unlock.');

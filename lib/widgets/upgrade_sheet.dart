@@ -40,6 +40,36 @@ class UpgradeSheet {
     );
   }
 
+  /// The plan grants the feature, but not enough report history to compute it.
+  static Future<void> showHistoryLimit(
+    BuildContext context, {
+    required String featureName,
+    required int neededDays,
+    required int allowedDays,
+  }) {
+    return show(
+      context,
+      title: 'More history needed',
+      message:
+          '$featureName needs ${formatDays(neededDays)} of report history.\n'
+          'Your plan includes ${formatDays(allowedDays)}.\n'
+          'Please contact Bill Berry to upgrade your plan.',
+    );
+  }
+
+  /// '30 days' / '1 year' / '1.5 years'.
+  static String formatDays(int days) {
+    if (days >= 365) {
+      final years = days / 365;
+      final rounded = years.round();
+      if ((years - rounded).abs() < 0.1) {
+        return '$rounded year${rounded == 1 ? '' : 's'}';
+      }
+      return '${years.toStringAsFixed(1)} years';
+    }
+    return '$days day${days == 1 ? '' : 's'}';
+  }
+
   /// A plan count/usage limit has been reached.
   static Future<void> showLimit(
     BuildContext context, {

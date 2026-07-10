@@ -10,6 +10,9 @@ class PrintSettings {
   /// ---- Default Values ----
   static const Map<String, bool> _defaultPrintSettings = {
     "Order ID": true,
+    // Logo prints on PDF/A4 receipts only — the raw ESC/POS builder has no
+    // image support, so a directly-connected thermal printer ignores this.
+    "Restaurant Logo": true,
     "Restaurant Name": true,
     "Restaurant Address": false,
     "Restaurant Mobile No": false,
@@ -69,6 +72,7 @@ class PrintSettings {
 
   // Individual getters for easy access in code
   static bool get showOrderId => getSetting("Order ID");
+  static bool get showRestaurantLogo => getSetting("Restaurant Logo");
   static bool get showRestaurantName => getSetting("Restaurant Name");
   static bool get showRestaurantAddress => getSetting("Restaurant Address");
   static bool get showRestaurantMobile => getSetting("Restaurant Mobile No");

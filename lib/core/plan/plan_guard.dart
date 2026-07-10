@@ -19,6 +19,18 @@ class PlanGuard {
     return false;
   }
 
+  /// True if ANY of [keys] is granted. Otherwise shows the blocker and returns
+  /// false. Use where one entry point fronts several individually-gated parts.
+  static bool allowedAnyOf(
+    BuildContext context,
+    Iterable<String> keys, {
+    String? featureName,
+  }) {
+    if (PlanEnforce.allowsAny(keys)) return true;
+    UpgradeSheet.showLocked(context, featureName: featureName);
+    return false;
+  }
+
   /// True if one more record fits under [maxKey] given [count]. Otherwise shows
   /// the "plan limit reached" blocker and returns false. [unit] labels the cap
   /// (e.g. 'items', 'customers', 'users', 'bills per day').

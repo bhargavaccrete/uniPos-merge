@@ -14,6 +14,9 @@ class CartCalculationService {
   final bool isDeliveryOrder;
   final bool? isTaxInclusive; // Optional: if provided, use this instead of AppSettings
   final bool? discountOnItems; // Optional: if provided, use this instead of AppSettings
+  /// ₹ value of loyalty points redeemed. Reduces the taxable base BEFORE GST
+  /// (treated like a discount) so GST is charged on the post-redemption amount.
+  final double loyaltyRedemption;
 
   // --- Final Calculated Properties ---
   /// Item Total = Gross total of all items (before discount)
@@ -35,6 +38,7 @@ class CartCalculationService {
   late final double serviceChargeAmount;
   late final double grandTotal;
   late final double roundOffAmount; // Amount added/subtracted for rounding
+  late final double loyaltyRedemptionAmount; // actual redemption applied (clamped)
 
   CartCalculationService({
     required this.items,
@@ -45,6 +49,7 @@ class CartCalculationService {
     this.isDeliveryOrder = false,
     this.isTaxInclusive, // If provided, use this instead of AppSettings
     this.discountOnItems, // If provided, use this instead of AppSettings
+    this.loyaltyRedemption = 0.0,
   }) {
     // The calculation is triggered the moment the service is created.
     _calculate();
@@ -59,6 +64,7 @@ class CartCalculationService {
       serviceChargeAmount = 0;
       roundOffAmount = 0;
       grandTotal = 0;
+      loyaltyRedemptionAmount = 0;
       return;
     }
 
@@ -149,10 +155,29 @@ class CartCalculationService {
       accumulatedDiscount += itemDiscount;
     }
 
-    // STEP 4: Assign final values (ONLY ONCE!)
+    // STEP 4: Loyalty points redemption — reduce the taxable base BEFORE GST
+    // (like a discount): scale taxable + GST proportionally so GST reflects the
+    // post-redemption amount. Reducible = gross (incl GST) when tax-inclusive,
+    // else the pre-tax base.
+    double redemptionApplied = 0;
+    if (loyaltyRedemption > 0) {
+      final bool useTaxInclusive = isTaxInclusive ?? AppSettings.isTaxInclusive;
+      final double reducible = useTaxInclusive
+          ? (accumulatedTaxableAmount + accumulatedGST)
+          : accumulatedTaxableAmount;
+      if (reducible > 0) {
+        redemptionApplied = loyaltyRedemption.clamp(0, reducible).toDouble();
+        final double f = (reducible - redemptionApplied) / reducible;
+        accumulatedTaxableAmount *= f;
+        accumulatedGST *= f;
+      }
+    }
+
+    // STEP 5: Assign final values (ONLY ONCE!)
     taxableAmount = accumulatedTaxableAmount;
     totalGST = accumulatedGST;
     discountAmount = accumulatedDiscount;
+    loyaltyRedemptionAmount = redemptionApplied;
 
     // STEP 5: Service Charge
     if (isDeliveryOrder) {

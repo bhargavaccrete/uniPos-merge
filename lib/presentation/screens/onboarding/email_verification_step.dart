@@ -47,6 +47,12 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
   DateTime? _lastResendTime;
   bool _isResending = false;
 
+  /// Client-side OTP expiry, set when a code is sent/resent. Used as a fallback
+  /// for the countdown when the server's [LicenseStore.otpExpiresAt] is missing
+  /// or unusable (see [_effectiveExpiry]). Assumes a 10-minute validity window.
+  DateTime? _localExpiry;
+  static const _otpValidity = Duration(minutes: 10);
+
   @override
   void initState() {
     super.initState();
@@ -80,8 +86,20 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
     });
   }
 
+  /// The server's expiry is authoritative ONLY when present and still in the
+  /// future. The API sometimes omits it, or sends a UTC-naive timestamp that
+  /// parses to a past *local* time (e.g. on IST devices) — which made the screen
+  /// show "Code expired" the instant it opened. In those cases fall back to the
+  /// locally-tracked expiry so the countdown is always sane. The server still
+  /// enforces the real TTL when the code is submitted.
+  DateTime? get _effectiveExpiry {
+    final server = _license.otpExpiresAt;
+    if (server != null && server.isAfter(DateTime.now())) return server;
+    return _localExpiry;
+  }
+
   Duration get _remaining {
-    final exp = _license.otpExpiresAt;
+    final exp = _effectiveExpiry;
     if (exp == null) return Duration.zero;
     final diff = exp.difference(DateTime.now());
     return diff.isNegative ? Duration.zero : diff;
@@ -129,6 +147,7 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
         _submittedEmail = email;
         _phase = _Phase.otp;
         _lastResendTime = DateTime.now();
+        _localExpiry = DateTime.now().add(_otpValidity);
         _startTicker();
       } else {
         _errorMsg = _license.signupError;
@@ -177,6 +196,7 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
       _isResending = false;
       if (ok) {
         _lastResendTime = DateTime.now();
+        _localExpiry = DateTime.now().add(_otpValidity);
         _startTicker();
       } else {
         _errorMsg = _license.signupError;
