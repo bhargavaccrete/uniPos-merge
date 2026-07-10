@@ -617,6 +617,10 @@ class _AdminWelcomeState extends State<AdminWelcome> {
       _MenuCardData('Expenses',      Icons.account_balance_wallet_rounded, Colors.red,         'expenses',     () => Navigator.pushNamed(context, RouteNames.restaurantExpenses), entitlementKey: EntKeys.expenses),
       _MenuCardData('Inventory',     Icons.inventory_2_rounded,         Colors.amber,          'inventory',    () => Navigator.pushNamed(context, RouteNames.restaurantInventory), entitlementKey: EntKeys.inventory),
       _MenuCardData('Settings',      Icons.settings_rounded,            Colors.blueGrey,       'settings',     () => Navigator.pushNamed(context, RouteNames.restaurantSettings), entitlementKey: EntKeys.settings),
+      // Usage & Limits is read-only plan info — NOT a premium feature, so it
+      // carries no entitlementKey (never plan-gated). 'settings' keeps it
+      // admin/manager-only, matching its account-level nature.
+      _MenuCardData('Usage & Limits', Icons.insights_rounded,           Colors.cyan,           'settings',     () => Navigator.pushNamed(context, RouteNames.restaurantUsageLimit)),
       // Day lifecycle follows billing: a day auto-opens on the first bill, so
       // Cash Drawer + End of Day must be available whenever billing is granted.
       _MenuCardData('Cash Drawer',   Icons.point_of_sale_rounded,       const Color(0xFF00897B), 'cashDrawer', () => Navigator.pushNamed(context, RouteNames.restaurantCashDrawer), entitlementKey: EntKeys.cashDrawer),

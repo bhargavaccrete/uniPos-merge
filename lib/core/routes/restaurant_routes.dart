@@ -37,6 +37,7 @@ import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 
 // Restaurant - Home & Dashboard
 import 'package:billberrylite/presentation/screens/restaurant/welcome_Admin.dart';
+import 'package:billberrylite/presentation/screens/restaurant/usage_limit_screen.dart';
 import 'package:billberrylite/presentation/screens/restaurant/notifications/notifications_screen.dart';
 
 // Restaurant - Orders
@@ -221,6 +222,7 @@ class RestaurantRoutes {
 
     // Restaurant - Settings
     RouteNames.restaurantSettings: _guard(const Settingsscreen(), 'settings', EntKeys.settings),
+    RouteNames.restaurantUsageLimit: _guard(const UsageLimitScreen(), 'settings'),
     // Licensing is the RECOVERY path (renew / reactivate / view) — it must never
     // be entitlement-gated, or a plan without `settings` (e.g. trial) could not
     // reach it to fix its own license. Role check only.
