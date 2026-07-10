@@ -5,6 +5,8 @@ import 'package:billberrylite/util/color.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../core/plan/plan_gate.dart';
+import '../../../core/plan/plan_enforcement.dart';
+import '../../../core/plan/entitlement_keys.dart';
 
 /// Usage & Limits — a read-only overview of how much of each plan-capped
 /// resource the outlet has consumed against its plan allowance.
@@ -111,37 +113,51 @@ class _UsageLimitScreenState extends State<UsageLimitScreen> {
   }
 
   /// The plan-capped resources, each paired with its live count and the plan
-  /// cap resolved through [PlanGate.limitFor] (null = unlimited on this plan).
+  /// cap resolved straight from the server-driven entitlement manifest.
+  ///
+  /// The cap comes from [PlanEnforce.limit] using the SAME [EntKeys] the stores
+  /// enforce on add (see e.g. `item_store` → [EntKeys.manageMenuItemsMax]), so
+  /// what this screen shows and what the app actually blocks can never diverge.
+  /// Semantics mirror [PlanEnforce.withinLimit]: a cap of 0/absent — or a
+  /// resource with no cap key at all (`entKey == null`, e.g. Categories &
+  /// Printers, which the plan does not count-limit) — means unlimited.
   List<_UsageMetric> _buildMetrics() {
+    int? capFor(String? entKey) {
+      if (entKey == null) return null; // resource has no count cap in the plan
+      final max = PlanEnforce.limit(entKey); // null when license is bypassed
+      if (max == null || max <= 0) return null; // 0/absent ⇒ unlimited
+      return max;
+    }
+
     _UsageMetric make(
       String label,
       IconData icon,
       Color accent,
       int count,
-      String key,
+      String? entKey,
     ) {
       return _UsageMetric(
         label: label,
         icon: icon,
         accent: accent,
         count: count,
-        limit: PlanGate.limitFor(key),
+        limit: capFor(entKey),
       );
     }
 
     return [
       make('Menu Items', Icons.restaurant_menu, AppColors.menuTab,
-          itemStore.itemCount, 'menuItems'),
+          itemStore.itemCount, EntKeys.manageMenuItemsMax),
       make('Categories', Icons.category_outlined, AppColors.secondary,
-          categoryStore.categoryCount, 'categories'),
+          categoryStore.categoryCount, null),
       make('Tables', Icons.table_restaurant_outlined, AppColors.tablesTab,
-          tableStore.totalTables, 'tables'),
+          tableStore.totalTables, EntKeys.billingTablesMax),
       make('Staff', Icons.badge_outlined, AppColors.info,
-          staffStore.totalStaff, 'staff'),
+          staffStore.totalStaff, EntKeys.usersMax),
       make('Customers', Icons.people_alt_outlined, AppColors.orange,
-          restaurantCustomerStore.totalCustomers, 'customers'),
+          restaurantCustomerStore.totalCustomers, EntKeys.customersMax),
       make('Printers', Icons.print_outlined, AppColors.accent,
-          printerStore.savedPrinters.length, 'printers'),
+          printerStore.savedPrinters.length, null),
     ];
   }
 }
