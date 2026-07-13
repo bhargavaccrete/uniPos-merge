@@ -104,7 +104,9 @@ class EntKeys {
   static const customersMax = 'customers.max';
   static const usersMax = 'users.max';
   static const manageMenuItemsMax = 'manage_menu.items.max';
-  static const billingTablesMax = 'billing.tables.max';
+  // Server sends the tables cap under 'billing.table' (not the '.tables.max'
+  // convention the other caps follow) — match it so the limit is read.
+  static const billingTablesMax = 'billing.table';
 
   // ── Data scopes ──────────────────────────────────────────────────────────────
   static const reportsHistoryLimitDays = 'reports.history_limit_days';

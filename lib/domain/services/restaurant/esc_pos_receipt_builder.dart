@@ -220,6 +220,7 @@ class EscPosReceiptBuilder {
   static List<int> buildReceiptTicket({
     required ReceiptData receiptData,
     required int paperWidth,
+    List<int>? logoRaster, // pre-encoded ESC/POS raster of the store logo
   }) {
     final cols = _columnsForPaper(paperWidth);
     final bytes = <int>[];
@@ -231,6 +232,12 @@ class EscPosReceiptBuilder {
 
     // ── STORE HEADER ──
     bytes.addAll(_alignCenter);
+
+    // Store logo (raster) — centered above the name when one is configured.
+    if (logoRaster != null && logoRaster.isNotEmpty) {
+      bytes.addAll(logoRaster);
+      bytes.addAll(_newline);
+    }
 
     // Store name in large bold text
     if (PrintSettings.showRestaurantName && receiptData.storeName != null) {

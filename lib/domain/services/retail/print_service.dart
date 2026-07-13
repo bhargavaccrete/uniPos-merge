@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:billberrylite/domain/services/retail/receipt_pdf_service.dart';
+import 'package:billberrylite/domain/services/restaurant/esc_pos_image.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 import 'package:billberrylite/domain/services/retail/retail_printer_settings_service.dart';
 import 'package:billberrylite/core/config/app_config.dart';
@@ -122,6 +123,81 @@ class PrintService {
   }
 
   /// Show print preview dialog
+  /// Direct thermal: render the SAME thermal PDF (logo + QR + Poppins font) to a
+  /// raster image and return a complete ESC/POS ticket, so a direct print looks
+  /// IDENTICAL to the downloaded PDF. Returns null on any failure so the caller
+  /// falls back to the plain text-based ESC/POS builder.
+  Future<List<int>?> buildThermalRasterTicket({
+    required SaleModel sale,
+    required List<SaleItemModel> items,
+    CustomerModel? customer,
+    String? storeName,
+    String? storeAddress,
+    String? storePhone,
+    String? storeEmail,
+    String? gstNumber,
+    String? orderType,
+    String? tableNo,
+    List<int>? kotNumbers,
+    int? billNumber,
+    double? itemTotal,
+    String? paymentBreakdown,
+    int? loyaltyPointsDiscount,
+    double? serviceCharge,
+    bool? isDeliveryOrder,
+    bool? isTaxInclusive,
+    double? roundOff,
+    required int paperWidth,
+  }) async {
+    try {
+      final logoBytes = await _loadStoreLogo();
+      final upi = await _loadUpiConfig();
+      final receiptData = ReceiptData(
+        sale: sale,
+        items: items,
+        customer: customer,
+        storeName: storeName,
+        storeAddress: storeAddress,
+        storePhone: storePhone,
+        storeEmail: storeEmail,
+        gstNumber: gstNumber,
+        orderType: orderType,
+        tableNo: tableNo,
+        kotNumbers: kotNumbers,
+        billNumber: billNumber,
+        logoBytes: logoBytes,
+        itemTotal: itemTotal,
+        loyaltyPointsDiscount: loyaltyPointsDiscount,
+        serviceCharge: serviceCharge,
+        isDeliveryOrder: isDeliveryOrder,
+        roundOff: roundOff,
+        paymentBreakdown: paymentBreakdown,
+        isTaxInclusive: isTaxInclusive,
+        upiId: upi.id,
+        upiPayeeName: upi.payee,
+        upiQrImageBytes: upi.qr,
+      );
+      final pdf = await _receiptPdfService.generateThermalReceipt(receiptData);
+      final pdfBytes = await pdf.save();
+      final targetW = paperWidth <= 58 ? 384 : 576;
+      await for (final page in Printing.raster(pdfBytes, dpi: 203)) {
+        final png = await page.toPng();
+        final raster = await EscPosImage.toRaster(png, targetWidth: targetW);
+        if (raster == null) return null;
+        return <int>[
+          0x1B, 0x40, // ESC @  — init
+          0x1B, 0x61, 0x01, // ESC a 1 — center
+          ...raster,
+          0x0A, 0x0A, 0x0A, 0x0A, // feed
+          0x1D, 0x56, 0x01, // GS V 1 — partial cut
+        ];
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> showPrintPreview({
     required BuildContext context,
     required SaleModel sale,

@@ -20,6 +20,7 @@ import 'package:billberrylite/util/restaurant/print_settings.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/domain/services/restaurant/esc_pos_receipt_builder.dart';
+import 'package:billberrylite/domain/services/restaurant/esc_pos_image.dart';
 
 class RestaurantPrintHelper {
 
@@ -552,10 +553,48 @@ class RestaurantPrintHelper {
       // Thermal → print directly to the billing printer when one is configured.
       final billingPrinter = printerStore.defaultReceiptPrinter;
       if (billingPrinter != null) {
-        final bytes = EscPosReceiptBuilder.buildReceiptTicket(
-          receiptData: receiptData,
+        // Primary path: render the SAME thermal PDF (logo + QR + Poppins font)
+        // to a raster image so the DIRECT print looks identical to the PDF.
+        List<int>? bytes = await printService.buildThermalRasterTicket(
+          sale: saleModel,
+          items: saleItems,
+          customer: customerModel,
+          storeName: storeName,
+          storeAddress: storeAddress,
+          storePhone: storePhone,
+          storeEmail: storeEmail,
+          gstNumber: storeGst,
+          orderType: order.orderType,
+          tableNo: order.tableNo,
+          kotNumbers: order.kotNumbers,
+          billNumber: billNumber,
+          itemTotal: calculations.itemTotal,
+          paymentBreakdown: paymentBreakdown,
+          loyaltyPointsDiscount: loyaltyPointsDiscount,
+          serviceCharge: calculations.serviceChargeAmount,
+          isDeliveryOrder: order.orderType.toLowerCase().contains('delivery'),
+          isTaxInclusive: order.isTaxInclusive,
+          roundOff: calculations.roundOffAmount,
           paperWidth: billingPrinter.paperSize,
         );
+
+        // Fallback: plain text ESC/POS (printer font) + logo raster header, used
+        // only if the PDF rasterization above fails for any reason.
+        if (bytes == null) {
+          List<int>? logoRaster;
+          if (PrintSettings.showRestaurantLogo) {
+            final logoBytes = await StoreSettingsService().getStoreLogo();
+            if (logoBytes != null) {
+              logoRaster = await EscPosImage.toRaster(logoBytes,
+                  targetWidth: billingPrinter.paperSize <= 58 ? 240 : 360);
+            }
+          }
+          bytes = EscPosReceiptBuilder.buildReceiptTicket(
+            receiptData: receiptData,
+            paperWidth: billingPrinter.paperSize,
+            logoRaster: logoRaster,
+          );
+        }
         final ok = await printerStore.sendBytes(bytes, billingPrinter);
         if (ok) {
           NotificationService.instance
