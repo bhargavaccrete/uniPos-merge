@@ -144,6 +144,22 @@ class ReceiptPdfService {
   }
 
   /// Generate a thermal receipt style PDF (narrow, suitable for 80mm printers)
+  /// Extra fonts so non-Latin scripts (Gujarati, Hindi/Devanagari) render on
+  /// receipts. Used as `fontFallback`: Poppins covers Latin, these cover the
+  /// rest. Best-effort — a missing file just leaves boxes for that script.
+  Future<List<pw.Font>> _indicFallbackFonts() async {
+    final fonts = <pw.Font>[];
+    for (final path in const [
+      'assets/fonts/NotoSansGujarati-Regular.ttf',
+      'assets/fonts/NotoSansDevanagari-Regular.ttf',
+    ]) {
+      try {
+        fonts.add(pw.Font.ttf(await rootBundle.load(path)));
+      } catch (_) {}
+    }
+    return fonts;
+  }
+
   Future<pw.Document> generateThermalReceipt(ReceiptData data) async {
     final pdf = pw.Document();
     final pageFormat = _getPaperFormat();
@@ -169,6 +185,7 @@ class ReceiptPdfService {
         theme: pw.ThemeData.withFont(
           base: ttf,
           bold: boldTtf,
+          fontFallback: await _indicFallbackFonts(),
         ),
         build: (context) => _buildThermalReceiptContent(data),
       ),
@@ -202,6 +219,7 @@ class ReceiptPdfService {
         theme: pw.ThemeData.withFont(
           base: ttf,
           bold: boldTtf,
+          fontFallback: await _indicFallbackFonts(),
         ),
         build: (context) => _buildInvoiceContent(data),
       ),

@@ -30,7 +30,7 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
     'Item Image': 'Show item photos in the menu grid',
     'Item Price': 'Show price on menu items',
     'Menu Grid View': 'Show menu items as a grid instead of a list',
-    'Keep Categories Open': "Opening a category won't close the others (list view)",
+    'Keep Categories Open': 'Start with all categories expanded',
     'Round Off': 'Round bill totals to the nearest value',
     'Visual Keyboard': 'On-screen number pad for inputs',
     'Generate KOT': 'Auto-print kitchen order tickets',
@@ -187,15 +187,7 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
         ),
 
         // Cards
-        ...keys.where((key) {
-          // "Keep Categories Open" only applies to the LIST menu — hide it when
-          // grid view is on (grid has no expandable categories).
-          if (key == 'Keep Categories Open' &&
-              (settings['Menu Grid View'] ?? false)) {
-            return false;
-          }
-          return true;
-        }).map((key) {
+        ...keys.map((key) {
           final isEnabled = settings[key] ?? false;
           return _settingCard(key, isEnabled, isTablet);
         }),

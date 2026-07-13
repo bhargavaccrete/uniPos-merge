@@ -93,9 +93,10 @@ class _MenuScreenState extends State<MenuScreen> {
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           controller: _expansionControllers[_kFavorites],
-          // Collapsed by default — opens on tap (or auto-opens during search),
-          // matching the category tiles below.
-          initiallyExpanded: query.isNotEmpty,
+          // Collapsed by default — opens on tap, during search, or when the
+          // "Keep Categories Open" setting is on (all sections start expanded).
+          initiallyExpanded:
+              query.isNotEmpty || AppSettings.keepCategoriesOpen,
           leading: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
@@ -167,7 +168,7 @@ class _MenuScreenState extends State<MenuScreen> {
   String _lastExpandQuery = '';
   void _syncSearchExpansion() {
     if (query == _lastExpandQuery) return;
-    final expanding = query.isNotEmpty;
+    final expanding = query.isNotEmpty || AppSettings.keepCategoriesOpen;
     _lastExpandQuery = query;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -614,7 +615,8 @@ class _MenuScreenState extends State<MenuScreen> {
                                   return _CategorySectionCard(
                                     category: category,
                                     searchFilteredItems: searchFilteredItems,
-                                    initiallyExpanded: query.isNotEmpty,
+                                    initiallyExpanded: query.isNotEmpty ||
+                                        AppSettings.keepCategoriesOpen,
                                     controller: _expansionControllers[category.id],
                                     cardKey: _categoryKeys[category.id]!,
                                     cartItems: cartItems,

@@ -387,7 +387,7 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
   /// Auto-expand every section while searching; collapse all when cleared.
   void _syncSearchExpansion() {
     if (query == _lastExpandQuery) return;
-    final expanding = query.isNotEmpty;
+    final expanding = query.isNotEmpty || AppSettings.keepCategoriesOpen;
     _lastExpandQuery = query;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       for (final c in _expansionControllers.values) {
@@ -488,7 +488,7 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           controller: _expansionControllers[id],
-          initiallyExpanded: query.isNotEmpty,
+          initiallyExpanded: query.isNotEmpty || AppSettings.keepCategoriesOpen,
           tilePadding: const EdgeInsets.symmetric(horizontal: 12),
           leading: Container(
             padding: const EdgeInsets.all(10),

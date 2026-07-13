@@ -174,10 +174,15 @@ class RestaurantPrintHelper {
       //    falls back to a thermal PDF (never A4) when no KOT printer exists.
       final kotPrinter = printerStore.defaultKotPrinter;
       if (kotPrinter != null && autoPrint) {
-        final bytes = EscPosReceiptBuilder.buildKotTicket(
-          receiptData: receiptData,
-          paperWidth: kotPrinter.paperSize,
-        );
+        // Rasterize the SAME KOT PDF so the direct print matches the PDF exactly;
+        // fall back to the plain text KOT builder only if rasterization fails.
+        final raster = await locator<PrintService>()
+            .rasterizeThermalReceipt(receiptData, paperWidth: kotPrinter.paperSize);
+        final bytes = raster ??
+            EscPosReceiptBuilder.buildKotTicket(
+              receiptData: receiptData,
+              paperWidth: kotPrinter.paperSize,
+            );
         final success = await printerStore.sendBytes(bytes, kotPrinter);
         if (context.mounted) {
           if (success) {

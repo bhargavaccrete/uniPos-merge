@@ -123,6 +123,36 @@ class PrintService {
   }
 
   /// Show print preview dialog
+  /// Rasterize an already-built thermal [ReceiptData] (bill OR KOT) to a complete
+  /// ESC/POS ticket, so a DIRECT print looks identical to the PDF. Reused by both
+  /// the bill path (below) and the KOT path. Null on any failure → caller falls
+  /// back to the plain text ESC/POS builder.
+  Future<List<int>?> rasterizeThermalReceipt(
+    ReceiptData data, {
+    required int paperWidth,
+  }) async {
+    try {
+      final pdf = await _receiptPdfService.generateThermalReceipt(data);
+      final pdfBytes = await pdf.save();
+      final targetW = paperWidth <= 58 ? 384 : 576;
+      await for (final page in Printing.raster(pdfBytes, dpi: 203)) {
+        final png = await page.toPng();
+        final raster = await EscPosImage.toRaster(png, targetWidth: targetW);
+        if (raster == null) return null;
+        return <int>[
+          0x1B, 0x40, // ESC @  — init
+          0x1B, 0x61, 0x01, // ESC a 1 — center
+          ...raster,
+          0x0A, 0x0A, 0x0A, 0x0A, // feed
+          0x1D, 0x56, 0x01, // GS V 1 — partial cut
+        ];
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Direct thermal: render the SAME thermal PDF (logo + QR + Poppins font) to a
   /// raster image and return a complete ESC/POS ticket, so a direct print looks
   /// IDENTICAL to the downloaded PDF. Returns null on any failure so the caller
