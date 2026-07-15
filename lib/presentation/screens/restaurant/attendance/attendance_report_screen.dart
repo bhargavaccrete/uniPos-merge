@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/restaurant/db/attendance_model.dart';
@@ -32,6 +33,19 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
     final font = await PdfGoogleFonts.poppinsRegular();
     final boldFont = await PdfGoogleFonts.poppinsBold();
 
+    final fallbackFonts = <pw.Font>[];
+    for (final path in const [
+      'assets/fonts/NotoSansGujarati-Regular.ttf',
+      'assets/fonts/NotoSansDevanagari-Regular.ttf',
+    ]) {
+      try {
+        final data = await rootBundle.load(path);
+        fallbackFonts.add(pw.Font.ttf(data));
+      } catch (e) {
+        debugPrint('Error loading fallback font $path: $e');
+      }
+    }
+
     final allStaff = _staffNames;
     final periodEnd = (_selectedMonth.year == DateTime.now().year &&
             _selectedMonth.month == DateTime.now().month)
@@ -47,7 +61,11 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
           pw.MultiPage(
             pageFormat: format,
             margin: const pw.EdgeInsets.all(32),
-            theme: pw.ThemeData.withFont(base: font, bold: boldFont),
+            theme: pw.ThemeData.withFont(
+              base: font,
+              bold: boldFont,
+              fontFallback: fallbackFonts,
+            ),
             header: (pw.Context context) {
               return pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,

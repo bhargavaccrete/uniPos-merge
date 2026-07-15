@@ -7,6 +7,7 @@ import 'package:billberrylite/domain/services/restaurant/notification_service.da
 import 'package:billberrylite/domain/services/restaurant/thermal_printer_service.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'save_printer_dialog.dart';
 
 /// Bluetooth Printer discovery and setup screen.
 ///
@@ -136,7 +137,12 @@ class _BluthoothhState extends State<Bluthooth> {
   Widget _buildDiscoveredDevices() {
     return Observer(
       builder: (_) {
-        final devices = printerStore.discoveredDevices;
+        // discoveredDevices is shared with the USB scan; show BLE only so USB
+        // results don't leak into this tab.
+        final devices = printerStore.discoveredDevices
+            .cast<DiscoveredPrinter>()
+            .where((d) => d.connectionType == 'BLE')
+            .toList();
 
         // Show prompt when no scan has happened yet
         if (devices.isEmpty && !printerStore.isScanning) {
@@ -184,8 +190,7 @@ class _BluthoothhState extends State<Bluthooth> {
             const SizedBox(height: 8),
             // Cast each device explicitly — ObservableList iteration
             // can lose type info in some MobX versions
-            ...devices.map((d) {
-              final DiscoveredPrinter device = d as DiscoveredPrinter;
+            ...devices.map((device) {
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
@@ -344,100 +349,31 @@ class _BluthoothhState extends State<Bluthooth> {
     printerStore.stopScan();
   }
 
-  /// Show save dialog — staff enters a name, picks paper size and role.
-  /// Called when staff taps "Save" on a discovered device.
+  /// Show save dialog — the dialog owns its own controller (see
+  /// [SavePrinterDialog]) and returns the entered name + paper size.
   Future<void> _showSaveDialog(DiscoveredPrinter device) async {
-    final nameController =
-        TextEditingController(text: device.name ?? 'BT Printer');
-    int paperSize = 80;
-    // Role is assigned later by the slot on the Printer Management screen.
-    const String role = 'receipt';
-
-    await showDialog(
+    final result = await showDialog<SavePrinterResult>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        // StatefulBuilder lets us call setState inside the dialog
-        // to update radio buttons without rebuilding the whole screen
-        builder: (ctx, setDialogState) => AppDialogShell(
-          title: 'Save Printer',
-          accent: AppColors.primary,
-          icon: Icons.bluetooth,
-          body: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Device address (read-only, for reference)
-              Text(
-                device.address ?? 'Unknown address',
-                style: GoogleFonts.poppins(
-                    fontSize: 12, color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 12),
-
-              // Printer name — editable, defaults to BLE advertised name
-              TextField(
-                controller: nameController,
-                decoration: InputDecoration(
-                  labelText: 'Printer Name',
-                  labelStyle: GoogleFonts.poppins(fontSize: 13),
-                  border: const OutlineInputBorder(),
-                ),
-                style: GoogleFonts.poppins(fontSize: 14),
-              ),
-              const SizedBox(height: 16),
-
-              // Paper size
-              Text('Paper Size',
-                  style: GoogleFonts.poppins(
-                      fontSize: 13, fontWeight: FontWeight.w500)),
-              Row(
-                children: [
-                  Radio<int>(
-                    value: 58,
-                    groupValue: paperSize,
-                    onChanged: (v) =>
-                        setDialogState(() => paperSize = v!),
-                    activeColor: AppColors.primary,
-                  ),
-                  Text('58mm', style: GoogleFonts.poppins(fontSize: 13)),
-                  const SizedBox(width: 16),
-                  Radio<int>(
-                    value: 80,
-                    groupValue: paperSize,
-                    onChanged: (v) =>
-                        setDialogState(() => paperSize = v!),
-                    activeColor: AppColors.primary,
-                  ),
-                  Text('80mm', style: GoogleFonts.poppins(fontSize: 13)),
-                ],
-              ),
-            ],
-          ),
-          actions: [
-            appDialogCancelButton(ctx),
-            const SizedBox(width: 12),
-            appDialogPrimaryButton(
-              label: 'Save',
-              onPressed: () async {
-                await printerStore.saveBluetoothPrinter(
-                  device: device,
-                  name: nameController.text.trim(),
-                  paperSize: paperSize,
-                  role: role,
-                );
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (mounted) {
-                  NotificationService.instance.showSuccess(
-                      'Printer "${nameController.text.trim()}" saved');
-                }
-              },
-            ),
-          ],
-        ),
+      builder: (ctx) => SavePrinterDialog(
+        title: 'Save Printer',
+        icon: Icons.bluetooth,
+        subtitle: device.address ?? 'Unknown address',
+        initialName: device.name ?? 'BT Printer',
       ),
     );
+    if (result == null) return; // cancelled / dismissed
 
-    nameController.dispose();
+    // Role is assigned later by the slot on the Printer Management screen.
+    await printerStore.saveBluetoothPrinter(
+      device: device,
+      name: result.name,
+      paperSize: result.paperSize,
+      role: 'receipt',
+    );
+    if (mounted) {
+      NotificationService.instance
+          .showSuccess('Printer "${result.name}" saved');
+    }
   }
 
   /// Delete with confirmation

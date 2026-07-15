@@ -6,6 +6,7 @@ import 'package:billberrylite/domain/services/restaurant/notification_service.da
 import 'package:billberrylite/domain/services/restaurant/thermal_printer_service.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'save_printer_dialog.dart';
 
 /// USB Printer discovery and setup screen.
 ///
@@ -120,7 +121,12 @@ class _UsbState extends State<Usb> {
   Widget _buildDiscoveredDevices() {
     return Observer(
       builder: (_) {
-        final devices = printerStore.discoveredDevices;
+        // discoveredDevices is shared with the Bluetooth scan; show USB only so
+        // BLE results don't leak into this tab.
+        final devices = printerStore.discoveredDevices
+            .cast<DiscoveredPrinter>()
+            .where((d) => d.connectionType == 'USB')
+            .toList();
 
         if (devices.isEmpty && !printerStore.isScanning) {
           return Padding(
@@ -153,32 +159,56 @@ class _UsbState extends State<Usb> {
           );
         }
 
+        // A USB-C converter/hub shows up as several USB devices (its HDMI, LAN,
+        // etc.). We can't read the USB class here, so flag the obvious non-printers
+        // by name and sort likely printers to the top — but keep ALL savable so a
+        // printer with an odd name is never hidden.
+        final sorted = devices.cast<DiscoveredPrinter>().toList()
+          ..sort((a, b) =>
+              (_isLikelyNonPrinter(a.name) ? 1 : 0) -
+              (_isLikelyNonPrinter(b.name) ? 1 : 0));
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Discovered USB Devices (${devices.length})',
                 style: GoogleFonts.poppins(
                     fontSize: 16, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            Text('Pick the one marked as your printer. Unsure? Save it and Test '
+                'Print — the one that prints paper is your printer.',
+                style: GoogleFonts.poppins(
+                    fontSize: 11, color: AppColors.textSecondary)),
             const SizedBox(height: 8),
-            ...devices.map((d) {
-              final DiscoveredPrinter device = d as DiscoveredPrinter;
+            ...sorted.map((device) {
+              final nonPrinter = _isLikelyNonPrinter(device.name);
+              final accent =
+                  nonPrinter ? AppColors.warning : AppColors.success;
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
                   color: AppColors.white,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.divider),
+                  border: Border.all(color: accent.withOpacity(0.5)),
                 ),
                 child: ListTile(
-                  leading: Icon(Icons.usb, color: AppColors.info),
+                  leading: Icon(
+                    nonPrinter ? Icons.warning_amber_rounded : Icons.print,
+                    color: accent,
+                  ),
                   title: Text(
                     device.name ?? 'USB Printer',
                     style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
                   ),
                   subtitle: Text(
-                    'VID: ${device.vendorId ?? device.address ?? "Unknown"}',
+                    nonPrinter
+                        ? 'Likely NOT a printer — part of your USB hub/converter'
+                        : 'Likely your printer  ·  VID ${device.vendorId ?? device.address ?? "?"}',
                     style: GoogleFonts.poppins(
-                        fontSize: 12, color: AppColors.textSecondary),
+                        fontSize: 12,
+                        color: nonPrinter
+                            ? AppColors.warning
+                            : AppColors.textSecondary),
                   ),
                   trailing: TextButton(
                     onPressed: () => _showSaveDialog(device),
@@ -283,90 +313,31 @@ class _UsbState extends State<Usb> {
     printerStore.stopScan();
   }
 
-  /// Save dialog — same structure as Bluetooth save dialog
+  /// Save dialog — same structure as Bluetooth save dialog. The dialog owns its
+  /// own controller (see [SavePrinterDialog]) and returns the entered values.
   Future<void> _showSaveDialog(DiscoveredPrinter device) async {
-    final nameController =
-        TextEditingController(text: device.name ?? 'USB Printer');
-    int paperSize = 80;
-    // Role is assigned later by the slot on the Printer Management screen.
-    const String role = 'receipt';
-
-    await showDialog(
+    final result = await showDialog<SavePrinterResult>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AppDialogShell(
-          title: 'Save USB Printer',
-          accent: AppColors.primary,
-          icon: Icons.usb,
-          body: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'VID: ${device.vendorId ?? device.address ?? "Unknown"}',
-                style: GoogleFonts.poppins(
-                    fontSize: 12, color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: nameController,
-                decoration: InputDecoration(
-                  labelText: 'Printer Name',
-                  labelStyle: GoogleFonts.poppins(fontSize: 13),
-                  border: const OutlineInputBorder(),
-                ),
-                style: GoogleFonts.poppins(fontSize: 14),
-              ),
-              const SizedBox(height: 16),
-              Text('Paper Size',
-                  style: GoogleFonts.poppins(
-                      fontSize: 13, fontWeight: FontWeight.w500)),
-              Row(
-                children: [
-                  Radio<int>(
-                      value: 58,
-                      groupValue: paperSize,
-                      onChanged: (v) =>
-                          setDialogState(() => paperSize = v!),
-                      activeColor: AppColors.primary),
-                  Text('58mm', style: GoogleFonts.poppins(fontSize: 13)),
-                  const SizedBox(width: 16),
-                  Radio<int>(
-                      value: 80,
-                      groupValue: paperSize,
-                      onChanged: (v) =>
-                          setDialogState(() => paperSize = v!),
-                      activeColor: AppColors.primary),
-                  Text('80mm', style: GoogleFonts.poppins(fontSize: 13)),
-                ],
-              ),
-            ],
-          ),
-          actions: [
-            appDialogCancelButton(ctx),
-            const SizedBox(width: 12),
-            appDialogPrimaryButton(
-              label: 'Save',
-              onPressed: () async {
-                await printerStore.saveUsbPrinter(
-                  device: device,
-                  name: nameController.text.trim(),
-                  paperSize: paperSize,
-                  role: role,
-                );
-                if (ctx.mounted) Navigator.pop(ctx);
-                if (mounted) {
-                  NotificationService.instance.showSuccess(
-                      'Printer "${nameController.text.trim()}" saved');
-                }
-              },
-            ),
-          ],
-        ),
+      builder: (ctx) => SavePrinterDialog(
+        title: 'Save USB Printer',
+        icon: Icons.usb,
+        subtitle: 'VID: ${device.vendorId ?? device.address ?? "Unknown"}',
+        initialName: device.name ?? 'USB Printer',
       ),
     );
+    if (result == null) return; // cancelled / dismissed
 
-    nameController.dispose();
+    // Role is assigned later by the slot on the Printer Management screen.
+    await printerStore.saveUsbPrinter(
+      device: device,
+      name: result.name,
+      paperSize: result.paperSize,
+      role: 'receipt',
+    );
+    if (mounted) {
+      NotificationService.instance
+          .showSuccess('Printer "${result.name}" saved');
+    }
   }
 
   Future<void> _confirmDelete(String id, String name) async {
@@ -386,4 +357,17 @@ class _UsbState extends State<Usb> {
       }
     }
   }
+}
+
+/// Heuristic: does this USB device name look like something OTHER than a printer
+/// (an HDMI/AV adapter, LAN chip, hub, keyboard…)? Used only to flag/sort the
+/// scan list — never to hide a device, since a real printer can be oddly named.
+bool _isLikelyNonPrinter(String? name) {
+  final n = (name ?? '').toLowerCase();
+  if (n.isEmpty) return false;
+  const nonPrinterHints = [
+    'adapter', 'av ', 'hdmi', 'lan', 'ethernet', 'hub', 'keyboard',
+    'mouse', 'audio', 'camera', 'webcam', 'storage', 'disk', 'display', 'dock',
+  ];
+  return nonPrinterHints.any(n.contains);
 }

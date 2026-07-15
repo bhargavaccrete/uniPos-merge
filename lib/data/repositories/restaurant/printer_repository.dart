@@ -70,20 +70,13 @@ class PrinterRepository {
 
   /// Set a printer as default for a specific role ('kot' or 'receipt').
   ///
-  /// Mutually exclusive: if this printer is currently the OTHER role's default,
-  /// that assignment is released first — one printer can't be both Billing and
-  /// Kitchen at once.
+  /// The two slots are independent: the SAME printer may serve both Billing and
+  /// Kitchen (single-printer shops), so assigning one slot no longer releases the
+  /// other. Callers save the printer with role 'both' so it stays valid for both.
   Future<void> setDefaultPrinter(String id, String role) async {
     final prefs = await SharedPreferences.getInstance();
     final thisKey =
         role == 'kot' ? _defaultKotPrinterKey : _defaultReceiptPrinterKey;
-    final otherKey =
-        role == 'kot' ? _defaultReceiptPrinterKey : _defaultKotPrinterKey;
-
-    // Release this printer from the other role if it held it.
-    if (prefs.getString(otherKey) == id) {
-      await prefs.remove(otherKey);
-    }
     await prefs.setString(thisKey, id);
   }
 

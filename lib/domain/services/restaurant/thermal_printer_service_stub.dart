@@ -5,12 +5,14 @@ class DiscoveredPrinter {
   final String? name;
   final String? address;
   final String? vendorId;
+  final String? productId; // USB devices are matched by vendorId + productId
   final String connectionType; // 'BLE' or 'USB'
 
   DiscoveredPrinter({
     this.name,
     this.address,
     this.vendorId,
+    this.productId,
     this.connectionType = 'BLE',
   });
 }
@@ -31,6 +33,8 @@ class ThermalPrinterService {
   Future<bool> printData(DiscoveredPrinter device, List<int> bytes) async {
     return false;
   }
+
+  Future<bool> isUsbPresent(DiscoveredPrinter device) async => false;
 
   /// WiFi printing via raw TCP socket — not available on web.
   Future<bool> sendViaWifi(List<int> bytes, String ip, int port) async {

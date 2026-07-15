@@ -203,6 +203,7 @@ class RestaurantPrintHelper {
       // 8. EXISTING PDF PATH — fallback when no thermal printer is saved,
       //    or when thermal print fails, or when autoPrint is false (preview).
       final printService = locator<PrintService>();
+      final int paperWidth = kotPrinter?.paperSize ?? 80;
 
       if (autoPrint) {
         // Auto-print via system print dialog (PDF)
@@ -223,6 +224,7 @@ class RestaurantPrintHelper {
           orderNo: orderNo,
           isAddonKot: isAddonKot,
           kotRemark: order.remark,
+          paperWidth: paperWidth,
         );
         if (context.mounted) {
           NotificationService.instance.showSuccess(
@@ -248,6 +250,7 @@ class RestaurantPrintHelper {
           orderNo: orderNo,
           isAddonKot: isAddonKot,
           kotRemark: order.remark,
+          paperWidth: paperWidth,
         );
       }
 
@@ -525,6 +528,8 @@ class RestaurantPrintHelper {
 
       // 6. Route the bill by the user's Bill Format choice (always forced).
       final printService = locator<PrintService>();
+      final billingPrinter = printerStore.defaultReceiptPrinter;
+      final int paperWidth = billingPrinter?.paperSize ?? 80;
 
       Future<void> printPdf(ReceiptFormat fmt) => printService.showPrintPreview(
             context: context,
@@ -547,6 +552,7 @@ class RestaurantPrintHelper {
             isDeliveryOrder: order.orderType.toLowerCase().contains('delivery'),
             isTaxInclusive: order.isTaxInclusive,
             roundOff: calculations.roundOffAmount,
+            paperWidth: paperWidth,
           );
 
       // A4 → always print an A4 invoice, ignoring any thermal billing printer.
@@ -556,7 +562,6 @@ class RestaurantPrintHelper {
       }
 
       // Thermal → print directly to the billing printer when one is configured.
-      final billingPrinter = printerStore.defaultReceiptPrinter;
       if (billingPrinter != null) {
         // Primary path: render the SAME thermal PDF (logo + QR + Poppins font)
         // to a raster image so the DIRECT print looks identical to the PDF.
@@ -606,8 +611,7 @@ class RestaurantPrintHelper {
               .showSuccess('Bill printed to ${billingPrinter.name}');
           return;
         }
-        NotificationService.instance.showError(
-            'Thermal print failed: ${printerStore.errorMessage ?? "Unknown error"}. Showing PDF...');
+        NotificationService.instance.showWarning('Printer not available');
         // fall through to thermal PDF
       }
 

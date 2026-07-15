@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:billberrylite/util/color.dart';
-import 'package:billberrylite/core/plan/plan_gate.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -129,8 +130,11 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
       {'key': 'Payment Paid', 'icon': Icons.money, 'description': 'Show cash received and change'},
       {'key': 'UPI QR', 'icon': Icons.qr_code_2, 'description': 'Show UPI Scan & Pay QR on unpaid bills'},
     ],
-    // "Powered by Bill Berry Lite" is no longer a shop toggle — it is controlled
-    // by the admin via the `billing.invoice.print` license entitlement.
+    'Branding': [
+      // Locked ON when the admin forces branding via `billing.invoice.print`;
+      // when the admin allows it (flag false), this becomes a user choice.
+      {'key': 'Powered By', 'icon': Icons.verified_outlined, 'description': 'Show "Powered by Bill Berry Lite" at the bottom of the bill'},
+    ],
   };
 
   Future<void> _resetSettings() async {
@@ -341,6 +345,176 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
     );
   }
 
+  // ── Bill & KOT template selectors (thermal only) ───────────────────────────
+  Widget _buildTemplateSection(bool isTablet) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _templateHeader('Bill Receipt Template', isTablet),
+        const SizedBox(height: 10),
+        ValueListenableBuilder<String>(
+          valueListenable: PrintSettings.billTemplateNotifier,
+          builder: (_, current, __) => Row(
+            children: [
+              Expanded(
+                child: _templateCard(
+                  title: 'Simple Invoice',
+                  subtitle: 'Clean, professional & structured layout',
+                  icon: Icons.receipt_long_outlined,
+                  isSelected: current == 'simple',
+                  onTap: () => PrintSettings.setBillTemplate('simple'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _templateCard(
+                  title: 'Paper Saver',
+                  subtitle: 'Compact layouts to save roll paper',
+                  icon: Icons.compress_outlined,
+                  isSelected: current == 'paper_saver',
+                  onTap: () => PrintSettings.setBillTemplate('paper_saver'),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        _templateHeader('KOT Template', isTablet),
+        const SizedBox(height: 10),
+        ValueListenableBuilder<String>(
+          valueListenable: PrintSettings.kotTemplateNotifier,
+          builder: (_, current, __) => Row(
+            children: [
+              Expanded(
+                child: _templateCard(
+                  title: 'Standard KOT',
+                  subtitle: 'Standard, clear KOT format',
+                  icon: Icons.restaurant_outlined,
+                  isSelected: current == 'standard',
+                  onTap: () => PrintSettings.setKotTemplate('standard'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _templateCard(
+                  title: 'Paper Saver KOT',
+                  subtitle: 'High density, minimal margins KOT',
+                  icon: Icons.flash_on_outlined,
+                  isSelected: current == 'paper_saver',
+                  onTap: () => PrintSettings.setKotTemplate('paper_saver'),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  Widget _templateHeader(String title, bool isTablet) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 18,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          title,
+          style: GoogleFonts.poppins(
+            fontSize: isTablet ? 17 : 16,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+            letterSpacing: 0.3,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _templateCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(12),
+        height: 110,
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary.withOpacity(0.04) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.divider,
+            width: isSelected ? 1.8 : 1.0,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.08),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  )
+                ]
+              : [],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Icon(
+                  icon,
+                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                  size: 20,
+                ),
+                if (isSelected)
+                  Icon(
+                    Icons.check_circle_rounded,
+                    color: AppColors.primary,
+                    size: 16,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: GoogleFonts.poppins(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: isSelected ? AppColors.primary : AppColors.textPrimary,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Expanded(
+              child: Text(
+                subtitle,
+                style: GoogleFonts.poppins(
+                  fontSize: 10,
+                  color: AppColors.textSecondary,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isTablet = !AppResponsive.isMobile(context);
@@ -439,26 +613,44 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
 
                 SizedBox(height: 24),*/
 
+                // Bill & KOT templates at the TOP — thermal only (A4 is fixed).
+                ValueListenableBuilder<String>(
+                  valueListenable: PrintSettings.billFormatNotifier,
+                  builder: (_, fmt, __) => fmt == 'thermal'
+                      ? _buildTemplateSection(isTablet)
+                      : const SizedBox.shrink(),
+                ),
+
                 // Store logo (image itself — the on/off toggle is below)
                 _buildLogoCard(context, isTablet),
 
-                SizedBox(height: 16),
+                SizedBox(height: 24),
 
-                // Dynamic footer / "Thank You" message
+                // Settings groups EXCEPT Branding (Powered By) — that goes last.
+                ..._settingGroups.entries
+                    .where((group) => group.key != 'Branding')
+                    .map((group) => _buildSettingGroup(
+                          context,
+                          group.key,
+                          group.value,
+                          settings,
+                          isTablet,
+                        )),
+
+                // Dynamic footer / "Thank You" message — just before Powered By.
                 _buildFooterMessageCard(context, isTablet),
 
                 SizedBox(height: 24),
 
-                // Settings Groups
-                ..._settingGroups.entries.map((group) {
-                  return _buildSettingGroup(
+                // Branding (Powered By) group — last.
+                if (_settingGroups.containsKey('Branding'))
+                  _buildSettingGroup(
                     context,
-                    group.key,
-                    group.value,
+                    'Branding',
+                    _settingGroups['Branding']!,
                     settings,
                     isTablet,
-                  );
-                }),
+                  ),
 
                 // Footer
                 SizedBox(height: 8),
@@ -540,10 +732,11 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
           final icon = setting['icon'] as IconData;
           final description = setting['description'] as String;
           final isEnabled = currentSettings[key] ?? false;
-          // Watermark is forced ON unless the plan is entitled to remove it
-          // (`removeWatermark` → PlanGate.showWatermark). `shown` drives the
-          // visuals; `locked` disables input.
-          final bool locked = key == 'Powered By' && PlanGate.showWatermark;
+          // "Powered By" is forced ON while the admin keeps `billing.invoice.print`
+          // enabled; when the admin turns that flag off, the user controls it.
+          // `shown` drives the visuals; `locked` disables input.
+          final bool locked =
+              key == 'Powered By' && PlanEnforce.allows(EntKeys.billingInvoicePrint);
           final bool shown = locked ? true : isEnabled;
 
           return Container(
@@ -625,7 +818,7 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
                             SizedBox(height: 3),
                             Text(
                               locked
-                                  ? 'Included on the Free plan — upgrade to Premium to hide'
+                                  ? 'Required by your plan — cannot be turned off'
                                   : description,
                               style: GoogleFonts.poppins(
                                 fontSize: 12,

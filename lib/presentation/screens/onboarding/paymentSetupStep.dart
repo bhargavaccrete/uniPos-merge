@@ -39,6 +39,10 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
   final TextEditingController _upiIdController = TextEditingController();
   final TextEditingController _upiPayeeController = TextEditingController();
 
+  // Focus chain for the UPI edit dialog (name → UPI ID → payee).
+  final FocusNode _upiIdFocus = FocusNode();
+  final FocusNode _upiPayeeFocus = FocusNode();
+
   /// Drives the QR preview. Updated off the keystroke frame (debounced) so the
   /// CustomPaint subtree never rebuilds during text-input processing.
   final ValueNotifier<String> _upiQrData = ValueNotifier<String>('');
@@ -91,6 +95,8 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
     _methodNameController.dispose();
     _upiIdController.dispose();
     _upiPayeeController.dispose();
+    _upiIdFocus.dispose();
+    _upiPayeeFocus.dispose();
     super.dispose();
   }
 
@@ -136,7 +142,32 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
     final isUpi = method.value == 'upi';
     await showDialog(
       context: context,
-      builder: (context) => AppDialogShell(
+      builder: (context) {
+        // Shared by the last field's done key and the Update button so pressing
+        // enter on the keyboard commits the edit exactly like tapping Update.
+        Future<void> submit() async {
+          if (_methodNameController.text.isEmpty) return;
+          final updatedMethod = method.copyWith(
+            name: _methodNameController.text,
+            value:
+                _methodNameController.text.toLowerCase().replaceAll(' ', '_'),
+          );
+          await _store.updatePaymentMethod(updatedMethod);
+          if (isUpi) {
+            await _storeSettings.setUpiId(_upiIdController.text);
+            await _storeSettings.setUpiPayeeName(_upiPayeeController.text);
+            // Generate the QR from the UPI ID and store it so receipts keep
+            // printing the same merchant QR.
+            final qrBytes = await UpiQrHelper.generateQrBytes(
+              _upiIdController.text,
+              payee: _upiPayeeController.text,
+            );
+            await _storeSettings.setUpiQrImage(qrBytes);
+          }
+          if (mounted) Navigator.pop(context);
+        }
+
+        return AppDialogShell(
         title: isUpi ? 'UPI Setup' : 'Edit Payment Method',
         subtitle:
             isUpi ? 'Set your merchant UPI ID & QR' : 'Update payment details',
@@ -152,22 +183,38 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
               hint: 'Enter method name',
               icon: Icons.payment_rounded,
               required: true,
+              textInputAction:
+                  isUpi ? TextInputAction.next : TextInputAction.done,
+              onFieldSubmitted: (_) {
+                if (isUpi) {
+                  FocusScope.of(context).requestFocus(_upiIdFocus);
+                } else {
+                  submit();
+                }
+              },
             ),
             if (isUpi) ...[
               const SizedBox(height: 16),
               AppTextField(
                 controller: _upiIdController,
+                focusNode: _upiIdFocus,
                 label: 'Merchant UPI ID (VPA)',
                 hint: 'e.g., merchant@okhdfc',
                 icon: Icons.alternate_email_rounded,
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: (_) =>
+                    FocusScope.of(context).requestFocus(_upiPayeeFocus),
                 onChanged: (_) => _scheduleUpiPreview(),
               ),
               const SizedBox(height: 16),
               AppTextField(
                 controller: _upiPayeeController,
+                focusNode: _upiPayeeFocus,
                 label: 'Payee Name (Optional)',
                 hint: 'Falls back to Store Name',
                 icon: Icons.person_outline_rounded,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => submit(),
                 onChanged: (_) => _scheduleUpiPreview(),
               ),
               const SizedBox(height: 16),
@@ -246,30 +293,11 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
           const SizedBox(width: 12),
           appDialogPrimaryButton(
             label: 'Update',
-            onPressed: () async {
-              if (_methodNameController.text.isNotEmpty) {
-                final updatedMethod = method.copyWith(
-                  name: _methodNameController.text,
-                  value: _methodNameController.text.toLowerCase().replaceAll(' ', '_'),
-                );
-                await _store.updatePaymentMethod(updatedMethod);
-                if (isUpi) {
-                  await _storeSettings.setUpiId(_upiIdController.text);
-                  await _storeSettings.setUpiPayeeName(_upiPayeeController.text);
-                  // Generate the QR from the UPI ID and store it so receipts
-                  // keep printing the same merchant QR.
-                  final qrBytes = await UpiQrHelper.generateQrBytes(
-                    _upiIdController.text,
-                    payee: _upiPayeeController.text,
-                  );
-                  await _storeSettings.setUpiQrImage(qrBytes);
-                }
-                if (mounted) Navigator.pop(context);
-              }
-            },
+            onPressed: submit,
           ),
         ],
-      ),
+        );
+      },
     );
   }
 
@@ -384,7 +412,30 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AppDialogShell(
+        builder: (ctx, setDialogState) {
+          // Shared by the name field's done key and the Add button so pressing
+          // enter commits the new method exactly like tapping Add.
+          Future<void> submitAdd() async {
+            final name = _methodNameController.text.trim();
+            if (name.isEmpty) {
+              setDialogState(() => errorText = 'Name is required');
+              return;
+            }
+            final exists = _store.paymentMethods
+                .any((m) => m.name.toLowerCase() == name.toLowerCase());
+            if (exists) {
+              setDialogState(() => errorText = '"$name" already exists');
+              return;
+            }
+            await _store.addPaymentMethod(
+              name: name,
+              value: name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_'),
+              iconName: selectedIcon,
+            );
+            if (mounted) Navigator.pop(ctx);
+          }
+
+          return AppDialogShell(
           title: 'Add Payment Method',
           subtitle: 'Create a custom payment option',
           accent: AppColors.primary,
@@ -403,6 +454,8 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
               TextField(
                 controller: _methodNameController,
                 textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => submitAdd(),
                 style: GoogleFonts.poppins(
                     fontSize: 14, color: AppColors.textPrimary),
                 onChanged: (_) {
@@ -502,33 +555,11 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
             const SizedBox(width: 12),
             appDialogPrimaryButton(
               label: 'Add',
-              onPressed: () async {
-                final name = _methodNameController.text.trim();
-
-                // Validation: empty name
-                if (name.isEmpty) {
-                  setDialogState(() => errorText = 'Name is required');
-                  return;
-                }
-
-                // Validation: duplicate name
-                final exists = _store.paymentMethods.any(
-                    (m) => m.name.toLowerCase() == name.toLowerCase());
-                if (exists) {
-                  setDialogState(() => errorText = '"$name" already exists');
-                  return;
-                }
-
-                await _store.addPaymentMethod(
-                  name: name,
-                  value: name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_'),
-                  iconName: selectedIcon,
-                );
-                if (mounted) Navigator.pop(ctx);
-              },
+              onPressed: submitAdd,
             ),
           ],
-        ),
+        );
+        },
       ),
     );
   }

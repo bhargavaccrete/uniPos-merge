@@ -475,6 +475,7 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                             hint: 'e.g. John',
                             icon: Icons.person_outline,
                             required: true,
+                            textInputAction: TextInputAction.next,
                             onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_lastNameFocus),
                             onChanged: (_) {
                               if (_firstNameError != null) setState(() => _firstNameError = null);
@@ -497,6 +498,7 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                         label: 'Last Name',
                         hint: 'e.g. Doe',
                         icon: Icons.person_outline,
+                        textInputAction: TextInputAction.next,
                         onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_emailFocus),
                       ),
                     ),
@@ -515,6 +517,7 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                         hint: 'Optional',
                         icon: Icons.email_outlined,
                         keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
                         onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_phoneFocus),
                       ),
                     ),
@@ -529,7 +532,10 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                         keyboardType: TextInputType.phone,
                         maxLength: 10,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_usernameFocus),
+                        textInputAction: TextInputAction.next,
+                        // Username field is hidden (auto-generated), so skip it and
+                        // jump straight to PIN — the next visible field.
+                        onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_pinFocus),
                       ),
                     ),
                   ],
@@ -551,6 +557,8 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                         maxLength: 6,
                         obscureText: !_isPinVisible,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) => _addStaff(),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _isPinVisible ? Icons.visibility_off : Icons.visibility,

@@ -165,27 +165,23 @@ class _ItemsDataViewState extends State<ItemsDataView> {
           ? (order.totalPrice - order.refundAmount!) / order.totalPrice
           : 1.0;
 
-      // Pre-discount gross total — weights for bill-level discount distribution.
-      final orderGrossTotal = order.items.fold(0.0, (s, i) => s + i.price * i.quantity);
-      final orderDiscount = order.Discount ?? 0.0;
+      // Pre-refund gross total of all effective items in this order
+      final orderGrossTotal = order.items.fold(0.0, (s, i) {
+        final effectiveQty = i.quantity - (i.refundedQuantity ?? 0);
+        return s + (i.price * (effectiveQty > 0 ? effectiveQty : 0));
+      });
+      final netAmount = order.totalPrice - (order.refundAmount ?? 0.0);
+      final scaleFactor = orderGrossTotal > 0 ? netAmount / orderGrossTotal : 1.0;
 
       for (final cartItem in order.items) {
         // Use effectiveQuantity so refunded units don't contribute revenue.
         final effectiveQuantity = cartItem.quantity - (cartItem.refundedQuantity ?? 0);
         if (effectiveQuantity <= 0) continue;
 
-        // Base revenue = finalItemPrice (already has per-item discount) × effectiveQuantity.
-        final unitPrice = cartItem.finalItemPrice;
-        // Proportional share of the bill-level discount for this item's effective quantity.
-        final itemBillDiscount = orderGrossTotal > 0 && orderDiscount > 0
-            ? orderDiscount * (cartItem.price * effectiveQuantity) / orderGrossTotal
-            : 0.0;
-        final discountedRevenue = (unitPrice * effectiveQuantity) - itemBillDiscount;
-
-        // Add tax on the discounted base (exclusive) or already included (inclusive).
-        final taxRevenue = isTaxInclusive ? 0.0 : discountedRevenue * (cartItem.taxRate ?? 0.0);
-
-        final effectiveRevenue = (discountedRevenue + taxRevenue) * orderRefundRatio;
+        // Base gross price for the remaining quantity of this item
+        final itemGross = cartItem.price * effectiveQuantity;
+        // Scale to capture taxes, discounts, and order-level refunds proportionally
+        final effectiveRevenue = itemGross * scaleFactor;
 
         // Include variantName in the key so variants appear as separate rows.
         final itemKey = (cartItem.variantName != null && cartItem.variantName!.isNotEmpty)

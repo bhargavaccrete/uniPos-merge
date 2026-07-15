@@ -1474,6 +1474,20 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     // ── PDF FALLBACK — same SETTLEMENT layout on an 80mm roll ──
     final font = await PdfGoogleFonts.poppinsRegular();
     final boldFont = await PdfGoogleFonts.poppinsBold();
+    
+    final fallbackFonts = <pw.Font>[];
+    for (final path in const [
+      'assets/fonts/NotoSansGujarati-Regular.ttf',
+      'assets/fonts/NotoSansDevanagari-Regular.ttf',
+    ]) {
+      try {
+        final data = await rootBundle.load(path);
+        fallbackFonts.add(pw.Font.ttf(data));
+      } catch (e) {
+        debugPrint('Error loading fallback font $path: $e');
+      }
+    }
+
     final df = DateFormat('dd-MM-yyyy hh:mm:ss a');
     String money(double v) => DecimalSettings.formatAmount(v);
     final dur = shiftEnd.difference(shiftStart);
@@ -1489,7 +1503,11 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
           pw.Page(
             pageFormat: PdfPageFormat.roll80,
             margin: const pw.EdgeInsets.all(10),
-            theme: pw.ThemeData.withFont(base: font, bold: boldFont),
+            theme: pw.ThemeData.withFont(
+              base: font,
+              bold: boldFont,
+              fontFallback: fallbackFonts,
+            ),
             build: (pw.Context ctx) => pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.stretch,
               children: [

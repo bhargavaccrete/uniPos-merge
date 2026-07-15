@@ -12,7 +12,6 @@ import '../../../widget/componets/restaurant/componets/drawer.dart';
 import '../../../widget/componets/common/primary_app_bar.dart';
 import '../../../../domain/services/common/auto_backup_service.dart';
 import '../tabbar/menu.dart';
-import '../tabbar/menu_grid_screen.dart';
 import '../../../../util/restaurant/staticswitch.dart';
 import '../tabbar/order.dart';
 import '../tabbar/table.dart';
@@ -333,23 +332,17 @@ class _StartorderState extends State<Startorder>
             child: TabBarView(
               controller: tabController,
               children: [
-                // Menu tab: the grid option is MOBILE-ONLY — tablet always keeps
-                // its existing (already-perfect) MenuScreen layout. On mobile the
-                // settings flag picks grid vs the default list. Wrapped so flipping
-                // the setting live-swaps without leaving the screen.
+                // Menu tab: MenuScreen now owns both layouts internally — the
+                // opt-in "Menu Grid View" (mobile only) and the default list;
+                // tablet keeps its own grid layout. Wrapped in the settings
+                // listener so flipping the flag live-swaps the mode without
+                // leaving the screen.
                 ValueListenableBuilder<Map<String, bool>>(
                   valueListenable: AppSettings.settingsNotifier,
-                  builder: (context, __, ___) =>
-                      (AppSettings.menuGridView &&
-                              AppResponsive.isMobile(context))
-                          ? MenuGridScreen(
-                              tableIdForNewOrder: _tableIdForCurrentSession,
-                              isForAddingItem: widget.isForAddingItem ?? false,
-                            )
-                          : MenuScreen(
-                              tableIdForNewOrder: _tableIdForCurrentSession,
-                              isForAddingItem: widget.isForAddingItem ?? false,
-                            ),
+                  builder: (context, __, ___) => MenuScreen(
+                    tableIdForNewOrder: _tableIdForCurrentSession,
+                    isForAddingItem: widget.isForAddingItem ?? false,
+                  ),
                 ),
                 Order(),
                 if ((OrderSettings.enableDineIn && PlanEnforce.allows(EntKeys.billingTables)))

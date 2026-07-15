@@ -183,25 +183,23 @@ class _CategoryDataViewState extends State<CategoryDataView> {
 
       final isTaxInclusive = order.isTaxInclusive ?? false;
 
-      final hasItemLevelRefunds = order.items.any((i) => (i.refundedQuantity ?? 0) > 0);
-      final orderRefundRatio = (!hasItemLevelRefunds && order.totalPrice > 0 && (order.refundAmount ?? 0) > 0)
-          ? (order.totalPrice - order.refundAmount!) / order.totalPrice
-          : 1.0;
-
-      final orderGrossTotal = order.items.fold(0.0, (s, i) => s + i.price * i.quantity);
-      final orderDiscount = order.Discount ?? 0.0;
+      // Pre-refund gross total of all effective items in this order
+      final orderGrossTotal = order.items.fold(0.0, (s, i) {
+        final effectiveQty = i.quantity - (i.refundedQuantity ?? 0);
+        return s + (i.price * (effectiveQty > 0 ? effectiveQty : 0));
+      });
+      final netAmount = order.totalPrice - (order.refundAmount ?? 0.0);
+      final scaleFactor = orderGrossTotal > 0 ? netAmount / orderGrossTotal : 1.0;
 
       for (final cartItem in order.items) {
+        // Use effectiveQuantity so refunded units don't contribute revenue.
         final effectiveQuantity = cartItem.quantity - (cartItem.refundedQuantity ?? 0);
         if (effectiveQuantity <= 0) continue;
 
-        final unitPrice = cartItem.finalItemPrice;
-        final itemBillDiscount = orderGrossTotal > 0 && orderDiscount > 0
-            ? orderDiscount * (cartItem.price * effectiveQuantity) / orderGrossTotal
-            : 0.0;
-        final discountedRevenue = (unitPrice * effectiveQuantity) - itemBillDiscount;
-        final taxRevenue = isTaxInclusive ? 0.0 : discountedRevenue * (cartItem.taxRate ?? 0.0);
-        final effectiveRevenue = (discountedRevenue + taxRevenue) * orderRefundRatio;
+        // Base gross price for the remaining quantity of this item
+        final itemGross = cartItem.price * effectiveQuantity;
+        // Scale to capture taxes, discounts, and order-level refunds proportionally
+        final effectiveRevenue = itemGross * scaleFactor;
 
         final cat = resolveCategoryName(cartItem);
 

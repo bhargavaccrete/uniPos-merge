@@ -4,6 +4,7 @@ import 'package:mobx/mobx.dart';
 import 'package:uuid/uuid.dart';
 import '../../../data/models/restaurant/db/saved_printer_model.dart';
 import '../../../data/repositories/restaurant/printer_repository.dart';
+import 'package:flutter/foundation.dart';
 import '../../services/restaurant/thermal_printer_service.dart';
 
 part 'printer_store.g.dart';
@@ -217,6 +218,8 @@ abstract class _PrinterStore with Store {
       _scanSubscription?.cancel();
       _scanSubscription = _thermalService.devicesStream.listen(
         (List<DiscoveredPrinter> printers) {
+          debugPrint('[USB] scan found ${printers.length} device(s): '
+              '${printers.map((p) => '${p.name}(vid=${p.vendorId})').join(', ')}');
           discoveredDevices = ObservableList.of(printers);
         },
         onError: (e) {
@@ -241,7 +244,10 @@ abstract class _PrinterStore with Store {
       id: const Uuid().v4(),
       name: name,
       type: 'usb',
-      address: device.address ?? device.vendorId ?? '',
+      // USB identity = "vendorId:productId" (mirrors WiFi's "ip:port"). Both are
+      // required for the native layer to match and open the device.
+      address:
+          '${device.vendorId ?? device.address ?? ''}:${device.productId ?? ''}',
       paperSize: paperSize,
       role: role,
     );
@@ -325,14 +331,38 @@ abstract class _PrinterStore with Store {
   Future<bool> _sendViaUsb(
       List<int> bytes, String address, String name) async {
     try {
+      // A saved USB printer stores its identity as "vendorId:productId". The
+      // native layer matches on BOTH, so split them back out here — passing only
+      // the vendorId made the match fail (device not found → silent no-op).
+      final parts = address.split(':');
+      final vendorId = parts.isNotEmpty ? parts[0] : address;
+      final productId = parts.length > 1 ? parts[1] : '';
       final device = DiscoveredPrinter(
         address: address,
+        vendorId: vendorId,
+        productId: productId,
         name: name,
         connectionType: 'USB',
       );
+      debugPrint('[USB] _sendViaUsb → vendorId=$vendorId productId=$productId '
+          'name=$name bytes=${bytes.length}');
+      if (productId.isEmpty) {
+        debugPrint('[USB] ⚠ no productId stored — re-add this printer '
+            '(old saved entry). Print will not reach the device.');
+      }
+      // The plugin reports success even when the USB device is gone, so verify
+      // the device is still PRESENT first. (Presence, not permission — so the
+      // first print can still raise the OS permission dialog.) If it's unplugged,
+      // fail cleanly so the caller shows the PDF instead of a false "printed".
+      if (!await _thermalService.isUsbPresent(device)) {
+        errorMessage = 'Printer not available';
+        debugPrint('[USB] device not present (unplugged) — caller shows PDF');
+        return false;
+      }
       return await _thermalService.printData(device, bytes);
     } catch (e) {
       errorMessage = 'USB print failed: $e';
+      debugPrint('[USB] _sendViaUsb FAILED: $e');
       return false;
     }
   }

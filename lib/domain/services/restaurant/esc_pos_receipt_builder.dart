@@ -405,8 +405,14 @@ class EscPosReceiptBuilder {
       }
       bytes.addAll(_divider(cols));
       bytes.addAll(_text(_formatTotalRow(
-          isTaxInclusive ? 'Total GST (Incl)' : 'Total GST:',
+          isTaxInclusive ? 'Total Tax (Incl)' : 'Total Tax:',
           _fmt(totalGst),
+          cols)));
+    } else if (!PrintSettings.showTax && (sale.totalGstAmount ?? 0) > 0.009) {
+      // Tax toggle OFF → single summary line so the bill still reconciles.
+      bytes.addAll(_text(_formatTotalRow(
+          isTaxInclusive ? 'Tax (Incl.)' : 'Tax',
+          _fmt(sale.totalGstAmount ?? 0),
           cols)));
     }
 
@@ -469,9 +475,10 @@ class EscPosReceiptBuilder {
         bytes.addAll(_text(line));
       }
     }
-    // "Powered by Bill Berry Lite" + company line — printed only when the admin
-    // grants `billing.invoice.print` in the license manifest (shown by default).
-    if (PlanEnforce.allows(EntKeys.billingInvoicePrint)) {
+    // "Powered by Bill Berry Lite" + company line. Forced when the admin keeps
+    // `billing.invoice.print` on; otherwise the shop's "Powered By" toggle decides.
+    if (PlanEnforce.allows(EntKeys.billingInvoicePrint) ||
+        PrintSettings.showPoweredBy) {
       bytes.addAll(_text('Powered by Bill Berry Lite'));
       bytes.addAll(_text('Accrete Infosolution Technologies Private Limited'));
       bytes.addAll(_text('Ph: 7041046049'));

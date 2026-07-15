@@ -110,26 +110,43 @@ class _MenuScreenState extends State<MenuScreen> {
           subtitle: Text('${favItems.length} items',
               style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
           children: [
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              itemCount: favItems.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (context, i) {
-                final item = favItems[i];
-                return _ItemListTile(
-                  key: ValueKey('${item.id}_${item.isFavorite}'),
-                  item: item,
-                  onTap: () => _handleItemTap(item),
-                  onToggleFavorite: () => _toggleFavorite(item),
-                  formatStock: _formatStockDisplay,
-                  getStockStatus: _getStockStatus,
-                  cartEntries:
-                      cartItems.where((c) => c.productId == item.id).toList(),
-                );
-              },
-            ),
+            if (AppSettings.menuGridView)
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: AppResponsive.gridColumns(context,
+                      mobile: 2, tablet: 3, desktop: 4),
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: AppResponsive.getValue(context,
+                      mobile: 0.75, tablet: 0.70, desktop: 0.75),
+                ),
+                itemCount: favItems.length,
+                itemBuilder: (_, i) => _buildGridItemCard(favItems[i], cartItems),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                itemCount: favItems.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (context, i) {
+                  final item = favItems[i];
+                  return _ItemListTile(
+                    key: ValueKey('${item.id}_${item.isFavorite}'),
+                    item: item,
+                    onTap: () => _handleItemTap(item),
+                    onToggleFavorite: () => _toggleFavorite(item),
+                    formatStock: _formatStockDisplay,
+                    getStockStatus: _getStockStatus,
+                    cartEntries:
+                        cartItems.where((c) => c.productId == item.id).toList(),
+                  );
+                },
+              ),
           ],
         ),
       ),
@@ -148,15 +165,45 @@ class _MenuScreenState extends State<MenuScreen> {
   bool _isLoadingData = false;
 
 
+  // Last-seen value of the "Keep Categories Open" setting, so the listener can
+  // tell an actual toggle apart from any other settings change.
+  bool _lastKeepOpen = false;
+
   @override
   void initState() {
     super.initState();
     _loadData();
+    _lastKeepOpen = AppSettings.keepCategoriesOpen;
+    AppSettings.settingsNotifier.addListener(_onSettingsChanged);
 
     _searchController.addListener(() {
       setState(() {
         query = _searchController.text;
       });
+    });
+  }
+
+  /// Instantly expand/collapse every section when "Keep Categories Open" is
+  /// toggled. Without this the change only shows after leaving and re-entering
+  /// the screen, because `initiallyExpanded` applies to a tile only on its first
+  /// build and the section list lives inside a MobX Observer that doesn't track
+  /// the (ValueNotifier-backed) settings.
+  void _onSettingsChanged() {
+    final keepOpen = AppSettings.keepCategoriesOpen;
+    if (keepOpen == _lastKeepOpen) return;
+    _lastKeepOpen = keepOpen;
+    // An active search already force-expands everything — don't fight it.
+    if (query.isNotEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      for (final controller in _expansionControllers.values) {
+        try {
+          keepOpen ? controller.expand() : controller.collapse();
+        } catch (_) {
+          // Tile not attached yet (off-screen) — it adopts the state via
+          // `initiallyExpanded` when first built.
+        }
+      }
     });
   }
 
@@ -217,6 +264,7 @@ class _MenuScreenState extends State<MenuScreen> {
 
   @override
   void dispose() {
+    AppSettings.settingsNotifier.removeListener(_onSettingsChanged);
     _searchController.dispose();
     _searchFocusNode.dispose();
     _listScrollController.dispose();
@@ -624,6 +672,11 @@ class _MenuScreenState extends State<MenuScreen> {
                                     onToggleFavorite: _toggleFavorite,
                                     formatStock: _formatStockDisplay,
                                     getStockStatus: _getStockStatus,
+                                    // Opt-in grid mode (was the separate
+                                    // MenuGridScreen) — mobile only; tablet has
+                                    // its own grid layout.
+                                    gridView: AppSettings.menuGridView,
+                                    buildGridCard: _buildGridItemCard,
                                   );
                                 }).toList(),
                               ],

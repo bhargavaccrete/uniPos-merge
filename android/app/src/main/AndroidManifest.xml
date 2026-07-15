@@ -52,6 +52,11 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <!-- Disable Impeller on Android to prevent Vulkan viewport startup freezes/deadlocks on Mali/Adreno GPUs during debugging/foreground-service starts -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
+
         <!-- flutter_local_notifications: deliver scheduled notifications and
              re-schedule them after a device reboot. -->
         <receiver

@@ -12,6 +12,13 @@ class _CategorySectionCard extends StatelessWidget {
   final String Function(Items) formatStock;
   final StockStatus Function(Items) getStockStatus;
 
+  /// When true, render this section's items as a GRID (the opt-in "Menu Grid
+  /// View" mode) instead of the default vertical list of tiles. [buildGridCard]
+  /// supplies each grid cell — it's `_MenuScreenState._buildGridItemCard`, the
+  /// same card the tablet layout uses, so both modes share one card.
+  final bool gridView;
+  final Widget Function(Items item, List<CartItem> cartItems)? buildGridCard;
+
   const _CategorySectionCard({
     required this.category,
     required this.searchFilteredItems,
@@ -23,6 +30,8 @@ class _CategorySectionCard extends StatelessWidget {
     required this.onToggleFavorite,
     required this.formatStock,
     required this.getStockStatus,
+    this.gridView = false,
+    this.buildGridCard,
   });
 
   @override
@@ -68,27 +77,45 @@ class _CategorySectionCard extends StatelessWidget {
             ),
           ),
           children: [
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              itemCount: searchFilteredItems.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (context, itemIndex) {
-                final item = searchFilteredItems[itemIndex];
-                return _ItemListTile(
-                  key: ValueKey('${item.id}_${item.isFavorite}'),
-                  item: item,
-                  onTap: () => onItemTap(item),
-                  onToggleFavorite: () => onToggleFavorite(item),
-                  formatStock: formatStock,
-                  getStockStatus: getStockStatus,
-                  cartEntries: cartItems
-                      .where((c) => c.productId == item.id)
-                      .toList(),
-                );
-              },
-            ),
+            if (gridView)
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: AppResponsive.gridColumns(context,
+                      mobile: 2, tablet: 3, desktop: 4),
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: AppResponsive.getValue(context,
+                      mobile: 0.75, tablet: 0.70, desktop: 0.75),
+                ),
+                itemCount: searchFilteredItems.length,
+                itemBuilder: (_, i) =>
+                    buildGridCard!(searchFilteredItems[i], cartItems),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                itemCount: searchFilteredItems.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (context, itemIndex) {
+                  final item = searchFilteredItems[itemIndex];
+                  return _ItemListTile(
+                    key: ValueKey('${item.id}_${item.isFavorite}'),
+                    item: item,
+                    onTap: () => onItemTap(item),
+                    onToggleFavorite: () => onToggleFavorite(item),
+                    formatStock: formatStock,
+                    getStockStatus: getStockStatus,
+                    cartEntries: cartItems
+                        .where((c) => c.productId == item.id)
+                        .toList(),
+                  );
+                },
+              ),
           ],
         ),
       ),

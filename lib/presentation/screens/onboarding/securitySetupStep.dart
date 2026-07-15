@@ -43,6 +43,11 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
   final _pwdController = TextEditingController();
   final _pwdConfirmController = TextEditingController();
 
+  final _pinFocusNode = FocusNode();
+  final _pinConfirmFocusNode = FocusNode();
+  final _pwdFocusNode = FocusNode();
+  final _pwdConfirmFocusNode = FocusNode();
+
   bool _obscurePin = true;
   bool _obscurePwd = true;
   bool _saving = false;
@@ -54,6 +59,10 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
     _pinConfirmController.dispose();
     _pwdController.dispose();
     _pwdConfirmController.dispose();
+    _pinFocusNode.dispose();
+    _pinConfirmFocusNode.dispose();
+    _pwdFocusNode.dispose();
+    _pwdConfirmFocusNode.dispose();
     super.dispose();
   }
 
@@ -144,6 +153,7 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
             SizedBox(height: AppResponsive.smallSpacing(context)),
             AppTextField(
               controller: _pinController,
+              focusNode: _pinFocusNode,
               label: 'Admin PIN (4–6 digits)',
               hint: 'Used to log in as admin',
               icon: Icons.pin_rounded,
@@ -151,6 +161,8 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
               keyboardType: TextInputType.number,
               maxLength: 6,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_pinConfirmFocusNode),
               suffixIcon: IconButton(
                 icon: Icon(_obscurePin ? Icons.visibility_off : Icons.visibility),
                 onPressed: () => setState(() => _obscurePin = !_obscurePin),
@@ -159,12 +171,23 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
             SizedBox(height: AppResponsive.mediumSpacing(context)),
             AppTextField(
               controller: _pinConfirmController,
+              focusNode: _pinConfirmFocusNode,
               label: 'Confirm Admin PIN',
               icon: Icons.pin_rounded,
               obscureText: _obscurePin,
               keyboardType: TextInputType.number,
               maxLength: 6,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              textInputAction: PlanEnforce.allows(EntKeys.settings)
+                  ? TextInputAction.next
+                  : TextInputAction.done,
+              onFieldSubmitted: (_) {
+                if (PlanEnforce.allows(EntKeys.settings)) {
+                  FocusScope.of(context).requestFocus(_pwdFocusNode);
+                } else {
+                  _onContinue();
+                }
+              },
             ),
 
             // Backup Password section — only when the plan includes backups.
@@ -176,6 +199,7 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
             SizedBox(height: AppResponsive.smallSpacing(context)),
             AppTextField(
               controller: _pwdController,
+              focusNode: _pwdFocusNode,
               label: 'Backup Password (6 digits)',
               hint: 'Used to encrypt your backups',
               icon: Icons.lock_outline_rounded,
@@ -183,6 +207,8 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
               keyboardType: TextInputType.number,
               maxLength: 6,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_pwdConfirmFocusNode),
               suffixIcon: IconButton(
                 icon: Icon(_obscurePwd ? Icons.visibility_off : Icons.visibility),
                 onPressed: () => setState(() => _obscurePwd = !_obscurePwd),
@@ -191,12 +217,15 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
             SizedBox(height: AppResponsive.mediumSpacing(context)),
             AppTextField(
               controller: _pwdConfirmController,
+              focusNode: _pwdConfirmFocusNode,
               label: 'Confirm Backup Password',
               icon: Icons.lock_outline_rounded,
               obscureText: _obscurePwd,
               keyboardType: TextInputType.number,
               maxLength: 6,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => _onContinue(),
             ),
             SizedBox(height: AppResponsive.smallSpacing(context)),
             Row(

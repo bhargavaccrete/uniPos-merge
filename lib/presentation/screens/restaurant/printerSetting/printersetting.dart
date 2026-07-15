@@ -11,9 +11,10 @@ import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/restaurant/print_settings.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 
-/// Printer Management — two role slots (Billing + Kitchen, mutually exclusive),
-/// a Bill Format selector (Thermal/A4), and a behavior explainer.
+/// Printer Management — two role slots (Billing + Kitchen; one printer may serve
+/// both), a Bill Format selector (Thermal/A4), and a behavior explainer.
 /// Tapping a slot opens a picker of saved printers (+ Add Printer).
+/// Bill/KOT templates live on the Customization screen.
 class Printersetting extends StatefulWidget {
   const Printersetting({super.key});
 
@@ -220,6 +221,7 @@ class _PrintersettingState extends State<Printersetting> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (ctx) {
@@ -227,49 +229,79 @@ class _PrintersettingState extends State<Printersetting> {
           builder: (_) {
             final printers = printerStore.savedPrinters;
             return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('$roleLabel Printer',
-                        style: GoogleFonts.poppins(
-                            fontSize: 16, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 4),
-                    Text('Pick a saved printer or add a new one',
-                        style: GoogleFonts.poppins(
-                            fontSize: 12, color: AppColors.textSecondary)),
-                    const SizedBox(height: 12),
-                    if (printers.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: Text('No saved printers yet.',
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(ctx).size.height * 0.7,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Drag handle
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: AppColors.divider,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      Text('$roleLabel Printer',
+                          style: GoogleFonts.poppins(
+                              fontSize: 16, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 4),
+                      Text('Pick a saved printer or add a new one',
+                          style: GoogleFonts.poppins(
+                              fontSize: 12, color: AppColors.textSecondary)),
+                      const SizedBox(height: 12),
+                      // Saved printers scroll; "Add Printer" stays pinned below so
+                      // it's always reachable no matter how many printers exist.
+                      Flexible(
+                        child: printers.isEmpty
+                            ? Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
+                                child: Text('No saved printers yet.',
+                                    style: GoogleFonts.poppins(
+                                        fontSize: 13,
+                                        color: AppColors.textSecondary)),
+                              )
+                            : SingleChildScrollView(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: printers
+                                      .map((p) => _pickerRow(ctx, p, role))
+                                      .toList(),
+                                ),
+                              ),
+                      ),
+                      const Divider(height: 24),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.add, color: AppColors.primary),
+                        title: Text('Add Printer',
                             style: GoogleFonts.poppins(
-                                fontSize: 13, color: AppColors.textSecondary)),
-                      )
-                    else
-                      ...printers.map((p) => _pickerRow(ctx, p, role)),
-                    const Divider(height: 24),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.add, color: AppColors.primary),
-                      title: Text('Add Printer',
-                          style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.primary)),
-                      subtitle: Text('Bluetooth · WiFi · USB',
-                          style: GoogleFonts.poppins(
-                              fontSize: 11, color: AppColors.textSecondary)),
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        Navigator.pushNamed(
-                                context, RouteNames.restaurantAddPrinter)
-                            .then((_) => printerStore.loadSavedPrinters());
-                      },
-                    ),
-                  ],
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primary)),
+                        subtitle: Text('Bluetooth · WiFi · USB',
+                            style: GoogleFonts.poppins(
+                                fontSize: 11, color: AppColors.textSecondary)),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          Navigator.pushNamed(
+                                  context, RouteNames.restaurantAddPrinter)
+                              .then((_) => printerStore.loadSavedPrinters());
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -305,21 +337,30 @@ class _PrintersettingState extends State<Printersetting> {
               fontSize: 14, fontWeight: FontWeight.w500)),
       subtitle: Text(
         '${p.type.toUpperCase()} · ${p.paperSize}mm'
-        '${otherSlotName != null ? '  · currently $otherSlotName' : ''}',
+        '${otherSlotName != null ? '  · also $otherSlotName' : ''}',
         style: GoogleFonts.poppins(
             fontSize: 11, color: AppColors.textSecondary),
       ),
-      trailing: isThisSlot
-          ? Icon(Icons.check_circle, color: AppColors.success, size: 20)
-          : IconButton(
-              icon: Icon(Icons.delete_outline,
-                  size: 20, color: AppColors.danger),
-              tooltip: 'Delete',
-              onPressed: () => _confirmDelete(p.id, p.name),
-            ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Show the "selected" check for the current slot, but ALWAYS keep the
+          // delete action so an assigned printer can still be removed (deleting
+          // clears its slot pointer in the repo).
+          if (isThisSlot)
+            Icon(Icons.check_circle, color: AppColors.success, size: 20),
+          IconButton(
+            icon: Icon(Icons.delete_outline,
+                size: 20, color: AppColors.danger),
+            tooltip: 'Delete',
+            onPressed: () => _confirmDelete(p.id, p.name),
+          ),
+        ],
+      ),
       onTap: () async {
-        // Role follows the slot; assigning releases the other slot (repo rule).
-        await printerStore.savePrinter(p.copyWith(role: role));
+        // Slots are independent — the same printer may serve both. Save as 'both'
+        // so it stays valid for whichever slot(s) point to it.
+        await printerStore.savePrinter(p.copyWith(role: 'both'));
         await printerStore.setDefaultForRole(p.id, role);
         if (sheetCtx.mounted) Navigator.pop(sheetCtx);
         if (mounted) {
@@ -470,4 +511,5 @@ class _PrintersettingState extends State<Printersetting> {
       }
     }
   }
+
 }

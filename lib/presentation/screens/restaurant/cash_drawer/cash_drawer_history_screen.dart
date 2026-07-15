@@ -90,7 +90,7 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
   DateTime _toDate = DateTime.now();
   String _typeFilter = 'All';
 
-  static const _typeOptions = ['All', 'Opening', 'Sale', 'Expense', 'Cash In', 'Cash Out', 'Withdrawal', 'Adjustment', 'Shift End'];
+  static const _typeOptions = ['All', 'Opening', 'Sale', 'Refund', 'Expense', 'Cash In', 'Cash Out', 'Withdrawal', 'Adjustment', 'Shift End'];
 
   // Pre-computed summary totals
   double _totalIn  = 0.0;
@@ -197,40 +197,49 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
 
       for (final o in pastOrderStore.pastOrders) {
         final status = (o.orderStatus ?? '').toUpperCase();
-        if (status == 'VOID' || status == 'VOIDED' ||
-            status == 'FULLY_REFUNDED' || status == 'PARTIALLY_REFUNDED') continue;
+        if (status == 'VOID' || status == 'CANCELLED') continue;
         if (o.orderAt == null) continue;
 
-        final method = (o.paymentmode ?? '').toLowerCase().trim();
-        bool hasCash = method == 'cash';
-        if (!hasCash && o.isSplitPayment == true) {
-          hasCash = o.paymentList
-              .any((p) => (p['method'] as String? ?? '').toLowerCase() == 'cash');
-        }
-        if (!hasCash) continue;
-
-        final cashAmt = _cashComponentOf(o);
-        if (cashAmt <= 0) continue;
+        final originalCash = _originalCashComponentOf(o);
+        if (originalCash <= 0) continue;
 
         final billNo = o.billNumber ?? o.id.substring(0, 6);
-        final label = o.isSplitPayment == true
-            ? 'Bill #$billNo (cash portion)'
-            : (o.refundAmount ?? 0.0) > 0
-                ? 'Bill #$billNo (net of refund)'
-                : 'Bill #$billNo';
-
         final saleStaff = (o.shiftId != null ? shiftIdToName[o.shiftId] : null)
             ?? staffAtTime(o.orderAt!);
 
+        // 1. Add Sale entry
+        final saleLabel = o.isSplitPayment == true
+            ? 'Bill #$billNo (cash portion)'
+            : 'Bill #$billNo';
         drafts.add(_RowDraft(
           timestamp: o.orderAt!,
           typeName: 'Sale',
           typeColor: Colors.green.shade600,
           staffName: saleStaff,
-          inAmount: cashAmt,
+          inAmount: originalCash,
           outAmount: 0.0,
-          reason: label,
+          reason: saleLabel,
         ));
+
+        // 2. Add Refund entry if there is a refund
+        final refundCash = _cashRefundComponentOf(o);
+        if (refundCash > 0) {
+          final refundLabel = o.isSplitPayment == true
+              ? 'Refund for Bill #$billNo (cash portion)'
+              : 'Refund for Bill #$billNo';
+          final refundTime = o.refundedAt ?? o.orderAt!;
+          final refundStaff = o.refundedAt != null ? staffAtTime(o.refundedAt!) : saleStaff;
+
+          drafts.add(_RowDraft(
+            timestamp: refundTime,
+            typeName: 'Refund',
+            typeColor: Colors.red.shade700,
+            staffName: refundStaff,
+            inAmount: 0.0,
+            outAmount: refundCash,
+            reason: refundLabel,
+          ));
+        }
       }
 
       // ── Source 3: Cash expenses ────────────────────────────────────────────
@@ -331,22 +340,35 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
     }
   }
 
-  /// Returns the net cash component of an order (pure cash or split payment cash portion).
-  double _cashComponentOf(PastOrderModel o) {
+  /// Returns the original cash component of an order (before refund).
+  double _originalCashComponentOf(PastOrderModel o) {
+    if (o.isSplitPayment == true) {
+      return o.paymentList
+          .where((p) => (p['method'] as String? ?? '').toLowerCase() == 'cash')
+          .fold(0.0, (s, p) => s + ((p['amount'] as num?)?.toDouble() ?? 0.0));
+    }
+    final method = (o.paymentmode ?? '').toLowerCase().trim();
+    if (method == 'cash') {
+      return o.totalPrice;
+    }
+    return 0.0;
+  }
+
+  /// Returns the cash portion of the refund for an order.
+  double _cashRefundComponentOf(PastOrderModel o) {
+    final refund = o.refundAmount ?? 0.0;
+    if (refund <= 0) return 0.0;
     if (o.isSplitPayment == true) {
       final rawCash = o.paymentList
           .where((p) => (p['method'] as String? ?? '').toLowerCase() == 'cash')
           .fold(0.0, (s, p) => s + ((p['amount'] as num?)?.toDouble() ?? 0.0));
-      final refund = o.refundAmount ?? 0.0;
-      if (refund > 0 && o.totalPrice > 0) {
-        final cashRatio = rawCash / o.totalPrice;
-        return (rawCash - refund * cashRatio).clamp(0.0, double.infinity);
+      if (o.totalPrice > 0) {
+        return refund * (rawCash / o.totalPrice);
       }
-      return rawCash;
     }
     final method = (o.paymentmode ?? '').toLowerCase().trim();
     if (method == 'cash') {
-      return (o.totalPrice - (o.refundAmount ?? 0.0)).clamp(0.0, double.infinity);
+      return refund;
     }
     return 0.0;
   }

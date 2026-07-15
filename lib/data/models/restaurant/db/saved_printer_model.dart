@@ -12,10 +12,10 @@ class SavedPrinterModel extends HiveObject {
   final String name;
 
   @HiveField(2)
-  final String type; // 'bluetooth' | 'wifi'
+  final String type; // 'bluetooth' | 'wifi' | 'usb'
 
   @HiveField(3)
-  final String address; // MAC address for BT, "IP:port" for WiFi
+  final String address; // MAC for BT, "IP:port" for WiFi, "vendorId:productId" for USB
 
   @HiveField(4)
   final int paperSize; // 58 or 80 (mm)

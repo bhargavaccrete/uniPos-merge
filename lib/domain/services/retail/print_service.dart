@@ -79,6 +79,7 @@ class PrintService {
     String? kotRemark, // Restaurant: order-level kitchen note (KOT only)
     double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
     int? loyaltyPointsDiscount, // Loyalty points redeemed
+    int paperWidth = 80, // Target paper width
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -112,13 +113,19 @@ class PrintService {
     );
 
     final pdf = format == ReceiptFormat.thermal
-        ? await _receiptPdfService.generateThermalReceipt(receiptData)
+        ? await _receiptPdfService.generateThermalReceipt(receiptData, paperWidth: paperWidth)
         : await _receiptPdfService.generateInvoice(receiptData);
 
+    final pageFormat = format == ReceiptFormat.thermal
+        ? (paperWidth <= 58
+            ? const PdfPageFormat(58 * PdfPageFormat.mm, double.infinity, marginAll: 0)
+            : const PdfPageFormat(80 * PdfPageFormat.mm, double.infinity, marginAll: 0))
+        : PdfPageFormat.a4;
+
     await Printing.layoutPdf(
-      onLayout: (PdfPageFormat pageFormat) async => pdf.save(),
+      onLayout: (PdfPageFormat _) async => pdf.save(),
       name: 'Receipt_${sale.saleId.length > 8 ? sale.saleId.substring(0, 8) : sale.saleId}',
-      format: format == ReceiptFormat.thermal ? PdfPageFormat.roll80 : PdfPageFormat.a4,
+      format: pageFormat,
     );
   }
 
@@ -132,7 +139,7 @@ class PrintService {
     required int paperWidth,
   }) async {
     try {
-      final pdf = await _receiptPdfService.generateThermalReceipt(data);
+      final pdf = await _receiptPdfService.generateThermalReceipt(data, paperWidth: paperWidth);
       final pdfBytes = await pdf.save();
       final targetW = paperWidth <= 58 ? 384 : 576;
       await for (final page in Printing.raster(pdfBytes, dpi: 203)) {
@@ -148,7 +155,8 @@ class PrintService {
         ];
       }
       return null;
-    } catch (_) {
+    } catch (e, s) {
+      debugPrint('Error in rasterizeThermalReceipt: $e\n$s');
       return null;
     }
   }
@@ -207,7 +215,7 @@ class PrintService {
         upiPayeeName: upi.payee,
         upiQrImageBytes: upi.qr,
       );
-      final pdf = await _receiptPdfService.generateThermalReceipt(receiptData);
+      final pdf = await _receiptPdfService.generateThermalReceipt(receiptData, paperWidth: paperWidth);
       final pdfBytes = await pdf.save();
       final targetW = paperWidth <= 58 ? 384 : 576;
       await for (final page in Printing.raster(pdfBytes, dpi: 203)) {
@@ -223,7 +231,8 @@ class PrintService {
         ];
       }
       return null;
-    } catch (_) {
+    } catch (e, s) {
+      debugPrint('Error in buildThermalRasterTicket: $e\n$s');
       return null;
     }
   }
@@ -257,6 +266,7 @@ class PrintService {
     bool? isDeliveryOrder,
     bool? isTaxInclusive,
     double? roundOff, // Rounding adjustment applied to reach grand total
+    int paperWidth = 80, // Target paper width
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -296,7 +306,7 @@ class PrintService {
     );
 
     final pdf = format == ReceiptFormat.thermal
-        ? await _receiptPdfService.generateThermalReceipt(receiptData)
+        ? await _receiptPdfService.generateThermalReceipt(receiptData, paperWidth: paperWidth)
         : await _receiptPdfService.generateInvoice(receiptData);
 
     if (!context.mounted) return;
@@ -326,7 +336,11 @@ class PrintService {
             canChangeOrientation: false,
             canDebug: false,
             pdfFileName: 'Receipt_${sale.saleId.length > 8 ? sale.saleId.substring(0, 8) : sale.saleId}.pdf',
-            initialPageFormat: format == ReceiptFormat.thermal ? PdfPageFormat.roll80 : PdfPageFormat.a4,
+            initialPageFormat: format == ReceiptFormat.thermal
+                ? (paperWidth <= 58
+                    ? const PdfPageFormat(58 * PdfPageFormat.mm, double.infinity, marginAll: 0)
+                    : const PdfPageFormat(80 * PdfPageFormat.mm, double.infinity, marginAll: 0))
+                : PdfPageFormat.a4,
           ),
         ),
       ),

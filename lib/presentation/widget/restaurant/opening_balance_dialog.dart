@@ -245,6 +245,7 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
                     // Amount input
                     AppTextField(
                       controller: _openingBalanceController,
+                      autofocus: true,
                       label: 'Cash in Drawer',
                       hint: '0.00',
                       icon: Icons.account_balance_wallet_outlined,
@@ -263,6 +264,8 @@ class _OpeningBalanceDialogState extends State<OpeningBalanceDialog> {
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
                       ],
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _saveOpeningBalance(),
                       validator: (_) => _errorText,
                       onChanged: (_) {
                         if (_errorText != null) setState(() => _errorText = null);

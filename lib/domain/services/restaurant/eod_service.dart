@@ -70,18 +70,41 @@ class EODService {
     final paymentSummaries = PaymentModeSummary.summarize(activeDayOrders);
     final taxSummaries = _calculateTaxSummaries(activeDayOrders);
 
-    final totalSales = allDayOrders.fold<double>(0.0, (sum, order) {
+    // 1. Identify all orders refunded within this session's time range [startTime, endTime]
+    final sessionRefundedOrders = pastOrders.where((order) {
+      if (order.refundedAt == null) return false;
+      final status = order.orderStatus?.toUpperCase() ?? '';
+      if (status == 'CANCELLED') return false;
+      return (order.refundedAt!.isAfter(startTime) || order.refundedAt!.isAtSameMomentAs(startTime)) &&
+             (order.refundedAt!.isBefore(endTime) || order.refundedAt!.isAtSameMomentAs(endTime));
+    }).toList();
+
+    // 2. Identify external refunded orders (refunded in this session but created before this session)
+    final externalRefundedOrders = sessionRefundedOrders.where((order) {
+      if (targetSessionId != null) {
+        return order.sessionId != targetSessionId;
+      }
+      return order.orderAt == null || (order.orderAt!.isBefore(startTime));
+    }).toList();
+
+    // 3. Compute EOD totalRefunds as sum of refundAmount for all orders refunded in this session's period
+    final totalRefunds = sessionRefundedOrders.fold<double>(0.0, (sum, order) => sum + (order.refundAmount ?? 0.0));
+
+    final totalSalesBase = allDayOrders.fold<double>(0.0, (sum, order) {
       final status = order.orderStatus?.toUpperCase() ?? '';
       if (_isExcluded(status)) return sum;
       return sum + (order.totalPrice - (order.refundAmount ?? 0.0));
     });
+    // Deduct external refunds from today's net sales
+    final totalSales = totalSalesBase - externalRefundedOrders.fold<double>(0.0, (sum, order) => sum + (order.refundAmount ?? 0.0));
+
     final totalDiscount = allDayOrders.fold<double>(0.0, (sum, order) {
       final status = order.orderStatus?.toUpperCase() ?? '';
       if (_isExcluded(status)) return sum;
       return sum + (order.Discount ?? 0.0);
     });
 
-    final totalTax = allDayOrders.fold<double>(0.0, (sum, order) {
+    final totalTaxBase = allDayOrders.fold<double>(0.0, (sum, order) {
       final status = order.orderStatus?.toUpperCase() ?? '';
       if (_isExcluded(status)) return sum;
       final refundRatio = order.totalPrice > 0
@@ -89,13 +112,46 @@ class EODService {
           : 1.0;
       return sum + (order.gstAmount ?? 0.0) * refundRatio;
     });
-
-    // Refunds: include partially/fully refunded amounts (real cash returned to customers)
-    final totalRefunds = allDayOrders.fold<double>(0.0, (sum, order) {
-      final status = order.orderStatus?.toUpperCase() ?? '';
-      if (status == 'CANCELLED') return sum;
-      return sum + (order.refundAmount ?? 0.0);
+    // Deduct external refund tax portions from today's net tax liability
+    final double externalRefundedTax = externalRefundedOrders.fold<double>(0.0, (sum, order) {
+      final refund = order.refundAmount ?? 0.0;
+      if (refund > 0 && order.totalPrice > 0) {
+        return sum + (refund * ((order.gstAmount ?? 0.0) / order.totalPrice));
+      }
+      return sum;
     });
+    final totalTax = totalTaxBase - externalRefundedTax;
+
+    // Subtract external refunds from paymentSummaries
+    for (final order in externalRefundedOrders) {
+      final refund = order.refundAmount ?? 0.0;
+      if (refund <= 0) continue;
+
+      if (order.isSplitPayment == true && order.paymentListJson != null && order.paymentListJson!.isNotEmpty) {
+        final ratio = order.totalPrice > 0 ? refund / order.totalPrice : 0.0;
+        for (final p in order.paymentList) {
+          final method = (p['method'] as String? ?? '').toLowerCase().trim();
+          final amt = ((p['amount'] as num?)?.toDouble() ?? 0.0) * ratio;
+          _subtractFromSummary(paymentSummaries, method, amt);
+        }
+      } else {
+        final method = (order.paymentmode ?? '').toLowerCase().trim();
+        _subtractFromSummary(paymentSummaries, method, refund);
+      }
+    }
+
+    // Recompute percentages for paymentSummaries
+    final newGrandTotal = paymentSummaries.fold<double>(0.0, (sum, p) => sum + p.totalAmount);
+    for (int i = 0; i < paymentSummaries.length; i++) {
+      final p = paymentSummaries[i];
+      paymentSummaries[i] = PaymentSummary(
+        paymentType: p.paymentType,
+        totalAmount: p.totalAmount,
+        transactionCount: p.transactionCount,
+        percentage: newGrandTotal > 0 ? (p.totalAmount / newGrandTotal) * 100 : 0.0,
+      );
+    }
+
     final totalOrderCount = activeDayOrders.length; // Count only active orders
 
     // Calculate expenses for the day using expense store
@@ -570,6 +626,27 @@ class EODService {
     }
 
     return summaries;
+  }
+
+  static void _subtractFromSummary(List<PaymentSummary> list, String method, double amount) {
+    final normMethod = PaymentModeSummary.normalizeMethod(method);
+    final idx = list.indexWhere((s) => s.paymentType.toLowerCase().trim() == normMethod.toLowerCase().trim());
+    if (idx != -1) {
+      final old = list[idx];
+      list[idx] = PaymentSummary(
+        paymentType: old.paymentType,
+        totalAmount: old.totalAmount - amount,
+        transactionCount: old.transactionCount,
+        percentage: 0.0,
+      );
+    } else {
+      list.add(PaymentSummary(
+        paymentType: normMethod,
+        totalAmount: -amount,
+        transactionCount: 1,
+        percentage: 0.0,
+      ));
+    }
   }
 }
 

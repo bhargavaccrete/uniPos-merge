@@ -35,6 +35,7 @@ class TaxSetupStep extends StatefulWidget {
 class _TaxSetupStepState extends State<TaxSetupStep> {
   final _taxNameController = TextEditingController();
   final _taxRateController = TextEditingController();
+  final _taxRateFocus = FocusNode();
   final _uuid = const Uuid();
 
   List<TaxItem> _taxes = [];
@@ -146,6 +147,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
   void dispose() {
     _taxNameController.dispose();
     _taxRateController.dispose();
+    _taxRateFocus.dispose();
     super.dispose();
   }
 
@@ -511,61 +513,73 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
     final formKey = GlobalKey<FormState>();
     await showDialog(
       context: context,
-      builder: (ctx) => AppDialogShell(
-        title: 'Create Custom Tax',
-        subtitle: 'Add a tax rate for your menu',
-        accent: AppColors.primary,
-        icon: Icons.receipt_long_rounded,
-        body: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AppTextField(
-                controller: _taxNameController,
-                label: 'Tax Name',
-                hint: 'e.g. GST, VAT',
-                icon: Icons.label_outline,
-                required: true,
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Tax name is required'
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              AppTextField(
-                controller: _taxRateController,
-                label: 'Rate %',
-                hint: '18',
-                icon: Icons.percent,
-                required: true,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                validator: (v) {
-                  final t = v?.trim() ?? '';
-                  if (t.isEmpty) return 'Rate is required';
-                  final r = double.tryParse(t);
-                  if (r == null) return 'Enter a valid number';
-                  if (r < 0) return 'Rate cannot be negative';
-                  return null;
-                },
-              ),
-            ],
+      builder: (ctx) {
+        // Shared by the Rate field's done key and the Add button so pressing
+        // enter on the keyboard commits the tax, exactly like tapping Add.
+        void submit() {
+          if (!(formKey.currentState?.validate() ?? false)) return;
+          _addTax();
+          Navigator.pop(ctx);
+        }
+
+        return AppDialogShell(
+          title: 'Create Custom Tax',
+          subtitle: 'Add a tax rate for your menu',
+          accent: AppColors.primary,
+          icon: Icons.receipt_long_rounded,
+          body: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppTextField(
+                  controller: _taxNameController,
+                  label: 'Tax Name',
+                  hint: 'e.g. GST, VAT',
+                  icon: Icons.label_outline,
+                  required: true,
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) =>
+                      FocusScope.of(ctx).requestFocus(_taxRateFocus),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Tax name is required'
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                AppTextField(
+                  controller: _taxRateController,
+                  focusNode: _taxRateFocus,
+                  label: 'Rate %',
+                  hint: '18',
+                  icon: Icons.percent,
+                  required: true,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => submit(),
+                  validator: (v) {
+                    final t = v?.trim() ?? '';
+                    if (t.isEmpty) return 'Rate is required';
+                    final r = double.tryParse(t);
+                    if (r == null) return 'Enter a valid number';
+                    if (r < 0) return 'Rate cannot be negative';
+                    return null;
+                  },
+                ),
+              ],
+            ),
           ),
-        ),
-        actions: [
-          appDialogCancelButton(ctx),
-          const SizedBox(width: 12),
-          appDialogPrimaryButton(
-            label: 'Add',
-            onPressed: () {
-              if (!(formKey.currentState?.validate() ?? false)) return;
-              _addTax();
-              Navigator.pop(ctx);
-            },
-          ),
-        ],
-      ),
+          actions: [
+            appDialogCancelButton(ctx),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: 'Add',
+              onPressed: submit,
+            ),
+          ],
+        );
+      },
     );
   }
 

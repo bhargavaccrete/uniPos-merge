@@ -65,6 +65,36 @@ class PrintSettings {
     await prefs.setString(_footerMessageKey, value);
   }
 
+  /// Bill template: 'simple' or 'paper_saver'
+  static const String _billTemplateKey = 'print_bill_template';
+  static const String _billTemplateDefault = 'simple';
+  static final ValueNotifier<String> billTemplateNotifier =
+      ValueNotifier(_billTemplateDefault);
+
+  static String get billTemplate => billTemplateNotifier.value;
+  static bool get isBillTemplatePaperSaver => billTemplate == 'paper_saver';
+
+  static Future<void> setBillTemplate(String value) async {
+    billTemplateNotifier.value = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_billTemplateKey, value);
+  }
+
+  /// KOT template: 'standard' or 'paper_saver'
+  static const String _kotTemplateKey = 'print_kot_template';
+  static const String _kotTemplateDefault = 'standard';
+  static final ValueNotifier<String> kotTemplateNotifier =
+      ValueNotifier(_kotTemplateDefault);
+
+  static String get kotTemplate => kotTemplateNotifier.value;
+  static bool get isKotTemplatePaperSaver => kotTemplate == 'paper_saver';
+
+  static Future<void> setKotTemplate(String value) async {
+    kotTemplateNotifier.value = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kotTemplateKey, value);
+  }
+
   /// ---- Public Getters ----
   static Map<String, bool> get values => settingsNotifier.value;
 
@@ -101,6 +131,8 @@ class PrintSettings {
     settingsNotifier.value = Map.from(_defaultPrintSettings);
     await setBillFormat(_billFormatDefault);
     await setFooterMessage(_footerMessageDefault);
+    await setBillTemplate(_billTemplateDefault);
+    await setKotTemplate(_kotTemplateDefault);
     await _save();
   }
 
@@ -125,5 +157,9 @@ class PrintSettings {
         prefs.getString(_billFormatKey) ?? _billFormatDefault;
     footerMessageNotifier.value =
         prefs.getString(_footerMessageKey) ?? _footerMessageDefault;
+    billTemplateNotifier.value =
+        prefs.getString(_billTemplateKey) ?? _billTemplateDefault;
+    kotTemplateNotifier.value =
+        prefs.getString(_kotTemplateKey) ?? _kotTemplateDefault;
   }
 }

@@ -4,8 +4,6 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:intl/intl.dart';
-
-
 import '../../../data/models/retail/hive_model/customer_model_208.dart';
 import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
 import '../../../data/models/retail/hive_model/sale_model_203.dart';
@@ -116,6 +114,11 @@ class ReceiptPdfService {
   static const String defaultStoreAddress = 'Your Store Address';
   static const String defaultStorePhone = '+91 1234567890';
 
+  // Static font cache to prevent reloading from assets on every single print
+  static pw.Font? _cachedBaseFont;
+  static pw.Font? _cachedBoldFont;
+  static List<pw.Font>? _cachedFallbackFonts;
+
   /// Get retail printer settings if in retail mode
   RetailPrinterSettings? _getRetailSettings() {
     if (AppConfig.isRetail) {
@@ -123,7 +126,6 @@ class ReceiptPdfService {
     }
     return null;
   }
-
 
   /// Get paper format based on retail settings or default
   PdfPageFormat _getPaperFormat() {
@@ -148,6 +150,9 @@ class ReceiptPdfService {
   /// receipts. Used as `fontFallback`: Poppins covers Latin, these cover the
   /// rest. Best-effort — a missing file just leaves boxes for that script.
   Future<List<pw.Font>> _indicFallbackFonts() async {
+    if (_cachedFallbackFonts != null) {
+      return _cachedFallbackFonts!;
+    }
     final fonts = <pw.Font>[];
     for (final path in const [
       'assets/fonts/NotoSansGujarati-Regular.ttf',
@@ -155,25 +160,52 @@ class ReceiptPdfService {
     ]) {
       try {
         fonts.add(pw.Font.ttf(await rootBundle.load(path)));
-      } catch (_) {}
+      } catch (e, s) {
+        print('Error loading fallback font $path: $e\n$s');
+      }
     }
+    _cachedFallbackFonts = fonts;
     return fonts;
   }
 
-  Future<pw.Document> generateThermalReceipt(ReceiptData data) async {
+  Future<pw.Document> generateThermalReceipt(ReceiptData data, {int paperWidth = 80}) async {
     final pdf = pw.Document();
-    final pageFormat = _getPaperFormat();
+    
+    // Natively layout the page size based on target printer width
+    final bool isSmallMedia = paperWidth <= 58;
+    final bool isKot = data.kotNumber != null;
+    final bool isPaperSaver = isKot
+        ? PrintSettings.isKotTemplatePaperSaver
+        : PrintSettings.isBillTemplatePaperSaver;
+
+    // Define format with 0 default margins so we control margins cleanly inside pw.Page
+    final pageFormat = isSmallMedia
+        ? const PdfPageFormat(58 * PdfPageFormat.mm, double.infinity, marginAll: 0)
+        : const PdfPageFormat(80 * PdfPageFormat.mm, double.infinity, marginAll: 0);
+
+    // Dynamic margins to eliminate outer spaces and top spacing
+    final double hMargin = isPaperSaver
+        ? (isSmallMedia ? 1.5 : 2.5)
+        : (isSmallMedia ? 3.0 : 5.0);
+    final double vMargin = 0.0;
 
     // Load fonts with fallback
     pw.Font ttf;
     pw.Font boldTtf;
     try {
-      final fontData = await rootBundle.load("assets/fonts/Poppins-Regular.ttf");
-      ttf = pw.Font.ttf(fontData);
-      final boldFontData = await rootBundle.load("assets/fonts/Poppins-Bold.ttf");
-      boldTtf = pw.Font.ttf(boldFontData);
-    } catch (e) {
-      print('Error loading fonts: $e');
+      if (_cachedBaseFont != null && _cachedBoldFont != null) {
+        ttf = _cachedBaseFont!;
+        boldTtf = _cachedBoldFont!;
+      } else {
+        final fontData = await rootBundle.load("assets/fonts/Poppins-Regular.ttf");
+        ttf = pw.Font.ttf(fontData);
+        final boldFontData = await rootBundle.load("assets/fonts/Poppins-Bold.ttf");
+        boldTtf = pw.Font.ttf(boldFontData);
+        _cachedBaseFont = ttf;
+        _cachedBoldFont = boldTtf;
+      }
+    } catch (e, s) {
+      print('Error loading fonts: $e\n$s');
       ttf = pw.Font.helvetica();
       boldTtf = pw.Font.helveticaBold();
     }
@@ -181,13 +213,13 @@ class ReceiptPdfService {
     pdf.addPage(
       pw.Page(
         pageFormat: pageFormat,
-        margin: const pw.EdgeInsets.all(8),
+        margin: pw.EdgeInsets.symmetric(horizontal: hMargin, vertical: vMargin),
         theme: pw.ThemeData.withFont(
           base: ttf,
           bold: boldTtf,
           fontFallback: await _indicFallbackFonts(),
         ),
-        build: (context) => _buildThermalReceiptContent(data),
+        build: (context) => _buildThermalReceiptContent(data, paperWidth: paperWidth),
       ),
     );
 
@@ -229,22 +261,82 @@ class ReceiptPdfService {
   }
 
   /// Build thermal receipt content (80mm width)
-  pw.Widget _buildThermalReceiptContent(ReceiptData data) {
+  pw.Widget _buildThermalReceiptContent(ReceiptData data, {int paperWidth = 80}) {
     final storeName = data.storeName ?? defaultStoreName;
     final storeAddress = data.storeAddress ?? defaultStoreAddress;
     final storePhone = data.storePhone ?? defaultStorePhone;
 
-    // Get settings based on mode
-    final retailSettings = _getRetailSettings();
+    final bool isSmallMedia = paperWidth <= 58;
     final isRetail = AppConfig.isRetail;
+    final retailSettings = _getRetailSettings();
 
-    // Determine what to show based on mode (suppress store details for KOTs)
     final isKot = data.kotNumber != null;
+    final bool isPaperSaver = isKot
+        ? PrintSettings.isKotTemplatePaperSaver
+        : PrintSettings.isBillTemplatePaperSaver;
+
+    // Font size baseline calculations based on template choice
+    final double storeNameSize = isPaperSaver
+        ? (isSmallMedia ? 8.5 : 10.0)
+        : (isSmallMedia ? 11.0 : 13.0);
+
+    final double headerBadgeSize = isKot
+        ? (isPaperSaver
+            ? (isSmallMedia ? 7.0 : 8.5)
+            : (isSmallMedia ? 9.0 : 11.0))
+        : (isPaperSaver
+            ? (isSmallMedia ? 7.0 : 8.5)
+            : (isSmallMedia ? 8.5 : 10.5));
+
+    final double labelSize = isKot
+        ? (isPaperSaver
+            ? (isSmallMedia ? 6.5 : 7.5)
+            : (isSmallMedia ? 8.0 : 9.5))
+        : (isPaperSaver
+            ? (isSmallMedia ? 6.5 : 7.5)
+            : (isSmallMedia ? 8.0 : 9.5));
+
+    final double tableHeaderSize = isPaperSaver
+        ? (isSmallMedia ? 6.5 : 7.5)
+        : (isSmallMedia ? 8.0 : 9.5);
+    final double bodySize = isPaperSaver
+        ? (isSmallMedia ? 6.0 : 7.0)
+        : (isSmallMedia ? 7.5 : 9.0);
+    final double totalRowSize = isPaperSaver
+        ? (isSmallMedia ? 6.5 : 7.5)
+        : (isSmallMedia ? 8.0 : 9.5);
+    final double grandTotalSize = isPaperSaver
+        ? (isSmallMedia ? 7.5 : 9.0)
+        : (isSmallMedia ? 9.5 : 11.5);
+    final double footerSize = isPaperSaver
+        ? (isSmallMedia ? 6.0 : 7.0)
+        : (isSmallMedia ? 8.0 : 9.0);
+
+    // Component Sizes
+    final double logoW = isPaperSaver
+        ? (isSmallMedia ? 120.0 : 160.0)
+        : (isSmallMedia ? 150.0 : 200.0);
+    final double logoH = isPaperSaver
+        ? (isSmallMedia ? 120.0 : 160.0)
+        : (isSmallMedia ? 150.0 : 200.0);
+    final double qrS = isPaperSaver
+        ? (isSmallMedia ? 55.0 : 65.0)
+        : (isSmallMedia ? 75.0 : 90.0);
+
+    final double lineSpacing = isPaperSaver ? 1.0 : 3.0;
+
     final showLogo = isKot ? false : (isRetail ? (retailSettings?.showLogo ?? true) : PrintSettings.showRestaurantLogo);
     final showStoreName = isKot ? false : (isRetail ? (retailSettings?.showStoreName ?? true) : PrintSettings.showRestaurantName);
     final showStoreAddress = isKot ? false : (isRetail ? (retailSettings?.showStoreAddress ?? true) : PrintSettings.showRestaurantAddress);
     final showStorePhone = isKot ? false : (isRetail ? (retailSettings?.showStorePhone ?? true) : PrintSettings.showRestaurantMobile);
     final showGST = isKot ? false : (isRetail ? (retailSettings?.showGSTNumber ?? true) : true);
+
+    final bool hasHeaderDetails = (showLogo && data.logoBytes != null) ||
+        showStoreName ||
+        showStoreAddress ||
+        showStorePhone ||
+        (showGST && data.gstNumber != null);
+
     final showInvoiceNumber = isRetail ? (retailSettings?.showInvoiceNumber ?? true) : PrintSettings.showOrderId;
     final showInvoiceDate = isRetail ? (retailSettings?.showInvoiceDate ?? true) : PrintSettings.showOrderedTime;
     final showPaymentMethod = isRetail ? (retailSettings?.showPaymentMethod ?? true) : PrintSettings.showPaymentType;
@@ -261,24 +353,23 @@ class ReceiptPdfService {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
-        // Store Logo — larger on restaurant receipts for better brand visibility.
+        // Store Logo
         if (showLogo && data.logoBytes != null) ...[
           pw.Container(
-            width: AppConfig.isRestaurant ? 100 : 60,
-            height: AppConfig.isRestaurant ? 100 : 60,
+            width: logoW,
             child: pw.Image(
               pw.MemoryImage(data.logoBytes!),
               fit: pw.BoxFit.contain,
             ),
           ),
-          pw.SizedBox(height: 8),
+          pw.SizedBox(height: isPaperSaver ? 0.5 : 1.0),
         ],
 
         // Custom Header Text (Retail only)
         if (isRetail && headerText.isNotEmpty) ...[
           pw.Text(
             headerText,
-            style: const pw.TextStyle(fontSize: 9),
+            style: pw.TextStyle(fontSize: bodySize),
             textAlign: pw.TextAlign.center,
           ),
           pw.SizedBox(height: 4),
@@ -289,7 +380,7 @@ class ReceiptPdfService {
           pw.Text(
             storeName,
             style: pw.TextStyle(
-              fontSize: 16,
+              fontSize: storeNameSize,
               fontWeight: pw.FontWeight.bold,
             ),
           ),
@@ -299,7 +390,7 @@ class ReceiptPdfService {
             pw.Text(
               'INVOICE',
               style: pw.TextStyle(
-                fontSize: 12,
+                fontSize: headerBadgeSize,
                 fontWeight: pw.FontWeight.bold,
               ),
               textAlign: pw.TextAlign.center,
@@ -310,25 +401,27 @@ class ReceiptPdfService {
         if (showStoreAddress) ...[
           pw.Text(
             storeAddress,
-            style: const pw.TextStyle(fontSize: 10),
+            style: pw.TextStyle(fontSize: bodySize),
             textAlign: pw.TextAlign.center,
           ),
         ],
         if (showStorePhone) ...[
           pw.Text(
             'Tel: $storePhone',
-            style: const pw.TextStyle(fontSize: 10),
+            style: pw.TextStyle(fontSize: bodySize),
           ),
         ],
         if (showGST && data.gstNumber != null) ...[
           pw.Text(
             'GSTIN: ${data.gstNumber}',
-            style: const pw.TextStyle(fontSize: 10),
+            style: pw.TextStyle(fontSize: bodySize),
           ),
         ],
-        pw.SizedBox(height: 8),
-        _buildDashedLine(),
-        pw.SizedBox(height: 4),
+        if (data.kotNumber == null && hasHeaderDetails) ...[
+          pw.SizedBox(height: lineSpacing * 2),
+          _buildDashedLine(isSmallMedia: isSmallMedia),
+          pw.SizedBox(height: lineSpacing),
+        ],
 
         // Receipt Info / KOT Info
         if (data.kotNumber != null) ...[
@@ -337,56 +430,56 @@ class ReceiptPdfService {
             pw.Center(
               child: pw.Text(
                 'CANCEL KOT',
-                style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(fontSize: storeNameSize, fontWeight: pw.FontWeight.bold),
                 textAlign: pw.TextAlign.center,
               ),
             ),
             pw.SizedBox(height: 4),
-            _buildDashedLine(),
+            _buildDashedLine(isSmallMedia: isSmallMedia),
             pw.SizedBox(height: 6),
           ],
           pw.Text(
             'KOT #: ${data.kotNumber.toString().padLeft(3, '0')}',
-            style:  pw.TextStyle(fontSize: 12,fontWeight:pw.FontWeight.bold),
+            style: pw.TextStyle(fontSize: headerBadgeSize, fontWeight: pw.FontWeight.bold),
           ),
           if (data.cancelReference != null && data.kotStatus?.toUpperCase() == 'CANCEL') ...[
             pw.Text(
               'Reference: ${data.cancelReference}',
-              style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+              style: pw.TextStyle(fontSize: headerBadgeSize, fontWeight: pw.FontWeight.bold),
             ),
           ],
           if (data.tableNo != null && data.tableNo!.isNotEmpty) ...[
             pw.Text(
               'Table: ${data.tableNo}',
-              style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+              style: pw.TextStyle(fontSize: labelSize, fontWeight: pw.FontWeight.bold),
             ),
           ],
           if (data.orderNo != null && data.orderNo!.isNotEmpty) ...[
             pw.Text(
               'Order No: ${data.orderNo}',
-              style: pw.TextStyle(fontSize: 12,fontWeight:pw.FontWeight.bold),
+              style: pw.TextStyle(fontSize: headerBadgeSize, fontWeight: pw.FontWeight.bold),
             ),
           ],
           if (PrintSettings.showOrderType && data.orderType != null) ...[
             pw.Text(
               'Type: ${data.orderType!.toUpperCase()}${(data.isAddonKot == true && data.kotStatus?.toUpperCase() != 'CANCEL') ? ' (ADD-ON)' : ''}',
-              style:  pw.TextStyle(fontSize: 12,fontWeight:pw.FontWeight.bold),
+              style: pw.TextStyle(fontSize: headerBadgeSize, fontWeight: pw.FontWeight.bold),
             ),
           ],
           if (data.orderTimestamp != null) ...[
             pw.Text(
               _formatDateTime(data.orderTimestamp!.toIso8601String()),
-              style:  pw.TextStyle(fontSize: 12,fontWeight:pw.FontWeight.bold),
+              style: pw.TextStyle(fontSize: labelSize, fontWeight: pw.FontWeight.bold),
             ),
           ],
           // Order-level kitchen note (e.g. "No onions") — KOT only.
           if (data.kotRemark != null && data.kotRemark!.trim().isNotEmpty) ...[
             pw.SizedBox(height: 4),
-            _buildDashedLine(),
+            _buildDashedLine(isSmallMedia: isSmallMedia),
             pw.SizedBox(height: 2),
             pw.Text(
               'Note: ${data.kotRemark!.trim()}',
-              style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold),
+              style: pw.TextStyle(fontSize: headerBadgeSize, fontWeight: pw.FontWeight.bold),
             ),
           ],
         ] else ...[
@@ -395,12 +488,12 @@ class ReceiptPdfService {
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text(data.billNumber != null ? 'Bill No:' : 'Receipt #:', style:  pw.TextStyle(fontSize: 11,fontWeight: pw.FontWeight.bold)),
+                pw.Text(data.billNumber != null ? 'Bill No:' : 'Receipt #:', style: pw.TextStyle(fontSize: labelSize, fontWeight: pw.FontWeight.bold)),
                 pw.Text(
                   data.billNumber != null
                       ? 'INV${data.billNumber}'
                       : data.sale.saleId.substring(0, min(8, data.sale.saleId.length)).toUpperCase(),
-                  style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+                  style: pw.TextStyle(fontSize: labelSize, fontWeight: pw.FontWeight.bold),
                 ),
               ],
             ),
@@ -410,10 +503,10 @@ class ReceiptPdfService {
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text('Date:', style:  pw.TextStyle(fontSize: 11,fontWeight: pw.FontWeight.bold)),
+                pw.Text('Date:', style: pw.TextStyle(fontSize: labelSize, fontWeight: pw.FontWeight.bold)),
                 pw.Text(
                   _formatDateTime(data.sale.date),
-                  style:  pw.TextStyle(fontSize: 11,fontWeight: pw.FontWeight.bold),
+                  style: pw.TextStyle(fontSize: labelSize, fontWeight: pw.FontWeight.bold),
                 ),
               ],
             ),
@@ -423,10 +516,10 @@ class ReceiptPdfService {
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text('Order Type:', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                pw.Text('Order Type:', style: pw.TextStyle(fontSize: labelSize, fontWeight: pw.FontWeight.bold)),
                 pw.Text(
                   data.orderType!.toUpperCase(),
-                  style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+                  style: pw.TextStyle(fontSize: labelSize, fontWeight: pw.FontWeight.bold),
                 ),
               ],
             ),
@@ -436,10 +529,10 @@ class ReceiptPdfService {
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text('Token #:', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                pw.Text('Token #:', style: pw.TextStyle(fontSize: labelSize, fontWeight: pw.FontWeight.bold)),
                 pw.Text(
                   data.orderNo!,
-                  style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+                  style: pw.TextStyle(fontSize: labelSize, fontWeight: pw.FontWeight.bold),
                 ),
               ],
             ),
@@ -448,10 +541,10 @@ class ReceiptPdfService {
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text('Payment:', style:  pw.TextStyle(fontSize: 11,fontWeight: pw.FontWeight.bold)),
+                pw.Text('Payment:', style: pw.TextStyle(fontSize: labelSize, fontWeight: pw.FontWeight.bold)),
                 pw.Text(
                   data.sale.paymentType.toUpperCase(),
-                  style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+                  style: pw.TextStyle(fontSize: labelSize, fontWeight: pw.FontWeight.bold),
                 ),
               ],
             ),
@@ -460,25 +553,35 @@ class ReceiptPdfService {
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text('Customer:', style:  pw.TextStyle(fontSize: 11,fontWeight: pw.FontWeight.bold)),
+                pw.Text('Customer:', style: pw.TextStyle(fontSize: labelSize, fontWeight: pw.FontWeight.bold)),
                 pw.Text(
-                    data.customer!.name,
-                    style:  pw.TextStyle(fontSize: 11,fontWeight: pw.FontWeight.bold)),
+                  data.customer!.name,
+                  style: pw.TextStyle(fontSize: labelSize, fontWeight: pw.FontWeight.bold),
+                ),
               ],
             ),
           ],
         ],
 
-        pw.SizedBox(height: 4),
-        _buildDashedLine(),
-        pw.SizedBox(height: 4),
-
+        pw.SizedBox(height: lineSpacing),
+        _buildDashedLine(isSmallMedia: isSmallMedia),
+        pw.SizedBox(height: lineSpacing),
         // Items List - Different format for KOT vs Regular Receipt
         if (data.kotNumber != null) ...[
           // KOT Format: Just item name and quantity (no prices)
-          ...data.items.map((item) => _buildKOTItemRow(item, data)),
-          pw.SizedBox(height: 4),
-          _buildDashedLine(),
+          ...data.items.map((item) => _buildKOTItemRow(
+                item,
+                data,
+                fontSize: isPaperSaver
+                    ? (isSmallMedia ? 7.5 : 9.0)
+                    : (isSmallMedia ? 9.0 : 11.0),
+                subFontSize: isPaperSaver
+                    ? (isSmallMedia ? 6.0 : 7.5)
+                    : (isSmallMedia ? 7.5 : 9.5),
+                isPaperSaver: isPaperSaver,
+              )),
+          pw.SizedBox(height: lineSpacing),
+          _buildDashedLine(isSmallMedia: isSmallMedia),
           // No footer for KOT - just end here
         ] else ...[
           // Regular Receipt Format: With headers and prices
@@ -487,34 +590,39 @@ class ReceiptPdfService {
             children: [
               pw.Expanded(
                 flex: 3,
-                child: pw.Text('Item', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                child: pw.Text('Item', style: pw.TextStyle(fontSize: tableHeaderSize, fontWeight: pw.FontWeight.bold)),
               ),
               pw.Expanded(
                 flex: 1,
-                child: pw.Text('Qty', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center),
+                child: pw.Text('Qty', style: pw.TextStyle(fontSize: tableHeaderSize, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center),
               ),
               pw.Expanded(
                 flex: 2,
-                child: pw.Text('Price', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right),
+                child: pw.Text('Price', style: pw.TextStyle(fontSize: tableHeaderSize, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right),
               ),
               pw.Expanded(
                 flex: 2,
-                child: pw.Text('Amount', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right),
+                child: pw.Text('Amount', style: pw.TextStyle(fontSize: tableHeaderSize, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right),
               ),
             ],
           ),
-          pw.SizedBox(height: 4),
+          pw.SizedBox(height: lineSpacing),
 
           // Items List
-          ...data.items.map((item) => _buildThermalItemRow(item)),
+          ...data.items.map((item) => _buildThermalItemRow(
+                item,
+                fontSize: bodySize,
+                subFontSize: bodySize - 1.0,
+                isPaperSaver: isPaperSaver,
+              )),
 
-          pw.SizedBox(height: 4),
-          _buildDashedLine(),
-          pw.SizedBox(height: 4),
+          pw.SizedBox(height: lineSpacing),
+          _buildDashedLine(isSmallMedia: isSmallMedia),
+          pw.SizedBox(height: lineSpacing),
 
           // Totals - Display only (NO calculations)
           // All values pre-calculated by CartCalculationService
-              () {
+          () {
             // Derive the tax mode from the order totals (the stored flag can be
             // stale and mismatch how THIS order was priced).
             final bool fallbackInclusive = AppConfig.isRestaurant &&
@@ -576,33 +684,39 @@ class ReceiptPdfService {
             final bool hasGst = showTax && taxLines.isNotEmpty;
             // Authoritative total — always matches the order's GST.
             final double totalGst = data.sale.taxAmount;
+            // Tax toggle OFF → collapse the per-rate table to a single summary
+            // line so Sub Total + Tax still reconcile to the Grand Total.
+            final bool showTaxSummaryLine = !showTax && totalGst > 0.009;
 
             return pw.Column(
               children: [
                 if (showSubtotal)
                   _buildThermalTotalRow(
-                      'Sub Total:', data.itemTotal ?? data.sale.subtotal),
+                      'Sub Total:', data.itemTotal ?? data.sale.subtotal, fontSize: totalRowSize),
                 if (data.sale.discountAmount > 0.009 && showSubtotal)
-                  _buildThermalTotalRow('Discount', -data.sale.discountAmount),
+                  _buildThermalTotalRow('Discount', -data.sale.discountAmount, fontSize: totalRowSize),
                 if ((data.loyaltyPointsDiscount ?? 0) > 0)
                   _buildThermalTotalRow('Points Redeemed',
-                      -(data.loyaltyPointsDiscount!.toDouble())),
+                      -(data.loyaltyPointsDiscount!.toDouble()), fontSize: totalRowSize),
 
                 // Per-rate GST table (Taxable / CGST / SGST / Total Tax), framed
                 // by dashed lines. Only when GST applies — all-0% bills skip it.
                 if (hasGst) ...[
-                  pw.SizedBox(height: 4),
-                  _buildDashedLine(),
-                  pw.SizedBox(height: 4),
+                  pw.SizedBox(height: lineSpacing),
+                  _buildDashedLine(isSmallMedia: isSmallMedia),
+                  pw.SizedBox(height: lineSpacing),
                   _buildTaxSummaryHeader(),
                   ...taxLines.map(_buildTaxSummaryRow),
-                  pw.SizedBox(height: 4),
-                  _buildDashedLine(),
-                  pw.SizedBox(height: 4),
+                  pw.SizedBox(height: lineSpacing),
+                  _buildDashedLine(isSmallMedia: isSmallMedia),
+                  pw.SizedBox(height: lineSpacing),
                   _buildThermalTotalRow(
-                      inclusive ? 'Total GST (Included)' : 'Total GST:',
-                      totalGst),
-                ],
+                      inclusive ? 'Total Tax (Included)' : 'Total Tax:',
+                      totalGst, fontSize: totalRowSize),
+                ] else if (showTaxSummaryLine)
+                  _buildThermalTotalRow(
+                      inclusive ? 'Tax (Incl.)' : 'Tax',
+                      totalGst, fontSize: totalRowSize),
 
                 // Service / Delivery Charge
                 if ((data.serviceCharge ?? 0) > 0.009)
@@ -611,38 +725,37 @@ class ReceiptPdfService {
                         ? 'Delivery Charge'
                         : 'Service Charge',
                     data.serviceCharge!,
+                    fontSize: totalRowSize,
                   ),
               ],
             );
           }(),
 
           // Second Separator
-          pw.SizedBox(height: 4),
-          _buildDashedLine(),
-          pw.SizedBox(height: 4),
+          pw.SizedBox(height: lineSpacing),
+          _buildDashedLine(isSmallMedia: isSmallMedia),
+          pw.SizedBox(height: lineSpacing),
 
           // Round Off
           if ((data.roundOff ?? 0).abs() > 0.009)
-            _buildThermalTotalRow('Round Off', data.roundOff!),
+            _buildThermalTotalRow('Round Off', data.roundOff!, fontSize: totalRowSize),
 
           // Grand Total
-          _buildThermalTotalRow('TOTAL', data.sale.totalAmount, isBold: true, fontSize: 14),
+          _buildThermalTotalRow('TOTAL', data.sale.totalAmount, isBold: true, fontSize: grandTotalSize),
 
           // Payment status - Show only for PAID orders (NOT PAID already shown at top)
-          // For split payments the per-method breakdown is shown in the
-          // "Payment Details" section below, so skip this single line.
           if (showPaymentMethod && data.sale.isSplitPayment != true && data.sale.paymentType != null && data.sale.paymentType != 'credit' && data.sale.paymentType != 'NOT PAID') ...[
-            _buildThermalTotalRow('Paid by ${data.sale.paymentType!.toUpperCase()}', data.sale.totalAmount, fontSize: 12),
+            _buildThermalTotalRow('Paid by ${data.sale.paymentType!.toUpperCase()}', data.sale.totalAmount, fontSize: totalRowSize),
           ],
 
           // Credit sale info
           if (data.sale.paymentType == 'credit' || data.sale.dueAmount > 0) ...[
-            pw.SizedBox(height: 4),
-            _buildDashedLine(),
-            pw.SizedBox(height: 4),
-            _buildThermalTotalRow('Paid', data.sale.paidAmount),
-            _buildThermalTotalRow('DUE', data.sale.dueAmount, isBold: true, fontSize: 12),
-            pw.SizedBox(height: 4),
+            pw.SizedBox(height: lineSpacing),
+            _buildDashedLine(isSmallMedia: isSmallMedia),
+            pw.SizedBox(height: lineSpacing),
+            _buildThermalTotalRow('Paid', data.sale.paidAmount, fontSize: totalRowSize),
+            _buildThermalTotalRow('DUE', data.sale.dueAmount, isBold: true, fontSize: totalRowSize),
+            pw.SizedBox(height: lineSpacing),
             pw.Container(
               padding: const pw.EdgeInsets.all(4),
               decoration: pw.BoxDecoration(
@@ -650,63 +763,62 @@ class ReceiptPdfService {
               ),
               child: pw.Text(
                 '** CREDIT SALE - PAYMENT PENDING **',
-                style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(fontSize: totalRowSize, fontWeight: pw.FontWeight.bold),
                 textAlign: pw.TextAlign.center,
               ),
             ),
           ],
 
-          pw.SizedBox(height: 8),
-          _buildDashedLine(),
+          pw.SizedBox(height: lineSpacing),
+          _buildDashedLine(isSmallMedia: isSmallMedia),
 
-          // Split Payment Breakdown + its own divider — only when the sale
-          // actually has a multi-method / split payment. (A single payment used
-          // to leave two empty dashed lines stacked under the total.)
+          // Split Payment Breakdown
           if (showPaymentPaid &&
               (data.sale.paymentList.length > 1 ||
                   data.sale.isSplitPayment == true)) ...[
             pw.SizedBox(height: 4),
-            ..._buildSplitPaymentSection(data.sale),
+            ..._buildSplitPaymentSection(data.sale, fontSize: totalRowSize, isSmallMedia: isSmallMedia),
             pw.SizedBox(height: 4),
-            _buildDashedLine(),
+            _buildDashedLine(isSmallMedia: isSmallMedia),
           ],
-          pw.SizedBox(height: 8),
+          pw.SizedBox(height: lineSpacing),
 
           // UPI "Scan & Pay" — only on UNPAID bills with UPI configured.
-          ..._buildUpiPaySection(data),
+          ..._buildUpiPaySection(data, qrSize: qrS, fontSize: totalRowSize, isSmallMedia: isSmallMedia, isPaperSaver: isPaperSaver),
 
           // Footer
           if (AppConfig.isRestaurant) ...[
             if (data.isTaxInclusive ?? false)
               pw.Text(
                 'All prices include GST',
-                style: const pw.TextStyle(fontSize: 10),
+                style: pw.TextStyle(fontSize: isSmallMedia ? 8 : 10),
                 textAlign: pw.TextAlign.center,
               ),
             // Dynamic footer / "Thank You" message (owner-editable, multi-line).
             if (PrintSettings.footerMessage.trim().isNotEmpty)
               pw.Text(
                 PrintSettings.footerMessage.trim(),
-                style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(fontSize: footerSize, fontWeight: pw.FontWeight.bold),
                 textAlign: pw.TextAlign.center,
               ),
-            // "Powered by" + company line — printed only when the admin grants
-            // `billing.invoice.print` in the license manifest (shown by default).
-            if (PlanEnforce.allows(EntKeys.billingInvoicePrint)) ...[
+            // "Powered by" + company line — forced by the admin flag, else the
+            // shop's "Powered By" toggle decides.
+            if (PlanEnforce.allows(EntKeys.billingInvoicePrint) ||
+                PrintSettings.showPoweredBy) ...[
               pw.SizedBox(height: 4),
               pw.Text(
                 'Powered by Bill Berry Lite',
-                style: const pw.TextStyle(fontSize: 9),
+                style: pw.TextStyle(fontSize: isSmallMedia ? 7.5 : 9),
                 textAlign: pw.TextAlign.center,
               ),
               pw.Text(
                 'Accrete Infosolution Technologies Private Limited',
-                style: const pw.TextStyle(fontSize: 8),
+                style: pw.TextStyle(fontSize: isSmallMedia ? 6.5 : 8),
                 textAlign: pw.TextAlign.center,
               ),
               pw.Text(
                 'Ph: 7041046049',
-                style: const pw.TextStyle(fontSize: 8),
+                style: pw.TextStyle(fontSize: isSmallMedia ? 6.5 : 8),
                 textAlign: pw.TextAlign.center,
               ),
             ],
@@ -714,18 +826,18 @@ class ReceiptPdfService {
             if (footerText.isNotEmpty) ...[
               pw.Text(
                 footerText,
-                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(fontSize: footerSize, fontWeight: pw.FontWeight.bold),
                 textAlign: pw.TextAlign.center,
               ),
             ] else ...[
               pw.Text(
                 'Thank you for your purchase!',
-                style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(fontSize: footerSize + 1, fontWeight: pw.FontWeight.bold),
               ),
               pw.SizedBox(height: 4),
               pw.Text(
                 'Visit us again!',
-                style: const pw.TextStyle(fontSize: 10),
+                style: pw.TextStyle(fontSize: footerSize),
               ),
             ],
           ],
@@ -1052,9 +1164,14 @@ class ReceiptPdfService {
                     // Sub Total / Taxable Amount — only for tax-exclusive
                     if (!isRestaurantInclusive && showSubtotal)
                       _buildInvoiceTotalRow('Sub Total (Before Tax)', data.sale.subtotal),
-                    // GST — only for tax-exclusive
-                    if (!isRestaurantInclusive && showTax && data.sale.taxAmount > 0)
+                    // GST summary row (exclusive) — always shown so the invoice
+                    // reconciles even when the detailed table above is toggled off.
+                    if (!isRestaurantInclusive && data.sale.taxAmount > 0)
                       _buildInvoiceTotalRow('GST', data.sale.taxAmount),
+                    // Inclusive mode: the detailed table carries tax; when it's
+                    // toggled off, show a single informational line instead.
+                    if (isRestaurantInclusive && !showTax && data.sale.taxAmount > 0)
+                      _buildInvoiceTotalRow('Tax (Incl.)', data.sale.taxAmount),
                     // Service / Delivery Charge
                     if ((data.serviceCharge ?? 0) > 0.009)
                       _buildInvoiceTotalRow(
@@ -1177,10 +1294,11 @@ class ReceiptPdfService {
                 'This is a computer-generated invoice.',
                 style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
               ),
-              // "Powered by" + company line — restaurant only; printed when the
-              // admin grants `billing.invoice.print` (shown by default).
+              // "Powered by" + company line — restaurant only. Forced by the admin
+              // `billing.invoice.print` flag; otherwise the shop's toggle decides.
               if (AppConfig.isRestaurant &&
-                  PlanEnforce.allows(EntKeys.billingInvoicePrint)) ...[
+                  (PlanEnforce.allows(EntKeys.billingInvoicePrint) ||
+                      PrintSettings.showPoweredBy)) ...[
                 pw.SizedBox(height: 4),
                 pw.Text(
                   'Powered by Bill Berry Lite',
@@ -1405,7 +1523,7 @@ class ReceiptPdfService {
   }
 
   /// Build item row for KOT (Kitchen Order Ticket) - Simple format without prices
-  pw.Widget _buildKOTItemRow(SaleItemModel item, ReceiptData data) {
+  pw.Widget _buildKOTItemRow(SaleItemModel item, ReceiptData data, {double fontSize = 14, double subFontSize = 12, bool isPaperSaver = false}) {
     final name = item.productName ?? 'Unknown';
     // Format item name with variant in parentheses: "Veg Pizza (Medium)"
     final displayName = item.size != null ? '$name (${item.size})' : name;
@@ -1415,7 +1533,10 @@ class ReceiptPdfService {
     final bool isCancel = data.kotStatus?.toUpperCase() == 'CANCEL';
 
     return pw.Container(
-      padding: const pw.EdgeInsets.only(top: 3, bottom: 3),
+      padding: pw.EdgeInsets.only(
+        top: isPaperSaver ? 1.0 : 3.0,
+        bottom: isPaperSaver ? 1.0 : 3.0,
+      ),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
@@ -1428,7 +1549,7 @@ class ReceiptPdfService {
                 child: pw.Text(
                   displayName,
                   style: pw.TextStyle(
-                    fontSize: 14,
+                    fontSize: fontSize,
                     fontWeight: pw.FontWeight.bold,
                     decoration: isCancel
                         ? pw.TextDecoration.lineThrough
@@ -1439,7 +1560,7 @@ class ReceiptPdfService {
               pw.SizedBox(width: 6),
               pw.Text(
                 isCancel ? 'CANCEL x${item.qty}' : 'x${item.qty}',
-                style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(fontSize: fontSize, fontWeight: pw.FontWeight.bold),
               ),
             ],
           ),
@@ -1449,7 +1570,7 @@ class ReceiptPdfService {
               padding: const pw.EdgeInsets.only(left: 4, top: 1),
               child: pw.Text(
                 '  ${item.weight!}',
-                style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700),
+                style: pw.TextStyle(fontSize: subFontSize, color: PdfColors.grey700),
               ),
             ),
         ],
@@ -1458,7 +1579,7 @@ class ReceiptPdfService {
   }
 
   /// Build item row for thermal receipt
-  pw.Widget _buildThermalItemRow(SaleItemModel item) {
+  pw.Widget _buildThermalItemRow(SaleItemModel item, {double fontSize = 9, double subFontSize = 8, bool isPaperSaver = false}) {
     final name = item.productName ?? 'Unknown';
     // Full name + variant — let it WRAP (no truncation) so variant/extra details
     // in parentheses aren't hidden behind an ellipsis.
@@ -1470,7 +1591,7 @@ class ReceiptPdfService {
     final unitPrice = item.qty > 0 ? item.total / item.qty : item.total;
 
     return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(vertical: 2),
+      padding: pw.EdgeInsets.symmetric(vertical: isPaperSaver ? 0.5 : 2.0),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
@@ -1481,17 +1602,17 @@ class ReceiptPdfService {
             children: [
               pw.Expanded(
                 flex: 3,
-                child: pw.Text(displayName, style: const pw.TextStyle(fontSize: 9)),
+                child: pw.Text(displayName, style: pw.TextStyle(fontSize: fontSize)),
               ),
               pw.Expanded(
                 flex: 1,
-                child: pw.Text('${item.qty}', style: const pw.TextStyle(fontSize: 9), textAlign: pw.TextAlign.center),
+                child: pw.Text('${item.qty}', style: pw.TextStyle(fontSize: fontSize), textAlign: pw.TextAlign.center),
               ),
               pw.Expanded(
                 flex: 2,
                 child: pw.Text(
                   _formatCurrency(unitPrice),
-                  style: const pw.TextStyle(fontSize: 9),
+                  style: pw.TextStyle(fontSize: fontSize),
                   textAlign: pw.TextAlign.right,
                 ),
               ),
@@ -1499,7 +1620,7 @@ class ReceiptPdfService {
                 flex: 2,
                 child: pw.Text(
                   _formatCurrency(item.total),
-                  style: const pw.TextStyle(fontSize: 9),
+                  style: pw.TextStyle(fontSize: fontSize),
                   textAlign: pw.TextAlign.right,
                 ),
               ),
@@ -1511,7 +1632,7 @@ class ReceiptPdfService {
               padding: const pw.EdgeInsets.only(left: 8, top: 2),
               child: pw.Text(
                 item.weight!,
-                style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+                style: pw.TextStyle(fontSize: subFontSize, color: PdfColors.grey600),
               ),
             ),
         ],
@@ -1522,7 +1643,7 @@ class ReceiptPdfService {
   /// "Scan & Pay via UPI" block — printed only on UNPAID bills when UPI is
   /// configured. Prefers the merchant's uploaded QR image; otherwise generates a
   /// dynamic UPI QR with the amount pre-filled. Returns [] when it shouldn't show.
-  List<pw.Widget> _buildUpiPaySection(ReceiptData data) {
+  List<pw.Widget> _buildUpiPaySection(ReceiptData data, {double qrSize = 80, double fontSize = 12, bool isSmallMedia = false, bool isPaperSaver = false}) {
     if (!PrintSettings.showUpiQr) return []; // customization toggle
     final hasUpiId = (data.upiId?.trim().isNotEmpty ?? false);
     final hasQrImage = data.upiQrImageBytes != null;
@@ -1536,7 +1657,7 @@ class ReceiptPdfService {
     pw.Widget qr;
     if (hasQrImage) {
       qr = pw.Image(pw.MemoryImage(data.upiQrImageBytes!),
-          width: 80, height: 80);
+          width: qrSize, height: qrSize);
     } else {
       final payee = (data.upiPayeeName?.trim().isNotEmpty ?? false)
           ? data.upiPayeeName!.trim()
@@ -1549,20 +1670,20 @@ class ReceiptPdfService {
       final link = 'upi://pay?pa=${data.upiId!.trim()}'
           '&pn=${Uri.encodeComponent(payee)}$amountParam&cu=INR';
       qr = pw.BarcodeWidget(
-          barcode: pw.Barcode.qrCode(), data: link, width: 80, height: 80);
+          barcode: pw.Barcode.qrCode(), data: link, width: qrSize, height: qrSize);
     }
 
     return [
       // No leading divider — the section is always preceded by the divider
       // printed after the TOTAL, so adding one here doubled the dashed line.
       pw.Text('Scan & Pay via UPI',
-          style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+          style: pw.TextStyle(fontSize: fontSize, fontWeight: pw.FontWeight.bold),
           textAlign: pw.TextAlign.center),
-      pw.SizedBox(height: 6),
+      pw.SizedBox(height: isPaperSaver ? 1.0 : 3.0),
       pw.Center(child: qr),
-      pw.SizedBox(height: 8),
-      _buildDashedLine(),
-      pw.SizedBox(height: 4),
+      pw.SizedBox(height: isPaperSaver ? 1.0 : 3.0),
+      _buildDashedLine(isSmallMedia: isSmallMedia),
+      pw.SizedBox(height: isPaperSaver ? 1.0 : 2.0),
     ];
   }
 
@@ -1625,7 +1746,7 @@ class ReceiptPdfService {
   /// Build total row for thermal receipt
   pw.Widget _buildThermalTotalRow(String label, double amount, {bool isBold = false, double fontSize = 14}) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(vertical: 1),
+      padding: const pw.EdgeInsets.symmetric(vertical: 0.5),
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
@@ -1807,11 +1928,14 @@ class ReceiptPdfService {
   }
 
   /// Build dashed line for thermal receipt
-  pw.Widget _buildDashedLine() {
+  pw.Widget _buildDashedLine({bool isSmallMedia = false}) {
+    final int count = isSmallMedia ? 28 : 42;
     return pw.Container(
+      padding: pw.EdgeInsets.zero,
+      margin: pw.EdgeInsets.zero,
       child: pw.Text(
-        '-' * 40,
-        style: const pw.TextStyle(fontSize: 8),
+        '-' * count,
+        style: pw.TextStyle(fontSize: 5.0, height: 0.8),
         textAlign: pw.TextAlign.center,
       ),
     );
@@ -1854,7 +1978,7 @@ class ReceiptPdfService {
   }
 
   /// Build split payment section for thermal receipt
-  List<pw.Widget> _buildSplitPaymentSection(SaleModel sale) {
+  List<pw.Widget> _buildSplitPaymentSection(SaleModel sale, {double fontSize = 11, bool isSmallMedia = false}) {
     final paymentList = sale.paymentList;
     final widgets = <pw.Widget>[];
 
@@ -1863,13 +1987,13 @@ class ReceiptPdfService {
       widgets.add(
         pw.Text(
           'Payment Details',
-          style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+          style: pw.TextStyle(fontSize: fontSize, fontWeight: pw.FontWeight.bold),
         ),
       );
       widgets.add(pw.SizedBox(height: 4));
 
       // Restaurant receipts use larger body text (fontSize 11) than retail (8).
-      final double rowFont = AppConfig.isRestaurant ? 11 : 8;
+      final double rowFont = AppConfig.isRestaurant ? fontSize : 8;
 
       for (final payment in paymentList) {
         final method = (payment['method'] as String?)?.toUpperCase() ?? 'OTHER';
@@ -1903,8 +2027,8 @@ class ReceiptPdfService {
               child: pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('Cash Received:', style: const pw.TextStyle(fontSize: 7)),
-                  pw.Text(_formatCurrency(received), style: const pw.TextStyle(fontSize: 7)),
+                  pw.Text('Cash Received:', style: pw.TextStyle(fontSize: isSmallMedia ? 6.5 : 7)),
+                  pw.Text(_formatCurrency(received), style: pw.TextStyle(fontSize: isSmallMedia ? 6.5 : 7)),
                 ],
               ),
             ),
@@ -1916,8 +2040,8 @@ class ReceiptPdfService {
                 child: pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
-                    pw.Text('Change Given:', style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold)),
-                    pw.Text(_formatCurrency(change), style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold)),
+                    pw.Text('Change Given:', style: pw.TextStyle(fontSize: isSmallMedia ? 6.5 : 7, fontWeight: pw.FontWeight.bold)),
+                    pw.Text(_formatCurrency(change), style: pw.TextStyle(fontSize: isSmallMedia ? 6.5 : 7, fontWeight: pw.FontWeight.bold)),
                   ],
                 ),
               ),
@@ -1933,8 +2057,8 @@ class ReceiptPdfService {
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Text('Total Paid:', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
-              pw.Text(_formatCurrency(sale.totalPaid!), style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+              pw.Text('Total Paid:', style: pw.TextStyle(fontSize: isSmallMedia ? 7 : 8, fontWeight: pw.FontWeight.bold)),
+              pw.Text(_formatCurrency(sale.totalPaid!), style: pw.TextStyle(fontSize: isSmallMedia ? 7 : 8, fontWeight: pw.FontWeight.bold)),
             ],
           ),
         );
@@ -1945,8 +2069,8 @@ class ReceiptPdfService {
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Text('Change:', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
-              pw.Text(_formatCurrency(sale.changeReturn!), style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+              pw.Text('Change:', style: pw.TextStyle(fontSize: isSmallMedia ? 7 : 8, fontWeight: pw.FontWeight.bold)),
+              pw.Text(_formatCurrency(sale.changeReturn!), style: pw.TextStyle(fontSize: isSmallMedia ? 7 : 8, fontWeight: pw.FontWeight.bold)),
             ],
           ),
         );

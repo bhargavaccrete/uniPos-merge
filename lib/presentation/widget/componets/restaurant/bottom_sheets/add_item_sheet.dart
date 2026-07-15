@@ -97,12 +97,14 @@ class _AddItemSheetState extends State<AddItemSheet> {
 
   // Focus nodes for all text fields
   final _itemNameFocusNode = FocusNode();
+  final _itemCodeFocusNode = FocusNode();
   final _priceFocusNode = FocusNode();
   final _descriptionFocusNode = FocusNode();
 
   @override
   void dispose() {
     _itemNameFocusNode.dispose();
+    _itemCodeFocusNode.dispose();
     _priceFocusNode.dispose();
     _descriptionFocusNode.dispose();
     _formState.dispose();
@@ -454,12 +456,15 @@ class _AddItemSheetState extends State<AddItemSheet> {
       hint: 'e.g. Margherita Pizza',
       icon: Icons.fastfood_outlined,
       required: true,
+      textInputAction: TextInputAction.next,
+      onFieldSubmitted: (_) => _itemCodeFocusNode.requestFocus(),
     );
   }
 
   Widget _buildItemCodeField() {
     return AppTextField(
       controller: _formState.itemCodeController,
+      focusNode: _itemCodeFocusNode,
       label: 'Item Code',
       hint: 'e.g. 10021',
       icon: Icons.qr_code_scanner_rounded,
@@ -469,6 +474,9 @@ class _AddItemSheetState extends State<AddItemSheet> {
         FilteringTextInputFormatter.digitsOnly,
         LengthLimitingTextInputFormatter(5), // item code = max 5 digits
       ],
+      textInputAction: TextInputAction.next,
+      // Skip the Selling Method button (not a text field) → jump to Price.
+      onFieldSubmitted: (_) => _priceFocusNode.requestFocus(),
     );
   }
 
@@ -490,6 +498,9 @@ class _AddItemSheetState extends State<AddItemSheet> {
       inputFormatters: [
         FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
       ],
+      textInputAction: TextInputAction.next,
+      // Skip the Category/Tax/Veg buttons (not text fields) → jump to Description.
+      onFieldSubmitted: (_) => _descriptionFocusNode.requestFocus(),
     );
   }
 
@@ -502,6 +513,8 @@ class _AddItemSheetState extends State<AddItemSheet> {
       icon: Icons.notes_outlined,
       maxLines: 3,
       minLines: 1,
+      // Multiline: leave the return key as a newline; just dismiss on submit.
+      onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
     );
   }
 
@@ -586,6 +599,8 @@ class _AddItemSheetState extends State<AddItemSheet> {
       inputFormatters: [
         FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
       ],
+      textInputAction: TextInputAction.done,
+      onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
     );
   }
 
@@ -619,6 +634,8 @@ class _AddItemSheetState extends State<AddItemSheet> {
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
               ],
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
             );
           }),
         ],

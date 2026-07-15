@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mobx/mobx.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/plan/entitlements.dart';
 import '../../../core/plan/entitlement_debug.dart';
 import '../../../core/routes/routes_name.dart';
@@ -705,11 +706,19 @@ abstract class _LicenseStore with Store {
 
     // 1. If not licensed (and not bypassed)
     if (!licStore.isLicensed) {
-      if (licStore.licenseInfo == null) {
-        // No license at all -> License Activation (Key Entry)
+      // A device with NO license record: a brand-new device goes through Key
+      // Entry -> Setup Wizard (activation is deferred until the wizard captures
+      // the store name). But a device that has ALREADY completed setup and only
+      // LOST its license — e.g. deactivated by the server, which returns
+      // reason=DEVICE_MISMATCH and wipes licenseInfo to null (see checkStatus) —
+      // must NOT be forced back through onboarding. Route it to the Lock screen
+      // to re-activate and return straight to the app.
+      if (licStore.licenseInfo == null && !AppConfig.isSetupComplete) {
+        // No license at all on a fresh device -> License Activation (Key Entry)
         Navigator.pushReplacementNamed(context, RouteNames.licenseKeyEntry);
       } else {
-        // Expired or invalid -> License Locked
+        // Expired / suspended / device-unregistered on an already-set-up
+        // device -> License Locked (re-activate in place).
         Navigator.pushReplacementNamed(context, RouteNames.licenseLock);
       }
       return;

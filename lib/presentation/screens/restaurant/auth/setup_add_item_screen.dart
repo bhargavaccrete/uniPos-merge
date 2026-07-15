@@ -822,6 +822,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
             hint: 'e.g., Margherita Pizza',
             icon: Icons.restaurant_menu_rounded,
             required: true,
+            textInputAction: TextInputAction.next,
             onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_codeFocusNode),
           ),
           const SizedBox(height: 15),
@@ -838,6 +839,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
             inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
             ],
+            textInputAction: TextInputAction.next,
             onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_priceFocusNode),
           ),
           const SizedBox(height: 15),
@@ -854,6 +856,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
             ],
+            textInputAction: TextInputAction.next,
             onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_descriptionFocusNode),
           ),
           const SizedBox(height: 15),

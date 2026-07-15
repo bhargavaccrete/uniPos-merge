@@ -118,8 +118,7 @@ abstract class _ShiftStore with Store {
             final status = (o.orderStatus ?? '').toUpperCase();
             return status != 'VOID' &&
                 status != 'VOIDED' &&
-                status != 'FULLY_REFUNDED' &&
-                status != 'PARTIALLY_REFUNDED';
+                status != 'FULLY_REFUNDED';
           }).toList();
           enriched.add(s.copyWith(
             orderCount: validOrders.length,
@@ -193,8 +192,7 @@ abstract class _ShiftStore with Store {
         final status = (o.orderStatus ?? '').toUpperCase();
         return status != 'VOID' &&
             status != 'VOIDED' &&
-            status != 'FULLY_REFUNDED' &&
-            status != 'PARTIALLY_REFUNDED';
+            status != 'FULLY_REFUNDED';
       }).toList();
       final orderCount = validOrders.length;
       final totalSales = validOrders.fold<double>(
@@ -245,8 +243,7 @@ abstract class _ShiftStore with Store {
         final status = (o.orderStatus ?? '').toUpperCase();
         return status != 'VOID' &&
             status != 'VOIDED' &&
-            status != 'FULLY_REFUNDED' &&
-            status != 'PARTIALLY_REFUNDED';
+            status != 'FULLY_REFUNDED';
       }).toList();
       final orderCount = validOrders.length;
       final totalSales = validOrders.fold<double>(
