@@ -28,6 +28,8 @@ class _AddexpenceState extends State<Addexpence> {
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _reasonController = TextEditingController();
+  final _amountFocus = FocusNode();
+  final _reasonFocus = FocusNode();
   bool _isSaving = false;
   String? _categoryError;
 
@@ -45,6 +47,8 @@ class _AddexpenceState extends State<Addexpence> {
     _dateController.dispose();
     _amountController.dispose();
     _reasonController.dispose();
+    _amountFocus.dispose();
+    _reasonFocus.dispose();
     super.dispose();
   }
 
@@ -336,6 +340,7 @@ class _AddexpenceState extends State<Addexpence> {
                             Expanded(
                               child: AppTextField(
                                 controller: _amountController,
+                                focusNode: _amountFocus,
                                 label: 'Amount (${CurrencyHelper.currentSymbol})',
                                 hint: 'Enter amount',
                                 icon: Icons.attach_money_rounded,
@@ -343,6 +348,11 @@ class _AddexpenceState extends State<Addexpence> {
                                 inputFormatters: [
                                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
                                 ],
+                                textInputAction: TextInputAction.next,
+                                // Dismiss the keyboard after Amount so the user can
+                                // pick the Category & Payment dropdowns; Reason is
+                                // typed afterwards and submits the form.
+                                onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
                                 validator: (value) {
                                   if (value == null || value.trim().isEmpty) return 'Please enter amount';
                                   final amount = double.tryParse(value.trim());
@@ -377,9 +387,12 @@ class _AddexpenceState extends State<Addexpence> {
                         // Reason
                         AppTextField(
                           controller: _reasonController,
+                          focusNode: _reasonFocus,
                           label: 'Reason',
                           hint: 'Enter reason (optional)',
                           icon: Icons.notes_rounded,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => _addExpense(),
                         ),
 
                         SizedBox(height: 24),

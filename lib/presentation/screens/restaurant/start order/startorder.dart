@@ -268,9 +268,40 @@ class _StartorderState extends State<Startorder>
   Widget build(BuildContext context) {
     final isTablet = !AppResponsive.isMobile(context);
 
-    return Scaffold(
-      backgroundColor: AppColors.surfaceLight,
-      drawer: Drawerr(),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        final now = DateTime.now();
+        if (_lastBackPress != null &&
+            now.difference(_lastBackPress!) < const Duration(seconds: 2)) {
+          SystemNavigator.pop();
+          return;
+        }
+        _lastBackPress = now;
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.exit_to_app_rounded, color: Colors.white, size: 20),
+                SizedBox(width: 10),
+                Text('Press back again to exit', textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
+              ],
+            ),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.primary,
+            margin: const EdgeInsets.only(bottom: 24, left: 24, right: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.surfaceLight,
+        drawer: Drawerr(),
       appBar: buildPrimaryAppBar(
         titleWidget: Row(
           children: [
@@ -377,6 +408,7 @@ class _StartorderState extends State<Startorder>
             ),
           ),
         ))
-      ) ;
+      ),
+    );
   }
 }

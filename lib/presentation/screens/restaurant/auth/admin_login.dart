@@ -170,12 +170,17 @@ class _AdminLoginState extends State<AdminLogin> {
                 AppTextField(
                   obscureText: _obscurePassword,
                   controller: _passwordController,
+                  autofocus: true,
                   hint: 'Enter admin PIN',
                   icon: Icons.lock_outline,
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   maxLength: 6,
                   enabled: !isLocked,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) {
+                    if (!isLocked && !_isLoading) _handleLogin();
+                  },
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) return 'PIN is required';
                     if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim())) return 'PIN must be 4–6 digits';

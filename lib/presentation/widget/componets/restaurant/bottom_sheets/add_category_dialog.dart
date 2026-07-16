@@ -238,10 +238,13 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
         _card(
           child: AppTextField(
             controller: _categoryNameController,
+            autofocus: true,
             label: 'Category Name',
             hint: 'e.g., Beverages, Starters',
             icon: Icons.category_outlined,
             required: true,
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) => _saveCategory(),
           ),
         ),
 

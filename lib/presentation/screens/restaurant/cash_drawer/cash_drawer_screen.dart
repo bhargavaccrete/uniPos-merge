@@ -14,6 +14,7 @@ import 'package:billberrylite/domain/services/common/notification_service.dart';
 import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
@@ -418,6 +419,8 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
   Future<void> _showMovementDialog(String type) async {
     final amountCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
+    final amountFocus = FocusNode();
+    final noteFocus = FocusNode();
 
     final isCashIn = type == 'in';
     // Separate reason lists for Cash In vs Cash Out
@@ -444,7 +447,9 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
 
     await showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => DialogDisposeScope(
+        disposables: [amountCtrl, noteCtrl, amountFocus, noteFocus],
+        child: StatefulBuilder(
         builder: (ctx, setDs) => AppDialogShell(
           title: isCashIn ? 'Cash In' : 'Cash Out',
           accent: accent,
@@ -458,12 +463,16 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
               // Amount
               AppTextField(
                 controller: amountCtrl,
+                focusNode: amountFocus,
+                autofocus: true,
                 label: 'Amount',
                 hint: '0.00',
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
                 ],
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: (_) => noteFocus.requestFocus(),
                 prefixWidget: Padding(
                   padding: const EdgeInsets.only(left: 14, right: 8),
                   child: Text(
@@ -534,9 +543,12 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
               // Optional note
               AppTextField(
                 controller: noteCtrl,
+                focusNode: noteFocus,
                 label: 'Note',
                 hint: 'Add extra details... (optional)',
                 icon: Icons.notes_rounded,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
               ),
             ],
           ),
@@ -587,6 +599,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -1349,12 +1362,16 @@ class CashHandoverCloseDialog extends StatefulWidget {
 class _CashHandoverCloseDialogState extends State<CashHandoverCloseDialog> {
   final _amountCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
+  final _amountFocus = FocusNode();
+  final _noteFocus = FocusNode();
   bool _isSaving = false;
 
   @override
   void dispose() {
     _amountCtrl.dispose();
     _noteCtrl.dispose();
+    _amountFocus.dispose();
+    _noteFocus.dispose();
     super.dispose();
   }
 
@@ -1430,6 +1447,8 @@ class _CashHandoverCloseDialogState extends State<CashHandoverCloseDialog> {
               // Cash count input
               AppTextField(
                 controller: _amountCtrl,
+                focusNode: _amountFocus,
+                autofocus: true,
                 label: 'Cash counted in drawer',
                 hint: '0.00',
                 keyboardType:
@@ -1437,6 +1456,8 @@ class _CashHandoverCloseDialogState extends State<CashHandoverCloseDialog> {
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
                 ],
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: (_) => _noteFocus.requestFocus(),
                 prefixWidget: Padding(
                   padding: const EdgeInsets.only(left: 14, right: 8),
                   child: Text(
@@ -1453,9 +1474,12 @@ class _CashHandoverCloseDialogState extends State<CashHandoverCloseDialog> {
               // Optional note
               AppTextField(
                 controller: _noteCtrl,
+                focusNode: _noteFocus,
                 label: 'Note',
                 hint: 'e.g. "Left ₹1500, all good" (optional)',
                 icon: Icons.notes_rounded,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
               ),
             ],
           ),
@@ -1552,6 +1576,8 @@ class HandoverReceiveDialog extends StatefulWidget {
 class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
   final _amountCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
+  final _amountFocus = FocusNode();
+  final _noteFocus = FocusNode();
   bool _isSaving = false;
   // After completion, show result before closing
   String? _resultStatus;
@@ -1568,6 +1594,8 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
   void dispose() {
     _amountCtrl.dispose();
     _noteCtrl.dispose();
+    _amountFocus.dispose();
+    _noteFocus.dispose();
     super.dispose();
   }
 
@@ -1676,6 +1704,8 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
                 // Incoming staff counts
                 AppTextField(
                   controller: _amountCtrl,
+                  focusNode: _amountFocus,
+                  autofocus: true,
                   label: 'Count the cash now',
                   hint: '0.00',
                   keyboardType:
@@ -1683,6 +1713,8 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
                   inputFormatters: [
                     FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
                   ],
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) => _noteFocus.requestFocus(),
                   prefixWidget: Padding(
                     padding: const EdgeInsets.only(left: 14, right: 8),
                     child: Text(
@@ -1704,9 +1736,12 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
                 const SizedBox(height: 16),
                 AppTextField(
                   controller: _noteCtrl,
+                  focusNode: _noteFocus,
                   label: 'Note',
                   hint: 'Any remarks... (optional)',
                   icon: Icons.notes_rounded,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
                 ),
               ],
             ),

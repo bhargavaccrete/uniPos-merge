@@ -307,6 +307,7 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
         SizedBox(height: AppResponsive.largeSpacing(context)),
         AppTextField(
           controller: _emailController,
+          autofocus: true,
           label: 'Email Address',
           hint: 'you@business.com',
           icon: Icons.email_rounded,
@@ -336,6 +337,7 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
         SizedBox(height: AppResponsive.largeSpacing(context)),
         AppTextField(
           controller: _otpController,
+          autofocus: true,
           label: 'Verification Code',
           hint: '6-digit code',
           icon: Icons.lock_clock_rounded,

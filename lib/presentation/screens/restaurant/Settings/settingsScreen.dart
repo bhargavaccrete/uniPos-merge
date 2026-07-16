@@ -9,10 +9,10 @@ import '../../../../domain/services/common/backup_encryption_service.dart';
 import '../../../../util/common/currency_helper.dart';
 import '../../../../util/restaurant/staticswitch.dart';
 import '../../../../util/common/decimal_settings.dart';
-import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 import '../../../../util/restaurant/restaurant_session.dart';
 import '../../../widget/componets/common/app_text_field.dart';
 import '../../../widget/componets/common/app_dialog.dart';
+import '../../../widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import '../../../../util/common/app_responsive.dart';
 import '../../../widget/componets/common/primary_app_bar.dart';
@@ -55,6 +55,17 @@ class _settingsScreenState extends State<Settingsscreen> {
     super.dispose();
   }
 
+  void _applyCustomThreshold() {
+    final v = double.tryParse(_customThresholdController.text.trim());
+    if (v == null || v <= 0) {
+      NotificationService.instance.showError('Enter a valid number');
+      return;
+    }
+    AppSettings.updateLowStockThreshold(v);
+    _customThresholdController.clear();
+    FocusScope.of(context).unfocus();
+  }
+
   Future<void> _loadSettings() async {
     await DecimalSettings.load();
     final result = await DeviceIdService.getResult();
@@ -72,12 +83,30 @@ class _settingsScreenState extends State<Settingsscreen> {
   Future<void> _showSetPasswordDialog({bool isChange = false}) async {
     final pwdController = TextEditingController();
     final confirmController = TextEditingController();
+    final pwdFocus = FocusNode();
+    final confirmFocus = FocusNode();
     bool obscure = true;
     String? error;
     await showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDlgState) => AppDialogShell(
+      builder: (ctx) => DialogDisposeScope(
+        disposables: [pwdController, confirmController, pwdFocus, confirmFocus],
+        child: StatefulBuilder(
+        builder: (ctx, setDlgState) {
+          Future<void> submit() async {
+            final pwd = pwdController.text.trim();
+            final err = BackupEncryptionService.validatePassword(
+                pwd, confirmController.text.trim());
+            if (err != null) {
+              setDlgState(() => error = err);
+              return;
+            }
+            await BackupEncryptionService.setPassword(pwd);
+            if (ctx.mounted) Navigator.pop(ctx);
+            setState(() => _hasBackupPassword = true);
+          }
+
+          return AppDialogShell(
           title: isChange ? 'Change Backup Password' : 'Set Backup Password',
           subtitle: 'Encrypts and protects your backups',
           accent: AppColors.primary,
@@ -88,6 +117,8 @@ class _settingsScreenState extends State<Settingsscreen> {
             children: [
               AppTextField(
                 controller: pwdController,
+                focusNode: pwdFocus,
+                autofocus: true,
                 label: 'Password (6 digits)',
                 hint: 'Enter 6-digit password',
                 icon: Icons.lock_outline_rounded,
@@ -95,6 +126,8 @@ class _settingsScreenState extends State<Settingsscreen> {
                 keyboardType: TextInputType.number,
                 maxLength: 6,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: (_) => confirmFocus.requestFocus(),
                 suffixIcon: IconButton(
                   icon: Icon(
                     obscure
@@ -109,12 +142,15 @@ class _settingsScreenState extends State<Settingsscreen> {
               const SizedBox(height: 12),
               AppTextField(
                 controller: confirmController,
+                focusNode: confirmFocus,
                 label: 'Confirm Password',
                 icon: Icons.lock_outline_rounded,
                 obscureText: obscure,
                 keyboardType: TextInputType.number,
                 maxLength: 6,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => submit(),
               ),
               const SizedBox(height: 14),
               // Warning callout
@@ -177,25 +213,14 @@ class _settingsScreenState extends State<Settingsscreen> {
             const SizedBox(width: 12),
             appDialogPrimaryButton(
               label: isChange ? 'Update' : 'Confirm',
-              onPressed: () async {
-                final pwd = pwdController.text.trim();
-                final err = BackupEncryptionService.validatePassword(
-                    pwd, confirmController.text.trim());
-                if (err != null) {
-                  setDlgState(() => error = err);
-                  return;
-                }
-                await BackupEncryptionService.setPassword(pwd);
-                if (ctx.mounted) Navigator.pop(ctx);
-                setState(() => _hasBackupPassword = true);
-              },
+              onPressed: submit,
             ),
           ],
-        ),
+        );
+        },
+      ),
       ),
     );
-    pwdController.dispose();
-    confirmController.dispose();
   }
 
   String _getTimeoutLabel(int minutes) {
@@ -452,8 +477,6 @@ class _settingsScreenState extends State<Settingsscreen> {
         title: 'Settings',
         titleFontSize: AppResponsive.headingFontSize(context),
       ),
-      drawer:
-          DrawerManage(islogout: true),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -847,10 +870,14 @@ class _settingsScreenState extends State<Settingsscreen> {
                                   Expanded(
                                     child: AppTextField(
                                       controller: _customThresholdController,
+                                      autofocus: true,
                                       hint: 'Custom value',
                                       keyboardType:
                                           const TextInputType.numberWithOptions(
                                               decimal: true),
+                                      textInputAction: TextInputAction.done,
+                                      onFieldSubmitted: (_) =>
+                                          _applyCustomThreshold(),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -864,19 +891,7 @@ class _settingsScreenState extends State<Settingsscreen> {
                                           borderRadius:
                                               BorderRadius.circular(10)),
                                     ),
-                                    onPressed: () {
-                                      final v = double.tryParse(
-                                          _customThresholdController.text
-                                              .trim());
-                                      if (v == null || v <= 0) {
-                                        NotificationService.instance
-                                            .showError('Enter a valid number');
-                                        return;
-                                      }
-                                      AppSettings.updateLowStockThreshold(v);
-                                      _customThresholdController.clear();
-                                      FocusScope.of(context).unfocus();
-                                    },
+                                    onPressed: _applyCustomThreshold,
                                     child: Text('Set',
                                         style: GoogleFonts.poppins(
                                             fontWeight: FontWeight.w600)),

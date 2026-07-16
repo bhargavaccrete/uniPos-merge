@@ -12,6 +12,7 @@ import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:billberrylite/util/restaurant/restaurant_auth_helper.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 
 class StaffAttendanceScreen extends StatefulWidget {
@@ -40,68 +41,77 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AppDialogShell(
-          title: 'Enter PIN',
-          subtitle: 'Verify ${staff.firstName} to continue',
-          accent: AppColors.primary,
-          icon: Icons.lock_outline_rounded,
-          body: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AppTextField(
-                controller: pinController,
-                label: 'PIN',
-                hint: 'Enter PIN',
-                icon: Icons.lock_outline_rounded,
-                obscureText: obscure,
-                keyboardType: TextInputType.number,
-                maxLength: 6,
-                autofocus: true,
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    obscure ? Icons.visibility_off : Icons.visibility,
-                    size: 20,
-                    color: AppColors.textSecondary,
+      builder: (ctx) => DialogDisposeScope(
+        disposables: [pinController],
+        child: StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            void verify() {
+              if (RestaurantAuthHelper.verifyPassword(
+                  pinController.text.trim(), staff.pinNo.trim())) {
+                Navigator.pop(ctx, true);
+              } else {
+                setDialogState(() {
+                  hasError = true;
+                  pinController.clear();
+                });
+              }
+            }
+
+            return AppDialogShell(
+              title: 'Enter PIN',
+              subtitle: 'Verify ${staff.firstName} to continue',
+              accent: AppColors.primary,
+              icon: Icons.lock_outline_rounded,
+              body: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AppTextField(
+                    controller: pinController,
+                    label: 'PIN',
+                    hint: 'Enter PIN',
+                    icon: Icons.lock_outline_rounded,
+                    obscureText: obscure,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    autofocus: true,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => verify(),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscure ? Icons.visibility_off : Icons.visibility,
+                        size: 20,
+                        color: AppColors.textSecondary,
+                      ),
+                      onPressed: () => setDialogState(() => obscure = !obscure),
+                    ),
                   ),
-                  onPressed: () => setDialogState(() => obscure = !obscure),
-                ),
+                  if (hasError)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6, left: 4),
+                      child: Row(
+                        children: [
+                          Icon(Icons.error_outline_rounded,
+                              size: 14, color: AppColors.danger),
+                          const SizedBox(width: 6),
+                          Text('Incorrect PIN',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 12, color: AppColors.danger)),
+                        ],
+                      ),
+                    ),
+                ],
               ),
-              if (hasError)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6, left: 4),
-                  child: Row(
-                    children: [
-                      Icon(Icons.error_outline_rounded,
-                          size: 14, color: AppColors.danger),
-                      const SizedBox(width: 6),
-                      Text('Incorrect PIN',
-                          style: GoogleFonts.poppins(
-                              fontSize: 12, color: AppColors.danger)),
-                    ],
-                  ),
+              actions: [
+                appDialogCancelButton(ctx),
+                const SizedBox(width: 12),
+                appDialogPrimaryButton(
+                  label: 'Verify',
+                  onPressed: verify,
                 ),
-            ],
-          ),
-          actions: [
-            appDialogCancelButton(ctx),
-            const SizedBox(width: 12),
-            appDialogPrimaryButton(
-              label: 'Verify',
-              onPressed: () {
-                if (RestaurantAuthHelper.verifyPassword(
-                    pinController.text.trim(), staff.pinNo.trim())) {
-                  Navigator.pop(ctx, true);
-                } else {
-                  setDialogState(() {
-                    hasError = true;
-                    pinController.clear();
-                  });
-                }
-              },
-            ),
-          ],
+              ],
+            );
+          },
         ),
       ),
     );

@@ -14,6 +14,7 @@ import 'package:intl/intl.dart';
 import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/constants/hive_box_names.dart';
 import 'package:billberrylite/data/models/restaurant/db/attendance_model.dart';
@@ -74,6 +75,13 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       await _loadEODData();
       await _promptResolveActiveOrders();
     });
+  }
+
+  @override
+  void dispose() {
+    _actualCashController.dispose();
+    _differenceController.dispose();
+    super.dispose();
   }
 
   /// Force the manager to resolve every RUNNING order before reconciling cash;
@@ -485,14 +493,22 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     final controller = TextEditingController();
     return showDialog<String>(
       context: context,
-      builder: (rc) => AppDialogShell(
+      builder: (rc) => DialogDisposeScope(
+        disposables: [controller],
+        child: AppDialogShell(
         title: 'Void Reason',
         accent: AppColors.danger,
         icon: Icons.block_rounded,
         body: AppTextField(
           controller: controller,
+          autofocus: true,
           hint: 'Why is this order being voided?',
           icon: Icons.edit_note_rounded,
+          textInputAction: TextInputAction.done,
+          onFieldSubmitted: (_) {
+            final r = controller.text.trim();
+            if (r.isNotEmpty) Navigator.of(rc).pop(r);
+          },
         ),
         actions: [
           appDialogCancelButton(rc),
@@ -507,6 +523,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
             },
           ),
         ],
+      ),
       ),
     );
   }
@@ -834,7 +851,9 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
-        return StatefulBuilder(
+        return DialogDisposeScope(
+          disposables: [withdrawalController],
+          child: StatefulBuilder(
           builder: (ctx, setDialogState) {
             final withdrawal =
                 double.tryParse(withdrawalController.text) ?? 0.0;
@@ -1129,11 +1148,10 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
               ),
             );
           },
+          ),
         );
       },
     );
-
-    withdrawalController.dispose();
   }
 
   Widget _safeDropRow(String label, double amount, Color color) {
@@ -2090,6 +2108,8 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                         color: AppColors.primary)),
               ),
               onChanged: (_) => _calculateDifference(),
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
             ),
 
             const SizedBox(height: 12),

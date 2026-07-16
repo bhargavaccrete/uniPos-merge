@@ -817,6 +817,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
           // Item Name (Required)
           AppTextField(
             controller: _itemNameController,
+            autofocus: true,
             focusNode: _nameFocusNode,
             label: 'Item Name',
             hint: 'e.g., Margherita Pizza',

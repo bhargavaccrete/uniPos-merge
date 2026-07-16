@@ -11,7 +11,6 @@ import 'package:billberrylite/presentation/screens/restaurant/manage%20menu/tab/
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
-import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 import '../import/bulk_import_screen.dart';
 
 class Managemenu extends StatefulWidget {
@@ -119,7 +118,6 @@ class _ManagemenuState extends State<Managemenu>
           SizedBox(width: 4),
         ],
       ),
-      drawer: DrawerManage(islogout: true),
       body: Column(
         children: [
           // Modern Tab Bar

@@ -16,6 +16,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:billberrylite/core/init/hive_init.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/data/models/restaurant/db/choiceoptionmodel_307.dart';
 
 // Conditional import for web file download
@@ -1086,69 +1087,85 @@ class CategoryImportExport {
   static Future<void> exportWithPasswordDialog(BuildContext context) async {
     final passwordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
+    final passwordFocus = FocusNode();
+    final confirmFocus = FocusNode();
     bool obscurePassword = true;
     bool obscureConfirm = true;
 
-    final result = await showDialog<bool>(
+    await showDialog<bool>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Secure Backup'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Enter a password to protect your backup:'),
-              const SizedBox(height: 16),
-              AppTextField(
-                controller: passwordController,
-                obscureText: obscurePassword,
-                label: 'Password',
-                suffixIcon: IconButton(
-                  icon: Icon(obscurePassword ? Icons.visibility : Icons.visibility_off),
-                  onPressed: () => setState(() => obscurePassword = !obscurePassword),
-                ),
+      builder: (context) => DialogDisposeScope(
+        disposables: [passwordController, confirmPasswordController, passwordFocus, confirmFocus],
+        child: StatefulBuilder(
+          builder: (context, setState) {
+            void submitExport() {
+              if (passwordController.text.isEmpty) {
+                NotificationService.instance.showError('Please enter a password');
+                return;
+              }
+              if (passwordController.text != confirmPasswordController.text) {
+                NotificationService.instance.showError('Passwords do not match');
+                return;
+              }
+              Navigator.pop(context, true);
+              exportAllData(password: passwordController.text);
+            }
+
+            return AlertDialog(
+              title: const Text('Secure Backup'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Enter a password to protect your backup:'),
+                  const SizedBox(height: 16),
+                  AppTextField(
+                    controller: passwordController,
+                    focusNode: passwordFocus,
+                    autofocus: true,
+                    obscureText: obscurePassword,
+                    label: 'Password',
+                    textInputAction: TextInputAction.next,
+                    onFieldSubmitted: (_) => confirmFocus.requestFocus(),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscurePassword ? Icons.visibility : Icons.visibility_off),
+                      onPressed: () => setState(() => obscurePassword = !obscurePassword),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  AppTextField(
+                    controller: confirmPasswordController,
+                    focusNode: confirmFocus,
+                    obscureText: obscureConfirm,
+                    label: 'Confirm Password',
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => submitExport(),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureConfirm ? Icons.visibility : Icons.visibility_off),
+                      onPressed: () => setState(() => obscureConfirm = !obscureConfirm),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              AppTextField(
-                controller: confirmPasswordController,
-                obscureText: obscureConfirm,
-                label: 'Confirm Password',
-                suffixIcon: IconButton(
-                  icon: Icon(obscureConfirm ? Icons.visibility : Icons.visibility_off),
-                  onPressed: () => setState(() => obscureConfirm = !obscureConfirm),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
                 ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () async {
-                // Export without password
-                Navigator.pop(context, true);
-                await exportAllData();
-              },
-              child: const Text('No Password'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (passwordController.text.isEmpty) {
-                  NotificationService.instance.showError('Please enter a password');
-                  return;
-                }
-                if (passwordController.text != confirmPasswordController.text) {
-                  NotificationService.instance.showError('Passwords do not match');
-                  return;
-                }
-                Navigator.pop(context, true);
-                exportAllData(password: passwordController.text);
-              },
-              child: const Text('Export'),
-            ),
-          ],
+                TextButton(
+                  onPressed: () async {
+                    // Export without password
+                    Navigator.pop(context, true);
+                    await exportAllData();
+                  },
+                  child: const Text('No Password'),
+                ),
+                ElevatedButton(
+                  onPressed: submitExport,
+                  child: const Text('Export'),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -1182,12 +1199,15 @@ class CategoryImportExport {
       if (keyType == 'password') {
         // Show password dialog
         final passwordController = TextEditingController();
+        final passwordFocus = FocusNode();
         bool obscurePassword = true;
 
         if (!context.mounted) return;
         final password = await showDialog<String>(
           context: context,
-          builder: (context) => StatefulBuilder(
+          builder: (context) => DialogDisposeScope(
+            disposables: [passwordController, passwordFocus],
+            child: StatefulBuilder(
             builder: (context, setState) => AlertDialog(
               title: const Text('Password Protected Backup'),
               content: Column(
@@ -1197,8 +1217,12 @@ class CategoryImportExport {
                   const SizedBox(height: 16),
                   AppTextField(
                     controller: passwordController,
+                    focusNode: passwordFocus,
+                    autofocus: true,
                     obscureText: obscurePassword,
                     label: 'Password',
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => Navigator.pop(context, passwordController.text),
                     suffixIcon: IconButton(
                       icon: Icon(obscurePassword ? Icons.visibility : Icons.visibility_off),
                       onPressed: () => setState(() => obscurePassword = !obscurePassword),
@@ -1217,6 +1241,7 @@ class CategoryImportExport {
                 ),
               ],
             ),
+          ),
           ),
         );
 

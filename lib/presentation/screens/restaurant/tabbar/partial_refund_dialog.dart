@@ -10,6 +10,7 @@ import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 
 // Export PartialRefundResult so UI screens can use it
 export '../../../../domain/services/restaurant/refund_service.dart' show PartialRefundResult;
@@ -165,21 +166,13 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final isTablet = !AppResponsive.isMobile(context);
-    final screenWidth = AppResponsive.screenWidth(context);
-    final dialogMaxWidth = AppResponsive.dialogWidth(context); // 500 on tablet, ∞ on mobile
-    final hInset = isTablet
-        ? ((screenWidth - dialogMaxWidth) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    return AlertDialog(
-      insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-      title: Text('Select Items to Refund', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+    return AppDialogShell(
+      title: 'Select Items to Refund',
+      accent: Colors.orange,
+      icon: Icons.assignment_return_rounded,
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -321,16 +314,13 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
               ),
             ],
           ),
-        ),
-      ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('Cancel', style: GoogleFonts.poppins()),
-        ),
-        ElevatedButton(
+        appDialogCancelButton(context),
+        const SizedBox(width: 12),
+        appDialogPrimaryButton(
+          label: 'Confirm Refund',
+          color: Colors.orange,
           onPressed: () {
-
             if (_totalRefundAmount <= 0) {
               NotificationService.instance.showError('Please select at least one item to refund');
               return;
@@ -347,10 +337,8 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
             itemsToRefund.forEach((item, quantity) {
               if (_restockStatus[item] == true) {
                 itemsToRestock[item] = quantity;
-              } else {
               }
             });
-
 
             final result = PartialRefundResult(
               itemsToRefund: itemsToRefund,
@@ -364,9 +352,7 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
 
             Navigator.pop(context, result);
           },
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-          child: Text('Confirm Refund', style: GoogleFonts.poppins(color: Colors.white)),
-        )
+        ),
       ],
     );
   }

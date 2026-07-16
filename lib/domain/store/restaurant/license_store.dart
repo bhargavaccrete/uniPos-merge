@@ -230,10 +230,12 @@ abstract class _LicenseStore with Store {
 
   /// Sync entitlements with the server: detects plan changes and revocation
   /// without an app release. Offline → keeps the cached manifest silently.
+  /// Returns true only when a new, verified manifest was actually applied
+  /// (i.e. the plan changed on this sync) so callers can surface it.
   @action
-  Future<void> syncEntitlements() async {
+  Future<bool> syncEntitlements() async {
     final info = licenseInfo;
-    if (info == null) return;
+    if (info == null) return false;
     final devicePayload = await DevicePayloadService.build();
     final deviceId = devicePayload['deviceid'] as String? ?? '';
     try {
@@ -249,16 +251,19 @@ abstract class _LicenseStore with Store {
         // authoritative reason — to apply the precise state (expired/suspended
         // preserved, device-mismatch wiped).
         await checkStatus();
-        return;
+        return false;
       }
       await _touchLastSync();
       final changed = data['entitlementChanged'] as bool? ?? false;
       if (changed) {
-        await _ingestManifest(data, deviceId, info.licenseKey);
+        final applied = await _ingestManifest(data, deviceId, info.licenseKey);
         EntitlementDebug.dump('SYNC', data); // debug-only — only when changed
+        return applied;
       }
+      return false;
     } catch (_) {
       // Offline — keep cache, enforce expiry + grace locally.
+      return false;
     }
   }
 
@@ -607,8 +612,18 @@ abstract class _LicenseStore with Store {
     _heartbeatTimer = null;
   }
 
+  /// Manual "Refresh from Server": re-checks license status AND pulls any
+  /// entitlement/plan change on demand (the 6h timer does this automatically,
+  /// this lets an admin apply a plan change immediately). Returns true when the
+  /// plan actually changed so the UI can confirm it.
   @action
-  Future<void> refreshLicense() async => checkStatus();
+  Future<bool> refreshLicense() async {
+    await checkStatus();
+    // If status stripped/wiped the license (expired/suspended/mismatch) there's
+    // no valid plan to pull — skip the sync.
+    if (licenseInfo == null || !isLicensed) return false;
+    return syncEntitlements();
+  }
 
   // ── Pending Key (collected at startup, activated after setup) ────────────
 

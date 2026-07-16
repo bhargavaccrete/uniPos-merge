@@ -4,9 +4,11 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../core/di/service_locator.dart';
-import '../../../../../presentation/screens/restaurant/manage%20menu/tab/edit_category.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'add_category_dialog.dart';
 
 /// Result from category selection
 class CategorySelectionResult {
@@ -100,38 +102,27 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
   }
 
   Future<void> _deleteCategory(Category category) async {
-    final confirm = await showDialog<bool>(
+    final confirmed = await showAppConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Delete Category?',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-        content: Text('Delete "${category.name}"? This cannot be undone.',
-            style: GoogleFonts.poppins(fontSize: 14)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel',
-                style: GoogleFonts.poppins(color: Colors.grey.shade600)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-            ),
-            child: Text('Delete', style: GoogleFonts.poppins(fontSize: 13)),
-          ),
-        ],
-      ),
+      title: 'Delete Category?',
+      message: 'Delete "${category.name}"? This cannot be undone.',
+      confirmLabel: 'Delete',
+      accent: AppColors.danger,
+      icon: Icons.delete_outline,
     );
 
-    if (confirm == true) {
-      await categoryStore.deleteCategory(category.id);
+    if (!confirmed) return;
+
+    // deleteCategory re-parents items in this category to "no category" (so
+    // nothing is orphaned) and is deny-by-default gated by the plan. Respect its
+    // result: refresh on success, surface the reason on failure instead of
+    // silently doing nothing.
+    final ok = await categoryStore.deleteCategory(category.id);
+    if (ok) {
       _loadData();
+    } else if (mounted) {
+      NotificationService.instance.showError(
+          categoryStore.errorMessage ?? 'Could not delete this category.');
     }
   }
 
@@ -387,13 +378,14 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
                   icon: Icons.edit_outlined,
                   color: AppColors.primary,
                   onTap: () async {
-                    Navigator.pop(context);
-                    await Navigator.push(
+                    // Reuse the shared Add/Edit category dialog in edit mode
+                    // instead of a separate full screen. Keep the picker open and
+                    // just refresh its list so the renamed category shows.
+                    final edited = await AddCategoryDialog.show(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => EditCategory(category: category),
-                      ),
+                      editCategory: category,
                     );
+                    if (edited) _loadData();
                   },
                 ),
                 const SizedBox(width: 6),

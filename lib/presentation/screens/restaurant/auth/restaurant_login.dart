@@ -214,6 +214,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                   // PIN Field — the only credential needed
                   AppTextField(
                     controller: _passwordController,
+                    autofocus: true,
                     label: 'PIN',
                     hint: 'Enter your PIN',
                     icon: Icons.lock_outline_rounded,
@@ -222,6 +223,10 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     maxLength: 6,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) {
+                      if (!_isLoading) _handleLogin();
+                    },
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,

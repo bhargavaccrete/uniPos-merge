@@ -26,6 +26,7 @@ import '../../../../../core/plan/entitlement_keys.dart';
 import '../../../../../data/models/restaurant/db/item_cancellation_model_134.dart';
 import '../../../../../data/repositories/restaurant/item_cancellation_repository.dart';
 import '../../../../widget/componets/common/app_text_field.dart';
+import '../../../../widget/componets/common/dialog_dispose_scope.dart';
 import '../../tabbar/table.dart';
 import '../startorder.dart';
 import 'customerdetails.dart';
@@ -515,7 +516,9 @@ class _TakeawayState extends State<Takeaway> {
     showDialog(
       context: context,
       builder: (ctx) {
-        return StatefulBuilder(
+        return DialogDisposeScope(
+          disposables: [reasonController],
+          child: StatefulBuilder(
           builder: (context, setState) {
             return Dialog(
               insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
@@ -773,6 +776,7 @@ class _TakeawayState extends State<Takeaway> {
               ),
             );
           },
+          ),
         );
       },
     );
@@ -1073,6 +1077,18 @@ class _TakeawayState extends State<Takeaway> {
   // NEW ORDER
   Future<void> _placeOrder(CartCalculationService calculations) async {
     if (!_stockOkToOrder()) return;
+    // Plan gate — placing an order is a billing entrance, so cap it here (not
+    // only at settle). todaysBillLoad counts active + settled orders so this
+    // can't be dodged by placing many orders and settling them elsewhere.
+    if (!PlanGuard.allowedOr(context, EntKeys.billingInvoiceCreate, featureName: 'Billing')) {
+      return;
+    }
+    final billsToday = await pastOrderStore.todaysBillLoad();
+    if (!mounted) return;
+    if (!PlanGuard.withinLimitOr(context, EntKeys.billingInvoicePerDayMax, billsToday,
+        unit: 'bills per day')) {
+      return;
+    }
     final strictlyPending = await DayManagementService.isEodStrictlyPending();
     if (strictlyPending) {
       NotificationService.instance.showError('Day has ended. Complete End of Day to unlock.');
@@ -2372,7 +2388,7 @@ class _TakeawayState extends State<Takeaway> {
     if (!PlanGuard.allowedOr(context, EntKeys.billingInvoiceCreate, featureName: 'Billing')) {
       return;
     }
-    final billsToday = (await pastOrderStore.getTodaysPastOrders()).length;
+    final billsToday = await pastOrderStore.todaysBillLoad();
     if (!mounted) return;
     if (!PlanGuard.withinLimitOr(context, EntKeys.billingInvoicePerDayMax, billsToday,
         unit: 'bills per day')) {

@@ -17,6 +17,7 @@ import '../../../../util/restaurant/refund_state.dart';
 import '../../../../util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import '../../../../util/restaurant/staticswitch.dart';
 import '../../../../util/common/app_responsive.dart';
@@ -844,9 +845,11 @@ class _OrderdetailsState extends State<Orderdetails> {
     final hInset = !AppResponsive.isMobile(context)
         ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
         : 24.0;
-    final confirm = await showDialog<bool>(
+    final reason = await showDialog<String?>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => DialogDisposeScope(
+        disposables: [reasonController],
+        child: AlertDialog(
         insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context))),
         title: Row(
@@ -875,6 +878,7 @@ class _OrderdetailsState extends State<Orderdetails> {
             SizedBox(height: 8),
             AppTextField(
               controller: reasonController,
+              autofocus: true,
               maxLines: 3,
               hint: "Enter reason (optional)",
               icon: Icons.note_alt_outlined,
@@ -883,11 +887,11 @@ class _OrderdetailsState extends State<Orderdetails> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
+            onPressed: () => Navigator.pop(ctx, null),
             child: Text("Cancel", style: GoogleFonts.poppins()),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
+            onPressed: () => Navigator.pop(ctx, reasonController.text.trim()),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
@@ -896,20 +900,16 @@ class _OrderdetailsState extends State<Orderdetails> {
           ),
         ],
       ),
+      ),
     );
 
-    if (confirm != true) {
-      reasonController.dispose();
-      return;
-    }
+    if (reason == null) return;
 
     // Use PastOrderStore to void the order
     final voidedOrder = await pastOrderStore.voidOrder(
       order: currentOrder,
-      reason: reasonController.text,
+      reason: reason,
     );
-
-    reasonController.dispose();
 
     if (voidedOrder != null) {
       setState(() => currentOrder = voidedOrder);

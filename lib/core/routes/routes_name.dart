@@ -98,7 +98,6 @@ class RouteNames {
   // Restaurant - Tax
   static const restaurantTaxSettings = '/restaurant-tax-settings';
   static const restaurantApplyTax = '/restaurant-apply-tax';
-  static const restaurantAddMultipleTax = '/restaurant-add-multiple-tax';
 
   // Restaurant - Printer
   static const restaurantPrinterSettings = '/restaurant-printer-settings';

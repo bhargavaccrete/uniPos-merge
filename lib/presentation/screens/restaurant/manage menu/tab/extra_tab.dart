@@ -47,6 +47,13 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
   final _maximumController = TextEditingController();
   final _searchController = TextEditingController();
 
+  // Focus chains — extra form: name → min → max; topping form: name → price.
+  final _extraNameFocus = FocusNode();
+  final _minFocus = FocusNode();
+  final _maxFocus = FocusNode();
+  final _toppingNameFocus = FocusNode();
+  final _priceFocus = FocusNode();
+
   String query = '';
   bool isveg = false, hasSize = false;
   Map<String, TextEditingController> _variantPriceControllers = {};
@@ -76,6 +83,11 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
     _minimumController.dispose();
     _maximumController.dispose();
     _searchController.dispose();
+    _extraNameFocus.dispose();
+    _minFocus.dispose();
+    _maxFocus.dispose();
+    _toppingNameFocus.dispose();
+    _priceFocus.dispose();
     _variantPriceControllers.values.forEach((controller) => controller.dispose());
     super.dispose();
   }
@@ -225,10 +237,14 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
                   // Category name
                   AppTextField(
                     controller: _extrasController,
+                    focusNode: _extraNameFocus,
+                    autofocus: true,
                     label: 'Category Name',
                     hint: 'e.g. Sauces, Toppings, Sides',
                     icon: Icons.star_outline_rounded,
                     required: true,
+                    textInputAction: TextInputAction.next,
+                    onFieldSubmitted: (_) => _minFocus.requestFocus(),
                   ),
                   const SizedBox(height: 14),
 
@@ -238,20 +254,26 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
                       Expanded(
                         child: AppTextField(
                           controller: _minimumController,
+                          focusNode: _minFocus,
                           label: 'Min Selection',
                           hint: '0',
                           icon: Icons.remove_circle_outline_rounded,
                           keyboardType: TextInputType.number,
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) => _maxFocus.requestFocus(),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: AppTextField(
                           controller: _maximumController,
+                          focusNode: _maxFocus,
                           label: 'Max Selection',
                           hint: '0',
                           icon: Icons.add_circle_outline_rounded,
                           keyboardType: TextInputType.number,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => _addOrEditExtra(),
                         ),
                       ),
                     ],
@@ -490,10 +512,14 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
                       // Topping Name
                       AppTextField(
                         controller: _toppingController,
+                        focusNode: _toppingNameFocus,
+                        autofocus: true,
                         label: 'Topping Name',
                         hint: 'e.g. Extra Cheese, Mushrooms',
                         icon: Icons.local_pizza_outlined,
                         required: true,
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (_) => _priceFocus.requestFocus(),
                       ),
                       const SizedBox(height: 14),
 
@@ -646,10 +672,13 @@ class _ExtraTabState extends State<ExtraTab> with AutomaticKeepAliveClientMixin 
                       if (!hasSize) ...[
                         AppTextField(
                           controller: _priceController,
+                          focusNode: _priceFocus,
                           label: 'Price',
                           hint: '0.00',
                           icon: Icons.currency_rupee_rounded,
                           keyboardType: TextInputType.number,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => _saveTopping(extra),
                           prefixWidget: Padding(
                             padding: const EdgeInsets.only(left: 12, right: 4),
                             child: Text(

@@ -34,6 +34,30 @@ class _loginScreenState extends State<loginScreen> {
   FocusNode passwordFocus = FocusNode();
 
   @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    emailFocus.dispose();
+    passwordFocus.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleLogin() async {
+    if (_fromKey.currentState!.validate()) {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isLoggedIn', true);
+      await prefs.setString('email', emailController.text);
+      await prefs.setString('password', passwordController.text);
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => Dashboard()),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final height = MediaQuery.of(context).size.height * 1;
     final width = MediaQuery.of(context).size.width * 1;
@@ -114,6 +138,7 @@ class _loginScreenState extends State<loginScreen> {
                       hint: 'Enter Email',
                       icon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return "please Enter Email";
@@ -157,6 +182,8 @@ class _loginScreenState extends State<loginScreen> {
                           return AppTextField(
                             controller: passwordController,
                             focusNode: passwordFocus,
+                            textInputAction: TextInputAction.done,
+                            onFieldSubmitted: (_) => _handleLogin(),
                             obscureText: obsecurepass.value,
                             hint: 'Enter Password',
                             icon: Icons.lock_outline,
@@ -231,22 +258,7 @@ class _loginScreenState extends State<loginScreen> {
                     CommonButton(
                       height: AppResponsive.height(context, 0.08),
                       width: width,
-                      onTap: () async {
-                        if (_fromKey.currentState!.validate()) {
-                          SharedPreferences prefs =
-                              await SharedPreferences.getInstance();
-                          await prefs.setBool('isLoggedIn', true);
-                          await prefs.setString('email', emailController.text);
-                          await prefs.setString(
-                              'password', passwordController.text);
-
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => Dashboard()),
-                          );
-                        }
-                      },
+                      onTap: _handleLogin,
                       child: Center(
                         child: Text(
                           'Login',

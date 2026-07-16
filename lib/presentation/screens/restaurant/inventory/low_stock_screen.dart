@@ -8,6 +8,7 @@ import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../domain/services/restaurant/stock_adjust_service.dart';
 import '../../../widget/componets/common/app_text_field.dart';
 import '../../../widget/componets/common/app_dialog.dart';
+import '../../../widget/componets/common/dialog_dispose_scope.dart';
 import '../../../widget/componets/common/primary_app_bar.dart';
 
 /// Flat, actionable list of every item/variant that is low or out of stock.
@@ -36,10 +37,14 @@ class _LowStockScreenState extends State<LowStockScreen> {
     final qtyController = TextEditingController();
     String reason = _addReasons.first;
     final noteController = TextEditingController();
+    final qtyFocus = FocusNode();
+    final noteFocus = FocusNode();
 
-    final confirmed = await showDialog<bool>(
+    final result = await showDialog<({String qty, String note})>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => DialogDisposeScope(
+        disposables: [qtyController, noteController, qtyFocus, noteFocus],
+        child: StatefulBuilder(
         builder: (ctx, setLocal) => AppDialogShell(
           title: 'Add Stock',
           subtitle: e.variantName != null
@@ -53,10 +58,14 @@ class _LowStockScreenState extends State<LowStockScreen> {
             children: [
               AppTextField(
                 controller: qtyController,
+                focusNode: qtyFocus,
+                autofocus: true,
                 label: 'Quantity to add ($unit)',
                 hint: 'e.g. 10',
                 icon: Icons.add_box_outlined,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: (_) => noteFocus.requestFocus(),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
@@ -77,10 +86,16 @@ class _LowStockScreenState extends State<LowStockScreen> {
               const SizedBox(height: 12),
               AppTextField(
                 controller: noteController,
+                focusNode: noteFocus,
                 hint: 'Note (optional)',
                 icon: Icons.notes_outlined,
                 maxLines: 2,
                 minLines: 1,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => Navigator.pop(
+                  ctx,
+                  (qty: qtyController.text.trim(), note: noteController.text.trim()),
+                ),
               ),
             ],
           ),
@@ -89,16 +104,20 @@ class _LowStockScreenState extends State<LowStockScreen> {
             const SizedBox(width: 12),
             appDialogPrimaryButton(
               label: 'Add',
-              onPressed: () => Navigator.pop(ctx, true),
+              onPressed: () => Navigator.pop(
+                ctx,
+                (qty: qtyController.text.trim(), note: noteController.text.trim()),
+              ),
             ),
           ],
         ),
       ),
+      ),
     );
 
-    if (confirmed != true) return;
+    if (result == null) return;
 
-    final qty = double.tryParse(qtyController.text.trim());
+    final qty = double.tryParse(result.qty);
     if (qty == null || qty <= 0) {
       NotificationService.instance.showError('Enter a valid quantity');
       return;
@@ -113,7 +132,7 @@ class _LowStockScreenState extends State<LowStockScreen> {
       variant: e.variant,
       qty: qty,
       reason: reason,
-      note: noteController.text.trim().isEmpty ? null : noteController.text.trim(),
+      note: result.note.isEmpty ? null : result.note,
     );
 
     if (mounted) {

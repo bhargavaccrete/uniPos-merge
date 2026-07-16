@@ -179,7 +179,7 @@ mixin _$LicenseStore on _LicenseStore, Store {
       AsyncAction('_LicenseStore.syncEntitlements', context: context);
 
   @override
-  Future<void> syncEntitlements() {
+  Future<bool> syncEntitlements() {
     return _$syncEntitlementsAsyncAction.run(() => super.syncEntitlements());
   }
 
@@ -278,7 +278,7 @@ mixin _$LicenseStore on _LicenseStore, Store {
       AsyncAction('_LicenseStore.refreshLicense', context: context);
 
   @override
-  Future<void> refreshLicense() {
+  Future<bool> refreshLicense() {
     return _$refreshLicenseAsyncAction.run(() => super.refreshLicense());
   }
 

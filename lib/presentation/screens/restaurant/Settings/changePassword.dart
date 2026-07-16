@@ -18,6 +18,9 @@ class _ChangepasswordState extends State<Changepassword> {
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _currentFocus = FocusNode();
+  final _newFocus = FocusNode();
+  final _confirmFocus = FocusNode();
   final _formKey = GlobalKey<FormState>();
 
   bool _obscureCurrentPass = true;
@@ -34,6 +37,9 @@ class _ChangepasswordState extends State<Changepassword> {
     _currentPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
+    _currentFocus.dispose();
+    _newFocus.dispose();
+    _confirmFocus.dispose();
     super.dispose();
   }
 
@@ -242,6 +248,7 @@ class _ChangepasswordState extends State<Changepassword> {
                   child: Column(children: [
                     AppTextField(
                       controller: _currentPasswordController,
+                      focusNode: _currentFocus,
                       label: 'Current Password',
                       hint: 'Enter current PIN',
                       icon: Icons.lock_outline_rounded,
@@ -252,6 +259,8 @@ class _ChangepasswordState extends State<Changepassword> {
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly
                       ],
+                      textInputAction: TextInputAction.next,
+                      onFieldSubmitted: (_) => _newFocus.requestFocus(),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscureCurrentPass
@@ -279,6 +288,7 @@ class _ChangepasswordState extends State<Changepassword> {
 
                     AppTextField(
                       controller: _newPasswordController,
+                      focusNode: _newFocus,
                       label: 'New Password',
                       hint: 'Enter new PIN',
                       icon: Icons.lock_reset_rounded,
@@ -289,6 +299,8 @@ class _ChangepasswordState extends State<Changepassword> {
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly
                       ],
+                      textInputAction: TextInputAction.next,
+                      onFieldSubmitted: (_) => _confirmFocus.requestFocus(),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscureNewPass
@@ -315,6 +327,7 @@ class _ChangepasswordState extends State<Changepassword> {
 
                     AppTextField(
                       controller: _confirmPasswordController,
+                      focusNode: _confirmFocus,
                       label: 'Confirm New Password',
                       hint: 'Re-enter new PIN',
                       icon: Icons.lock_rounded,
@@ -325,6 +338,8 @@ class _ChangepasswordState extends State<Changepassword> {
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly
                       ],
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _handleChangePassword(),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscureConfirmPass

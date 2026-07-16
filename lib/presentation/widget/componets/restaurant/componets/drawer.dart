@@ -1,12 +1,9 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
-import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:lottie/lottie.dart';
-import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Textform.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
@@ -16,13 +13,8 @@ import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/routes/routes_name.dart';
-import 'package:billberrylite/domain/store/restaurant/license_store.dart';
-import 'package:billberrylite/domain/services/common/unified_backup_service.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
-import 'package:billberrylite/main.dart' as main_app;
-
-import '../../../../../util/images.dart';
 
 class Drawerr extends StatefulWidget {
   // Order-screen-only action; hidden on the Dashboard.
@@ -33,6 +25,8 @@ class Drawerr extends StatefulWidget {
   final bool showChangePin;
   // Redundant on the Dashboard (that screen IS Home).
   final bool showHome;
+  final bool showLogout;
+  final bool isManagementMode;
 
   const Drawerr({
     super.key,
@@ -40,6 +34,8 @@ class Drawerr extends StatefulWidget {
     this.showGridDuplicates = true,
     this.showChangePin = false,
     this.showHome = true,
+    this.showLogout = false,
+    this.isManagementMode = false,
   });
 
   @override
@@ -112,7 +108,7 @@ class _DrawerrState extends State<Drawerr> {
                   ),
                   SizedBox(height: 4),
                   Text(
-                    'POS System',
+                    widget.isManagementMode ? 'Restaurant Management' : 'POS System',
                     style: GoogleFonts.poppins(
                       fontSize: AppResponsive.getValue(context, mobile: 13, tablet: 14),
                       fontWeight: FontWeight.w400,
@@ -139,7 +135,11 @@ class _DrawerrState extends State<Drawerr> {
                       title: 'Home',
                       onTap: () {
                         Navigator.pop(context);
-                        Navigator.pushNamed(context, RouteNames.restaurantAdminWelcome);
+                        Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          RouteNames.restaurantAdminWelcome,
+                          (route) => false,
+                        );
                       },
                       isTablet: isTablet,
                     ),
@@ -305,6 +305,20 @@ class _DrawerrState extends State<Drawerr> {
                       },
                       isTablet: isTablet,
                     ),
+                  if (widget.showLogout) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Divider(color: AppColors.divider, thickness: 1),
+                    ),
+                    _buildDrawerItem(
+                      context: context,
+                      icon: Icons.logout_rounded,
+                      title: 'Logout',
+                      onTap: () => _showLogoutDialog(context),
+                      isTablet: isTablet,
+                      color: Colors.red,
+                    ),
+                  ],
 
                 ],
               ),
@@ -617,54 +631,28 @@ class _DrawerrState extends State<Drawerr> {
     );
   }
 
-  void _showSyncDialog(BuildContext context) {
-    Timer(
-      Duration(seconds: 5),
-      () {
-        Navigator.of(context, rootNavigator: true).pop();
-      },
-    );
-
-    final syncHInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    showDialog(
+  void _showLogoutDialog(BuildContext context) async {
+    final navigator = Navigator.of(context);
+    final ok = await showAppConfirmDialog(
       context: context,
+      title: 'Logout',
+      message: 'Are you sure you want to logout?',
+      confirmLabel: 'Logout',
+      accent: Colors.red,
+      icon: Icons.logout_rounded,
       barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          insetPadding: EdgeInsets.symmetric(horizontal: syncHInset, vertical: 24),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          content: Container(
-            padding: EdgeInsets.all(10),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Lottie.asset(
-                  AppImages.syncanimation,
-                  width: AppResponsive.getValue(context, mobile: 180, tablet: 220),
-                  height: AppResponsive.getValue(context, mobile: 130, tablet: 160),
-                ),
-                AppResponsive.verticalSpace(context, size: SpacingSize.large),
-                Text(
-                  'Sync in Progress...',
-                  style: GoogleFonts.poppins(
-                    color: AppColors.primary,
-                    fontSize: AppResponsive.getValue(context, mobile: 18, tablet: 20),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                AppResponsive.verticalSpace(context, size: SpacingSize.small),
-                Text(
-                  'Please wait while we update your data...',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context)),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
+    if (!ok) return;
+    await _clearLoginState();
+    navigator.pushNamedAndRemoveUntil(
+      RouteNames.restaurantLogin,
+      (route) => false,
+    );
+  }
+
+  Future<void> _clearLoginState() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('restaurant_is_logged_in', false);
+    await RestaurantSession.clearSession();
   }
 }

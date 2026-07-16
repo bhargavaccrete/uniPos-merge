@@ -188,10 +188,13 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
           // ── Variant Name field ────────────────────────────────────────
           AppTextField(
             controller: variantController,
+            autofocus: true,
             label: 'Variant Name',
             hint: 'e.g. Small, Medium, Large',
             icon: Icons.tune_rounded,
             required: true,
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) => _addOrEditVariante(),
           ),
           const SizedBox(height: 20),
 

@@ -5,7 +5,6 @@ import 'package:billberrylite/presentation/screens/restaurant/Expense/viewexpens
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 
-import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 import '../../../../util/common/app_responsive.dart';
 
 class ExpenseScreen extends StatefulWidget {
@@ -60,15 +59,8 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      drawer: DrawerManage(islogout: false),
       appBar: buildPrimaryAppBar(
         title: 'Expenses',
-        leading: Builder(
-          builder: (context) => IconButton(
-            onPressed: () => Scaffold.of(context).openDrawer(),
-            icon: const Icon(Icons.menu),
-          ),
-        ),
       ),
       body: Column(
         children: [

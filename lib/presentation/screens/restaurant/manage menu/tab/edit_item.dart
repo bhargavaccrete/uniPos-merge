@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:billberrylite/util/color.dart';
-import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/core/constants/item_units.dart';
 import 'package:billberrylite/util/restaurant/staticswitch.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
@@ -13,7 +12,6 @@ import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemvariantemodel_312.dart';
-import 'package:billberrylite/presentation/widget/componets/restaurant/componets/filterButton.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/util/restaurant/audit_trail_helper.dart';
@@ -21,17 +19,25 @@ import 'package:billberrylite/domain/services/restaurant/stock_adjust_service.da
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/tax_selector_sheet.dart';
+// Shared add/edit-item components — kept in sync with the Add Item sheet so both
+// screens present the same controls. The SellingMethod enum is the canonical one.
+import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/add_item_form_state.dart' show SellingMethod;
+import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/widgets/selling_method_selector.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/veg_selector_sheet.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/category_selector_sheet.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/widgets/category_selector_button.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/widgets/tax_selector_button.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/widgets/inventory_toggle.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/image_picker_sheet.dart';
 import '../../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../../data/models/restaurant/db/extramodel_303.dart';
+import '../../../../../util/common/currency_helper.dart';
 import '../../item/default_choice_picker.dart';
 import '../../item/variant_selection_screen.dart';
 import '../../item/choice_selection_screen.dart';
 import '../../item/extra_selection_screen.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../data/models/restaurant/db/variantmodel_305.dart';
-import 'edit_category.dart';
-
-enum SellingMethod { byUnit, byWeight }
 
 // Helper class to hold all the data needed for the screen
 class EditScreenData {
@@ -65,6 +71,13 @@ class _EdititemScreenState extends State<EdititemScreen> {
   late TextEditingController _lowStockController;
   late TextEditingController _stockController;
   late TextEditingController _itemCodeController;
+
+  // Focus chain (mirrors the Add Item sheet): name → code → price → description.
+  final _nameFocus = FocusNode();
+  final _codeFocus = FocusNode();
+  final _priceFocus = FocusNode();
+  final _descFocus = FocusNode();
+
   late String selectedCategoryId;
   late String selectedIMGCategory;
 
@@ -237,6 +250,10 @@ class _EdititemScreenState extends State<EdititemScreen> {
     _lowStockController.dispose();
     _stockController.dispose();
     _itemCodeController.dispose();
+    _nameFocus.dispose();
+    _codeFocus.dispose();
+    _priceFocus.dispose();
+    _descFocus.dispose();
 
     // Dispose variant price controllers
     for (var controller in _variantStockControllers) {
@@ -492,10 +509,12 @@ class _EdititemScreenState extends State<EdititemScreen> {
 
   // This method now contains your full UI with improved structure
   Widget _buildForm(EditScreenData data) {
-    final currentCategoryName = data.allCategories.firstWhere(
-            (cat) => cat.id == selectedCategoryId,
-        orElse: () => Category(id: '', name: 'Select Category')
-    ).name;
+    // Category name is read live from the store so a rename/delete inside the
+    // picker reflects immediately (null → the button shows "Select Category").
+    final match = categoryStore.categories
+        .where((c) => c.id == selectedCategoryId)
+        .toList();
+    final selectedCategoryName = match.isEmpty ? null : match.first.name;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20.0),
@@ -507,503 +526,142 @@ class _EdititemScreenState extends State<EdititemScreen> {
           const SizedBox(height: 15),
           AppTextField(
             controller: _nameController,
+            focusNode: _nameFocus,
             label: 'Item Name',
-            icon: Icons.label_outline,
+            icon: Icons.fastfood_outlined,
+            required: true,
+            textInputAction: TextInputAction.next,
+            onFieldSubmitted: (_) => _codeFocus.requestFocus(),
           ),
           const SizedBox(height: 15),
           AppTextField(
             controller: _itemCodeController,
+            focusNode: _codeFocus,
             label: 'Item Code',
             icon: Icons.qr_code_scanner_rounded,
+            required: true,
             keyboardType: TextInputType.number,
             inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(5),
             ],
+            textInputAction: TextInputAction.next,
+            onFieldSubmitted: (_) => _priceFocus.requestFocus(),
           ),
           const SizedBox(height: 25),
 
           // Selling Method Section
           _buildSectionHeader('Selling Method', Icons.scale),
           const SizedBox(height: 15),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Sold by:",
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: RadioListTile<SellingMethod>(
-                      title: const Text('Unit'),
-                      value: SellingMethod.byUnit,
-                      groupValue: _sellingMethod,
-                      contentPadding: EdgeInsets.zero,
-                      onChanged: (value) => setState(() => _sellingMethod = value!),
-                    ),
-                  ),
-                  Expanded(
-                    child: RadioListTile<SellingMethod>(
-                      title: const Text('Weight'),
-                      value: SellingMethod.byWeight,
-                      groupValue: _sellingMethod,
-                      contentPadding: EdgeInsets.zero,
-                      onChanged: (value) => setState(() => _sellingMethod = value!),
-                    ),
-                  ),
-                ],
-              ),
-              if (_sellingMethod == SellingMethod.byWeight)
-                DropdownButtonFormField<String>(
-                  value: _selectedUnit,
-                  decoration: InputDecoration(
-                    labelText: 'Select Unit',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: kItemUnits.map((String unit) {
-                    return DropdownMenuItem<String>(
-                      value: unit,
-                      child: Text(unit),
-                    );
-                  }).toList(),
-                  onChanged: (String? newValue) {
-                    setState(() {
-                      _selectedUnit = newValue!;
-                    });
-                  },
-                ),
-            ],
+          SellingMethodButton(
+            method: _sellingMethod,
+            unit: _selectedUnit,
+            onTap: _selectSellingMethod,
           ),
+          const SizedBox(height: 25),
 
-
-
-          SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: AppTextField(
-                  controller: _itemPriceController,
-                  label: 'Item Price',
-                  icon: Icons.currency_rupee,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              // ✅ ADDED: Your Veg/Non-Veg selector UI
-              Expanded(
-                child: InkWell(
-                  onTap: () {
-                    showModalBottomSheet(context: context, builder: (context) => _VegNonVegSheet(
-                      onSelected: (newValue) {
-                        setState(() { selectedIMGCategory = newValue; });
-                        Navigator.pop(context);
-                      },
-                    ));
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
-                    decoration: BoxDecoration(
-                      color: AppColors.white,
-                      border: Border.all(color: AppColors.divider),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.circle, color: selectedIMGCategory == 'Veg' ? Colors.green : Colors.red, size: 16),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            selectedIMGCategory,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const Icon(Icons.keyboard_arrow_down_rounded),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+          // Price
+          AppTextField(
+            controller: _itemPriceController,
+            focusNode: _priceFocus,
+            label: 'Price',
+            prefixWidget: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              child: Text("${CurrencyHelper.currentSymbol}",
+                  style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary)),
+            ),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
             ],
+            textInputAction: TextInputAction.next,
+            onFieldSubmitted: (_) => _descFocus.requestFocus(),
           ),
           const SizedBox(height: 25),
 
           // Category Section
           _buildSectionHeader('Category', Icons.category_outlined),
           const SizedBox(height: 15),
-          InkWell(
-            onTap: () async {
-              final String? newId = await showModalBottomSheet(
-                context: context,
-                builder: (_) => _CategorySelectionSheet(
-                  categories: data.allCategories,
-                  allItems: data.allItems,
-                  selectedId: selectedCategoryId,
-                  onCategoryDeleted: (deletedCategoryId) {
-                    if (selectedCategoryId == deletedCategoryId) {
-                      setState(() => selectedCategoryId = '');
-                    }
-                    setState(() => _loadDataFuture = _loadInitialData());
-                  },
-                ),
-              );
-              if (newId != null) setState(() => selectedCategoryId = newId);
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              height: 56,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: AppColors.white,
-                border: Border.all(color: AppColors.divider),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.category_outlined, color: AppColors.primary, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      currentCategoryName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textSecondary),
-                ],
-              ),
-            ),
+          CategorySelectorButton(
+            selectedCategoryName: selectedCategoryName,
+            onTap: _selectCategory,
           ),
           const SizedBox(height: 25),
 
           // Tax Section
           _buildSectionHeader('Tax', Icons.percent_rounded),
           const SizedBox(height: 15),
-          InkWell(
-            onTap: () async {
-              final result = await TaxSelectorSheet.show(
-                context,
-                selectedTaxIds: selectedTaxIds,
-              );
-              if (result != null) {
-                setState(() {
-                  selectedTaxIds = result.ids;
-                  selectedTaxRate = result.rate == 0 ? null : result.rate;
-                });
-              }
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              height: 56,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: AppColors.white,
-                border: Border.all(color: AppColors.divider),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.percent_rounded, color: AppColors.primary, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      selectedTaxRate != null
-                          ? 'Tax: ${(selectedTaxRate! * 100).toStringAsFixed(2)}%'
-                          : 'No tax applied',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textSecondary),
-                ],
-              ),
-            ),
+          TaxSelectorButton(
+            taxRate: selectedTaxRate,
+            onTap: _selectTax,
           ),
           const SizedBox(height: 25),
 
-          // Inventory Management Section — stock module. Hidden when `inventory`
-          // isn't in the plan (a menu item is still fully editable without stock).
-          if (PlanEnforce.allows(EntKeys.inventory))
+          // Food Type (Veg / Non-Veg)
+          _buildSectionHeader('Food Type', Icons.eco_outlined),
+          const SizedBox(height: 15),
+          VegSelectorButton(
+            selectedCategory: selectedIMGCategory,
+            onTap: _selectVeg,
+          ),
+          const SizedBox(height: 25),
+
+          // Description
+          AppTextField(
+            controller: _descController,
+            focusNode: _descFocus,
+            label: 'Description',
+            hint: 'Optional',
+            icon: Icons.notes_outlined,
+            maxLines: 3,
+            minLines: 1,
+            onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
+          ),
+          const SizedBox(height: 25),
+
+          // Inventory Management — stock module. InventoryToggle hides itself
+          // when the plan excludes `inventory`, so guard the header/fields to match.
+          if (PlanEnforce.allows(EntKeys.inventory)) ...[
             _buildSectionHeader('Inventory Management', Icons.inventory_2_outlined),
-          if (PlanEnforce.allows(EntKeys.inventory)) const SizedBox(height: 15),
-          if (PlanEnforce.allows(EntKeys.inventory))
-            Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade400),
-              borderRadius: BorderRadius.circular(8),
+            const SizedBox(height: 15),
+            InventoryToggle(
+              trackInventory: selectedFilter.toLowerCase() == 'yes',
+              allowOrderWhenOutOfStock: allowOutOfStockFilter.toLowerCase() == 'yes',
+              onTrackInventoryChanged: (v) => setState(() {
+                selectedFilter = v ? 'YES' : 'NO';
+                // Enforce stock limits by default when enabling tracking.
+                if (v) allowOutOfStockFilter = 'NO';
+              }),
+              onAllowOutOfStockChanged: (v) =>
+                  setState(() => allowOutOfStockFilter = v ? 'YES' : 'NO'),
             ),
-            child: Column(
-              children: [
-                // Manage Inventory Row
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        "Manage Inventory",
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Transform.scale(
-                          scale: 0.8,
-                          child: Filterbutton(
-                            title: 'YES',
-                            selectedFilter: selectedFilter,
-                            onpressed: () {
-                              setState(() {
-                                selectedFilter = "YES";
-                                // Auto-set "Allow out of stock" to NO when enabling inventory management
-                                // This enforces stock limits by default (better UX)
-                                allowOutOfStockFilter = "NO";
-                              });
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Transform.scale(
-                          scale: 0.8,
-                          child: Filterbutton(
-                            title: 'NO',
-                            selectedFilter: selectedFilter,
-                            onpressed: () {
-                              setState(() {
-                                selectedFilter = "NO";
-                              });
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-
-                // Out of Stock Option (shown only when inventory is YES)
-                if (selectedFilter.toLowerCase() == 'yes') ...[
-                  SizedBox(height: 12),
-                  // Current Stock — only for SIMPLE items. Variant items track
-                  // stock per-variant in the Variants section below.
-                  if (!_variantCheckedList.contains(true)) ...[
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            "Current Stock (${_sellingMethod == SellingMethod.byWeight ? _selectedUnit : 'pcs'})",
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w500,
-                              fontSize: 13,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 10),
-                        SizedBox(
-                          width: 120,
-                          child: AppTextField(
-                            controller: _stockController,
-                            hint: '0',
-                            keyboardType:
-                                const TextInputType.numberWithOptions(decimal: true),
-                            inputFormatters: [
-                              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 12),
-                  ],
-                  Divider(height: 1, color: Colors.grey.shade300),
-                  SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          "Allow order if out of stock",
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 13,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 10),
-                      Row(
-                        children: [
-                          Transform.scale(
-                            scale: 0.8,
-                            child: Filterbutton(
-                              title: 'YES',
-                              selectedFilter: allowOutOfStockFilter,
-                              onpressed: () {
-                                setState(() {
-                                  allowOutOfStockFilter = "YES";
-                                });
-                              },
-                            ),
-                          ),
-                          SizedBox(width: 6),
-                          Transform.scale(
-                            scale: 0.8,
-                            child: Filterbutton(
-                              title: 'NO',
-                              selectedFilter: allowOutOfStockFilter,
-                              onpressed: () {
-                                setState(() {
-                                  allowOutOfStockFilter = "NO";
-                                });
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 12),
-                  Divider(height: 1, color: Colors.grey.shade300),
-                  SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          "Low-stock alert",
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 13,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 10),
-                      Row(
-                        children: [
-                          Transform.scale(
-                            scale: 0.8,
-                            child: Filterbutton(
-                              title: 'YES',
-                              selectedFilter: _lowStockAlertFilter,
-                              onpressed: () => setState(() => _lowStockAlertFilter = 'YES'),
-                            ),
-                          ),
-                          SizedBox(width: 6),
-                          Transform.scale(
-                            scale: 0.8,
-                            child: Filterbutton(
-                              title: 'NO',
-                              selectedFilter: _lowStockAlertFilter,
-                              onpressed: () => setState(() => _lowStockAlertFilter = 'NO'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  if (_lowStockAlertFilter == 'YES') ...[
-                    SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            "Alert threshold (${_sellingMethod == SellingMethod.byWeight ? _selectedUnit : 'pcs'})",
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w500,
-                              fontSize: 13,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 10),
-                        SizedBox(
-                          width: 120,
-                          child: AppTextField(
-                            controller: _lowStockController,
-                            hint: 'Default ${AppSettings.lowStockThreshold.toStringAsFixed(0)}',
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            inputFormatters: [
-                              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
+            if (selectedFilter.toLowerCase() == 'yes') ...[
+              // Current Stock — only for SIMPLE items. Variant items track stock
+              // per-variant in the Variants section below.
+              if (!_variantCheckedList.contains(true)) ...[
+                const SizedBox(height: 14),
+                _buildCurrentStockField(),
+              ] else ...[
+                const SizedBox(height: 10),
+                Text('Stock is set per variant below.',
+                    style: GoogleFonts.poppins(
+                        fontSize: 12, color: AppColors.textSecondary)),
               ],
-            ),
-          ),
-          const SizedBox(height: 25),
+              const SizedBox(height: 14),
+              _buildLowStockSection(),
+            ],
+            const SizedBox(height: 25),
+          ],
 
           // Item Image Section
           _buildSectionHeader('Item Image', Icons.image_outlined),
           const SizedBox(height: 15),
-          InkWell(
-            onTap: () async {
-              final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
-              if (pickedFile != null) {
-                final bytes = await pickedFile.readAsBytes();
-                
-                // Validate image size (max 2MB)
-                final int maxSizeInBytes = 2 * 1024 * 1024; // 2MB
-                if (bytes.length > maxSizeInBytes) {
-                  if (mounted) {
-                    NotificationService.instance.showError('Image is too large. Please select an image under 2MB.');
-                  }
-                  return;
-                }
-
-                setState(() => _selectedImageBytes = bytes);
-              }
-            },
-            child: Column(
-              children: [
-                Container(
-                  height: 160,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceLight,
-                    border: Border.all(color: AppColors.divider, width: 1.5),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: _buildImage(),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text('Upload Image (png, .jpg, .jpeg) up to 3MB', style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          AppTextField(
-            controller: _descController,
-            maxLines: 3,
-            hint: 'Description (Optional)',
-            icon: Icons.notes_outlined,
+          ImageUploader(
+            imageBytes: _displayImageBytes,
+            onTap: _pickImage,
           ),
           const SizedBox(height: 25),
 
@@ -1043,28 +701,141 @@ class _EdititemScreenState extends State<EdititemScreen> {
       ),
     );
   }
-  // ✅ ADDED: Helper method to decide what image to show
-  Widget _buildImage() {
-    // If a new image has been selected, show it from bytes (web-compatible)
-    if (_selectedImageBytes != null) {
-      return Image.memory(_selectedImageBytes!, fit: BoxFit.cover);
+  // ── Selectors (open the shared sheets, mirroring the Add Item sheet) ────────
+
+  Future<void> _selectSellingMethod() async {
+    FocusScope.of(context).unfocus();
+    final result = await SellingMethodSheet.show(
+      context,
+      currentMethod: _sellingMethod,
+      currentUnit: _selectedUnit,
+    );
+    if (result != null) {
+      setState(() {
+        _sellingMethod = result.method;
+        _selectedUnit = result.unit;
+      });
     }
-    // If there's an existing image bytes from the original item, show it.
-    if (widget.items.imageBytes != null && widget.items.imageBytes!.isNotEmpty) {
-      return Image.memory(
-        widget.items.imageBytes!,
-        fit: BoxFit.fill,
-        width: 80,
-        height: 80,
-      );
+  }
+
+  Future<void> _selectVeg() async {
+    FocusScope.of(context).unfocus();
+    final result = await VegSelectorSheet.show(context,
+        currentSelection: selectedIMGCategory);
+    if (result != null) setState(() => selectedIMGCategory = result);
+  }
+
+  Future<void> _selectTax() async {
+    FocusScope.of(context).unfocus();
+    final result =
+        await TaxSelectorSheet.show(context, selectedTaxIds: selectedTaxIds);
+    if (result != null) {
+      setState(() {
+        selectedTaxIds = result.ids;
+        selectedTaxRate = result.rate == 0 ? null : result.rate;
+      });
     }
-    // Otherwise, show the placeholder.
+  }
+
+  Future<void> _selectCategory() async {
+    FocusScope.of(context).unfocus();
+    final result = await CategorySelectorSheet.show(
+      context,
+      selectedCategoryId: selectedCategoryId.isEmpty ? null : selectedCategoryId,
+      onAddCategory: () async {
+        Navigator.pop(context);
+        final wasAdded = await AddCategoryDialog.show(context);
+        if (wasAdded) _selectCategory();
+      },
+    );
+    if (result != null) {
+      setState(() => selectedCategoryId = result.id);
+    } else if (selectedCategoryId.isNotEmpty &&
+        !categoryStore.categories.any((c) => c.id == selectedCategoryId)) {
+      // The selected category may have been deleted from inside the picker.
+      setState(() => selectedCategoryId = '');
+    }
+  }
+
+  // ── Image ───────────────────────────────────────────────────────────────────
+
+  /// Bytes to preview: the freshly-picked image, else the item's existing image.
+  Uint8List? get _displayImageBytes {
+    if (_selectedImageBytes != null) return _selectedImageBytes;
+    final existing = widget.items.imageBytes;
+    return (existing != null && existing.isNotEmpty) ? existing : null;
+  }
+
+  Future<void> _pickImage() async {
+    final picked = await ImagePicker()
+        .pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    // 3 MB cap — matches the Add Item sheet (was 2 MB here).
+    if (bytes.length > 3 * 1024 * 1024) {
+      NotificationService.instance.showError(
+          'Image size must be less than 3MB. Please choose a smaller image.');
+      return;
+    }
+    if (mounted) setState(() => _selectedImageBytes = bytes);
+  }
+
+  // ── Inventory sub-fields (mirror the Add Item sheet) ────────────────────────
+
+  Widget _buildCurrentStockField() {
+    final unit = _sellingMethod == SellingMethod.byWeight ? _selectedUnit : 'pcs';
+    return AppTextField(
+      controller: _stockController,
+      label: 'Current Stock ($unit)',
+      hint: '0',
+      icon: Icons.inventory_2_rounded,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: [
+        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+      ],
+      textInputAction: TextInputAction.done,
+      onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
+    );
+  }
+
+  Widget _buildLowStockSection() {
     return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.image, color: Colors.grey, size: 50),
-        const SizedBox(height: 5),
-        Text('Upload Image', style: GoogleFonts.poppins(fontWeight: FontWeight.w500)),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: Text('Low-stock alert',
+              style:
+                  GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
+          subtitle: Text('Warn when this item runs low',
+              style: GoogleFonts.poppins(
+                  fontSize: 12, color: AppColors.textSecondary)),
+          value: _lowStockAlertFilter == 'YES',
+          activeColor: AppColors.primary,
+          onChanged: (v) =>
+              setState(() => _lowStockAlertFilter = v ? 'YES' : 'NO'),
+        ),
+        if (_lowStockAlertFilter == 'YES') ...[
+          const SizedBox(height: 8),
+          Builder(builder: (_) {
+            final unit =
+                _sellingMethod == SellingMethod.byWeight ? _selectedUnit : 'pcs';
+            return AppTextField(
+              controller: _lowStockController,
+              label: 'Alert threshold ($unit, optional)',
+              hint:
+                  'Default: ${AppSettings.lowStockThreshold.toStringAsFixed(0)} $unit',
+              icon: Icons.warning_amber_rounded,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+              ],
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
+            );
+          }),
+        ],
       ],
     );
   }
@@ -1609,177 +1380,10 @@ class _EdititemScreenState extends State<EdititemScreen> {
 }
 
 
-// Helper widget for building the choices section
-
-
-// ✅ REFACTORED: The Category Selection Sheet is now complete.
-class _CategorySelectionSheet extends StatefulWidget {
-  final List<Category> categories;
-  final List<Items> allItems;
-  final String selectedId;
-  final Function(String) onCategoryDeleted; // Callback for deletion
-
-  const _CategorySelectionSheet({
-    required this.categories,
-    required this.allItems,
-    required this.selectedId,
-    required this.onCategoryDeleted,
-  });
-  @override
-  State<_CategorySelectionSheet> createState() => _CategorySelectionSheetState();
-}
-
-class _CategorySelectionSheetState extends State<_CategorySelectionSheet> {
-  late List<Category> _currentCategories;
-
-  @override
-  void initState() {
-    super.initState();
-    _currentCategories = widget.categories;
-  }
-
-  void _deleteCategory(String categoryId) async {
-    // Show confirmation dialog
-    final confirmed = await showAppConfirmDialog(
-      context: context,
-      title: 'Delete Category?',
-      message: 'Do you want to delete this category?',
-      confirmLabel: 'Delete',
-      accent: AppColors.danger,
-      icon: Icons.delete_outline,
-    );
-
-    if (confirmed) {
-      // Unlink items belonging to this category
-      final affected = widget.allItems.where((item) => item.categoryOfItem == categoryId).toList();
-      for (final item in affected) {
-        await itemStore.updateItem(item.copyWith(categoryOfItem: ''));
-      }
-      await categoryStore.deleteCategory(categoryId);
-      widget.onCategoryDeleted(categoryId);
-      setState(() {
-        _currentCategories.removeWhere((cat) => cat.id == categoryId);
-      });
-    }
-  }
-  Future<void> _onAddNewCategory() async {
-    final added = await AddCategoryDialog.show(context);
-    if (added) {
-      setState(() {
-        _currentCategories = categoryStore.categories.toList();
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text("Select Category", style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold)),
-              IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
-            ],
-          ),
-          const Divider(),
-          Flexible(
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: _currentCategories.length,
-              itemBuilder: (context, index) {
-                final category = _currentCategories[index];
-                return ListTile(
-                  onTap: () => Navigator.pop(context, category.id),
-                  leading: Radio<String>(
-                    value: category.id,
-                    groupValue: widget.selectedId,
-                    onChanged: (value) {
-                      if (value != null) {
-                        Navigator.pop(context, value);
-                      }
-                    },
-                  ),
-                  title: Text(category.name),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.edit, color: AppColors.primary),
-                        onPressed: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => EditCategory(category: category),
-                            ),
-                          );
-                          // Re-pull from the store so the renamed category shows
-                          // immediately (mirrors _onAddNewCategory's refresh).
-                          if (mounted) {
-                            setState(() {
-                              _currentCategories = categoryStore.categories.toList();
-                            });
-                          }
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => _deleteCategory(category.id),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-          const Divider(),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _onAddNewCategory,
-              icon: const Icon(Icons.add_circle_outline, color: Colors.white),
-              label: Text('Add New Category', style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                elevation: 0,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 
 
 
-class _VegNonVegSheet extends StatelessWidget {
-  final Function(String) onSelected;
-  const _VegNonVegSheet({required this.onSelected});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ListTile(
-          leading: Icon(Icons.circle, color: Colors.green),
-          title: Text('Veg'),
-          onTap: () => onSelected('Veg'),
-        ),
-        ListTile(
-          leading: Icon(Icons.circle, color: Colors.red),
-          title: Text('Non-Veg'),
-          onTap: () => onSelected('Non-Veg'),
-        ),
-      ],
-    );
-  }}
 
 
 

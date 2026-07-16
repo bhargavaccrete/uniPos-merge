@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
@@ -94,6 +95,9 @@ class _ViewExpenseState extends State<ViewExpense> {
     final isTablet = !AppResponsive.isMobile(context);
     final TextEditingController amountController = TextEditingController(text: expense.amount.toString());
     final TextEditingController reasonController = TextEditingController(text: expense.reason ?? '');
+    // Focus chain: amount → reason. Disposed alongside the controllers in .then().
+    final amountFocus = FocusNode();
+    final reasonFocus = FocusNode();
     DateTime selectedDate = expense.dateandTime;
     String? selectedCategoryId = expense.categoryOfExpense;
     String selectedPaymentType = expense.paymentType ?? 'Cash';
@@ -152,10 +156,13 @@ class _ViewExpenseState extends State<ViewExpense> {
           SizedBox(height: 10),
           AppTextField(
             controller: amountController,
+            focusNode: amountFocus,
             hint: 'Enter amount',
             icon: Icons.attach_money,
             keyboardType: TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))],
+            textInputAction: TextInputAction.next,
+            onFieldSubmitted: (_) => reasonFocus.requestFocus(),
           ),
           SizedBox(height: 16),
           Text('Category',
@@ -195,8 +202,11 @@ class _ViewExpenseState extends State<ViewExpense> {
           SizedBox(height: 10),
           AppTextField(
             controller: reasonController,
+            focusNode: reasonFocus,
             hint: 'Enter reason (optional)',
             icon: Icons.note_alt_outlined,
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
           ),
           SizedBox(height: 16),
           Text('Payment Type',
@@ -315,7 +325,9 @@ class _ViewExpenseState extends State<ViewExpense> {
     if (isTablet) {
       showDialog(
         context: context,
-        builder: (context) => StatefulBuilder(
+        builder: (context) => DialogDisposeScope(
+          disposables: [amountController, reasonController, amountFocus, reasonFocus],
+          child: StatefulBuilder(
           builder: (context, setModalState) => AppDialogShell(
             title: 'Edit Expense',
             accent: AppColors.primary,
@@ -366,10 +378,13 @@ class _ViewExpenseState extends State<ViewExpense> {
                 SizedBox(height: 10),
                 AppTextField(
                   controller: amountController,
+                  focusNode: amountFocus,
                   hint: 'Enter amount',
                   icon: Icons.attach_money,
                   keyboardType: TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))],
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) => reasonFocus.requestFocus(),
                 ),
                 SizedBox(height: 16),
                 Text('Category',
@@ -409,8 +424,11 @@ class _ViewExpenseState extends State<ViewExpense> {
                 SizedBox(height: 10),
                 AppTextField(
                   controller: reasonController,
+                  focusNode: reasonFocus,
                   hint: 'Enter reason (optional)',
                   icon: Icons.note_alt_outlined,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
                 ),
                 SizedBox(height: 16),
                 Text('Payment Type',
@@ -505,10 +523,8 @@ class _ViewExpenseState extends State<ViewExpense> {
             ],
           ),
         ),
-      ).then((_) {
-        amountController.dispose();
-        reasonController.dispose();
-      });
+        ),
+      );
       return;
     }
 
@@ -519,7 +535,9 @@ class _ViewExpenseState extends State<ViewExpense> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (BuildContext context) {
-        return StatefulBuilder(
+        return DialogDisposeScope(
+          disposables: [amountController, reasonController, amountFocus, reasonFocus],
+          child: StatefulBuilder(
           builder: (context, setModalState) {
             return Container(
               padding: EdgeInsets.only(
@@ -554,12 +572,10 @@ class _ViewExpenseState extends State<ViewExpense> {
               ),
             );
           },
+        ),
         );
       },
-    ).then((_) {
-      amountController.dispose();
-      reasonController.dispose();
-    });
+    );
   }
 
   @override

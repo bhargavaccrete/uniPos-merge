@@ -153,6 +153,7 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
             SizedBox(height: AppResponsive.smallSpacing(context)),
             AppTextField(
               controller: _pinController,
+              autofocus: true,
               focusNode: _pinFocusNode,
               label: 'Admin PIN (4–6 digits)',
               hint: 'Used to log in as admin',

@@ -28,6 +28,12 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
   final _foodPreferenceController = TextEditingController();
   final _notesController = TextEditingController();
 
+  // Focus chain: name → phone → food preference → notes.
+  final _nameFocus = FocusNode();
+  final _phoneFocus = FocusNode();
+  final _foodPreferenceFocus = FocusNode();
+  final _notesFocus = FocusNode();
+
   bool _isLoading = false;
   bool get _isEditMode => widget.customer != null;
 
@@ -48,6 +54,10 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
     _phoneController.dispose();
     _foodPreferenceController.dispose();
     _notesController.dispose();
+    _nameFocus.dispose();
+    _phoneFocus.dispose();
+    _foodPreferenceFocus.dispose();
+    _notesFocus.dispose();
     super.dispose();
   }
 
@@ -252,10 +262,13 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
             // Name Field
             AppTextField(
               controller: _nameController,
+              focusNode: _nameFocus,
               label: 'Customer Name',
               hint: 'Enter customer name',
               icon: Icons.person_outline_rounded,
               required: true,
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) => _phoneFocus.requestFocus(),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
                   return 'Please enter customer name';
@@ -269,6 +282,7 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
             // Phone Field
             AppTextField(
               controller: _phoneController,
+              focusNode: _phoneFocus,
               label: 'Phone Number',
               hint: 'Enter 10-digit phone number',
               icon: Icons.phone_rounded,
@@ -276,6 +290,8 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
               keyboardType: TextInputType.phone,
               maxLength: 10,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) => _foodPreferenceFocus.requestFocus(),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
                   return 'Please enter phone number';
@@ -303,9 +319,12 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
             // Food Preference Field
             AppTextField(
               controller: _foodPreferenceController,
+              focusNode: _foodPreferenceFocus,
               label: 'Food Preference',
               hint: 'E.g., Vegetarian, Non-Veg, Vegan',
               icon: Icons.restaurant_menu_rounded,
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) => _notesFocus.requestFocus(),
             ),
 
             SizedBox(height: isTablet ? 18 : 16),
@@ -313,10 +332,13 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
             // Notes Field
             AppTextField(
               controller: _notesController,
+              focusNode: _notesFocus,
               label: 'Notes',
               hint: 'Any special notes about this customer',
               icon: Icons.notes_rounded,
               maxLines: 4,
+              // Multiline: leave the return key as a newline; just dismiss on submit.
+              onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
             ),
 
             SizedBox(height: isTablet ? 28 : 24),

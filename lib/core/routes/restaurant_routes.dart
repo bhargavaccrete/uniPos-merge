@@ -88,7 +88,6 @@ import 'package:billberrylite/presentation/screens/restaurant/Settings/changePas
 import 'package:billberrylite/presentation/screens/restaurant/Settings/licensing_screen.dart';
 
 // Restaurant - Tax
-import 'package:billberrylite/presentation/screens/restaurant/TaxSetting/taxSettings.dart';
 import 'package:billberrylite/presentation/screens/restaurant/TaxSetting/apply_tax_screen.dart';
 import 'package:billberrylite/presentation/screens/restaurant/TaxSetting/addMultipleTax.dart';
 
@@ -232,9 +231,9 @@ class RestaurantRoutes {
     RouteNames.restaurantPaymentMethods: _guard(Paymentsmethods(), 'settings', EntKeys.settings),
     RouteNames.restaurantChangePassword: _guard(Changepassword(), 'settings', EntKeys.settings),
 
-    // Restaurant - Tax
-    RouteNames.restaurantTaxSettings: _guard(taxSetting(), 'taxSettings', EntKeys.settings),
-    RouteNames.restaurantAddMultipleTax: _guard(Addtax(), 'taxSettings', EntKeys.settings),
+    // Restaurant - Tax — opens the tax management screen directly (the old
+    // single-card "Tax Settings" menu screen was a redundant hop, now removed).
+    RouteNames.restaurantTaxSettings: _guard(Addtax(), 'taxSettings', EntKeys.settings),
 
     // Restaurant - Printer
     // Printer setup is required to actually operate (KOT/bill printing), so it

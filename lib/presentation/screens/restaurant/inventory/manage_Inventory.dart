@@ -17,10 +17,10 @@ import '../../../../util/restaurant/restaurant_session.dart';
 import '../../../../util/restaurant/staticswitch.dart';
 import '../../../../domain/services/restaurant/stock_adjust_service.dart';
 import 'low_stock_screen.dart';
-import '../../../widget/componets/restaurant/componets/drawermanage.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'stock_history_screen.dart';
 
@@ -129,7 +129,9 @@ class _ManageInventoryState extends State<ManageInventory> {
 
     final result = await showDialog<({String reason, String? note})>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => DialogDisposeScope(
+        disposables: [noteController],
+        child: StatefulBuilder(
         builder: (ctx, setLocal) => AppDialogShell(
           title: isAdd ? 'Add Stock' : 'Remove Stock',
           subtitle: itemName,
@@ -274,9 +276,9 @@ class _ManageInventoryState extends State<ManageInventory> {
           ],
         ),
       ),
+      ),
     );
 
-    noteController.dispose();
     return result;
   }
 
@@ -924,17 +926,8 @@ class _ManageInventoryState extends State<ManageInventory> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      drawer: DrawerManage(
-        islogout: true,
-      ),
       appBar: buildPrimaryAppBar(
         title: 'Inventory',
-        leading: Builder(
-          builder: (context) => IconButton(
-            onPressed: () => Scaffold.of(context).openDrawer(),
-            icon: const Icon(Icons.menu),
-          ),
-        ),
         actions: [
           Observer(
             builder: (context) {

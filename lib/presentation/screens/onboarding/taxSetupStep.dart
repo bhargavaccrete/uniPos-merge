@@ -535,6 +535,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
               children: [
                 AppTextField(
                   controller: _taxNameController,
+                  autofocus: true,
                   label: 'Tax Name',
                   hint: 'e.g. GST, VAT',
                   icon: Icons.label_outline,

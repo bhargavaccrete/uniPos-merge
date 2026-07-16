@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/data/models/restaurant/db/taxmodel_314.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:uuid/uuid.dart';
@@ -263,86 +264,95 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
   Future<void> _showAddTaxDialog() async {
     final nameController = TextEditingController();
     final percentageController = TextEditingController();
+    final nameFocus = FocusNode();
+    final percentageFocus = FocusNode();
 
     await showDialog(
       context: context,
-      builder: (context) => AppDialogShell(
-        title: 'Add New Tax',
-        accent: AppColors.primary,
-        icon: Icons.receipt_long_rounded,
-        body: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AppTextField(
-              controller: nameController,
-              label: 'Tax Name',
-              hint: 'e.g. GST, VAT, Sales Tax',
-              icon: Icons.receipt_outlined,
+      builder: (ctx) {
+        Future<void> submit() async {
+          final name = nameController.text.trim();
+          final percentage = double.tryParse(percentageController.text.trim());
+
+          if (name.isEmpty || percentage == null) {
+            NotificationService.instance.showError('Please enter valid tax details');
+            return;
+          }
+
+          final newTax = Tax(
+            id: const Uuid().v4(),
+            taxname: name,
+            taxperecentage: percentage,
+          );
+
+          // Save the tax
+          await taxStore.addTax(newTax);
+
+          // Unfocus keyboard, then close the dialog (controllers are disposed
+          // by DialogDisposeScope once the dialog unmounts — no manual dispose).
+          FocusScope.of(ctx).unfocus();
+          Navigator.of(ctx).pop();
+
+          // Auto-select the newly added tax
+          if (mounted) {
+            setState(() {
+              selectedTaxId = newTax.id;
+              selectedTaxRate = newTax.taxperecentage != null
+                  ? newTax.taxperecentage! / 100.0
+                  : null;
+            });
+            _loadTaxes();
+          }
+
+          if (mounted) {
+            NotificationService.instance.showSuccess('$name added and selected successfully');
+          }
+        }
+
+        return DialogDisposeScope(
+          disposables: [nameController, percentageController, nameFocus, percentageFocus],
+          child: AppDialogShell(
+            title: 'Add New Tax',
+            accent: AppColors.primary,
+            icon: Icons.receipt_long_rounded,
+            body: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppTextField(
+                  controller: nameController,
+                  focusNode: nameFocus,
+                  autofocus: true,
+                  label: 'Tax Name',
+                  hint: 'e.g. GST, VAT, Sales Tax',
+                  icon: Icons.receipt_outlined,
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) => percentageFocus.requestFocus(),
+                ),
+                const SizedBox(height: 15),
+                AppTextField(
+                  controller: percentageController,
+                  focusNode: percentageFocus,
+                  label: 'Tax Percentage (%)',
+                  hint: 'e.g. 18',
+                  icon: Icons.percent_rounded,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => submit(),
+                ),
+              ],
             ),
-            const SizedBox(height: 15),
-            AppTextField(
-              controller: percentageController,
-              label: 'Tax Percentage (%)',
-              hint: 'e.g. 18',
-              icon: Icons.percent_rounded,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            ),
-          ],
-        ),
-        actions: [
-          appDialogCancelButton(context),
-          const SizedBox(width: 12),
-          appDialogPrimaryButton(
-            label: 'Add Tax',
-            onPressed: () async {
-              final name = nameController.text.trim();
-              final percentage = double.tryParse(percentageController.text.trim());
-
-              if (name.isEmpty || percentage == null) {
-                NotificationService.instance.showError('Please enter valid tax details');
-                return;
-              }
-
-              final newTax = Tax(
-                id: const Uuid().v4(),
-                taxname: name,
-                taxperecentage: percentage,
-              );
-
-              // Save the tax
-              await taxStore.addTax(newTax);
-
-              // Unfocus keyboard
-              FocusScope.of(context).unfocus();
-
-              // Close the dialog
-              Navigator.of(context).pop();
-
-              // Dispose controllers after dialog is closed
-              await Future.delayed(const Duration(milliseconds: 100));
-              nameController.dispose();
-              percentageController.dispose();
-
-              // Auto-select the newly added tax
-              if (mounted) {
-                setState(() {
-                  selectedTaxId = newTax.id;
-                  selectedTaxRate = newTax.taxperecentage != null
-                      ? newTax.taxperecentage! / 100.0
-                      : null;
-                });
-                _loadTaxes();
-              }
-
-              // Show success message
-              if (mounted) {
-                NotificationService.instance.showSuccess('$name added and selected successfully');
-              }
-            },
+            actions: [
+              appDialogCancelButton(ctx),
+              const SizedBox(width: 12),
+              appDialogPrimaryButton(
+                label: 'Add Tax',
+                onPressed: () => submit(),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 

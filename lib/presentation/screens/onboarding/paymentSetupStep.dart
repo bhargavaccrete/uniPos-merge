@@ -179,6 +179,7 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
           children: [
             AppTextField(
               controller: _methodNameController,
+              autofocus: true,
               label: 'Method Name',
               hint: 'Enter method name',
               icon: Icons.payment_rounded,
@@ -453,6 +454,7 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
               const SizedBox(height: 6),
               TextField(
                 controller: _methodNameController,
+                autofocus: true,
                 textCapitalization: TextCapitalization.words,
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => submitAdd(),

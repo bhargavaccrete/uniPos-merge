@@ -28,6 +28,10 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
   final TextEditingController _upiIdController = TextEditingController();
   final TextEditingController _upiPayeeController = TextEditingController();
 
+  // Focus chain for the UPI edit dialog (name → UPI ID → payee).
+  final FocusNode _upiIdFocus = FocusNode();
+  final FocusNode _upiPayeeFocus = FocusNode();
+
   /// Drives the QR preview. Updated off the keystroke frame (debounced) so the
   /// CustomPaint subtree never rebuilds during text-input processing.
   final ValueNotifier<String> _upiQrData = ValueNotifier<String>('');
@@ -48,6 +52,8 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
     _nameController.dispose();
     _upiIdController.dispose();
     _upiPayeeController.dispose();
+    _upiIdFocus.dispose();
+    _upiPayeeFocus.dispose();
     super.dispose();
   }
 
@@ -100,37 +106,45 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
     _nameController.clear();
     showDialog(
       context: context,
-      builder: (context) => AppDialogShell(
-        title: 'Add Payment Method',
-        subtitle: 'Create a custom payment option',
-        accent: AppColors.primary,
-        icon: Icons.add_circle_rounded,
-        body: AppTextField(
-          controller: _nameController,
-          label: 'Method Name',
-          hint: 'e.g., PhonePe, Google Pay',
-          icon: Icons.payment_rounded,
-          required: true,
-        ),
-        actions: [
-          appDialogCancelButton(context),
-          const SizedBox(width: 12),
-          appDialogPrimaryButton(
-            label: 'Add',
-            onPressed: () async {
-              if (_nameController.text.isNotEmpty) {
-                await _paymentStore.addPaymentMethod(
-                  name: _nameController.text,
-                  value: _nameController.text.toLowerCase().replaceAll(' ', '_'),
-                  iconName: 'payment',
-                );
-                if (mounted) Navigator.pop(context);
-                NotificationService.instance.showSuccess('${_nameController.text} added successfully');
-              }
-            },
+      builder: (context) {
+        // Shared by the name field's done key and the Add button.
+        Future<void> submitAdd() async {
+          if (_nameController.text.trim().isEmpty) return;
+          await _paymentStore.addPaymentMethod(
+            name: _nameController.text,
+            value: _nameController.text.toLowerCase().replaceAll(' ', '_'),
+            iconName: 'payment',
+          );
+          if (mounted) Navigator.pop(context);
+          NotificationService.instance
+              .showSuccess('${_nameController.text} added successfully');
+        }
+
+        return AppDialogShell(
+          title: 'Add Payment Method',
+          subtitle: 'Create a custom payment option',
+          accent: AppColors.primary,
+          icon: Icons.add_circle_rounded,
+          body: AppTextField(
+            controller: _nameController,
+            autofocus: true,
+            label: 'Method Name',
+            hint: 'e.g., PhonePe, Google Pay',
+            icon: Icons.payment_rounded,
+            required: true,
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) => submitAdd(),
           ),
-        ],
-      ),
+          actions: [
+            appDialogCancelButton(context),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: 'Add',
+              onPressed: submitAdd,
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -149,7 +163,34 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
 
     showDialog(
       context: context,
-      builder: (context) => AppDialogShell(
+      builder: (context) {
+        // Shared by the last field's done key and the Update button.
+        Future<void> submit() async {
+          if (_nameController.text.trim().isEmpty) return;
+          final updatedMethod = method.copyWith(
+            name: _nameController.text,
+            value: _nameController.text.toLowerCase().replaceAll(' ', '_'),
+          );
+          await _paymentStore.updatePaymentMethod(updatedMethod);
+          if (isUpi) {
+            await _storeSettings.setUpiId(_upiIdController.text);
+            await _storeSettings.setUpiPayeeName(_upiPayeeController.text);
+            // Generate the QR from the UPI ID and store it so receipts keep
+            // printing the same merchant QR.
+            final qrBytes = await UpiQrHelper.generateQrBytes(
+              _upiIdController.text,
+              payee: _upiPayeeController.text,
+            );
+            await _storeSettings.setUpiQrImage(qrBytes);
+          }
+          if (mounted) {
+            Navigator.pop(context);
+            NotificationService.instance
+                .showSuccess('Payment method updated successfully');
+          }
+        }
+
+        return AppDialogShell(
         title: isUpi ? 'UPI Setup' : 'Edit Payment Method',
         subtitle:
             isUpi ? 'Set your merchant UPI ID & QR' : 'Update payment details',
@@ -161,26 +202,42 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
           children: [
             AppTextField(
               controller: _nameController,
+              autofocus: true,
               label: 'Method Name',
               hint: 'Enter method name',
               icon: Icons.payment_rounded,
               required: true,
+              textInputAction:
+                  isUpi ? TextInputAction.next : TextInputAction.done,
+              onFieldSubmitted: (_) {
+                if (isUpi) {
+                  _upiIdFocus.requestFocus();
+                } else {
+                  submit();
+                }
+              },
             ),
             if (isUpi) ...[
               const SizedBox(height: 16),
               AppTextField(
                 controller: _upiIdController,
+                focusNode: _upiIdFocus,
                 label: 'Merchant UPI ID (VPA)',
                 hint: 'e.g., merchant@okhdfc',
                 icon: Icons.alternate_email_rounded,
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: (_) => _upiPayeeFocus.requestFocus(),
                 onChanged: (_) => _scheduleUpiPreview(),
               ),
               const SizedBox(height: 16),
               AppTextField(
                 controller: _upiPayeeController,
+                focusNode: _upiPayeeFocus,
                 label: 'Payee Name (Optional)',
                 hint: 'Falls back to Store Name',
                 icon: Icons.person_outline_rounded,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => submit(),
                 onChanged: (_) => _scheduleUpiPreview(),
               ),
               const SizedBox(height: 16),
@@ -260,33 +317,11 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
           const SizedBox(width: 12),
           appDialogPrimaryButton(
             label: 'Update',
-            onPressed: () async {
-              if (_nameController.text.isNotEmpty) {
-                final updatedMethod = method.copyWith(
-                  name: _nameController.text,
-                  value: _nameController.text.toLowerCase().replaceAll(' ', '_'),
-                );
-                await _paymentStore.updatePaymentMethod(updatedMethod);
-                if (isUpi) {
-                  await _storeSettings.setUpiId(_upiIdController.text);
-                  await _storeSettings.setUpiPayeeName(_upiPayeeController.text);
-                  // Generate the QR from the UPI ID and store it so receipts
-                  // keep printing the same merchant QR.
-                  final qrBytes = await UpiQrHelper.generateQrBytes(
-                    _upiIdController.text,
-                    payee: _upiPayeeController.text,
-                  );
-                  await _storeSettings.setUpiQrImage(qrBytes);
-                }
-                if (mounted) {
-                  Navigator.pop(context);
-                  NotificationService.instance.showSuccess('Payment method updated successfully');
-                }
-              }
-            },
+            onPressed: submit,
           ),
         ],
-      ),
+        );
+      },
     );
   }
 

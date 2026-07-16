@@ -6,13 +6,13 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
-import 'package:billberrylite/presentation/widget/componets/restaurant/componets/drawermanage.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../data/models/restaurant/db/staffModel_310.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -55,6 +55,13 @@ class _manageStaffState extends State<manageStaff> {
   TextEditingController pinNoController = TextEditingController();
   TextEditingController searchController = TextEditingController();
 
+  // Focus chain for the Add Staff dialog: first → last → mobile → email → pin.
+  final _addFirstNameFocus = FocusNode();
+  final _addLastNameFocus = FocusNode();
+  final _addMobileFocus = FocusNode();
+  final _addMailFocus = FocusNode();
+  final _addPinFocus = FocusNode();
+
   String selectedrole = 'Select Role';
   String searchQuery = '';
 
@@ -67,6 +74,11 @@ class _manageStaffState extends State<manageStaff> {
     mailController.dispose();
     pinNoController.dispose();
     searchController.dispose();
+    _addFirstNameFocus.dispose();
+    _addLastNameFocus.dispose();
+    _addMobileFocus.dispose();
+    _addMailFocus.dispose();
+    _addPinFocus.dispose();
     super.dispose();
   }
 
@@ -219,9 +231,6 @@ class _manageStaffState extends State<manageStaff> {
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Staff Management',
-      ),
-      drawer: DrawerManage(
-        islogout: true,
       ),
       body: Column(
         children: [
@@ -500,7 +509,32 @@ class _manageStaffState extends State<manageStaff> {
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AppDialogShell(
+        builder: (ctx, setS) {
+          // Shared by the PIN field's done key and the Add Staff button so
+          // pressing enter commits the form exactly like tapping the button.
+          Future<void> submitAdd() async {
+            if (!formKey.currentState!.validate()) return;
+            if (selectedrole == 'Select Role') {
+              NotificationService.instance.showInfo('Please select a role');
+              return;
+            }
+            final username = userNameController.text.trim().toLowerCase();
+            if (staffStore.staff
+                .any((s) => s.userName.toLowerCase() == username)) {
+              NotificationService.instance.showError('Username already exists.');
+              return;
+            }
+            if (await _isPinTaken(pinNoController.text.trim())) {
+              NotificationService.instance.showError(
+                  'This PIN is already in use. Choose a different one.');
+              return;
+            }
+            _addStaff();
+            if (ctx.mounted) Navigator.pop(ctx);
+            NotificationService.instance.showSuccess('Staff added successfully');
+          }
+
+          return AppDialogShell(
           title: 'Add New Staff',
           accent: AppColors.primary,
           icon: Icons.person_add_rounded,
@@ -514,18 +548,25 @@ class _manageStaffState extends State<manageStaff> {
                 Row(children: [
                   Expanded(child: AppTextField(
                     controller: firstNameController,
+                    focusNode: _addFirstNameFocus,
                     label: 'First Name',
                     hint: 'John',
                     icon: Icons.person_outline,
                     required: true,
+                    textInputAction: TextInputAction.next,
+                    onFieldSubmitted: (_) => _addLastNameFocus.requestFocus(),
                     validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                   )),
                   const SizedBox(width: 12),
                   Expanded(child: AppTextField(
                     controller: lastNameController,
+                    focusNode: _addLastNameFocus,
                     label: 'Last Name',
                     hint: 'Doe',
                     icon: Icons.person_outline,
+                    textInputAction: TextInputAction.next,
+                    // Skip the Role buttons (not text fields) → jump to Mobile.
+                    onFieldSubmitted: (_) => _addMobileFocus.requestFocus(),
                   )),
                 ]),
                 const SizedBox(height: 14),
@@ -541,12 +582,15 @@ class _manageStaffState extends State<manageStaff> {
                 Row(children: [
                   Expanded(child: AppTextField(
                     controller: mobileController,
+                    focusNode: _addMobileFocus,
                     label: 'Mobile (optional)',
                     hint: '9876543210',
                     icon: Icons.phone_outlined,
                     keyboardType: TextInputType.phone,
                     maxLength: 10,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    textInputAction: TextInputAction.next,
+                    onFieldSubmitted: (_) => _addMailFocus.requestFocus(),
                     validator: (v) {
                       if (v != null && v.trim().isNotEmpty && v.trim().length != 10) {
                         return 'Must be 10 digits';
@@ -557,10 +601,13 @@ class _manageStaffState extends State<manageStaff> {
                   const SizedBox(width: 12),
                   Expanded(child: AppTextField(
                     controller: mailController,
+                    focusNode: _addMailFocus,
                     label: 'Email',
                     hint: 'john@email.com',
                     icon: Icons.mail_outline,
                     keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
+                    onFieldSubmitted: (_) => _addPinFocus.requestFocus(),
                     validator: (v) {
                       if (v != null && v.trim().isNotEmpty) {
                         if (!RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$').hasMatch(v.trim()))
@@ -575,6 +622,7 @@ class _manageStaffState extends State<manageStaff> {
                 // ── PIN ──────────────────────────────────────────
                 AppTextField(
                   controller: pinNoController,
+                  focusNode: _addPinFocus,
                   label: 'PIN (4–6 digits)',
                   hint: '••••••',
                   icon: Icons.lock_outline_rounded,
@@ -583,6 +631,8 @@ class _manageStaffState extends State<manageStaff> {
                   maxLength: 6,
                   obscureText: !pinVisible,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => submitAdd(),
                   suffixIcon: IconButton(
                     icon: Icon(
                       pinVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
@@ -603,30 +653,11 @@ class _manageStaffState extends State<manageStaff> {
             const SizedBox(width: 12),
             appDialogPrimaryButton(
               label: 'Add Staff',
-              onPressed: () async {
-                if (formKey.currentState!.validate()) {
-                  if (selectedrole == 'Select Role') {
-                    NotificationService.instance.showInfo('Please select a role');
-                    return;
-                  }
-                  final username = userNameController.text.trim().toLowerCase();
-                  if (staffStore.staff.any((s) => s.userName.toLowerCase() == username)) {
-                    NotificationService.instance.showError('Username already exists.');
-                    return;
-                  }
-                  if (await _isPinTaken(pinNoController.text.trim())) {
-                    NotificationService.instance.showError(
-                        'This PIN is already in use. Choose a different one.');
-                    return;
-                  }
-                  _addStaff();
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  NotificationService.instance.showSuccess('Staff added successfully');
-                }
-              },
+              onPressed: submitAdd,
             ),
           ],
-        ),
+        );
+        },
       ),
     );
   }
@@ -651,10 +682,18 @@ class _manageStaffState extends State<manageStaff> {
     // showDialog builder triggers a _dependents assertion on back-dismiss.
     final editFormKey = GlobalKey<FormState>();
 
+    // Focus chain for the Edit dialog: first → last → mobile → email → pin.
+    // FocusNode is a ChangeNotifier, so the dispose scope cleans these up too.
+    final editFirstNameFocus = FocusNode();
+    final editLastNameFocus = FocusNode();
+    final editMobileFocus = FocusNode();
+    final editEmailFocus = FocusNode();
+    final editPinFocus = FocusNode();
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return _DialogDisposeScope(
+        return DialogDisposeScope(
           disposables: [
             editUserNameController,
             editFirstNameController,
@@ -662,9 +701,56 @@ class _manageStaffState extends State<manageStaff> {
             editMobileController,
             editEmailController,
             editPinController,
+            editFirstNameFocus,
+            editLastNameFocus,
+            editMobileFocus,
+            editEmailFocus,
+            editPinFocus,
           ],
           child: StatefulBuilder(
           builder: (context, setState) {
+            // Shared by the PIN field's done key and the Update Staff button.
+            Future<void> submitUpdate() async {
+              if (!editFormKey.currentState!.validate()) return;
+              final newUsername =
+                  editUserNameController.text.trim().toLowerCase();
+              final isDuplicate = staffStore.staff.any(
+                (s) =>
+                    s.id != staff.id && s.userName.toLowerCase() == newUsername,
+              );
+              if (isDuplicate) {
+                NotificationService.instance
+                    .showError('Username already exists.');
+                return;
+              }
+              final newPin = editPinController.text.trim();
+              if (newPin.isNotEmpty &&
+                  await _isPinTaken(newPin, excludeStaffId: staff.id)) {
+                NotificationService.instance.showError(
+                    'This PIN is already in use. Choose a different one.');
+                return;
+              }
+              final updatedStaff = staff.copyWith(
+                userName: editUserNameController.text.trim(),
+                firstName: editFirstNameController.text.trim(),
+                lastName: editLastNameController.text.trim(),
+                isCashier: editSelectedRole,
+                mobileNo: editMobileController.text.trim(),
+                emailId: editEmailController.text.trim(),
+                // Only re-hash if the user typed a new PIN; keep existing otherwise.
+                pinNo: newPin.isNotEmpty
+                    ? RestaurantAuthHelper.hashPassword(newPin)
+                    : staff.pinNo,
+                isActive: isActive,
+              );
+              await _updateStaff(updatedStaff);
+              if (context.mounted) {
+                Navigator.pop(context);
+                NotificationService.instance
+                    .showSuccess('Staff updated successfully');
+              }
+            }
+
             return AppDialogShell(
               title: 'Edit Staff',
               subtitle: 'Update staff member details',
@@ -681,18 +767,25 @@ class _manageStaffState extends State<manageStaff> {
                       children: [
                         Expanded(child: AppTextField(
                           controller: editFirstNameController,
+                          focusNode: editFirstNameFocus,
                           label: 'First Name',
                           hint: 'John',
                           icon: Icons.person_outline,
                           required: true,
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) => editLastNameFocus.requestFocus(),
                           validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                         )),
                         const SizedBox(width: 12),
                         Expanded(child: AppTextField(
                           controller: editLastNameController,
+                          focusNode: editLastNameFocus,
                           label: 'Last Name',
                           hint: 'Doe',
                           icon: Icons.person_outline,
+                          textInputAction: TextInputAction.next,
+                          // Skip the Role buttons (not text fields) → jump to Mobile.
+                          onFieldSubmitted: (_) => editMobileFocus.requestFocus(),
                         )),
                       ],
                     ),
@@ -714,12 +807,15 @@ class _manageStaffState extends State<manageStaff> {
                       children: [
                         Expanded(child: AppTextField(
                           controller: editMobileController,
+                          focusNode: editMobileFocus,
                           label: 'Mobile (optional)',
                           hint: '9876543210',
                           icon: Icons.phone_outlined,
                           keyboardType: TextInputType.phone,
                           maxLength: 10,
                           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) => editEmailFocus.requestFocus(),
                           validator: (v) {
                             if (v != null && v.trim().isNotEmpty && v.trim().length != 10) {
                               return 'Must be 10 digits';
@@ -730,10 +826,13 @@ class _manageStaffState extends State<manageStaff> {
                         const SizedBox(width: 12),
                         Expanded(child: AppTextField(
                           controller: editEmailController,
+                          focusNode: editEmailFocus,
                           label: 'Email',
                           hint: 'john@email.com',
                           icon: Icons.mail_outline,
                           keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) => editPinFocus.requestFocus(),
                           validator: (v) {
                             if (v != null && v.trim().isNotEmpty) {
                               if (!RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$').hasMatch(v.trim()))
@@ -749,6 +848,7 @@ class _manageStaffState extends State<manageStaff> {
                     // ── New PIN ──────────────────────────────────────────
                     AppTextField(
                       controller: editPinController,
+                      focusNode: editPinFocus,
                       label: 'New PIN (leave blank to keep current)',
                       hint: '4–6 digits',
                       icon: Icons.lock_outline_rounded,
@@ -756,6 +856,8 @@ class _manageStaffState extends State<manageStaff> {
                       keyboardType: TextInputType.number,
                       maxLength: 6,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => submitUpdate(),
                       suffixIcon: IconButton(
                         icon: Icon(
                           editPinVisible ? Icons.visibility_off : Icons.visibility,
@@ -821,45 +923,7 @@ class _manageStaffState extends State<manageStaff> {
                 const SizedBox(width: 12),
                 appDialogPrimaryButton(
                   label: 'Update Staff',
-                  onPressed: () async {
-                    if (!editFormKey.currentState!.validate()) return;
-                    // FIX: Duplicate username check (exclude this staff's own record).
-                    final newUsername = editUserNameController.text.trim().toLowerCase();
-                    final isDuplicate = staffStore.staff.any(
-                      (s) => s.id != staff.id && s.userName.toLowerCase() == newUsername,
-                    );
-                    if (isDuplicate) {
-                      NotificationService.instance.showError('Username already exists.');
-                      return;
-                    }
-                    final newPin = editPinController.text.trim();
-                    if (newPin.isNotEmpty &&
-                        await _isPinTaken(newPin, excludeStaffId: staff.id)) {
-                      NotificationService.instance.showError(
-                          'This PIN is already in use. Choose a different one.');
-                      return;
-                    }
-                    final updatedStaff = staff.copyWith(
-                      userName: editUserNameController.text.trim(),
-                      firstName: editFirstNameController.text.trim(),
-                      lastName: editLastNameController.text.trim(),
-                      isCashier: editSelectedRole,
-                      mobileNo: editMobileController.text.trim(),
-                      emailId: editEmailController.text.trim(),
-                      // Only re-hash if user typed a new PIN; keep existing hash otherwise.
-                      pinNo: newPin.isNotEmpty
-                          ? RestaurantAuthHelper.hashPassword(newPin)
-                          : staff.pinNo,
-                      isActive: isActive,
-                    );
-                    await _updateStaff(updatedStaff);
-                    if (context.mounted) {
-                      Navigator.pop(context);
-                      NotificationService.instance.showSuccess(
-                        'Staff updated successfully',
-                      );
-                    }
-                  },
+                  onPressed: submitUpdate,
                 ),
               ],
             );
@@ -960,28 +1024,3 @@ class _manageStaffState extends State<manageStaff> {
   }
 }
 
-/// Owns dialog-scoped [ChangeNotifier]s (TextEditingControllers, etc.) and
-/// disposes them in its own [dispose] — which runs only when the dialog subtree
-/// unmounts (after the exit animation). Disposing in showDialog().then() instead
-/// fires at pop-start, so a controller can be reused mid-animation → crash.
-class _DialogDisposeScope extends StatefulWidget {
-  final List<ChangeNotifier> disposables;
-  final Widget child;
-  const _DialogDisposeScope({required this.disposables, required this.child});
-
-  @override
-  State<_DialogDisposeScope> createState() => _DialogDisposeScopeState();
-}
-
-class _DialogDisposeScopeState extends State<_DialogDisposeScope> {
-  @override
-  void dispose() {
-    for (final d in widget.disposables) {
-      d.dispose();
-    }
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => widget.child;
-}

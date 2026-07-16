@@ -1,4 +1,5 @@
 import 'package:mobx/mobx.dart';
+import '../../../core/di/service_locator.dart';
 import '../../../core/plan/entitlement_keys.dart';
 import '../../../core/plan/plan_enforcement.dart';
 import '../../../data/models/restaurant/db/categorymodel_300.dart';
@@ -164,6 +165,16 @@ abstract class _CategoryStore with Store {
       }
 
       await _repository.deleteCategory(categoryId);
+
+      // Re-parent any items that belonged to this category so none are left
+      // pointing at a deleted category (which would otherwise render as
+      // "Unknown"). This makes deletion safe from every caller — the add-item
+      // sheet, the edit screen, and category management all share this path.
+      final orphaned =
+          itemStore.items.where((i) => i.categoryOfItem == categoryId).toList();
+      for (final item in orphaned) {
+        await itemStore.updateItem(item.copyWith(categoryOfItem: ''));
+      }
 
       // Remove from local list
       categories.removeWhere((c) => c.id == categoryId);

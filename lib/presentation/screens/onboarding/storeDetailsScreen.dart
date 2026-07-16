@@ -423,6 +423,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                     children: [
                       AppTextField(
                         controller: _storeNameController,
+                        autofocus: true,
                         focusNode: _storeNameFocus,
                         textInputAction: TextInputAction.next,
                         onFieldSubmitted: (_) => _ownerNameFocus.requestFocus(),
@@ -459,6 +460,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
             // Mobile: stacked
             AppTextField(
               controller: _storeNameController,
+              autofocus: true,
               focusNode: _storeNameFocus,
               textInputAction: TextInputAction.next,
               onFieldSubmitted: (_) => _ownerNameFocus.requestFocus(),

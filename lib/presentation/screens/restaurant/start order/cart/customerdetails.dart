@@ -2093,10 +2093,15 @@ class _CustomerdetailsState extends State<Customerdetails> {
     if (!PlanGuard.allowedOr(context, EntKeys.billingInvoiceCreate, featureName: 'Billing')) {
       return;
     }
-    final billsToday = (await pastOrderStore.getTodaysPastOrders()).length;
-    if (!mounted) return;
-    if (!PlanGuard.withinLimitOr(context, EntKeys.billingInvoicePerDayMax, billsToday, unit: 'bills per day')) {
-      return;
+    // Per-day bill cap applies to NEW orders only (existingModel == null).
+    // Settling an already-placed order is an exit — it was counted at placement
+    // via todaysBillLoad (active + past), so blocking it here would trap it.
+    if (widget.existingModel == null) {
+      final billsToday = await pastOrderStore.todaysBillLoad();
+      if (!mounted) return;
+      if (!PlanGuard.withinLimitOr(context, EntKeys.billingInvoicePerDayMax, billsToday, unit: 'bills per day')) {
+        return;
+      }
     }
 
     // EOD lockout: block NEW orders, but ALLOW settling an EXISTING active order

@@ -470,6 +470,7 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                         children: [
                           AppTextField(
                             controller: _firstNameController,
+                            autofocus: true,
                             focusNode: _firstNameFocus,
                             label: 'First Name',
                             hint: 'e.g. John',

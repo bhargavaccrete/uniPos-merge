@@ -8,6 +8,7 @@ import 'package:billberrylite/data/models/retail/hive_model/customer_model_208.d
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -317,7 +318,9 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => AppDialogShell(
+      builder: (ctx) => DialogDisposeScope(
+        disposables: [nameController, phoneController, emailController, addressController, notesController],
+        child: AppDialogShell(
         title: 'Add New Customer',
         accent: AppColors.primary,
         icon: Icons.person_add_rounded,
@@ -420,13 +423,8 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
           ),
         ],
       ),
-    ).then((_) {
-      nameController.dispose();
-      phoneController.dispose();
-      emailController.dispose();
-      addressController.dispose();
-      notesController.dispose();
-    });
+      ),
+    );
   }
 
   void _showEditCustomerDialog(BuildContext context, CustomerModel customer) {
@@ -439,7 +437,9 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => AppDialogShell(
+      builder: (ctx) => DialogDisposeScope(
+        disposables: [nameController, phoneController, emailController, addressController, notesController],
+        child: AppDialogShell(
         title: 'Edit Customer',
         accent: AppColors.primary,
         icon: Icons.edit_rounded,
@@ -531,13 +531,8 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
           ),
         ],
       ),
-    ).then((_) {
-      nameController.dispose();
-      phoneController.dispose();
-      emailController.dispose();
-      addressController.dispose();
-      notesController.dispose();
-    });
+      ),
+    );
   }
 
   void _showCustomerDetailsDialog(BuildContext context, CustomerModel customer) {

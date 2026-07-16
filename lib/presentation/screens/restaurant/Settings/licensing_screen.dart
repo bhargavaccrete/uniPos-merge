@@ -224,11 +224,16 @@ class _LicensingScreenState extends State<LicensingScreen> {
               onTap: _store.isLoading
                   ? null
                   : () async {
-                      await _store.refreshLicense();
+                      final planChanged = await _store.refreshLicense();
                       if (_store.errorMessage != null) {
                         _showSnack(_store.errorMessage!, isError: true);
                       } else {
-                        _showSnack('License refreshed', isError: false);
+                        _showSnack(
+                          planChanged
+                              ? 'Your plan was updated'
+                              : 'You already have the latest plan',
+                          isError: false,
+                        );
                       }
                     },
             ),
@@ -499,11 +504,16 @@ class _ActivateSheetState extends State<_ActivateSheet> {
           const SizedBox(height: 16),
           AppTextField(
             controller: widget.controller,
+            autofocus: true,
             label: 'License Key',
             hint: 'e.g. XXXX-XXXX-XXXX-XXXX',
             icon: Icons.key_rounded,
             enableSuggestions: false,
             autocorrect: false,
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) {
+              if (!_loading) _activate();
+            },
           ),
           const SizedBox(height: 16),
           SizedBox(

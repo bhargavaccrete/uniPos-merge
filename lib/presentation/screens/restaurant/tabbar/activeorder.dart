@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/plan/plan_guard.dart';
@@ -222,7 +223,9 @@ class _ActiveorderState extends State<Activeorder> {
     final result = await showDialog<String?>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
+      builder: (ctx) => DialogDisposeScope(
+        disposables: [reasonCtrl],
+        child: StatefulBuilder(
         builder: (ctx, setDialog) {
           return Dialog(
             backgroundColor: AppColors.white,
@@ -290,6 +293,7 @@ class _ActiveorderState extends State<Activeorder> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: reasonCtrl,
+                    autofocus: true,
                     onChanged: (_) => setDialog(() {}),
                     decoration: InputDecoration(
                       hintText: 'Or type a reason (optional)',
@@ -351,9 +355,9 @@ class _ActiveorderState extends State<Activeorder> {
           );
         },
       ),
+      ),
     );
 
-    reasonCtrl.dispose();
     return result;
   }
 

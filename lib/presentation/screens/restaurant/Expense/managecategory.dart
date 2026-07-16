@@ -99,8 +99,11 @@ class _ManageCategoryState extends State<ManageCategory> {
             const SizedBox(height: 10),
             AppTextField(
               controller: categoryController,
+              autofocus: true,
               hint: 'Enter category name',
               icon: Icons.category_outlined,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => _updateCategoryName(category),
             ),
           ],
         ),
@@ -228,8 +231,11 @@ class _ManageCategoryState extends State<ManageCategory> {
                       SizedBox(height: 10),
                       AppTextField(
                         controller: categoryController,
+                        autofocus: true,
                         hint: 'Enter category name',
                         icon: Icons.category_outlined,
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) => AddECategory(),
                       ),
                       SizedBox(height: 24),
                       SizedBox(
@@ -274,8 +280,11 @@ class _ManageCategoryState extends State<ManageCategory> {
                             SizedBox(height: 10),
                             AppTextField(
                               controller: categoryController,
+                              autofocus: true,
                               hint: 'Enter category name',
                               icon: Icons.category_outlined,
+                              textInputAction: TextInputAction.done,
+                              onFieldSubmitted: (_) => AddECategory(),
                             ),
                           ],
                         ),

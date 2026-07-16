@@ -29,6 +29,11 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
   TextEditingController choiceController = TextEditingController();
   TextEditingController optionController = TextEditingController();
   TextEditingController searchController = TextEditingController();
+
+  // Focus chain for the add/edit sheet: choice name → option input.
+  final _choiceNameFocus = FocusNode();
+  final _optionFocus = FocusNode();
+
   String query = '';
   List<ChoiceOption> tempOptions = [];
   ChoicesModel? editingChoice;
@@ -56,6 +61,8 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
     choiceController.dispose();
     optionController.dispose();
     searchController.dispose();
+    _choiceNameFocus.dispose();
+    _optionFocus.dispose();
     super.dispose();
   }
 
@@ -216,10 +223,14 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
                       // ── Choice Name ──────────────────────────────────
                       AppTextField(
                         controller: choiceController,
+                        focusNode: _choiceNameFocus,
+                        autofocus: true,
                         label: 'Choice Name',
                         hint: 'e.g. Spice Level, Add-ons',
                         icon: Icons.checklist_rounded,
                         required: true,
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (_) => _optionFocus.requestFocus(),
                       ),
                       const SizedBox(height: 16),
 
@@ -305,9 +316,16 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
                           Expanded(
                             child: AppTextField(
                               controller: optionController,
+                              focusNode: _optionFocus,
                               hint: 'e.g. Mild, Medium, Hot…',
                               icon: Icons.add_circle_outline_rounded,
-                              onFieldSubmitted: (_) => _addOption(),
+                              textInputAction: TextInputAction.next,
+                              // Add the option and keep focus here so the user can
+                              // type several options back-to-back.
+                              onFieldSubmitted: (_) {
+                                _addOption();
+                                _optionFocus.requestFocus();
+                              },
                             ),
                           ),
                           const SizedBox(width: 8),

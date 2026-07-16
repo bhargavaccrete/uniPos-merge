@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:io';
 
@@ -3303,55 +3304,64 @@ class _AddProductScreenState extends State<AddProductScreen>
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add New Attribute'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Attribute Name',
-                hintText: 'e.g., Size, Color, Material',
-                border: OutlineInputBorder(),
-              ),
-              autofocus: true,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'You can add values for this attribute after creating it.',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final name = nameController.text.trim();
-              if (name.isEmpty) {
-                NotificationService.instance.showError('Please enter an attribute name');
-                return;
-              }
+      builder: (context) {
+        Future<void> create() async {
+          final name = nameController.text.trim();
+          if (name.isEmpty) {
+            NotificationService.instance.showError('Please enter an attribute name');
+            return;
+          }
 
-              final success = await attributeStore.addAttribute(name);
-              if (mounted) {
-                Navigator.pop(context);
-                if (success) {
-                  NotificationService.instance.showSuccess('Attribute "$name" created successfully!');
-                  _showAddValuesDialog(attributeStore, attributeStore.attributes.last);
-                } else {
-                  NotificationService.instance.showError(attributeStore.errorMessage ?? 'Failed to create attribute');
-                }
-              }
-            },
-            child: const Text('Create'),
+          final success = await attributeStore.addAttribute(name);
+          if (mounted) {
+            Navigator.pop(context);
+            if (success) {
+              NotificationService.instance.showSuccess('Attribute "$name" created successfully!');
+              _showAddValuesDialog(attributeStore, attributeStore.attributes.last);
+            } else {
+              NotificationService.instance.showError(attributeStore.errorMessage ?? 'Failed to create attribute');
+            }
+          }
+        }
+
+        return DialogDisposeScope(
+          disposables: [nameController],
+          child: AlertDialog(
+            title: const Text('Add New Attribute'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Attribute Name',
+                    hintText: 'e.g., Size, Color, Material',
+                    border: OutlineInputBorder(),
+                  ),
+                  autofocus: true,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => create(),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'You can add values for this attribute after creating it.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => create(),
+                child: const Text('Create'),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -3360,13 +3370,16 @@ class _AddProductScreenState extends State<AddProductScreen>
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => DialogDisposeScope(
+        disposables: [valueController],
+        child: AlertDialog(
         title: Text('Add Values for ${attribute.name}'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: valueController,
+              autofocus: true,
               decoration: const InputDecoration(
                 labelText: 'Value',
                 hintText: 'e.g., Small, Medium, Large',
@@ -3402,6 +3415,7 @@ class _AddProductScreenState extends State<AddProductScreen>
             child: const Text('Add Value'),
           ),
         ],
+      ),
       ),
     );
   }
