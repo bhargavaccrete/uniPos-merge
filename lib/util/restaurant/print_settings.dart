@@ -25,6 +25,7 @@ class PrintSettings {
     "Subtotal": true,
     "Payment Paid": true,
     "UPI QR": true,
+    "UPI QR Amount": true,
     "Powered By": true,
     "Custom Field": false,
     "Extra Info": false,
@@ -115,6 +116,7 @@ class PrintSettings {
   static bool get showSubtotal => getSetting("Subtotal");
   static bool get showPaymentPaid => getSetting("Payment Paid");
   static bool get showUpiQr => getSetting("UPI QR");
+  static bool get showUpiQrAmount => getSetting("UPI QR Amount");
   static bool get showPoweredBy => getSetting("Powered By");
   static bool get showCustomField => getSetting("Custom Field");
   static bool get showExtraInfo => getSetting("Extra Info");

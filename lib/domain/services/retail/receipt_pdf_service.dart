@@ -1339,20 +1339,26 @@ class ReceiptPdfService {
     // it to unpaid invoices only.
     if (!AppConfig.isRestaurant && !unpaid) return pw.SizedBox();
 
+    final payee = (data.upiPayeeName?.trim().isNotEmpty ?? false)
+        ? data.upiPayeeName!.trim()
+        : (data.storeName ?? 'Merchant');
+    // When "UPI QR Amount" is on and a VPA exists, generate a fresh QR with the
+    // bill total baked in (…&am=…) so scanning pre-fills the amount — this wins
+    // over the merchant's static QR image. Otherwise use the static image, then a
+    // plain amount-less dynamic QR.
+    final embedAmount = PrintSettings.showUpiQrAmount && hasUpiId;
     pw.Widget qr;
-    if (hasQrImage) {
+    if (embedAmount) {
+      final link = 'upi://pay?pa=${data.upiId!.trim()}'
+          '&pn=${Uri.encodeComponent(payee)}'
+          '&am=${data.sale.totalAmount.toStringAsFixed(2)}&cu=INR';
+      qr = pw.BarcodeWidget(
+          barcode: pw.Barcode.qrCode(), data: link, width: 76, height: 76);
+    } else if (hasQrImage) {
       qr = pw.Image(pw.MemoryImage(data.upiQrImageBytes!), width: 76, height: 76);
     } else {
-      final payee = (data.upiPayeeName?.trim().isNotEmpty ?? false)
-          ? data.upiPayeeName!.trim()
-          : (data.storeName ?? 'Merchant');
-      // Encode the exact amount only while unpaid, so a QR on an already-paid
-      // bill can't prompt a duplicate payment — it becomes a generic
-      // "pay this merchant" QR instead.
-      final amountParam =
-          unpaid ? '&am=${data.sale.totalAmount.toStringAsFixed(2)}' : '';
       final link = 'upi://pay?pa=${data.upiId!.trim()}'
-          '&pn=${Uri.encodeComponent(payee)}$amountParam&cu=INR';
+          '&pn=${Uri.encodeComponent(payee)}&cu=INR';
       qr = pw.BarcodeWidget(
           barcode: pw.Barcode.qrCode(), data: link, width: 76, height: 76);
     }
@@ -1654,21 +1660,27 @@ class ReceiptPdfService {
     // keeps it to unpaid bills only.
     if (!AppConfig.isRestaurant && !unpaid) return [];
 
+    final payee = (data.upiPayeeName?.trim().isNotEmpty ?? false)
+        ? data.upiPayeeName!.trim()
+        : (data.storeName ?? 'Merchant');
+    // When "UPI QR Amount" is on and a VPA exists, generate a fresh QR with the
+    // bill total baked in (…&am=…) so scanning pre-fills the amount — this wins
+    // over the merchant's static QR image. Otherwise use the static image, then a
+    // plain amount-less dynamic QR.
+    final embedAmount = PrintSettings.showUpiQrAmount && hasUpiId;
     pw.Widget qr;
-    if (hasQrImage) {
+    if (embedAmount) {
+      final link = 'upi://pay?pa=${data.upiId!.trim()}'
+          '&pn=${Uri.encodeComponent(payee)}'
+          '&am=${data.sale.totalAmount.toStringAsFixed(2)}&cu=INR';
+      qr = pw.BarcodeWidget(
+          barcode: pw.Barcode.qrCode(), data: link, width: qrSize, height: qrSize);
+    } else if (hasQrImage) {
       qr = pw.Image(pw.MemoryImage(data.upiQrImageBytes!),
           width: qrSize, height: qrSize);
     } else {
-      final payee = (data.upiPayeeName?.trim().isNotEmpty ?? false)
-          ? data.upiPayeeName!.trim()
-          : (data.storeName ?? 'Merchant');
-      // Encode the exact amount only while unpaid, so a QR on an already-paid
-      // bill can't prompt a duplicate payment — it becomes a generic
-      // "pay this merchant" QR instead.
-      final amountParam =
-          unpaid ? '&am=${data.sale.totalAmount.toStringAsFixed(2)}' : '';
       final link = 'upi://pay?pa=${data.upiId!.trim()}'
-          '&pn=${Uri.encodeComponent(payee)}$amountParam&cu=INR';
+          '&pn=${Uri.encodeComponent(payee)}&cu=INR';
       qr = pw.BarcodeWidget(
           barcode: pw.Barcode.qrCode(), data: link, width: qrSize, height: qrSize);
     }

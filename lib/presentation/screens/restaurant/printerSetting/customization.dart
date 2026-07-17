@@ -129,6 +129,7 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
       {'key': 'Subtotal', 'icon': Icons.calculate, 'description': 'Show subtotal before tax'},
       {'key': 'Payment Paid', 'icon': Icons.money, 'description': 'Show cash received and change'},
       {'key': 'UPI QR', 'icon': Icons.qr_code_2, 'description': 'Show UPI Scan & Pay QR on unpaid bills'},
+      {'key': 'UPI QR Amount', 'icon': Icons.currency_rupee, 'description': 'Prefill the bill amount in the UPI QR so scanning shows the total'},
     ],
     'Branding': [
       // Locked ON when the admin forces branding via `billing.invoice.print`;
