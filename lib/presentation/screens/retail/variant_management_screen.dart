@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 
 import '../../../core/di/service_locator.dart';
+import '../../../core/config/tax_feature.dart';
+import '../../../data/models/common/taxmodel_314.dart';
 import '../../../data/models/retail/hive_model/product_model_200.dart';
 import '../../../data/models/retail/hive_model/variante_model_201.dart';
 
@@ -35,6 +37,15 @@ class _VariantManagementScreenState extends State<VariantManagementScreen> {
       variants = loadedVariants;
       isLoading = false;
     });
+  }
+
+  /// Resolves the product's category name once, used as the SKU prefix when
+  /// auto-generating for new variants added from this screen.
+  String? _categoryName() {
+    for (final c in categoryStore.categories) {
+      if (c.id == widget.product.category) return c.name;
+    }
+    return null;
   }
 
   Future<void> _deleteVariant(VarianteModel variant) async {
@@ -481,6 +492,7 @@ class _VariantManagementScreenState extends State<VariantManagementScreen> {
                     context: context,
                     builder: (context) => _AddVariantDialog(
                       productId: widget.product.productId,
+                      categoryName: _categoryName(),
                       onVariantAdded: _loadVariants,
                     ),
                   );
@@ -541,6 +553,7 @@ class _VariantManagementScreenState extends State<VariantManagementScreen> {
                     context: context,
                     builder: (context) => _BulkAddVariantDialog(
                       productId: widget.product.productId,
+                      categoryName: _categoryName(),
                       onVariantsAdded: _loadVariants,
                     ),
                   );
@@ -641,10 +654,12 @@ class _VariantManagementScreenState extends State<VariantManagementScreen> {
 // Add Variant Dialog
 class _AddVariantDialog extends StatefulWidget {
   final String productId;
+  final String? categoryName;
   final VoidCallback onVariantAdded;
 
   const _AddVariantDialog({
     required this.productId,
+    this.categoryName,
     required this.onVariantAdded,
   });
 
@@ -663,10 +678,16 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
   final _mrpController = TextEditingController();
   final _stockController = TextEditingController();
   final _minStockController = TextEditingController();
-  final _taxRateController = TextEditingController();
+  String? _selectedTaxId;
 
   // Custom attributes
   final List<_CustomAttrData> _customAttributes = [];
+
+  @override
+  void initState() {
+    super.initState();
+    taxStore.loadTaxes();
+  }
 
   @override
   void dispose() {
@@ -679,7 +700,6 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
     _mrpController.dispose();
     _stockController.dispose();
     _minStockController.dispose();
-    _taxRateController.dispose();
     for (var attr in _customAttributes) {
       attr.dispose();
     }
@@ -714,6 +734,11 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
   Future<void> _saveVariant() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Auto-generate only when left blank — never overwrite what was typed.
+    final sku = _skuController.text.trim().isEmpty
+        ? await skuGeneratorService.generate(widget.categoryName)
+        : _skuController.text.trim();
+
     final variantId = '${widget.productId}_${DateTime.now().millisecondsSinceEpoch}';
     final variant = VarianteModel.create(
       varianteId: variantId,
@@ -721,13 +746,19 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
       size: _sizeController.text.trim().isEmpty ? null : _sizeController.text.trim(),
       color: _colorController.text.trim().isEmpty ? null : _colorController.text.trim(),
       weight: _weightController.text.trim().isEmpty ? null : _weightController.text.trim(),
-      sku: _skuController.text.trim().isEmpty ? null : _skuController.text.trim(),
+      sku: sku,
       barcode: _barcodeController.text.trim().isEmpty ? null : _barcodeController.text.trim(),
       costPrice: double.tryParse(_priceController.text.trim()) ?? 0.0,
       mrp: _mrpController.text.trim().isEmpty ? null : double.tryParse(_mrpController.text.trim()),
       stockQty: int.tryParse(_stockController.text.trim()) ?? 0,
       minStock: _minStockController.text.trim().isEmpty ? null : int.tryParse(_minStockController.text.trim()),
-      taxRate: _taxRateController.text.trim().isEmpty ? null : double.tryParse(_taxRateController.text.trim()),
+      taxRate: _selectedTaxId == null
+          ? null
+          : taxStore.taxes
+              .firstWhere((t) => t.id == _selectedTaxId,
+                  orElse: () => Tax(id: '', taxname: '', taxperecentage: null))
+              .taxperecentage,
+      taxId: _selectedTaxId,
       customAttributes: _getCustomAttributesMap(),
     );
 
@@ -779,9 +810,10 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
                 _buildTextField(_barcodeController, 'Barcode (Optional)', 'Scan or enter'),
                 const SizedBox(height: 12),
                 _buildTextField(_skuController, 'SKU (Optional)', 'Enter SKU'),
-                const SizedBox(height: 12),
-                _buildTextField(_taxRateController, 'Tax Rate % (Optional)', '0.00',
-                  keyboardType: TextInputType.number),
+                if (TaxFeature.enabled) ...[
+                  const SizedBox(height: 12),
+                  _buildTaxDropdown(_selectedTaxId, (value) => setState(() => _selectedTaxId = value)),
+                ],
 
                 // Custom Attributes Section
                 const SizedBox(height: 16),
@@ -898,6 +930,32 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
   }
 }
 
+// Shared by both the Add and Edit variant dialogs.
+Widget _buildTaxDropdown(String? selectedTaxId, ValueChanged<String?> onChanged) {
+  return Observer(
+    builder: (_) {
+      final taxes = taxStore.taxes;
+      return DropdownButtonFormField<String>(
+        value: taxes.any((t) => t.id == selectedTaxId) ? selectedTaxId : null,
+        isExpanded: true,
+        decoration: const InputDecoration(
+          labelText: 'Tax Rate (Optional)',
+          border: OutlineInputBorder(),
+          isDense: true,
+        ),
+        items: [
+          const DropdownMenuItem(value: null, child: Text('No tax')),
+          ...taxes.map((tax) => DropdownMenuItem(
+                value: tax.id,
+                child: Text('${tax.taxname} (${tax.taxperecentage ?? 0}%)'),
+              )),
+        ],
+        onChanged: onChanged,
+      );
+    },
+  );
+}
+
 // Helper class for custom attribute data
 class _CustomAttrData {
   final TextEditingController keyController = TextEditingController();
@@ -1002,6 +1060,7 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
       stockQty: int.tryParse(_stockController.text.trim()) ?? 0,
       minStock: _minStockController.text.trim().isEmpty ? null : int.tryParse(_minStockController.text.trim()),
       taxRate: widget.variant.taxRate,
+      taxId: widget.variant.taxId,
       createdAt: widget.variant.createdAt,
       updateAt: DateTime.now().toIso8601String(),
       customAttributes: _getCustomAttributesMap(),
@@ -1181,10 +1240,12 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
 // Bulk Add Variant Dialog
 class _BulkAddVariantDialog extends StatefulWidget {
   final String productId;
+  final String? categoryName;
   final VoidCallback onVariantsAdded;
 
   const _BulkAddVariantDialog({
     required this.productId,
+    this.categoryName,
     required this.onVariantsAdded,
   });
 
@@ -1200,7 +1261,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
   final _stockController = TextEditingController();
   final _minStockController = TextEditingController();
   final _baseBarcodeController = TextEditingController();
-  final _taxRateController = TextEditingController();
+  String? _selectedTaxId;
 
   // Size selection
   final List<String> _availableSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
@@ -1211,6 +1272,12 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
   final _customSizeController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    taxStore.loadTaxes();
+  }
+
+  @override
   void dispose() {
     _colorController.dispose();
     _priceController.dispose();
@@ -1218,7 +1285,6 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
     _stockController.dispose();
     _minStockController.dispose();
     _baseBarcodeController.dispose();
-    _taxRateController.dispose();
     _customSizeController.dispose();
     super.dispose();
   }
@@ -1244,7 +1310,12 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
     final stock = int.tryParse(_stockController.text.trim()) ?? 0;
     final minStock = _minStockController.text.trim().isEmpty ? null : int.tryParse(_minStockController.text.trim());
     final baseBarcode = _baseBarcodeController.text.trim();
-    final taxRate = _taxRateController.text.trim().isEmpty ? null : double.tryParse(_taxRateController.text.trim());
+    final taxRate = _selectedTaxId == null
+        ? null
+        : taxStore.taxes
+            .firstWhere((t) => t.id == _selectedTaxId,
+                orElse: () => Tax(id: '', taxname: '', taxperecentage: null))
+            .taxperecentage;
 
     // Create variants for each size
     int barcodeCounter = 1;
@@ -1257,19 +1328,24 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
         barcode = '$baseBarcode${barcodeCounter.toString().padLeft(3, '0')}';
       }
 
+      // Bulk-created variants have no manual SKU input, so every one gets an
+      // auto-generated SKU (each call advances the shared global sequence).
+      final sku = await skuGeneratorService.generate(widget.categoryName);
+
       final variant = VarianteModel.create(
         varianteId: variantId,
         productId: widget.productId,
         size: size,
         color: color,
         weight: null,
-        sku: null,
+        sku: sku,
         barcode: barcode,
         costPrice: price,
         mrp: mrp,
         stockQty: stock,
         minStock: minStock,
         taxRate: taxRate,
+        taxId: _selectedTaxId,
       );
 
       await productStore.addVariant(variant);
@@ -1477,19 +1553,11 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
                     isDense: true,
                   ),
                 ),
-                const SizedBox(height: 12),
-
                 // Tax Rate
-                TextFormField(
-                  controller: _taxRateController,
-                  decoration: const InputDecoration(
-                    labelText: 'Tax Rate % (Optional)',
-                    hintText: '0.00',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
+                if (TaxFeature.enabled) ...[
+                  const SizedBox(height: 12),
+                  _buildTaxDropdown(_selectedTaxId, (value) => setState(() => _selectedTaxId = value)),
+                ],
               ],
             ),
           ),

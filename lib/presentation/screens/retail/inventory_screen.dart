@@ -21,6 +21,25 @@ class InventoryScreen extends StatefulWidget {
 class _InventoryScreenState extends State<InventoryScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  Map<String, String> _categoryNames = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategoryNames();
+  }
+
+  Future<void> _loadCategoryNames() async {
+    await categoryStore.loadCategories();
+    final categories = categoryStore.categories;
+    if (!mounted) return;
+    setState(() {
+      _categoryNames = {for (final c in categories) c.id: c.name};
+    });
+  }
+
+  /// Resolve a product's category id to its display name.
+  String _categoryName(String categoryId) => _categoryNames[categoryId] ?? categoryId;
 
   @override
   void dispose() {
@@ -131,7 +150,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    product.category,
+                    _categoryName(product.category),
                     style: const TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.normal),
                   ),
                 ],
@@ -430,7 +449,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   ? allProducts
                   : allProducts.where((product) {
                       return product.productName.toLowerCase().contains(_searchQuery) ||
-                          product.category.toLowerCase().contains(_searchQuery);
+                          _categoryName(product.category).toLowerCase().contains(_searchQuery);
                     }).toList();
 
               if (filteredProducts.isEmpty) {
@@ -524,7 +543,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   ? allProducts
                   : allProducts.where((product) {
                       return product.productName.toLowerCase().contains(_searchQuery) ||
-                          product.category.toLowerCase().contains(_searchQuery);
+                          _categoryName(product.category).toLowerCase().contains(_searchQuery);
                     }).toList();
 
               if (filteredProducts.isEmpty) {
@@ -616,7 +635,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      product.category,
+                      _categoryName(product.category),
                       style: const TextStyle(
                         fontSize: 11,
                         color: Color(0xFF4CAF50),
@@ -731,7 +750,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             ? allProducts
             : allProducts.where((product) {
                 return product.productName.toLowerCase().contains(_searchQuery) ||
-                    product.category.toLowerCase().contains(_searchQuery);
+                    _categoryName(product.category).toLowerCase().contains(_searchQuery);
               }).toList();
 
         return Column(
@@ -879,7 +898,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         Row(
                           children: [
                             Text(
-                              product.category,
+                              _categoryName(product.category),
                               style: const TextStyle(
                                 fontSize: 11,
                                 color: Color(0xFF9E9E9E),

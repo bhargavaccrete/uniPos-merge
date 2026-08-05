@@ -88,11 +88,28 @@ abstract class _SetupWizardStore with Store {
 
   /*-----------------  TAX DETAILS ---------------*///
 
+  // Restaurant path's tax-inclusive/exclusive toggle (retail uses `taxInclusive`
+  // for the same concept). Renamed from the old `taxEnabled` to free that name up
+  // for the unrelated "does this business use tax features" flag below.
   @observable
-  bool taxEnabled = true;
+  bool taxInclusiveRestaurant = true;
 
   @observable
   bool taxInclusive = true;
+
+  // Two distinct concepts, kept as separate fields even though V1 onboarding always
+  // sets them identically (see _onTaxRegistrationStatusChanged in
+  // storeDetailsScreen.dart — the wizard exposes exactly one Yes/No question, no
+  // separate control for either field): `isRegisteredForTax` is legal/business
+  // status, `taxEnabled` is what billing and step-gating logic should actually
+  // read. Keeping them apart now means a future "Tax Settings" screen can let an
+  // advanced user decouple them (e.g. registered but tax intentionally off)
+  // without a schema change — not a V1 feature, just future-proofing the model.
+  @observable
+  bool isRegisteredForTax = true;
+
+  @observable
+  bool taxEnabled = true;
 
   @observable
   double taxRate = 0.0;
@@ -294,13 +311,23 @@ abstract class _SetupWizardStore with Store {
 
   // Tax Actions
   @action
-  void setTaxEnabled(bool value) {
-    taxEnabled = value;
+  void setTaxInclusiveRestaurant(bool value) {
+    taxInclusiveRestaurant = value;
   }
 
   @action
   void setTaxInclusive(bool value) {
     taxInclusive = value;
+  }
+
+  @action
+  void setIsRegisteredForTax(bool value) {
+    isRegisteredForTax = value;
+  }
+
+  @action
+  void setTaxEnabled(bool value) {
+    taxEnabled = value;
   }
 
   @action
@@ -388,6 +415,8 @@ abstract class _SetupWizardStore with Store {
         country = savedDetails.country ?? '';
         pincode = savedDetails.pincode ?? '';
         logoByte = savedDetails.logo;
+        isRegisteredForTax = savedDetails.isRegisteredForTax;
+        taxEnabled = savedDetails.taxEnabled;
         // Use AppConfig as source of truth for setup complete status
         if (!AppConfig.isBusinessModeSet) {
           isSetupComplete = savedDetails.isSetupComplete;
@@ -397,7 +426,7 @@ abstract class _SetupWizardStore with Store {
       // Load tax details if exists
       final savedTax = _taxDetailsRepo.get();
       if (savedTax != null) {
-        taxEnabled = savedTax.isEnabled;
+        taxInclusiveRestaurant = savedTax.isInclusive;
         taxInclusive = savedTax.isInclusive;
         taxRate = savedTax.defaultRate;
         taxName = savedTax.taxName;
@@ -451,6 +480,8 @@ abstract class _SetupWizardStore with Store {
         state: state,
         country: country,
         pincode: pincode,
+        isRegisteredForTax: isRegisteredForTax,
+        taxEnabled: taxEnabled,
         isSetupComplete: false,
         logo: logoByte
       );
@@ -480,30 +511,17 @@ abstract class _SetupWizardStore with Store {
   Future<void> saveTaxDetails() async {
     isLoading = true;
     try {
-
-      // Convert taxRates to TaxRateItem list
-      List<TaxRateItem>? rateItems;
-      if (taxRates != null && taxRates!.isNotEmpty) {
-        rateItems = taxRates!.map((tax) {
-          // tax is a TaxItem from UI, convert to TaxRateItem for storage
-          return TaxRateItem(
-            name: tax.name as String,
-            rate: tax.rate as double,
-            isDefault: tax.isDefault as bool,
-          );
-        }).toList();
-      } else {
-      }
-
+      // Named tax rates themselves live in the shared TaxStore (see
+      // taxSetupStep.dart's _saveTaxesToDatabase) — this record only keeps
+      // the wizard step's own UI state so it can be restored on revisit.
       final details = TaxDetails(
         isEnabled: taxEnabled,
-        isInclusive: taxInclusive,
+        isInclusive: AppConfig.isRestaurant ? taxInclusiveRestaurant : taxInclusive,
         defaultRate: taxRate,
         taxName: taxName,
         placeOfSupply: taxPlaceOfSupply,
         applyOnDelivery: taxApplyOnDelivery,
         notes: taxNotes,
-        taxRates: rateItems,
       );
       await _taxDetailsRepo.save(details);
     } catch (e) {
@@ -553,6 +571,8 @@ abstract class _SetupWizardStore with Store {
         state: state,
         country: country,
         pincode: pincode,
+        isRegisteredForTax: isRegisteredForTax,
+        taxEnabled: taxEnabled,
         logo: logoByte,
         isSetupComplete: true,
 
@@ -632,10 +652,12 @@ abstract class _SetupWizardStore with Store {
       country = '';
       pincode = '';
       logoByte = null;
+      isRegisteredForTax = true;
+      taxEnabled = true;
       isSetupComplete = false;
 
       // Reset tax observables
-      taxEnabled = true;
+      taxInclusiveRestaurant = true;
       taxInclusive = true;
       taxRate = 0.0;
       taxName = 'GST';

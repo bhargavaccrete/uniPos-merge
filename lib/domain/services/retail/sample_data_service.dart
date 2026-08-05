@@ -1,6 +1,7 @@
 import 'package:uuid/uuid.dart';
 import '../../../data/models/retail/hive_model/product_model_200.dart';
 import '../../../data/models/retail/hive_model/variante_model_201.dart';
+import '../../../data/models/common/categorymodel_300.dart';
 import '../../../core/di/service_locator.dart';
 
 /// Service for providing sample data for different business types
@@ -36,16 +37,36 @@ class SampleDataService {
 
       int importedCount = 0;
 
+      final categoryIdMap = <String, String>{};
+
       // Add categories first
-      for (var category in categories) {
-        if (!productStore.categories.contains(category)) {
-          await productStore.addCategory(category);
+      for (var categoryName in categories) {
+        Category? category;
+        try {
+          category = categoryStore.categories.firstWhere(
+            (c) => c.name.toLowerCase() == categoryName.toLowerCase(),
+          );
+        } catch (_) {
+          category = null;
         }
+
+        if (category == null) {
+          final newCategory = Category(
+            id: _uuid.v4(),
+            name: categoryName,
+            createdTime: DateTime.now(),
+          );
+          await categoryStore.addCategory(newCategory);
+          category = newCategory;
+        }
+        categoryIdMap[categoryName.toLowerCase()] = category.id;
       }
 
       // Add products and their variants
       for (var product in products) {
-        await productStore.addProduct(product);
+        final categoryId = categoryIdMap[product.category.toLowerCase()] ?? product.category;
+        final updatedProduct = product.copyWith(category: categoryId);
+        await productStore.addProduct(updatedProduct);
         importedCount++;
 
         // Add variants for this product

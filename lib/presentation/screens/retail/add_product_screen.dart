@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:billberrylite/data/models/retail/hive_model/category_model_215.dart';
+import 'package:billberrylite/data/models/common/categorymodel_300.dart';
+import 'package:billberrylite/data/models/common/taxmodel_314.dart';
 import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
 import 'package:billberrylite/domain/services/retail/variant_generator_service.dart';
@@ -10,6 +13,7 @@ import 'package:billberrylite/presentation/widget/retail/product_attribute_selec
 import 'package:uuid/uuid.dart';
 
 import '../../../core/di/service_locator.dart';
+import '../../../core/config/tax_feature.dart';
 
 const _uuid = Uuid();
 
@@ -107,16 +111,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final _nameController = TextEditingController();
   final _brandController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _taxRateController = TextEditingController();
+  final _hsnCodeController = TextEditingController();
+  String? _selectedTaxId;
+  // Once the user manually picks a tax, an HSN-based suggestion should never
+  // silently overwrite that choice again for this product.
+  bool _taxManuallyChanged = false;
+  Timer? _hsnLookupDebounce;
   final _defaultPriceController = TextEditingController();
   final _defaultCostController = TextEditingController();
   final _defaultMrpController = TextEditingController();
   final _defaultStockController = TextEditingController();
 
-  String? _selectedCategory;
-  CategoryModel? _selectedCategoryModel;
+  Category? _selectedCategoryModel;
   bool _hasVariants = false;
-  List<CategoryModel> _categories = [];
+  List<Category> _categories = [];
 
   // Product type: 'simple' or 'variable'
   String _productType = 'simple';
@@ -145,27 +153,46 @@ class _AddProductScreenState extends State<AddProductScreen> {
     _loadCategories();
     // Load attributes
     attributeStore.loadAttributes();
+    taxStore.loadTaxes();
   }
 
   Future<void> _loadCategories() async {
-    _categories = await categoryModelRepository.getAllCategories();
-    if (_categories.isEmpty) {
-      await categoryModelRepository.addDefaultCategories();
-      _categories = await categoryModelRepository.getAllCategories();
-    }
+    await categoryStore.loadCategories();
+    _categories = categoryStore.categories.toList();
     setState(() {});
   }
 
   @override
   void dispose() {
+    _hsnLookupDebounce?.cancel();
     _nameController.dispose();
     _brandController.dispose();
     _descriptionController.dispose();
-    _taxRateController.dispose();
+    _hsnCodeController.dispose();
     for (var variant in _variants) {
       variant.dispose();
     }
     super.dispose();
+  }
+
+  /// Looks up the tax previously used with this HSN code (debounced so it
+  /// only fires once the user pauses typing) and pre-fills the Tax dropdown.
+  /// Never overrides a tax the user has already picked manually.
+  void _onHsnCodeChanged(String value) {
+    _hsnLookupDebounce?.cancel();
+    _hsnLookupDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (_taxManuallyChanged || !mounted) return;
+      final suggestedTaxId = productStore.findTaxIdByHsnCode(value);
+      if (suggestedTaxId != null && suggestedTaxId != _selectedTaxId) {
+        setState(() => _selectedTaxId = suggestedTaxId);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Tax rate auto-filled from HSN $value'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    });
   }
 
   void _addVariant() {
@@ -204,15 +231,35 @@ class _AddProductScreenState extends State<AddProductScreen> {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
-              final category = categoryController.text.trim();
-              if (category.isNotEmpty) {
-                productStore.addCategory(category);
-                setState(() {
-                  _selectedCategory = category;
-                });
-                Navigator.pop(context);
+            onPressed: () async {
+              final name = categoryController.text.trim();
+              if (name.isEmpty) return;
+
+              Category? existing;
+              try {
+                existing = categoryStore.categories.firstWhere(
+                  (c) => c.name.toLowerCase() == name.toLowerCase(),
+                );
+              } catch (_) {
+                existing = null;
               }
+
+              final category = existing ??
+                  Category(
+                    id: _uuid.v4(),
+                    name: name,
+                    createdTime: DateTime.now(),
+                  );
+              if (existing == null) {
+                await categoryStore.addCategory(category);
+              }
+              await _loadCategories();
+
+              if (!mounted) return;
+              setState(() {
+                _selectedCategoryModel = category;
+              });
+              Navigator.pop(context);
             },
             child: const Text('Add'),
           ),
@@ -293,10 +340,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
       }
     }
 
-    // Get GST rate from input or category
-    final taxRate = _taxRateController.text.trim().isEmpty
-        ? (_selectedCategoryModel?.gstRate)
-        : double.tryParse(_taxRateController.text.trim());
+    // GST rate is set per product/variant, not inherited from category.
+    // taxRate is resolved once from the selected shared Tax entity and kept
+    // as a cached percentage on the model, exactly like before — only the
+    // source of the number changed, from free-typed to a named picklist.
+    final taxRate = _selectedTaxId == null
+        ? null
+        : taxStore.taxes
+            .firstWhere((t) => t.id == _selectedTaxId,
+                orElse: () => Tax(id: '', taxname: '', taxperecentage: null))
+            .taxperecentage;
 
     // Create ProductModel
     final productId = _uuid.v4();
@@ -304,12 +357,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
       productId: productId,
       productName: _nameController.text.trim(),
       brandName: _brandController.text.trim().isEmpty ? null : _brandController.text.trim(),
-      category: _selectedCategory ?? 'Uncategorized',
+      category: _selectedCategoryModel?.id ?? '',
       imagePath: null,
       description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
       hasVariants: _hasVariants || _productType == 'variable',
       productType: _productType,
       gstRate: taxRate,
+      hsnCode: _hsnCodeController.text.trim().isEmpty ? null : _hsnCodeController.text.trim(),
+      taxId: _selectedTaxId,
     );
 
     await productStore.addProduct(product);
@@ -323,6 +378,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         final updatedVariant = variant.copyWith(
           productId: productId,
           taxRate: taxRate,
+          taxId: _selectedTaxId,
         );
         await productStore.addVariant(updatedVariant);
         variantCount++;
@@ -357,6 +413,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           costPrice: double.tryParse(variantData.costPriceController.text.trim()) ?? 0.0,
           stockQty: int.tryParse(variantData.stockController.text.trim()) ?? 0,
           taxRate: taxRate,
+          taxId: _selectedTaxId,
           customAttributes: variantData.getCustomAttributesMap(),
         );
 
@@ -422,11 +479,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ),
               const SizedBox(height: 12),
               _buildTextField(
-                controller: _taxRateController,
-                label: 'Tax Rate % (Optional)',
-                hint: '0.00',
-                keyboardType: TextInputType.number,
+                controller: _hsnCodeController,
+                label: 'HSN Code (Optional)',
+                hint: 'e.g., 6109',
+                onChanged: _onHsnCodeChanged,
               ),
+              if (TaxFeature.enabled) ...[
+                const SizedBox(height: 12),
+                _buildTaxDropdown(),
+              ],
               const SizedBox(height: 16),
 
               // Product Type Selector
@@ -769,9 +830,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
     TextInputType? keyboardType,
     String? Function(String?)? validator,
     int maxLines = 1,
+    ValueChanged<String>? onChanged,
   }) {
     return TextFormField(
       controller: controller,
+      onChanged: onChanged,
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
@@ -802,7 +865,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         DropdownButtonFormField<String>(
-          value: _selectedCategory,
+          value: _selectedCategoryModel?.id,
           isExpanded: true,
           decoration: InputDecoration(
             labelText: 'Category',
@@ -820,9 +883,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
           items: [
             ..._categories.map((category) {
               return DropdownMenuItem(
-                value: category.categoryName,
+                value: category.id,
                 child: Text(
-                  '${category.categoryName} (GST ${(category.gstRate ?? 0).toInt()}%)',
+                  category.name,
                   overflow: TextOverflow.ellipsis,
                 ),
               );
@@ -849,15 +912,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
               await _loadCategories();
             } else {
               setState(() {
-                _selectedCategory = value;
                 _selectedCategoryModel = _categories.firstWhere(
-                  (c) => c.categoryName == value,
+                  (c) => c.id == value,
                   orElse: () => _categories.first,
                 );
-                // Auto-fill tax rate from category if not set
-                if (_taxRateController.text.isEmpty && _selectedCategoryModel != null) {
-                  _taxRateController.text = (_selectedCategoryModel!.gstRate ?? 0).toString();
-                }
               });
             }
           },
@@ -868,19 +926,39 @@ class _AddProductScreenState extends State<AddProductScreen> {
             return null;
           },
         ),
-        if (_selectedCategoryModel != null && (_selectedCategoryModel!.gstRate ?? 0) > 0)
-          Padding(
-            padding: const EdgeInsets.only(top: 4, left: 4),
-            child: Text(
-              'Category GST: ${(_selectedCategoryModel!.gstRate ?? 0).toInt()}% will be applied if no product/variant GST is set',
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.grey[600],
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ),
       ],
+    );
+  }
+
+  Widget _buildTaxDropdown() {
+    final taxes = taxStore.taxes;
+    return DropdownButtonFormField<String>(
+      value: taxes.any((t) => t.id == _selectedTaxId) ? _selectedTaxId : null,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: 'Tax Rate (Optional)',
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFFE8E8E8)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFFE8E8E8)),
+        ),
+        filled: true,
+        fillColor: Colors.white,
+      ),
+      items: [
+        const DropdownMenuItem(value: null, child: Text('No tax')),
+        ...taxes.map((tax) => DropdownMenuItem(
+              value: tax.id,
+              child: Text('${tax.taxname} (${tax.taxperecentage ?? 0}%)'),
+            )),
+      ],
+      onChanged: (value) => setState(() {
+        _selectedTaxId = value;
+        _taxManuallyChanged = true;
+      }),
     );
   }
 

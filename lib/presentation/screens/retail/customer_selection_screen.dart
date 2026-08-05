@@ -4,7 +4,7 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/di/service_locator.dart';
-import '../../../data/models/retail/hive_model/customer_model_208.dart';
+import '../../../data/models/common/customer_model_125.dart';
 import '../../../domain/services/restaurant/notification_service.dart';
 
 class CustomerSelectionScreen extends StatefulWidget {
@@ -22,7 +22,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
   void initState() {
     super.initState();
     // Clear any previous selection and search
-    customerStoreRestail.clearSelection();
+    customerStore.clearSelection();
   }
 
   @override
@@ -33,11 +33,11 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
   }
 
   void _onSearchChanged(String query) {
-    customerStoreRestail.searchCustomers(query);
+    customerStore.searchCustomers(query);
   }
 
-  void _selectCustomer(CustomerModel customer) {
-    customerStoreRestail.selectCustomer(customer);
+  void _selectCustomer(Customer customer) {
+    customerStore.selectCustomer(customer);
     Navigator.pop(context, customer);
   }
 
@@ -107,7 +107,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
                 return;
               }
 
-              final newCustomer = CustomerModel.create(
+              final newCustomer = Customer.create(
                 customerId: const Uuid().v4(),
                 name: nameController.text.trim(),
                 phone: phoneController.text.trim(),
@@ -115,7 +115,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
                 address: addressController.text.trim().isEmpty ? null : addressController.text.trim(),
               );
 
-              await customerStoreRestail.addCustomer(newCustomer);
+              await customerStore.addCustomer(newCustomer);
 
               if (mounted) {
                 Navigator.pop(context);
@@ -165,7 +165,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
                   return _buildEmptyState();
                 }
 
-                if (customerStoreRestail.searchResults.isEmpty) {
+                if (customerStore.searchResults.isEmpty) {
                   return _buildNoResultsState();
                 }
 
@@ -319,13 +319,13 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
       builder: (context) {
         return ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: customerStoreRestail.searchResults.length + 1,
+          itemCount: customerStore.searchResults.length + 1,
           itemBuilder: (context, index) {
             if (index == 0) {
               return _buildAddNewCustomerTile();
             }
 
-            final customer = customerStoreRestail.searchResults[index - 1];
+            final customer = customerStore.searchResults[index - 1];
             return _buildCustomerTile(customer);
           },
         );
@@ -368,7 +368,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
     );
   }
 
-  Widget _buildCustomerTile(CustomerModel customer) {
+  Widget _buildCustomerTile(Customer customer) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -380,7 +380,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
         leading: CircleAvatar(
           backgroundColor: const Color(0xFF4CAF50).withOpacity(0.1),
           child: Text(
-            customer.name[0].toUpperCase(),
+            (customer.name?.isNotEmpty ?? false) ? customer.name![0].toUpperCase() : '?',
             style: const TextStyle(
               color: Color(0xFF4CAF50),
               fontWeight: FontWeight.w600,
@@ -388,7 +388,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
           ),
         ),
         title: Text(
-          customer.name,
+          customer.name ?? '',
           style: const TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w600,
@@ -400,7 +400,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
           children: [
             const SizedBox(height: 4),
             Text(
-              customer.phone,
+              customer.phone ?? '',
               style: const TextStyle(fontSize: 13, color: Color(0xFF6B6B6B)),
             ),
             if (customer.totalPurchaseAmount > 0) ...[

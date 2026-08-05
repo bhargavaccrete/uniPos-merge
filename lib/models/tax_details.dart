@@ -26,8 +26,8 @@ class TaxDetails extends HiveObject {
   @HiveField(6)
   final String? notes;             // optional info
 
-  @HiveField(7)
-  final List<TaxRateItem>? taxRates; // List of all tax rates added during setup
+  // Field 7 (taxRates: List<TaxRateItem>?) retired — named tax rates now
+  // live in the shared TaxStore (data/models/common/taxmodel_314.dart).
 
    TaxDetails({
     this.isEnabled = true,
@@ -37,7 +37,6 @@ class TaxDetails extends HiveObject {
     this.placeOfSupply,
     this.applyOnDelivery = false,
     this.notes,
-    this.taxRates,
   });
 
   TaxDetails copyWith({
@@ -48,7 +47,6 @@ class TaxDetails extends HiveObject {
     String? placeOfSupply,
     bool? applyOnDelivery,
     String? notes,
-    List<TaxRateItem>? taxRates,
   }) {
     return TaxDetails(
       isEnabled: isEnabled ?? this.isEnabled,
@@ -58,7 +56,6 @@ class TaxDetails extends HiveObject {
       placeOfSupply: placeOfSupply ?? this.placeOfSupply,
       applyOnDelivery: applyOnDelivery ?? this.applyOnDelivery,
       notes: notes ?? this.notes,
-      taxRates: taxRates ?? this.taxRates,
     );
   }
 
@@ -71,7 +68,6 @@ class TaxDetails extends HiveObject {
       'placeOfSupply': placeOfSupply,
       'applyOnDelivery': applyOnDelivery,
       'notes': notes,
-      'taxRates': taxRates?.map((e) => e.toMap()).toList(),
     };
   }
 
@@ -84,55 +80,6 @@ class TaxDetails extends HiveObject {
       placeOfSupply: map['placeOfSupply'] as String?,
       applyOnDelivery: map['applyOnDelivery'] as bool? ?? false,
       notes: map['notes'] as String?,
-      taxRates: (map['taxRates'] as List<dynamic>?)
-          ?.map((e) => TaxRateItem.fromMap(Map<String, dynamic>.from(e)))
-          .toList(),
-    );
-  }
-}
-
-@HiveType(typeId:  HiveTypeIds.taxRateItem) // Unique type ID for TaxRateItem
-class TaxRateItem extends HiveObject {
-  @HiveField(0)
-  final String name;
-
-  @HiveField(1)
-  final double rate;
-
-  @HiveField(2)
-  final bool isDefault;
-
-  TaxRateItem({
-    required this.name,
-    required this.rate,
-    this.isDefault = false,
-  });
-
-  TaxRateItem copyWith({
-    String? name,
-    double? rate,
-    bool? isDefault,
-  }) {
-    return TaxRateItem(
-      name: name ?? this.name,
-      rate: rate ?? this.rate,
-      isDefault: isDefault ?? this.isDefault,
-    );
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      'name': name,
-      'rate': rate,
-      'isDefault': isDefault,
-    };
-  }
-
-  factory TaxRateItem.fromMap(Map<String, dynamic> map) {
-    return TaxRateItem(
-      name: map['name'] as String,
-      rate: (map['rate'] as num).toDouble(),
-      isDefault: map['isDefault'] as bool? ?? false,
     );
   }
 }

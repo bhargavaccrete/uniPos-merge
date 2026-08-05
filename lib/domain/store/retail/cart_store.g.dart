@@ -123,7 +123,7 @@ mixin _$CartStore on _CartStore, Store {
   @override
   Future<CartOperationResult> addItem(
       ProductModel product, VarianteModel variant,
-      {CategoryModel? category}) {
+      {Category? category}) {
     return _$addItemAsyncAction
         .run(() => super.addItem(product, variant, category: category));
   }
@@ -192,7 +192,7 @@ mixin _$CartStore on _CartStore, Store {
   @override
   Future<CartOperationResult> addItemToTab(
       ProductModel product, VarianteModel variant,
-      {CategoryModel? category}) {
+      {Category? category}) {
     return _$addItemToTabAsyncAction
         .run(() => super.addItemToTab(product, variant, category: category));
   }

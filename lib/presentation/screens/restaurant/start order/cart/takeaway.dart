@@ -18,7 +18,7 @@ import '../../../../../util/common/currency_helper.dart';
 import '../../../../../util/restaurant/staticswitch.dart';
 import '../../../../../util/restaurant/restaurant_session.dart';
 
-import '../../../../../data/models/restaurant/db/customer_model_125.dart';
+import '../../../../../data/models/common/customer_model_125.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../core/plan/plan_enforcement.dart';
 import '../../../../../core/plan/plan_guard.dart';
@@ -984,7 +984,7 @@ class _TakeawayState extends State<Takeaway> {
   }
 
   // Handle customer selection from autocomplete
-  void _onCustomerSelected(RestaurantCustomer customer) {
+  void _onCustomerSelected(Customer customer) {
     setState(() {
       selectedCustomer = customer;
       nameController.text = customer.name ?? '';
@@ -994,18 +994,18 @@ class _TakeawayState extends State<Takeaway> {
   }
 
   // Update customer statistics (visits, loyalty points, last visit, etc.)
-  Future<void> _updateCustomerStats(RestaurantCustomer customer, String orderType, {int pointsToEarn = 0}) async {
+  Future<void> _updateCustomerStats(Customer customer, String orderType, {int pointsToEarn = 0}) async {
     if (!PlanEnforce.allows(EntKeys.customers)) return;
     try {
 
-      await restaurantCustomerStore.updateCustomerVisit(
+      await customerStore.updateCustomerVisit(
         customerId: customer.customerId,
         orderType: orderType,
         pointsToAdd: pointsToEarn,
       );
 
       // Verify the update
-      final updatedCustomer = await restaurantCustomerStore.getCustomerById(customer.customerId);
+      final updatedCustomer = await customerStore.getCustomerById(customer.customerId);
       if (updatedCustomer != null) {
       } else {
       }
@@ -1014,7 +1014,7 @@ class _TakeawayState extends State<Takeaway> {
   }
 
   // Check if customer exists or create new customer
-  Future<RestaurantCustomer?> _getOrCreateCustomer(String name, String phone, String orderType) async {
+  Future<Customer?> _getOrCreateCustomer(String name, String phone, String orderType) async {
     // Customers not in plan → never search, create, or link a customer.
     if (!PlanEnforce.allows(EntKeys.customers)) return null;
     try {
@@ -1030,7 +1030,7 @@ class _TakeawayState extends State<Takeaway> {
 
       // Search for existing customer by phone number (phone is more unique than name)
       if (phone.trim().isNotEmpty) {
-        final searchResults = await restaurantCustomerStore.searchCustomers(phone.trim());
+        final searchResults = await customerStore.searchCustomers(phone.trim());
 
         // Check if we have an exact phone match
         for (var customer in searchResults) {
@@ -1043,13 +1043,13 @@ class _TakeawayState extends State<Takeaway> {
       // If not found and we have at least phone or name, create new customer
       if (phone.trim().isNotEmpty || name.trim().isNotEmpty) {
 
-        final newCustomer = RestaurantCustomer.create(
+        final newCustomer = Customer.create(
           customerId: Uuid().v4(),
           name: name.trim().isEmpty ? null : name.trim(),
           phone: phone.trim().isEmpty ? null : phone.trim(),
         );
 
-        await restaurantCustomerStore.addCustomer(newCustomer);
+        await customerStore.addCustomer(newCustomer);
 
         return newCustomer;
       }
@@ -1068,9 +1068,9 @@ class _TakeawayState extends State<Takeaway> {
   TextEditingController remarkController = TextEditingController();
 
   // Customer selection
-  RestaurantCustomer? selectedCustomer;
-  List<RestaurantCustomer> nameSuggestions = [];
-  List<RestaurantCustomer> phoneSuggestions = [];
+  Customer? selectedCustomer;
+  List<Customer> nameSuggestions = [];
+  List<Customer> phoneSuggestions = [];
   bool showNameSuggestions = false;
   bool showPhoneSuggestions = false;
 
@@ -1277,7 +1277,7 @@ class _TakeawayState extends State<Takeaway> {
       // Restore the linked customer so _getOrCreateCustomer skips search/create
       if (m.customerId != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) async {
-          final customer = await restaurantCustomerStore.getCustomerById(m.customerId!);
+          final customer = await customerStore.getCustomerById(m.customerId!);
           if (mounted && customer != null) {
             setState(() => selectedCustomer = customer);
           }
@@ -1898,7 +1898,7 @@ class _TakeawayState extends State<Takeaway> {
       builder: (BuildContext ctx) {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
-            Widget suggestionList(List<RestaurantCustomer> suggestions, void Function(RestaurantCustomer) onSelect) {
+            Widget suggestionList(List<Customer> suggestions, void Function(Customer) onSelect) {
               return Container(
                 constraints: const BoxConstraints(maxHeight: 140),
                 margin: const EdgeInsets.only(top: 4, bottom: 8),
@@ -2083,7 +2083,7 @@ class _TakeawayState extends State<Takeaway> {
                               controller: nameController, label: 'Customer Name', hint: 'e.g. John Doe', icon: Icons.person_outline,
                               onChanged: (value) async {
                                 if (value.isEmpty) { setDialogState(() { showNameSuggestions = false; nameSuggestions = []; }); }
-                                else { final r = await restaurantCustomerStore.searchCustomers(value); setDialogState(() { nameSuggestions = r; showNameSuggestions = r.isNotEmpty; }); }
+                                else { final r = await customerStore.searchCustomers(value); setDialogState(() { nameSuggestions = r; showNameSuggestions = r.isNotEmpty; }); }
                               },
                             ),
                             if (showNameSuggestions && nameSuggestions.isNotEmpty)
@@ -2099,7 +2099,7 @@ class _TakeawayState extends State<Takeaway> {
                               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                               onChanged: (value) async {
                                 if (value.isEmpty) { setDialogState(() { showPhoneSuggestions = false; phoneSuggestions = []; }); }
-                                else { final r = await restaurantCustomerStore.searchCustomers(value); setDialogState(() { phoneSuggestions = r; showPhoneSuggestions = r.isNotEmpty; }); }
+                                else { final r = await customerStore.searchCustomers(value); setDialogState(() { phoneSuggestions = r; showPhoneSuggestions = r.isNotEmpty; }); }
                               },
                             ),
                             if (showPhoneSuggestions && phoneSuggestions.isNotEmpty)

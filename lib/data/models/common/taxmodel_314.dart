@@ -5,7 +5,7 @@ import 'package:hive/hive.dart';
 import 'package:billberrylite/core/constants/hive_type_ids.dart';
 part 'taxmodel_314.g.dart';
 
-@HiveType(typeId: HiveTypeIds.restaurantTax)
+@HiveType(typeId: HiveTypeIds.tax)
 class Tax extends HiveObject{
 
   @HiveField(0)

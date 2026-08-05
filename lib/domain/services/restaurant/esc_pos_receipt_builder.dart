@@ -259,7 +259,9 @@ class EscPosReceiptBuilder {
         receiptData.storePhone!.isNotEmpty) {
       bytes.addAll(_text('Tel: ${receiptData.storePhone}'));
     }
-    if (receiptData.gstNumber != null && receiptData.gstNumber!.isNotEmpty) {
+    if (receiptData.taxEnabled &&
+        receiptData.gstNumber != null &&
+        receiptData.gstNumber!.isNotEmpty) {
       bytes.addAll(_text('GSTIN: ${receiptData.gstNumber}'));
     }
 
@@ -297,7 +299,7 @@ class EscPosReceiptBuilder {
     // Customer name
     if (PrintSettings.showCustomerName &&
         receiptData.customer != null &&
-        receiptData.customer!.name.isNotEmpty) {
+        (receiptData.customer!.name?.isNotEmpty ?? false)) {
       bytes.addAll(_text('Customer: ${receiptData.customer!.name}'));
     }
 
@@ -394,7 +396,7 @@ class EscPosReceiptBuilder {
       isTaxInclusive: isTaxInclusive,
       reconcileToGst: sale.totalGstAmount ?? 0, // lines must sum to the order's GST
     );
-    if (PrintSettings.showTax && taxLines.isNotEmpty) {
+    if (receiptData.taxEnabled && PrintSettings.showTax && taxLines.isNotEmpty) {
       final totalGst = sale.totalGstAmount ?? 0; // authoritative — matches order
       bytes.addAll(_divider(cols));
       bytes.addAll(
@@ -408,7 +410,7 @@ class EscPosReceiptBuilder {
           isTaxInclusive ? 'Total Tax (Incl)' : 'Total Tax:',
           _fmt(totalGst),
           cols)));
-    } else if (!PrintSettings.showTax && (sale.totalGstAmount ?? 0) > 0.009) {
+    } else if (receiptData.taxEnabled && !PrintSettings.showTax && (sale.totalGstAmount ?? 0) > 0.009) {
       // Tax toggle OFF → single summary line so the bill still reconciles.
       bytes.addAll(_text(_formatTotalRow(
           isTaxInclusive ? 'Tax (Incl.)' : 'Tax',
@@ -464,7 +466,7 @@ class EscPosReceiptBuilder {
 
     // ── FOOTER ──
     bytes.addAll(_alignCenter);
-    if (isTaxInclusive) {
+    if (receiptData.taxEnabled && isTaxInclusive) {
       bytes.addAll(_text('All prices include GST'));
     }
     // Custom footer / "Thank You" message — owner-editable in Print

@@ -38,13 +38,14 @@ class VarianteModelAdapter extends TypeAdapter<VarianteModel> {
       imagePath: fields[18] as String?,
       isDefault: fields[19] as bool,
       status: fields[20] as String,
+      taxId: fields[21] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, VarianteModel obj) {
     writer
-      ..writeByte(21)
+      ..writeByte(22)
       ..writeByte(0)
       ..write(obj.varianteId)
       ..writeByte(1)
@@ -86,7 +87,9 @@ class VarianteModelAdapter extends TypeAdapter<VarianteModel> {
       ..writeByte(19)
       ..write(obj.isDefault)
       ..writeByte(20)
-      ..write(obj.status);
+      ..write(obj.status)
+      ..writeByte(21)
+      ..write(obj.taxId);
   }
 
   @override

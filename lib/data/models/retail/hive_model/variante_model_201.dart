@@ -75,6 +75,13 @@ class VarianteModel extends HiveObject {
   @HiveField(20)
   final String status;
 
+  /// Reference to a shared Tax entity (see data/models/common/taxmodel_314.dart)
+  /// picked in the variant form. [taxRate] is kept in sync as the resolved
+  /// percentage so GstService/cart/receipt/report code never needs to look
+  /// the Tax entity up — it stays a plain cached rate exactly as before.
+  @HiveField(21)
+  final String? taxId;
+
   VarianteModel({
     required this.varianteId,
     required this.productId,
@@ -97,6 +104,7 @@ class VarianteModel extends HiveObject {
     this.imagePath,
     this.isDefault = false,
     this.status = 'active',
+    this.taxId,
   });
 
   // Factory for creating a variant
@@ -120,6 +128,7 @@ class VarianteModel extends HiveObject {
     String? imagePath,
     bool isDefault = false,
     String status = 'active',
+    String? taxId,
   }) {
     final now = DateTime.now().toIso8601String();
     return VarianteModel(
@@ -144,6 +153,7 @@ class VarianteModel extends HiveObject {
       imagePath: imagePath,
       isDefault: isDefault,
       status: status,
+      taxId: taxId,
     );
   }
 
@@ -226,6 +236,7 @@ class VarianteModel extends HiveObject {
       'imagePath': imagePath,
       'isDefault': isDefault,
       'status': status,
+      'taxId': taxId,
     };
   }
 
@@ -257,6 +268,7 @@ class VarianteModel extends HiveObject {
       imagePath: map['imagePath'] as String?,
       isDefault: (map['isDefault'] as bool?) ?? false,
       status: (map['status'] as String?) ?? 'active',
+      taxId: map['taxId'] as String?,
     );
   }
 
@@ -289,6 +301,7 @@ class VarianteModel extends HiveObject {
     String? imagePath,
     bool? isDefault,
     String? status,
+    String? taxId,
   }) {
     return VarianteModel(
       varianteId: varianteId ?? this.varianteId,
@@ -312,6 +325,7 @@ class VarianteModel extends HiveObject {
       imagePath: imagePath ?? this.imagePath,
       isDefault: isDefault ?? this.isDefault,
       status: status ?? this.status,
+      taxId: taxId ?? this.taxId,
     );
   }
 }

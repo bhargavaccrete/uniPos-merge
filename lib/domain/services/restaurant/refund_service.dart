@@ -105,7 +105,7 @@ class RefundService {
             : 0.0;
         final pointsToRestore = (pointsUsed * refundRatio).round();
         if (pointsToRestore > 0) {
-          await restaurantCustomerStore.addLoyaltyPoints(cid, pointsToRestore);
+          await customerStore.addLoyaltyPoints(cid, pointsToRestore);
         }
       }
 

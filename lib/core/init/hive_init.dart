@@ -20,26 +20,23 @@ import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.
 import 'package:billberrylite/data/models/retail/hive_model/supplier_model_205.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_Item_model_206.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_model_207.dart';
-import 'package:billberrylite/data/models/retail/hive_model/customer_model_208.dart';
+import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/retail/hive_model/hold_sale_model_209.dart';
 import 'package:billberrylite/data/models/retail/hive_model/hold_sale_item_model_210.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model_211.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_item_model_212.dart';
 import 'package:billberrylite/data/models/retail/hive_model/grn_model_213.dart';
 import 'package:billberrylite/data/models/retail/hive_model/grn_item_model_214.dart';
-import 'package:billberrylite/data/models/retail/hive_model/category_model_215.dart';
 import 'package:billberrylite/data/models/retail/hive_model/payment_entry_model_216.dart';
-import 'package:billberrylite/data/models/retail/hive_model/admin_model_217.dart';
 import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model_218.dart';
 import 'package:billberrylite/data/models/retail/hive_model/attribute_model_219.dart';
 import 'package:billberrylite/data/models/retail/hive_model/attribute_value_model_220.dart';
 import 'package:billberrylite/data/models/retail/hive_model/product_attribute_model_221.dart';
-import 'package:billberrylite/data/models/retail/hive_model/staff_model_222.dart';
+import 'package:billberrylite/data/models/common/staffModel_310.dart';
 import 'package:billberrylite/data/models/retail/hive_model/billing_tab_model_173.dart';
 
 // Restaurant Models
-import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
-import 'package:billberrylite/data/models/restaurant/db/companymodel_301.dart';
+import 'package:billberrylite/data/models/common/categorymodel_300.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:billberrylite/data/models/restaurant/db/extramodel_303.dart';
 import 'package:billberrylite/data/models/restaurant/db/toppingmodel_304.dart';
@@ -48,16 +45,14 @@ import 'package:billberrylite/data/models/restaurant/db/choicemodel_306.dart';
 import 'package:billberrylite/data/models/restaurant/db/choiceoptionmodel_307.dart';
 import 'package:billberrylite/data/models/restaurant/db/cartmodel_308.dart';
 import 'package:billberrylite/data/models/restaurant/db/ordermodel_309.dart';
-import 'package:billberrylite/data/models/restaurant/db/staffModel_310.dart';
 import 'package:billberrylite/data/models/restaurant/db/table_Model_311.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
-import 'package:billberrylite/data/models/restaurant/db/taxmodel_314.dart';
+import 'package:billberrylite/data/models/common/taxmodel_314.dart';
 import 'package:billberrylite/data/models/restaurant/db/expensemodel_315.dart';
 import 'package:billberrylite/data/models/restaurant/db/expensel_316.dart';
 import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:billberrylite/data/models/restaurant/db/testbillmodel_318.dart';
-import 'package:billberrylite/data/models/restaurant/db/customer_model_125.dart';
 import 'package:billberrylite/data/models/restaurant/db/shift_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/cash_movement_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/stock_movement_model.dart';
@@ -103,10 +98,7 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.businessDetails)) {
       Hive.registerAdapter(BusinessDetailsAdapter());
     }
-    // TaxRateItem - typeId: 5
-    if (!Hive.isAdapterRegistered(HiveTypeIds.taxRateItem)) {
-      Hive.registerAdapter(TaxRateItemAdapter());
-    }
+    // typeId 5 (TaxRateItem) retired — see hive_type_ids.dart, don't reuse.
     // PaymentMethod - typeId: 6
     if (!Hive.isAdapterRegistered(HiveTypeIds.paymentMethod)) {
       Hive.registerAdapter(pm.PaymentMethodAdapter());
@@ -123,6 +115,9 @@ class HiveInit {
     await Hive.openBox<TaxDetails>(HiveBoxNames.taxBox);
     await Hive.openBox<BusinessType>(HiveBoxNames.businessTypeBox);
     await Hive.openBox<BusinessDetails>(HiveBoxNames.businessDetailsBox);
+    // Generic named-sequence counters (bill/order/KOT numbers, SKU sequence,
+    // etc.) — shared across both business modes.
+    await Hive.openBox(HiveBoxNames.appCounters);
 
     // Open and initialize payment methods box with defaults
     final paymentBox = await Hive.openBox<pm.PaymentMethod>(HiveBoxNames.paymentMethods);
@@ -231,9 +226,10 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailPurchase)) {
       Hive.registerAdapter(PurchaseModelAdapter());
     }
-    // Customer - 158
-    if (!Hive.isAdapterRegistered(HiveTypeIds.retailCustomer)) {
-      Hive.registerAdapter(CustomerModelAdapter());
+    // Customer - shared with restaurant (typeId 125, see restaurant section
+    // below) — same adapter, retail's own box.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.customer)) {
+      Hive.registerAdapter(CustomerAdapter());
     }
     // HoldSale - 159
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailHoldSale)) {
@@ -259,17 +255,14 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailGrnItem)) {
       Hive.registerAdapter(GRNItemModelAdapter());
     }
-    // Category - 165
-    if (!Hive.isAdapterRegistered(HiveTypeIds.retailCategory)) {
-      Hive.registerAdapter(CategoryModelAdapter());
+    // Category - shared with restaurant (id/name only, no GST/HSN — those
+    // live on the product/variant). Same adapter, retail's own box.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.category)) {
+      Hive.registerAdapter(CategoryAdapter());
     }
     // PaymentEntry - 166
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailPaymentEntry)) {
       Hive.registerAdapter(PaymentEntryModelAdapter());
-    }
-    // Admin - 167
-    if (!Hive.isAdapterRegistered(HiveTypeIds.retailAdmin)) {
-      Hive.registerAdapter(AdminModelAdapter());
     }
     // CreditPayment - 168
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailCreditPayment)) {
@@ -287,9 +280,15 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailProductAttribute)) {
       Hive.registerAdapter(ProductAttributeModelAdapter());
     }
-    // RetailStaff - 172
-    if (!Hive.isAdapterRegistered(HiveTypeIds.retailStaff)) {
-      Hive.registerAdapter(RetailStaffModelAdapter());
+    // Staff - shared with restaurant (typeId 110, see restaurant section
+    // below) — same adapter, retail's own box.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.staff)) {
+      Hive.registerAdapter(StaffModelAdapter());
+    }
+    // Tax - shared with restaurant (typeId 114, see restaurant section
+    // below) — same adapter, same box.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.tax)) {
+      Hive.registerAdapter(TaxAdapter());
     }
     // BillingTab - 173
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailBillingTab)) {
@@ -381,24 +380,27 @@ class HiveInit {
     await Hive.openBox<SupplierModel>(HiveBoxNames.suppliers);
     await Hive.openBox<PurchaseItemModel>(HiveBoxNames.purchaseItems);
     await Hive.openBox<PurchaseModel>(HiveBoxNames.purchases);
-    await Hive.openBox<CustomerModel>(HiveBoxNames.customers);
+    await Hive.openBox<Customer>(HiveBoxNames.customer);
     await Hive.openBox<HoldSaleModel>(HiveBoxNames.holdSales);
     await Hive.openBox<HoldSaleItemModel>(HiveBoxNames.holdSaleItems);
     await Hive.openBox<PurchaseOrderModel>(HiveBoxNames.purchaseOrders);
     await Hive.openBox<PurchaseOrderItemModel>(HiveBoxNames.purchaseOrderItems);
     await Hive.openBox<GRNModel>(HiveBoxNames.grns);
     await Hive.openBox<GRNItemModel>(HiveBoxNames.grnItems);
-    // Note: Retail categories use Box<String> named 'retail_categories' to avoid conflict
+    // Legacy string-keyed category box — kept open only for not-yet-migrated
+    // callers (bulk import, sample data, backup's legacy path). Not used by
+    // the main Add Product / Category Management / Cart flows anymore.
     await Hive.openBox<String>(HiveBoxNames.retailCategories);
-    // CategoryModel box for GST support
-    await Hive.openBox<CategoryModel>(HiveBoxNames.categoryModels);
+    // Retail categories — shared `Category` model (same as restaurant), own box.
+    await Hive.openBox<Category>(HiveBoxNames.category);
     await Hive.openBox<PaymentEntryModel>(HiveBoxNames.paymentEntries);
-    await Hive.openBox<AdminModel>(HiveBoxNames.adminBox);
     await Hive.openBox<CreditPaymentModel>(HiveBoxNames.creditPayments);
     await Hive.openBox<AttributeModel>(HiveBoxNames.attributes);
     await Hive.openBox<AttributeValueModel>(HiveBoxNames.attributeValues);
     await Hive.openBox<ProductAttributeModel>(HiveBoxNames.productAttributes);
-    await Hive.openBox<RetailStaffModel>(HiveBoxNames.retailStaff);
+    await Hive.openBox<StaffModel>(HiveBoxNames.staff);
+    // Tax - shared with restaurant, same box.
+    await Hive.openBox<Tax>(HiveBoxNames.tax);
 
     // Fix for typeId 252 corruption - delete and recreate billingTabs box
     try {
@@ -441,12 +443,8 @@ class HiveInit {
   /// Register all restaurant adapters (typeIds: 100-149)
   static Future<void> registerRestaurantAdapters() async {
     // Category - 100
-    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantCategory)) {
+    if (!Hive.isAdapterRegistered(HiveTypeIds.category)) {
       Hive.registerAdapter(CategoryAdapter());
-    }
-    // Company - 101
-    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantCompany)) {
-      Hive.registerAdapter(CompanyAdapter());
     }
     // Items - 102
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantItem)) {
@@ -480,8 +478,8 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantOrder)) {
       Hive.registerAdapter(OrderModelAdapter());
     }
-    // Staff - 110
-    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantStaff)) {
+    // Staff - 110, shared with retail (see retail section above)
+    if (!Hive.isAdapterRegistered(HiveTypeIds.staff)) {
       Hive.registerAdapter(StaffModelAdapter());
     }
     // TableModel - 111
@@ -496,8 +494,8 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantPastOrder)) {
       Hive.registerAdapter(PastOrderModelAdapter());
     }
-    // Tax - 114
-    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantTax)) {
+    // Tax - 114, shared with retail (see retail section above)
+    if (!Hive.isAdapterRegistered(HiveTypeIds.tax)) {
       Hive.registerAdapter(TaxAdapter());
     }
     // ExpenseCategory - 115
@@ -536,9 +534,9 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.TestBill)) {
       Hive.registerAdapter(TestBillModelAdapter());
     }
-    // RestaurantCustomer - 125
-    if (!Hive.isAdapterRegistered(HiveTypeIds.RestaurantCustomer)) {
-      Hive.registerAdapter(RestaurantCustomerAdapter());
+    // Customer - 125, shared with retail (see retail section above)
+    if (!Hive.isAdapterRegistered(HiveTypeIds.customer)) {
+      Hive.registerAdapter(CustomerAdapter());
     }
     // ShiftModel - 127
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantShift)) {
@@ -585,8 +583,7 @@ class HiveInit {
     }
 
     // Core restaurant boxes - use actual box names from database files
-    await Hive.openBox<Category>(HiveBoxNames.restaurantCategories);
-    await Hive.openBox<Company>(HiveBoxNames.restaurantCompany);
+    await Hive.openBox<Category>(HiveBoxNames.category);
     await Hive.openBox<Items>(HiveBoxNames.restaurantItems);
     await Hive.openBox<Extramodel>(HiveBoxNames.restaurantExtras);
     await Hive.openBox<VariantModel>(HiveBoxNames.restaurantVariants);
@@ -597,16 +594,16 @@ class HiveInit {
 
     // Orders
     await Hive.openBox<OrderModel>(HiveBoxNames.restaurantOrders);
-    await Hive.openBox(HiveBoxNames.appCounters);
+    // appCounters is opened in openCommonBoxes() now (shared with retail).
 
-    await Hive.openBox<StaffModel>(HiveBoxNames.restaurantStaff);
+    await Hive.openBox<StaffModel>(HiveBoxNames.staff);
     await Hive.openBox<TableModel>(HiveBoxNames.restaurantTables);
 
     // Past Orders
     await Hive.openBox<PastOrderModel>(HiveBoxNames.restaurantPastOrders);
 
-    // Tax - use unique name to avoid conflict with retail 'taxBox'
-    await Hive.openBox<Tax>(HiveBoxNames.restaurantTaxes);
+    // Tax - shared with retail, same box.
+    await Hive.openBox<Tax>(HiveBoxNames.tax);
 
     // Expenses (restaurant-specific)
     await Hive.openBox<ExpenseCategory>(HiveBoxNames.restaurantExpenseCategory);
@@ -620,8 +617,8 @@ class HiveInit {
 
     await Hive.openBox<TestBillModel>(HiveBoxNames.testBillBox);
 
-    // Restaurant Customer
-    await Hive.openBox<RestaurantCustomer>(HiveBoxNames.restaurantCustomer);
+    // Restaurant Customer (shared Customer model, own box)
+    await Hive.openBox<Customer>(HiveBoxNames.customer);
 
     // Restaurant Shifts
     await Hive.openBox<ShiftModel>(HiveBoxNames.restaurantShift);
@@ -697,9 +694,9 @@ class HiveInit {
   /// Check if restaurant boxes are open
   static bool get areRestaurantBoxesOpen {
     try {
-      return Hive.isBoxOpen(HiveBoxNames.restaurantCategories) &&
+      return Hive.isBoxOpen(HiveBoxNames.category) &&
              Hive.isBoxOpen(HiveBoxNames.restaurantItems) &&
-             Hive.isBoxOpen(HiveBoxNames.restaurantTaxes) &&
+             Hive.isBoxOpen(HiveBoxNames.tax) &&
              Hive.isBoxOpen(HiveBoxNames.restaurantExtras) &&
              Hive.isBoxOpen(HiveBoxNames.restaurantVariants) &&
              Hive.isBoxOpen(HiveBoxNames.restaurantChoices) &&

@@ -10,10 +10,6 @@ class RouteNames {
 
   // Restaurant - Auth
   static const restaurantLogin = '/restaurant-login';
-  static const restaurantAdminLogin = '/restaurant-admin-login';
-  static const restaurantCashierWaiter = '/restaurant-cashier-waiter';
-  static const restaurantSignup = '/restaurant-signup';
-  static const restaurantAuthSelection = '/restaurant-auth-selection';
 
   // Restaurant - Home & Dashboard
   static const restaurantHome = '/restaurant-home';
@@ -112,7 +108,6 @@ class RouteNames {
 
   // Restaurant - Other
   static const restaurantNeedHelp = '/restaurant-need-help';
-  static const restaurantSupport = '/restaurant-support';
   static const restaurantCustomizationDrawer = '/restaurant-customization';
   static const restaurantTestData = '/restaurant-testdatascreen';
   static const restaurantAddPrinter = '/restaurant-addprinter';

@@ -9,7 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/di/service_locator.dart';
-import '../../../data/models/retail/hive_model/customer_model_208.dart';
+import '../../../data/models/common/customer_model_125.dart';
 import '../../../data/models/retail/hive_model/product_model_200.dart';
 import '../../../data/models/retail/hive_model/purchase_Item_model_206.dart';
 import '../../../data/models/retail/hive_model/purchase_model_207.dart';
@@ -17,6 +17,7 @@ import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
 import '../../../data/models/retail/hive_model/sale_model_203.dart';
 import '../../../data/models/retail/hive_model/supplier_model_205.dart';
 import '../../../data/models/retail/hive_model/variante_model_201.dart';
+import '../../../data/models/common/categorymodel_300.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 import 'package:billberrylite/data/repositories/business_details_repository.dart';
 
@@ -58,7 +59,7 @@ class BackupService {
       'barcode': si.barcode,
     }).toList();
 
-    final customers = customerStoreRestail.customers.map((c) => {
+    final customers = customerStore.customers.map((c) => {
       'customerId': c.customerId,
       'name': c.name,
       'email': c.email,
@@ -98,7 +99,7 @@ class BackupService {
     }
 
     // Get categories
-    final categories = productStore.categories.toList();
+    final categories = categoryStore.categories.map((c) => c.toMap()).toList();
 
     // Get store settings
     final storeSettings = StoreSettingsService();
@@ -512,7 +513,24 @@ class BackupService {
         try {
           final categories = backupData['categories'] as List;
           for (var category in categories) {
-            await productStore.addCategory(category.toString());
+            if (category is String) {
+              final name = category;
+              final exists = categoryStore.categories.any((c) => c.name.toLowerCase() == name.toLowerCase());
+              if (!exists) {
+                await categoryStore.addCategory(Category(
+                  id: const Uuid().v4(),
+                  name: name,
+                  createdTime: DateTime.now(),
+                ));
+              }
+            } else if (category is Map) {
+              final map = Map<String, dynamic>.from(category);
+              final cat = Category.fromMap(map);
+              final exists = categoryStore.categories.any((c) => c.id == cat.id || c.name.toLowerCase() == cat.name.toLowerCase());
+              if (!exists) {
+                await categoryStore.addCategory(cat);
+              }
+            }
             restoredCount++;
           }
         } catch (e) {
@@ -591,7 +609,7 @@ class BackupService {
           for (var customerData in customers) {
             try {
               final customerMap = customerData as Map<String, dynamic>;
-              final customer = CustomerModel(
+              final customer = Customer(
                 customerId: customerMap['customerId'] ?? const Uuid().v4(),
                 name: customerMap['name'] ?? '',
                 phone: customerMap['phone'] ?? '',
@@ -599,13 +617,13 @@ class BackupService {
                 address: customerMap['address'],
                 notes: customerMap['notes'],
                 totalPurchaseAmount: (customerMap['totalPurchaseAmount'] as num?)?.toDouble() ?? 0.0,
-                lastVisited: customerMap['lastVisited'],
-                pointsBalance: (customerMap['pointsBalance'] as num?)?.toInt() ?? 0,
+                lastVisitAt: customerMap['lastVisitAt'],
+                loyaltyPoints: (customerMap['loyaltyPoints'] as num?)?.toInt() ?? 0,
                 creditBalance: (customerMap['creditBalance'] as num?)?.toDouble() ?? 0.0,
                 createdAt: customerMap['createdAt'] ?? DateTime.now().toIso8601String(),
                 updatedAt: customerMap['updatedAt'],
               );
-              await customerStoreRestail.addCustomer(customer);
+              await customerStore.addCustomer(customer);
               restoredCount++;
             } catch (e) {
               // Skip individual customer errors

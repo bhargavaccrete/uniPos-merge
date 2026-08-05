@@ -8,7 +8,8 @@ import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/di/service_locator.dart';
-import '../../../../data/models/restaurant/db/taxmodel_314.dart';
+import '../../../../core/config/tax_feature.dart';
+import '../../../../data/models/common/taxmodel_314.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../widget/componets/common/app_text_field.dart';
 import '../../../widget/componets/common/primary_app_bar.dart';
@@ -163,6 +164,10 @@ class _AddtaxState extends State<Addtax> {
                         color: AppColors.primary,
                       ),
                     );
+                  }
+
+                  if (!TaxFeature.enabled) {
+                    return _buildDisabledState(context);
                   }
 
                   final allTax = taxStore.taxes;
@@ -325,36 +330,70 @@ class _AddtaxState extends State<Addtax> {
             ),
 
 
-            // Add Tax Button
-            Container(
-              color: Colors.white,
-              padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0)),
-              child: SizedBox(
-                width: double.infinity,
-                height: AppResponsive.getValue(context, mobile: 50.0, tablet: 54.0, desktop: 58.0),
-                child: ElevatedButton.icon(
-                  onPressed: () => _model(isTablet),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+            // Add Tax Button — hidden while tax is disabled for this business
+            if (TaxFeature.enabled)
+              Container(
+                color: Colors.white,
+                padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0)),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: AppResponsive.getValue(context, mobile: 50.0, tablet: 54.0, desktop: 58.0),
+                  child: ElevatedButton.icon(
+                    onPressed: () => _model(isTablet),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                  ),
-                  icon: Icon(Icons.add_circle_rounded, size: AppResponsive.getValue(context, mobile: 22.0, tablet: 24.0, desktop: 26.0)),
-                  label: Text(
-                    'Add New Tax',
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0),
-                      fontWeight: FontWeight.w600,
+                    icon: Icon(Icons.add_circle_rounded, size: AppResponsive.getValue(context, mobile: 22.0, tablet: 24.0, desktop: 26.0)),
+                    label: Text(
+                      'Add New Tax',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
           ],
         ));
+  }
+
+  Widget _buildDisabledState(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.receipt_long_outlined,
+            size: AppResponsive.getValue(context, mobile: 64.0, tablet: 80.0, desktop: 96.0),
+            color: AppColors.divider,
+          ),
+          SizedBox(height: AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0)),
+          Text(
+            'Tax is currently disabled',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 18.0, desktop: 20.0),
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'This business is marked as not registered for tax during setup.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0),
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
 

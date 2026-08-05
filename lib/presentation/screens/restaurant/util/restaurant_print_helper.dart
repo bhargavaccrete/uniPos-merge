@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/config/tax_feature.dart';
 import 'package:billberrylite/data/models/restaurant/db/cartmodel_308.dart';
 import 'package:billberrylite/data/models/restaurant/db/ordermodel_309.dart';
 import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
-import 'package:billberrylite/data/models/retail/hive_model/customer_model_208.dart';
+import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/domain/services/retail/print_service.dart';
@@ -467,40 +468,38 @@ class RestaurantPrintHelper {
         );
       }
 
-      // 4. Create Customer Model (Adapter)
+      // 4. Resolve the customer for the receipt.
       // Quick Settle orders are anonymous walk-ins — "Quick Settle" is just a
       // label, not a real customer, so skip the customer block (and its loyalty
       // points lines) on the bill.
       final bool isAnonymous = order.customerName.trim().isEmpty ||
           order.customerName.trim().toLowerCase() == 'quick settle';
-      CustomerModel? customerModel;
+      Customer? customerModel;
       if (!isAnonymous) {
-        // Look up the real customer's current (post-award) loyalty balance so the
-        // bill's "Total Points" is accurate, instead of a hardcoded 0. Match by
-        // linked customerId first, else by phone number.
-        int realPoints = 0;
-        for (final c in restaurantCustomerStore.customers) {
+        // Prefer the real saved customer record (accurate loyalty balance via
+        // its actual `loyaltyPoints`); match by linked customerId first, else
+        // by phone number. Fall back to a display-only placeholder for ad-hoc
+        // orders that were never saved as a customer.
+        Customer? matched;
+        for (final c in customerStore.customers) {
           final byId = (order.customerId?.isNotEmpty ?? false) &&
               c.customerId == order.customerId;
           final byPhone =
               order.customerNumber.isNotEmpty && c.phone == order.customerNumber;
           if (byId || byPhone) {
-            realPoints = c.loyaltyPoints;
+            matched = c;
             break;
           }
         }
-        customerModel = CustomerModel(
-          customerId: 'GUEST',
-          name: order.customerName,
-          phone: order.customerNumber,
-          email: order.customerEmail,
-          address: '',
-          totalPurchaseAmount: 0, // Fixed: totalSales -> totalPurchaseAmount
-          pointsBalance: realPoints,
-          // creditBalance: 0, // Removed: Not in constructor or named parameter default is 0.0
-          createdAt: DateTime.now().toIso8601String(),
-          updatedAt: DateTime.now().toIso8601String(),
-        );
+        customerModel = matched ??
+            Customer(
+              customerId: 'GUEST',
+              name: order.customerName,
+              phone: order.customerNumber,
+              email: order.customerEmail,
+              createdAt: DateTime.now().toIso8601String(),
+              updatedAt: DateTime.now().toIso8601String(),
+            );
       }
 
       // 5. Create ReceiptData (Internal use for validation/debugging if needed,
@@ -514,6 +513,7 @@ class RestaurantPrintHelper {
         storePhone: storePhone,
         storeEmail: storeEmail,
         gstNumber: storeGst,
+        taxEnabled: TaxFeature.enabled,
         // Restaurant-specific fields
         orderType: order.orderType,
         tableNo: order.tableNo,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/config/tax_feature.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 
@@ -191,6 +192,25 @@ class _GstReportScreenState extends State<GstReportScreen> with SingleTickerProv
       ),
       body: Column(
         children: [
+          if (!TaxFeature.enabled)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              color: const Color(0xFFFFF8E1),
+              child: Row(
+                children: const [
+                  Icon(Icons.info_outline, size: 18, color: Color(0xFFB28900)),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Tax is currently disabled for new sales. This report reflects '
+                      'historical data collected while tax was active.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF7A5C00)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           // Date Range Selector
           Container(
             color: Colors.white,

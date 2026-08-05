@@ -1,6 +1,6 @@
 import 'package:mobx/mobx.dart';
-import '../../../data/models/restaurant/db/taxmodel_314.dart';
-import '../../../data/repositories/restaurant/tax_repository.dart';
+import '../../../data/models/common/taxmodel_314.dart';
+import '../../../data/repositories/common/tax_repository.dart';
 
 part 'tax_store.g.dart';
 

@@ -59,6 +59,13 @@ class ProductModel extends HiveObject {
   @HiveField(15)
   final double? defaultCostPrice;
 
+  /// Reference to a shared Tax entity (see data/models/common/taxmodel_314.dart)
+  /// picked in the product form. [gstRate] is kept in sync as the resolved
+  /// percentage so GstService/cart/receipt/report code never needs to look
+  /// the Tax entity up — it stays a plain cached rate exactly as before.
+  @HiveField(16)
+  final String? taxId;
+
   ProductModel({
     required this.productId,
     required this.productName,
@@ -76,6 +83,7 @@ class ProductModel extends HiveObject {
     this.defaultPrice,
     this.defaultMrp,
     this.defaultCostPrice,
+    this.taxId,
   });
 
   /// Check if this is a variable product
@@ -100,6 +108,7 @@ class ProductModel extends HiveObject {
     double? defaultPrice,
     double? defaultMrp,
     double? defaultCostPrice,
+    String? taxId,
   }) {
     final now = DateTime.now().toIso8601String();
     return ProductModel(
@@ -119,6 +128,7 @@ class ProductModel extends HiveObject {
       defaultPrice: defaultPrice,
       defaultMrp: defaultMrp,
       defaultCostPrice: defaultCostPrice,
+      taxId: taxId,
     );
   }
 
@@ -141,6 +151,7 @@ class ProductModel extends HiveObject {
       'defaultPrice': defaultPrice,
       'defaultMrp': defaultMrp,
       'defaultCostPrice': defaultCostPrice,
+      'taxId': taxId,
     };
   }
 
@@ -163,6 +174,7 @@ class ProductModel extends HiveObject {
       defaultPrice: (map['defaultPrice'] as num?)?.toDouble(),
       defaultMrp: (map['defaultMrp'] as num?)?.toDouble(),
       defaultCostPrice: (map['defaultCostPrice'] as num?)?.toDouble(),
+      taxId: map['taxId'] as String?,
     );
   }
 
@@ -183,6 +195,7 @@ class ProductModel extends HiveObject {
     double? defaultPrice,
     double? defaultMrp,
     double? defaultCostPrice,
+    String? taxId,
   }) {
     return ProductModel(
       productId: productId ?? this.productId,
@@ -201,6 +214,7 @@ class ProductModel extends HiveObject {
       defaultPrice: defaultPrice ?? this.defaultPrice,
       defaultMrp: defaultMrp ?? this.defaultMrp,
       defaultCostPrice: defaultCostPrice ?? this.defaultCostPrice,
+      taxId: taxId ?? this.taxId,
     );
   }
 }

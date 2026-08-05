@@ -5,12 +5,13 @@ import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
-import 'package:billberrylite/domain/store/retail/customer_store.dart';
+import 'package:billberrylite/domain/store/common/customer_store.dart';
 import 'package:billberrylite/domain/store/retail/product_store.dart';
 import 'package:billberrylite/domain/store/retail/purchase_store.dart';
 import 'package:billberrylite/domain/store/retail/sale_store.dart';
 import 'package:billberrylite/domain/store/retail/supplier_store.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/screens/retail/login_screen.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import '../../../util/color.dart';
 import '../../../util/responsive.dart';
@@ -339,8 +340,8 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
       }
 
       // Force reload CustomerStore
-      if (locator.isRegistered<CustomerStoreRetail>()) {
-        final customerStore = locator<CustomerStoreRetail>();
+      if (locator.isRegistered<CustomerStore>()) {
+        final customerStore = locator<CustomerStore>();
         await customerStore.loadCustomers();
         debugPrint("📦 CustomerStore reloaded: ${customerStore.customers.length} customers");
       }
@@ -387,9 +388,24 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
     }
   }
 
-  void _goToDashboard() {
-    final route = AppConfig.isRetail ? '/retail-billing' : '/restaurant-home';
-    Navigator.pushReplacementNamed(context, route);
+  Future<void> _goToDashboard() async {
+    if (AppConfig.isRetail) {
+      // Same admin-login gate as the splash screen — a restore brings back
+      // the admin credential but never the session flag (denylisted), so
+      // this always requires a fresh login after restoring.
+      final loggedIn = await authService.initialize();
+      if (!mounted) return;
+      if (loggedIn) {
+        Navigator.pushReplacementNamed(context, '/retail-billing');
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        );
+      }
+      return;
+    }
+    Navigator.pushReplacementNamed(context, '/restaurant-home');
   }
 
   @override

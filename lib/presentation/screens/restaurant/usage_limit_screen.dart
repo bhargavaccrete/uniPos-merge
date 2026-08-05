@@ -38,7 +38,7 @@ class _UsageLimitScreenState extends State<UsageLimitScreen> {
       categoryStore.loadCategories(),
       tableStore.loadTables(),
       staffStore.loadStaff(),
-      restaurantCustomerStore.loadCustomers(),
+      customerStore.loadCustomers(),
       printerStore.loadSavedPrinters(),
     ].map((f) => f.catchError((_) {})));
   }
@@ -155,7 +155,7 @@ class _UsageLimitScreenState extends State<UsageLimitScreen> {
       make('Staff', Icons.badge_outlined, AppColors.info,
           staffStore.totalStaff, EntKeys.usersMax),
       make('Customers', Icons.people_alt_outlined, AppColors.orange,
-          restaurantCustomerStore.totalCustomers, EntKeys.customersMax),
+          customerStore.totalCustomers, EntKeys.customersMax),
       make('Printers', Icons.print_outlined, AppColors.accent,
           printerStore.savedPrinters.length, null),
     ];

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/di/service_locator.dart';
 import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model_218.dart';
-import 'package:billberrylite/data/models/retail/hive_model/customer_model_208.dart';
+import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 
 import 'customer_detail_screen.dart';
@@ -595,7 +595,7 @@ class _OutstandingTab extends StatefulWidget {
 }
 
 class _OutstandingTabState extends State<_OutstandingTab> {
-  List<CustomerModel> _customersWithDue = [];
+  List<Customer> _customersWithDue = [];
   double _totalOutstanding = 0;
   bool _isLoading = true;
 
@@ -608,7 +608,7 @@ class _OutstandingTabState extends State<_OutstandingTab> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final customers = await customerStoreRestail.getCustomersWithCredit();
+      final customers = await customerStore.getCustomersWithCredit();
       final total = customers.fold<double>(0, (sum, c) => sum + c.creditBalance);
 
       // Sort by credit balance descending
@@ -715,7 +715,7 @@ class _OutstandingTabState extends State<_OutstandingTab> {
     );
   }
 
-  Widget _buildCustomerCard(CustomerModel customer) {
+  Widget _buildCustomerCard(Customer customer) {
     final percentage = _totalOutstanding > 0
         ? (customer.creditBalance / _totalOutstanding * 100)
         : 0.0;
@@ -748,7 +748,7 @@ class _OutstandingTabState extends State<_OutstandingTab> {
                     radius: 20,
                     backgroundColor: Colors.red.withOpacity(0.1),
                     child: Text(
-                      customer.name[0].toUpperCase(),
+                      (customer.name?.isNotEmpty ?? false) ? customer.name![0].toUpperCase() : '?',
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         color: Colors.red,
@@ -761,14 +761,14 @@ class _OutstandingTabState extends State<_OutstandingTab> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          customer.name,
+                          customer.name ?? '',
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         Text(
-                          customer.phone,
+                          customer.phone ?? '',
                           style: const TextStyle(
                             fontSize: 12,
                             color: Color(0xFF9E9E9E),

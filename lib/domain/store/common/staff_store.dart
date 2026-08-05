@@ -1,8 +1,8 @@
 import 'package:mobx/mobx.dart';
 import '../../../core/plan/entitlement_keys.dart';
 import '../../../core/plan/plan_enforcement.dart';
-import '../../../data/models/restaurant/db/staffModel_310.dart';
-import '../../../data/repositories/restaurant/staff_repository.dart';
+import '../../../data/models/common/staffModel_310.dart';
+import '../../../data/repositories/common/staff_repository.dart';
 
 part 'staff_store.g.dart';
 

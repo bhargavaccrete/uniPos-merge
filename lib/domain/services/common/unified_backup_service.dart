@@ -28,16 +28,15 @@ import 'package:billberrylite/models/tax_details.dart';
 import 'package:billberrylite/models/payment_method.dart' as pm;
 
 // Restaurant models
-import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
+import 'package:billberrylite/data/models/common/categorymodel_300.dart';
 import 'package:billberrylite/data/models/restaurant/db/choicemodel_306.dart';
-import 'package:billberrylite/data/models/restaurant/db/companymodel_301.dart';
 import 'package:billberrylite/data/models/restaurant/db/extramodel_303.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:billberrylite/data/models/restaurant/db/ordermodel_309.dart';
 import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
-import 'package:billberrylite/data/models/restaurant/db/staffModel_310.dart';
+import 'package:billberrylite/data/models/common/staffModel_310.dart';
 import 'package:billberrylite/data/models/restaurant/db/table_Model_311.dart';
-import 'package:billberrylite/data/models/restaurant/db/taxmodel_314.dart';
+import 'package:billberrylite/data/models/common/taxmodel_314.dart';
 import 'package:billberrylite/data/models/restaurant/db/variantmodel_305.dart';
 
 import 'package:billberrylite/data/models/restaurant/db/cartmodel_308.dart';
@@ -45,7 +44,7 @@ import 'package:billberrylite/data/models/restaurant/db/testbillmodel_318.dart';
 import 'package:billberrylite/data/models/restaurant/db/shift_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/cash_movement_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/cash_handover_model.dart';
-import 'package:billberrylite/data/models/restaurant/db/customer_model_125.dart';
+import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/restaurant/db/saved_printer_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/session_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/attendance_model.dart';
@@ -64,7 +63,6 @@ import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.d
 import 'package:billberrylite/data/models/retail/hive_model/cart_model_202.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
-import 'package:billberrylite/data/models/retail/hive_model/customer_model_208.dart';
 import 'package:billberrylite/data/models/retail/hive_model/supplier_model_205.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_model_207.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_Item_model_206.dart';
@@ -74,14 +72,11 @@ import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_item_model_212.dart';
 import 'package:billberrylite/data/models/retail/hive_model/grn_model_213.dart';
 import 'package:billberrylite/data/models/retail/hive_model/grn_item_model_214.dart';
-import 'package:billberrylite/data/models/retail/hive_model/category_model_215.dart';
 import 'package:billberrylite/data/models/retail/hive_model/payment_entry_model_216.dart';
-import 'package:billberrylite/data/models/retail/hive_model/admin_model_217.dart';
 import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model_218.dart';
 import 'package:billberrylite/data/models/retail/hive_model/attribute_model_219.dart';
 import 'package:billberrylite/data/models/retail/hive_model/attribute_value_model_220.dart';
 import 'package:billberrylite/data/models/retail/hive_model/product_attribute_model_221.dart';
-import 'package:billberrylite/data/models/retail/hive_model/staff_model_222.dart';
 import 'package:billberrylite/data/models/retail/hive_model/billing_tab_model_173.dart';
 
 /// Unified Backup Service - Works for both Restaurant and Retail modes
@@ -648,7 +643,7 @@ class UnifiedBackupService {
         }
       } else if (mode == 'restaurant') {
         // Check if restaurant boxes are already open
-        final bool boxesAlreadyOpen = Hive.isBoxOpen(HiveBoxNames.restaurantCategories) &&
+        final bool boxesAlreadyOpen = Hive.isBoxOpen(HiveBoxNames.category) &&
             Hive.isBoxOpen(HiveBoxNames.restaurantItems);
 
         if (!boxesAlreadyOpen) {
@@ -679,8 +674,8 @@ class UnifiedBackupService {
     if (AppConfig.isRestaurant) {
       debugPrint("📦 Collecting RESTAURANT data...");
 
-      // Categories
-      exportMap["categories"] = Hive.box<Category>("categories").values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
+      // Categories — shared box (restaurant + retail)
+      exportMap["categories"] = Hive.box<Category>(HiveBoxNames.category).values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
 
       // Items — imageBytes stripped from JSON (raw pixels = 100+ MB as List<int>).
       // Each item's image is stored separately as item_img_{id} binary in the ZIP.
@@ -699,15 +694,13 @@ class UnifiedBackupService {
       // Extras
       exportMap["extras"] = Hive.box<Extramodel>("extra").values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
 
-      // Company
-      exportMap["companyBox"] = Hive.box<Company>("companyBox").values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
+      // Staff — shared box (restaurant + retail)
+      exportMap["staffBox"] = Hive.box<StaffModel>(HiveBoxNames.staff).values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
 
-      // Staff
-      exportMap["staffBox"] = Hive.box<StaffModel>("staffBox").values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
-
-      // Taxes (using helper - mode aware)
+      // Taxes — shared box (restaurant + retail); retail's export of this
+      // same box lives below in the `isRetail` branch, under the same key.
       try {
-        exportMap["taxes"] = Hive.box<Tax>("restaurant_taxes").values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
+        exportMap["taxes"] = Hive.box<Tax>(HiveBoxNames.tax).values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
       } catch (e) {
         debugPrint("⚠️ Tax box not found: $e");
         exportMap["taxes"] = [];
@@ -826,16 +819,19 @@ class UnifiedBackupService {
         exportMap["cashHandovers"] = [];
       }
 
-      // Restaurant Customers
+      // Customers — shared box (restaurant + retail). Retail's export of this
+      // same box (key "customers") lives in the isRetail branch below; this
+      // branch needs its own copy since only one of the two branches runs
+      // per export.
       try {
-        exportMap["restaurantCustomers"] = Hive.box<RestaurantCustomer>(HiveBoxNames.restaurantCustomer)
+        exportMap["customers"] = Hive.box<Customer>(HiveBoxNames.customer)
             .values
             .map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>)
             .toList();
-        debugPrint("📦 Restaurant Customers exported: ${exportMap["restaurantCustomers"]!.length}");
+        debugPrint("📦 Customers exported: ${exportMap["customers"]!.length}");
       } catch (e) {
-        debugPrint("⚠️ Restaurant Customers box error: $e");
-        exportMap["restaurantCustomers"] = [];
+        debugPrint("⚠️ Customers box error: $e");
+        exportMap["customers"] = [];
       }
 
       // Past Orders — regular Box, all values in memory, no async reads needed
@@ -927,9 +923,9 @@ class UnifiedBackupService {
         exportMap["saleItems"] = [];
       }
 
-      // Customers
+      // Customers — shared box (restaurant + retail)
       try {
-        exportMap["customers"] = Hive.box<CustomerModel>(HiveBoxNames.customers).values.map((e) => e.toMap()).toList();
+        exportMap["customers"] = Hive.box<Customer>(HiveBoxNames.customer).values.map((e) => e.toMap()).toList();
       } catch (e) {
         debugPrint("⚠️ Customers box error: $e");
         exportMap["customers"] = [];
@@ -1059,13 +1055,16 @@ class UnifiedBackupService {
         exportMap["grnItems"] = [];
       }
 
-      // ✅ Category Models (with GST)
+      // ✅ Categories — shared box (restaurant + retail). Restaurant's export
+      // of this same box (key "categories") lives in the isRestaurant branch
+      // above; this branch needs its own copy since only one of the two
+      // branches runs per export.
       try {
-        exportMap["categoryModels"] = Hive.box<CategoryModel>(HiveBoxNames.categoryModels).values.map((e) => e.toMap()).toList();
-        debugPrint("📦 Category Models exported: ${exportMap["categoryModels"]!.length}");
+        exportMap["categories"] = Hive.box<Category>(HiveBoxNames.category).values.map((e) => e.toMap()).toList();
+        debugPrint("📦 Categories exported: ${exportMap["categories"]!.length}");
       } catch (e) {
-        debugPrint("⚠️ Category Models box error: $e");
-        exportMap["categoryModels"] = [];
+        debugPrint("⚠️ Categories box error: $e");
+        exportMap["categories"] = [];
       }
 
       // ✅ Payment Entries
@@ -1111,13 +1110,25 @@ class UnifiedBackupService {
         exportMap["productAttributes"] = [];
       }
 
-      // ✅ Retail Staff
+      // Staff — shared box (restaurant + retail). Restaurant's export of this
+      // same box lives above in the `isRestaurant` branch, under the same key;
+      // this branch needs its own copy since only one of these two branches
+      // runs per export.
       try {
-        exportMap["retailStaff"] = Hive.box<RetailStaffModel>(HiveBoxNames.retailStaff).values.map((e) => e.toMap()).toList();
-        debugPrint("📦 Retail Staff exported: ${exportMap["retailStaff"]!.length}");
+        exportMap["staffBox"] = Hive.box<StaffModel>(HiveBoxNames.staff).values.map((e) => e.toMap()).toList();
+        debugPrint("📦 Staff exported: ${exportMap["staffBox"]!.length}");
       } catch (e) {
-        debugPrint("⚠️ Retail Staff box error: $e");
-        exportMap["retailStaff"] = [];
+        debugPrint("⚠️ Staff box error: $e");
+        exportMap["staffBox"] = [];
+      }
+
+      // Tax — shared box (restaurant + retail), same reasoning as Staff above.
+      try {
+        exportMap["taxes"] = Hive.box<Tax>(HiveBoxNames.tax).values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
+        debugPrint("📦 Taxes exported: ${exportMap["taxes"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Tax box error: $e");
+        exportMap["taxes"] = [];
       }
 
       // ✅ Billing Tabs
@@ -1143,14 +1154,9 @@ class UnifiedBackupService {
         exportMap["dayManagement"] = [];
       }
 
-      // ✅ Admin Box
-      try {
-        exportMap["adminBox"] = Hive.box<AdminModel>(HiveBoxNames.adminBox).values.map((e) => e.toMap()).toList();
-        debugPrint("📦 Admin Box exported: ${exportMap["adminBox"]!.length}");
-      } catch (e) {
-        debugPrint("⚠️ Admin Box error: $e");
-        exportMap["adminBox"] = [];
-      }
+      // Admin credential is a SharedPreferences value now (retail_admin_username/
+      // retail_admin_password), not a Hive box — it's already covered by the
+      // generic localPrefs export below, no explicit handling needed here.
     }
 
     // ==================== COMMON BOXES (both retail and restaurant) ====================
@@ -1888,7 +1894,7 @@ class UnifiedBackupService {
       debugPrint("📦 $keyName: ${items.length} items restored with ID keys");
     }
 
-    await restoreBoxWithId("categories", Hive.box<Category>("categories"), (m) => Category.fromMap(m), (c) => c.id);
+    await restoreBoxWithId("categories", Hive.box<Category>(HiveBoxNames.category), (m) => Category.fromMap(m), (c) => c.id);
     await restoreBoxWithId("items", Hive.box<Items>("itemBoxs"), (m) => Items.fromMap(m), (i) => i.id);
 
     // Reload imageBytes for each item from its item_img_{id} file.
@@ -1930,9 +1936,8 @@ class UnifiedBackupService {
     await restoreBoxWithId("variants", Hive.box<VariantModel>("variante"), (m) => VariantModel.fromMap(m), (v) => v.id);
     await restoreBoxWithId("choices", Hive.box<ChoicesModel>("choice"), (m) => ChoicesModel.fromMap(m), (ch) => ch.id);
     await restoreBox("extras", Hive.box<Extramodel>("extra"), (m) => Extramodel.fromMap(m));
-    await restoreBox("companyBox", Hive.box<Company>("companyBox"), (m) => Company.fromMap(m));
-    await restoreBoxWithId("staffBox", Hive.box<StaffModel>("staffBox"), (m) => StaffModel.fromMap(m), (s) => s.id);
-    await restoreBoxWithId("taxes", Hive.box<Tax>("restaurant_taxes"), (m) => Tax.fromMap(m), (t) => t.id);
+    await restoreBoxWithId("staffBox", Hive.box<StaffModel>(HiveBoxNames.staff), (m) => StaffModel.fromMap(m), (s) => s.id);
+    await restoreBoxWithId("taxes", Hive.box<Tax>(HiveBoxNames.tax), (m) => Tax.fromMap(m), (t) => t.id);
     await restoreBoxWithId("expenseCategories", HiveExpenseCat.getECategory(), (m) => ExpenseCategory.fromMap(m), (ec) => ec.id);
     await restoreBoxWithId("expenses", HiveExpenceL.getexpenseBox(), (m) => Expense.fromMap(m), (e) => e.id);
     await restoreBoxWithId("tables", Hive.box<TableModel>("tablesBox"), (m) => TableModel.fromMap(m), (tb) => tb.id);
@@ -2009,16 +2014,19 @@ class UnifiedBackupService {
       debugPrint("⚠️ Error restoring cash handovers: $e");
     }
 
-    // ✅ Restore Restaurant Customers
+    // ✅ Restore Customers — shared box (restaurant + retail). Retail's
+    // restore of this same box (key "customers") lives in
+    // `_restoreRetailData`; this function needs its own copy since only one
+    // of the two restore functions runs per import.
     try {
       await restoreBoxWithId(
-        "restaurantCustomers",
-        Hive.box<RestaurantCustomer>(HiveBoxNames.restaurantCustomer),
-        (m) => RestaurantCustomer.fromMap(m),
+        "customers",
+        Hive.box<Customer>(HiveBoxNames.customer),
+        (m) => Customer.fromMap(m),
         (c) => c.customerId,
       );
     } catch (e) {
-      debugPrint("⚠️ Error restoring restaurant customers: $e");
+      debugPrint("⚠️ Error restoring customers: $e");
     }
 
     // ✅ Restore Saved Printers
@@ -2167,11 +2175,11 @@ class UnifiedBackupService {
           (si) => si.saleItemId,  // Use saleItemId as key
     );
 
-    // ✅ Restore Customers (as CustomerModel objects with ID keys)
+    // ✅ Restore Customers — shared box (restaurant + retail)
     await restoreBoxTypedWithId(
       "customers",
-      Hive.box<CustomerModel>(HiveBoxNames.customers),
-          (m) => CustomerModel.fromMap(m),
+      Hive.box<Customer>(HiveBoxNames.customer),
+          (m) => Customer.fromMap(m),
           (c) => c.customerId,  // Use customerId as key
     );
 
@@ -2262,11 +2270,14 @@ class UnifiedBackupService {
       debugPrint("⚠️ Error restoring GRN items: $e");
     }
 
-    // ✅ Restore Category Models (with GST) (with ID keys)
+    // ✅ Restore Categories — shared box (restaurant + retail). Restaurant's
+    // restore of this same box (key "categories") lives in
+    // `_restoreRestaurantData`; this function needs its own copy since only
+    // one of the two restore functions runs per import.
     try {
-      await restoreBoxTypedWithId("categoryModels", Hive.box<CategoryModel>(HiveBoxNames.categoryModels), (m) => CategoryModel.fromMap(m), (c) => c.categoryId);
+      await restoreBoxTypedWithId("categories", Hive.box<Category>(HiveBoxNames.category), (m) => Category.fromMap(m), (c) => c.id);
     } catch (e) {
-      debugPrint("⚠️ Error restoring category models: $e");
+      debugPrint("⚠️ Error restoring categories: $e");
     }
 
     // ✅ Restore Payment Entries
@@ -2302,11 +2313,23 @@ class UnifiedBackupService {
       debugPrint("⚠️ Error restoring product attributes: $e");
     }
 
-    // ✅ Restore Retail Staff
+    // Staff — shared box (restaurant + retail). Restaurant's restore of this
+    // same box (key "staffBox") lives in `_restoreRestaurantData`; this
+    // function needs its own copy since only one of the two restore
+    // functions runs per import (chosen by the backup's own origin mode).
     try {
-      await restoreBoxTyped("retailStaff", Hive.box<RetailStaffModel>(HiveBoxNames.retailStaff), (m) => RetailStaffModel.fromMap(m));
+      await restoreBoxTypedWithId("staffBox", Hive.box<StaffModel>(HiveBoxNames.staff), (m) => StaffModel.fromMap(m), (s) => s.id);
     } catch (e) {
-      debugPrint("⚠️ Error restoring retail staff: $e");
+      debugPrint("⚠️ Error restoring staff: $e");
+    }
+
+    // Tax — shared box (restaurant + retail). Restaurant's restore of this
+    // same box (key "taxes") lives in `_restoreRestaurantData`; same reasoning
+    // as Staff above.
+    try {
+      await restoreBoxTypedWithId("taxes", Hive.box<Tax>(HiveBoxNames.tax), (m) => Tax.fromMap(m), (t) => t.id);
+    } catch (e) {
+      debugPrint("⚠️ Error restoring taxes: $e");
     }
 
     // ✅ Restore Billing Tabs
@@ -2332,12 +2355,8 @@ class UnifiedBackupService {
       debugPrint("⚠️ Error restoring day management: $e");
     }
 
-    // ✅ Restore Admin Box
-    try {
-      await restoreBoxTyped("adminBox", Hive.box<AdminModel>(HiveBoxNames.adminBox), (m) => AdminModel.fromMap(m));
-    } catch (e) {
-      debugPrint("⚠️ Error restoring admin box: $e");
-    }
+    // Admin credential restores via the generic localPrefs restore (see
+    // _restoreLocalSettings) — no explicit handling needed here.
 
     debugPrint("✅ Full retail data restored successfully!");
   }

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
-import 'package:billberrylite/data/models/retail/hive_model/customer_model_208.dart';
+import 'package:billberrylite/core/config/tax_feature.dart';
+import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/domain/services/retail/gst_service.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
@@ -82,16 +83,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// Process a Credit/Pay Later sale
   Future<void> _processCreditSale() async {
     // Require customer for credit sales
-    if (customerStoreRestail.selectedCustomer == null) {
+    if (customerStore.selectedCustomer == null) {
       NotificationService.instance.showError('Customer is required for Pay Later sales');
       return;
     }
 
     // Check credit limit
-    final customerId = customerStoreRestail.selectedCustomer!.customerId;
-    final canCredit = await customerStoreRestail.canMakeCreditPurchase(customerId, _grandTotal);
+    final customerId = customerStore.selectedCustomer!.customerId;
+    final canCredit = await customerStore.canMakeCreditPurchase(customerId, _grandTotal);
     if (!canCredit) {
-      final availableCredit = await customerStoreRestail.getAvailableCredit(customerId);
+      final availableCredit = await customerStore.getAvailableCredit(customerId);
       if (mounted) {
         final symbol = CurrencyHelper.currentSymbol;
         final precision = DecimalSettings.precision;
@@ -113,7 +114,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Customer: ${customerStoreRestail.selectedCustomer!.name}'),
+            Text('Customer: ${customerStore.selectedCustomer!.name}'),
             const SizedBox(height: 8),
             Text('Amount: $symbol$formattedTotal'),
             const SizedBox(height: 8),
@@ -162,7 +163,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
 
       // Update customer credit balance
-      await customerStoreRestail.updateAfterCreditSale(customerId, _grandTotal);
+      await customerStore.updateAfterCreditSale(customerId, _grandTotal);
 
       // Save sale and items
       await saleStore.addSale(sale);
@@ -170,7 +171,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       await _deductStock();
 
       // Store customer before clearing
-      final customer = customerStoreRestail.selectedCustomer;
+      final customer = customerStore.selectedCustomer;
 
       // Clear the cart
       await cartStore.clearCart();
@@ -262,7 +263,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       // Create sale record with GST totals and split payment
       final sale = SaleModel.createWithSplitPayment(
         saleId: saleId,
-        customerId: customerStoreRestail.selectedCustomer?.customerId,
+        customerId: customerStore.selectedCustomer?.customerId,
         totalItems: cartStore.totalItems,
         subtotal: _subtotal,
         discountAmount: _discountAmount,
@@ -275,10 +276,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
 
       // Update customer purchase data if customer is selected
-      if (customerStoreRestail.selectedCustomer != null) {
+      if (customerStore.selectedCustomer != null) {
         final points = (_grandTotal / 10).floor(); // 1 point per Rs.10
-        await customerStoreRestail.updateAfterPurchase(
-          customerStoreRestail.selectedCustomer!.customerId,
+        await customerStore.updateAfterPurchase(
+          customerStore.selectedCustomer!.customerId,
           _grandTotal,
           points,
         );
@@ -337,7 +338,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
 
       // Store customer before clearing
-      final customer = customerStoreRestail.selectedCustomer;
+      final customer = customerStore.selectedCustomer;
 
       // Clear the cart
       await cartStore.clearCart();
@@ -612,6 +613,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildGstBreakdownCard() {
+    if (!TaxFeature.enabled) {
+      return const SizedBox.shrink();
+    }
     final breakdown = cartStore.gstBreakdown;
     if (breakdown.isEmpty || _totalGstAmount == 0) {
       return const SizedBox.shrink();
@@ -792,7 +796,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _showSuccessDialog({
     required SaleModel sale,
     required List<SaleItemModel> saleItems,
-    CustomerModel? customer,
+    Customer? customer,
   }) async {
     await showDialog(
       context: context,
@@ -944,7 +948,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// Show success dialog for credit/pay later sale
   Future<void> _showCreditSuccessDialog({
     required SaleModel sale,
-    required CustomerModel customer,
+    required Customer customer,
   }) async {
     await showDialog(
       context: context,
@@ -1038,7 +1042,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   style: TextStyle(fontSize: 14, color: Color(0xFF6B6B6B)),
                                 ),
                                 Text(
-                                  customer.name,
+                                  customer.name ?? '',
                                   style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
@@ -1159,7 +1163,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget _buildCustomerCard() {
     return Observer(
       builder: (context) {
-        final customer = customerStoreRestail.selectedCustomer;
+        final customer = customerStore.selectedCustomer;
 
         return InkWell(
           onTap: () async {
@@ -1205,7 +1209,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              customer.name,
+                              customer.name ?? '',
                               style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
@@ -1214,7 +1218,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              customer.phone,
+                              customer.phone ?? '',
                               style: const TextStyle(
                                 fontSize: 13,
                                 color: Color(0xFF6B6B6B),

@@ -515,6 +515,23 @@ abstract class _AddProductFormStore with Store {
     }
   }
 
+  /// Resolves the display name of [selectedCategoryId], used as the SKU
+  /// prefix. Returns null if no category is selected/found (the generator
+  /// falls back to a generic prefix in that case).
+  String? get _selectedCategoryName {
+    for (final c in categoryStore.categories) {
+      if (c.id == selectedCategoryId) return c.name;
+    }
+    return null;
+  }
+
+  /// Auto-generates a SKU only when [currentSku] is blank — an existing SKU
+  /// (user-typed or previously generated) is never touched.
+  Future<String> _skuOrGenerated(String currentSku) async {
+    if (currentSku.trim().isNotEmpty) return currentSku;
+    return skuGeneratorService.generate(_selectedCategoryName);
+  }
+
   Future<void> _submitRetailProduct() async {
     final productStore = locator<ProductStore>();
     final productId = _uuid.v4();
@@ -539,13 +556,14 @@ abstract class _AddProductFormStore with Store {
 
     await productStore.addProduct(product);
 
-    // Create variants
+    // Create variants — every variant gets its own SKU (auto-generated only
+    // when left blank; each call advances the shared global sequence).
     if (isVariableProduct) {
       for (final variantData in retailVariants) {
         final variant = VarianteModel.create(
           varianteId: variantData.id,
           productId: productId,
-          sku: variantData.sku,
+          sku: await _skuOrGenerated(variantData.sku),
           barcode: variantData.barcode,
           size: variantData.attributes['Size'],
           color: variantData.attributes['Color'],
@@ -566,7 +584,7 @@ abstract class _AddProductFormStore with Store {
       final variant = VarianteModel.create(
         varianteId: _uuid.v4(),
         productId: productId,
-        sku: sku,
+        sku: await _skuOrGenerated(sku),
         barcode: barcode,
         mrp: mrp,
         costPrice: costPrice,

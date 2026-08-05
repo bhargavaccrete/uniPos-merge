@@ -16,6 +16,7 @@ import '../../../../core/di/service_locator.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/retail/price_formatter.dart';
+import 'package:billberrylite/data/models/common/categorymodel_300.dart';
 
 class RetailPosScreen extends StatefulWidget {
   const RetailPosScreen({super.key});
@@ -34,12 +35,26 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
   DateTime? _lastScanTime;
 
   MobileScannerController? _scannerController;
+  Map<String, String> _categoryNames = {};
 
   @override
   void initState() {
     super.initState();
     _initializeStores();
+    _loadCategoryNames();
   }
+
+  Future<void> _loadCategoryNames() async {
+    await categoryStore.loadCategories();
+    final categories = categoryStore.categories;
+    if (!mounted) return;
+    setState(() {
+      _categoryNames = {for (final c in categories) c.id: c.name};
+    });
+  }
+
+  /// Resolve a product's category id to its display name.
+  String _categoryName(String categoryId) => _categoryNames[categoryId] ?? categoryId;
 
   Future<void> _initializeStores() async {
     await Future.delayed(Duration.zero);
@@ -1048,7 +1063,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                         Row(
                           children: [
                             Text(
-                              product.category,
+                              _categoryName(product.category),
                               style: const TextStyle(
                                 fontSize: 12,
                                 color: Color(0xFF6B6B6B),
@@ -1785,9 +1800,10 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     final priceController = TextEditingController();
     final mrpController = TextEditingController();
     final stockController = TextEditingController(text: '1');
-    String selectedCategory = productStore.categories.isNotEmpty
-        ? productStore.categories.first
-        : 'General';
+
+    await categoryStore.loadCategories();
+    List<Category> categories = categoryStore.categories.toList();
+    String selectedCategory = categories.isNotEmpty ? categories.first.id : '';
 
     await showModalBottomSheet(
       context: context,
@@ -1987,11 +2003,11 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                             value: selectedCategory,
                             isExpanded: true,
                             icon: const Icon(Icons.keyboard_arrow_down),
-                            items: productStore.categories.map((String category) {
+                            items: categories.map((Category category) {
                               return DropdownMenuItem<String>(
-                                value: category,
+                                value: category.id,
                                 child: Text(
-                                  category,
+                                  category.name,
                                   style: const TextStyle(fontSize: 14),
                                 ),
                               );

@@ -2,7 +2,7 @@ import 'package:hive/hive.dart';
 import 'package:billberrylite/core/constants/hive_type_ids.dart';
 part 'categorymodel_300.g.dart';
 
-@HiveType(typeId : HiveTypeIds.restaurantCategory)
+@HiveType(typeId : HiveTypeIds.category)
 class Category{
   @HiveField(0)
   final String id;

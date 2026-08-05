@@ -1,10 +1,11 @@
 import 'package:mobx/mobx.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/plan/entitlement_keys.dart';
 import '../../../core/plan/plan_enforcement.dart';
-import '../../../data/models/restaurant/db/categorymodel_300.dart';
+import '../../../data/models/common/categorymodel_300.dart';
 import '../../../data/models/restaurant/db/itemmodel_302.dart';
-import '../../../data/repositories/restaurant/category_repository.dart';
+import '../../../data/repositories/common/category_repository.dart';
 
 part 'category_store.g.dart';
 
@@ -63,12 +64,19 @@ abstract class _CategoryStore with Store {
       isLoading = true;
       errorMessage = null;
 
-      final loadedCategories = await _repository.getAllCategories();
+      var loadedCategories = await _repository.getAllCategories();
+      if (loadedCategories.isEmpty && AppConfig.isRetail) {
+        await _repository.addDefaultCategories();
+        loadedCategories = await _repository.getAllCategories();
+      }
       categories.clear();
       categories.addAll(loadedCategories);
 
-      // Load items for each category
-      await _loadCategoryItems();
+      // Load items for each category (restaurant only — retail counts
+      // products directly off productStore, see getItemCountForCategory).
+      if (AppConfig.isRestaurant) {
+        await _loadCategoryItems();
+      }
     } catch (e) {
       errorMessage = 'Failed to load categories: $e';
     } finally {
@@ -92,7 +100,8 @@ abstract class _CategoryStore with Store {
       isLoading = true;
       errorMessage = null;
 
-      // Plan gate — add category (manage_menu.categories.add).
+      // Plan gate — PlanEnforce itself bypasses retail (no entitlement system
+      // yet), so this only ever blocks restaurant.
       if (!PlanEnforce.allows(EntKeys.manageMenuCategoriesAdd)) {
         errorMessage =
             'Adding categories isn’t available on your current plan.';
@@ -129,7 +138,8 @@ abstract class _CategoryStore with Store {
       isLoading = true;
       errorMessage = null;
 
-      // Plan gate — edit category (manage_menu.categories.edit).
+      // Plan gate — PlanEnforce itself bypasses retail (no entitlement system
+      // yet), so this only ever blocks restaurant.
       if (!PlanEnforce.allows(EntKeys.manageMenuCategoriesEdit)) {
         errorMessage = 'Editing categories isn’t available on your current plan.';
         return false;
@@ -158,7 +168,8 @@ abstract class _CategoryStore with Store {
       isLoading = true;
       errorMessage = null;
 
-      // Plan gate — delete category (manage_menu.categories.delete).
+      // Plan gate — PlanEnforce itself bypasses retail (no entitlement system
+      // yet), so this only ever blocks restaurant.
       if (!PlanEnforce.allows(EntKeys.manageMenuCategoriesDelete)) {
         errorMessage = 'Deleting categories isn’t available on your current plan.';
         return false;
@@ -166,19 +177,29 @@ abstract class _CategoryStore with Store {
 
       await _repository.deleteCategory(categoryId);
 
-      // Re-parent any items that belonged to this category so none are left
-      // pointing at a deleted category (which would otherwise render as
-      // "Unknown"). This makes deletion safe from every caller — the add-item
-      // sheet, the edit screen, and category management all share this path.
-      final orphaned =
-          itemStore.items.where((i) => i.categoryOfItem == categoryId).toList();
-      for (final item in orphaned) {
-        await itemStore.updateItem(item.copyWith(categoryOfItem: ''));
+      if (AppConfig.isRestaurant) {
+        // Re-parent any items that belonged to this category so none are left
+        // pointing at a deleted category (which would otherwise render as
+        // "Unknown"). This makes deletion safe from every caller — the add-item
+        // sheet, the edit screen, and category management all share this path.
+        final orphaned =
+            itemStore.items.where((i) => i.categoryOfItem == categoryId).toList();
+        for (final item in orphaned) {
+          await itemStore.updateItem(item.copyWith(categoryOfItem: ''));
+        }
+        categoryItemsMap.remove(categoryId);
+      } else {
+        // Retail: re-parent products so none are left pointing at a deleted
+        // category id.
+        final orphaned =
+            productStore.products.where((p) => p.category == categoryId).toList();
+        for (final product in orphaned) {
+          await productStore.updateProduct(product.copyWith(category: ''));
+        }
       }
 
       // Remove from local list
       categories.removeWhere((c) => c.id == categoryId);
-      categoryItemsMap.remove(categoryId);
 
       return true;
     } catch (e) {
@@ -206,8 +227,11 @@ abstract class _CategoryStore with Store {
     return categoryItemsMap[categoryId] ?? [];
   }
 
-  /// Get item count for a category
+  /// Get item count for a category (product count in retail mode)
   int getItemCountForCategory(String categoryId) {
+    if (AppConfig.isRetail) {
+      return productStore.products.where((p) => p.category == categoryId).length;
+    }
     return categoryItemsMap[categoryId]?.length ?? 0;
   }
 

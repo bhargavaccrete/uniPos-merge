@@ -2,9 +2,9 @@ import 'package:mobx/mobx.dart';
 
 import '../../../data/models/retail/hive_model/product_model_200.dart';
 import '../../../data/models/retail/hive_model/variante_model_201.dart';
-import '../../../data/repositories/retail/category_repository.dart';
 import '../../../data/repositories/retail/product_repository.dart';
 import '../../../data/repositories/retail/variant_repository.dart';
+import '../../../core/di/service_locator.dart';
 
 
 part 'product_store.g.dart';
@@ -15,25 +15,19 @@ abstract class _ProductStore with Store {
   // Repositories handle all database operations
   late final ProductRepository _productRepository;
   late final VariantRepository _variantRepository;
-  late final CategoryRepository _categoryRepository;
 
   @observable
   ObservableList<ProductModel> products = ObservableList<ProductModel>();
 
-  @observable
-  ObservableList<String> categories = ObservableList<String>();
-
   _ProductStore() {
     _productRepository = ProductRepository();
     _variantRepository = VariantRepository();
-    _categoryRepository = CategoryRepository();
     _init();
   }
 
   Future<void> _init() async {
     // Load data from repositories
     await loadProducts();
-    await loadCategories();
   }
 
   // ==================== PRODUCT OPERATIONS ====================
@@ -90,6 +84,22 @@ abstract class _ProductStore with Store {
     } catch (e) {
       return null;
     }
+  }
+
+  /// Suggests a taxId based on the most recently saved product that used the
+  /// same HSN code. Returns null if no prior product used this HSN code, or
+  /// if the match has no tax set — the caller decides what to do with it
+  /// (e.g. pre-fill a dropdown that the user can still override).
+  String? findTaxIdByHsnCode(String hsnCode) {
+    final trimmed = hsnCode.trim();
+    if (trimmed.isEmpty) return null;
+
+    final matches = products
+        .where((p) => p.hsnCode == trimmed && p.taxId != null)
+        .toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+    return matches.isEmpty ? null : matches.first.taxId;
   }
 
   /// Search products by name or category
@@ -159,49 +169,7 @@ abstract class _ProductStore with Store {
     return await _variantRepository.getAllVariants();
   }
 
-  // ==================== CATEGORY OPERATIONS ====================
 
-  @action
-  Future<void> loadCategories() async {
-    final loadedCategories = await _categoryRepository.getAllCategories();
-
-    if (loadedCategories.isEmpty) {
-      // Add default categories
-      await _categoryRepository.addDefaultCategories();
-      final defaults = await _categoryRepository.getAllCategories();
-      categories.clear();
-      categories.addAll(defaults);
-    } else {
-      categories.clear();
-      categories.addAll(loadedCategories);
-    }
-  }
-
-  @action
-  Future<void> addCategory(String category) async {
-    if (!categories.contains(category)) {
-      // Save to database
-      await _categoryRepository.addCategory(category);
-
-      // Update UI state
-      categories.add(category);
-    }
-  }
-
-  @action
-  Future<void> deleteCategory(String category) async {
-    // Delete from database
-    await _categoryRepository.deleteCategory(category);
-
-    // Update UI state
-    categories.remove(category);
-  }
-
-  @computed
-  List<String> get sortedCategories {
-    final sorted = categories.toList()..sort();
-    return sorted;
-  }
 
   // ==================== UTILITY METHODS ====================
 
@@ -269,8 +237,8 @@ abstract class _ProductStore with Store {
   Future<void> clearAllData() async {
     await _productRepository.clearAll();
     await _variantRepository.clearAll();
-    await _categoryRepository.clearAll();
+    await categoryRepository.clearAll();
+    await categoryStore.loadCategories();
     products.clear();
-    categories.clear();
   }
 }

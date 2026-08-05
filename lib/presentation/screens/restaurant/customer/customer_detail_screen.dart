@@ -5,7 +5,7 @@ import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
-import 'package:billberrylite/data/models/restaurant/db/customer_model_125.dart';
+import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'add_edit_customer_screen.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -13,7 +13,7 @@ import 'package:billberrylite/presentation/widget/componets/common/primary_app_b
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 
 class CustomerDetailScreen extends StatefulWidget {
-  final RestaurantCustomer customer;
+  final Customer customer;
 
   const CustomerDetailScreen({super.key, required this.customer});
 
@@ -22,7 +22,7 @@ class CustomerDetailScreen extends StatefulWidget {
 }
 
 class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
-  late RestaurantCustomer _customer;
+  late Customer _customer;
   bool _isLoading = false;
   final _pointsController = TextEditingController();
 
@@ -39,7 +39,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
   }
 
   Future<void> _refreshCustomerData() async {
-    final updatedCustomer = await restaurantCustomerStore.getCustomerById(_customer.customerId);
+    final updatedCustomer = await customerStore.getCustomerById(_customer.customerId);
     if (updatedCustomer != null) {
       setState(() {
         _customer = updatedCustomer;
@@ -187,7 +187,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
 
     setState(() { _isLoading = true; });
     try {
-      final success = await restaurantCustomerStore.addLoyaltyPoints(_customer.customerId, points);
+      final success = await customerStore.addLoyaltyPoints(_customer.customerId, points);
       if (success) {
         await _refreshCustomerData();
         if (mounted) {
@@ -213,7 +213,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     if (confirm) {
       setState(() { _isLoading = true; });
       try {
-        final success = await restaurantCustomerStore.deleteCustomer(_customer.customerId);
+        final success = await customerStore.deleteCustomer(_customer.customerId);
         if (mounted && success) {
           Navigator.pop(context, 'deleted');
         } else if (mounted) {

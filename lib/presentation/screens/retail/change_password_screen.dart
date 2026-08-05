@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
+import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 
-
+/// Change PIN — same mechanism as restaurant's admin PIN (see
+/// `AuthService.changePin`). Kept the class/file name to avoid touching the
+/// home_screen.dart call site.
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
 
@@ -11,25 +17,25 @@ class ChangePasswordScreen extends StatefulWidget {
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _currentPasswordController = TextEditingController();
-  final _newPasswordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
+  final _currentPinController = TextEditingController();
+  final _newPinController = TextEditingController();
+  final _confirmPinController = TextEditingController();
 
   bool _isLoading = false;
-  bool _obscureCurrentPassword = true;
-  bool _obscureNewPassword = true;
-  bool _obscureConfirmPassword = true;
+  bool _obscureCurrentPin = true;
+  bool _obscureNewPin = true;
+  bool _obscureConfirmPin = true;
   String? _errorMessage;
 
   @override
   void dispose() {
-    _currentPasswordController.dispose();
-    _newPasswordController.dispose();
-    _confirmPasswordController.dispose();
+    _currentPinController.dispose();
+    _newPinController.dispose();
+    _confirmPinController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleChangePassword() async {
+  Future<void> _handleChangePin() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -40,19 +46,19 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     });
 
     try {
-      final result = await authService.changePassword(
-        oldPassword: _currentPasswordController.text,
-        newPassword: _newPasswordController.text,
-        confirmPassword: _confirmPasswordController.text,
+      final result = await authService.changePin(
+        oldPin: _currentPinController.text.trim(),
+        newPin: _newPinController.text.trim(),
+        confirmPin: _confirmPinController.text.trim(),
       );
 
       if (!mounted) return;
 
       if (result.success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Password changed successfully!'),
-            backgroundColor: Color(0xFF4CAF50),
+          SnackBar(
+            content: Text('PIN changed successfully!', style: GoogleFonts.poppins()),
+            backgroundColor: AppColors.success,
           ),
         );
         Navigator.pop(context);
@@ -74,15 +80,16 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
+      backgroundColor: AppColors.surfaceLight,
       appBar: AppBar(
-        title: const Text(
-          'Change Password',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+        title: Text(
+          'Change PIN',
+          style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w500),
         ),
         centerTitle: true,
         elevation: 0,
         backgroundColor: Colors.white,
+        foregroundColor: AppColors.textPrimary,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -95,37 +102,32 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2196F3).withOpacity(0.1),
+                  color: AppColors.info.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFF2196F3).withOpacity(0.3),
-                  ),
+                  border: Border.all(color: AppColors.info.withOpacity(0.3)),
                 ),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.info_outline,
-                      color: const Color(0xFF2196F3),
-                    ),
+                    const Icon(Icons.info_outline, color: AppColors.info),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Password Requirements',
-                            style: TextStyle(
+                            'PIN Requirements',
+                            style: GoogleFonts.poppins(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: const Color(0xFF2196F3),
+                              color: AppColors.info,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Password must be at least 6 characters long',
-                            style: TextStyle(
+                            'PIN must be 4–6 digits',
+                            style: GoogleFonts.poppins(
                               fontSize: 13,
-                              color: const Color(0xFF6B6B6B),
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ],
@@ -141,27 +143,18 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: AppColors.danger.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: Colors.red.withOpacity(0.3),
-                    ),
+                    border: Border.all(color: AppColors.danger.withOpacity(0.3)),
                   ),
                   child: Row(
                     children: [
-                      const Icon(
-                        Icons.error_outline,
-                        color: Colors.red,
-                        size: 20,
-                      ),
+                      const Icon(Icons.error_outline, color: AppColors.danger, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: const TextStyle(
-                            color: Colors.red,
-                            fontSize: 14,
-                          ),
+                          style: GoogleFonts.poppins(color: AppColors.danger, fontSize: 14),
                         ),
                       ),
                     ],
@@ -170,101 +163,81 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 const SizedBox(height: 24),
               ],
 
-              // Current Password
-              _buildPasswordField(
-                controller: _currentPasswordController,
-                label: 'Current Password',
-                hint: 'Enter your current password',
-                obscure: _obscureCurrentPassword,
-                onToggleVisibility: () {
-                  setState(() {
-                    _obscureCurrentPassword = !_obscureCurrentPassword;
-                  });
-                },
+              // Current PIN
+              _buildPinField(
+                controller: _currentPinController,
+                label: 'Current PIN',
+                hint: 'Enter your current PIN',
+                obscure: _obscureCurrentPin,
+                onToggleVisibility: () => setState(() => _obscureCurrentPin = !_obscureCurrentPin),
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your current password';
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Current PIN is required';
                   }
                   return null;
                 },
               ),
               const SizedBox(height: 16),
 
-              // New Password
-              _buildPasswordField(
-                controller: _newPasswordController,
-                label: 'New Password',
-                hint: 'Enter your new password',
-                obscure: _obscureNewPassword,
-                onToggleVisibility: () {
-                  setState(() {
-                    _obscureNewPassword = !_obscureNewPassword;
-                  });
-                },
+              // New PIN
+              _buildPinField(
+                controller: _newPinController,
+                label: 'New PIN',
+                hint: 'Enter your new PIN',
+                obscure: _obscureNewPin,
+                onToggleVisibility: () => setState(() => _obscureNewPin = !_obscureNewPin),
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a new password';
+                  if (value == null || value.trim().isEmpty) {
+                    return 'New PIN is required';
                   }
-                  if (value.length < 6) {
-                    return 'Password must be at least 6 characters';
+                  if (!RegExp(r'^\d{4,6}$').hasMatch(value.trim())) {
+                    return 'PIN must be 4–6 digits';
                   }
                   return null;
                 },
               ),
               const SizedBox(height: 16),
 
-              // Confirm New Password
-              _buildPasswordField(
-                controller: _confirmPasswordController,
-                label: 'Confirm New Password',
-                hint: 'Confirm your new password',
-                obscure: _obscureConfirmPassword,
-                onToggleVisibility: () {
-                  setState(() {
-                    _obscureConfirmPassword = !_obscureConfirmPassword;
-                  });
-                },
+              // Confirm New PIN
+              _buildPinField(
+                controller: _confirmPinController,
+                label: 'Confirm New PIN',
+                hint: 'Confirm your new PIN',
+                obscure: _obscureConfirmPin,
+                onToggleVisibility: () => setState(() => _obscureConfirmPin = !_obscureConfirmPin),
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please confirm your new password';
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please confirm your new PIN';
                   }
-                  if (value != _newPasswordController.text) {
-                    return 'Passwords do not match';
+                  if (value.trim() != _newPinController.text.trim()) {
+                    return 'PINs do not match';
                   }
                   return null;
                 },
               ),
               const SizedBox(height: 32),
 
-              // Change Password Button
+              // Change PIN Button
               SizedBox(
                 height: 54,
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : _handleChangePassword,
+                  onPressed: _isLoading ? null : _handleChangePin,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4CAF50),
+                    backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     elevation: 0,
-                    disabledBackgroundColor: const Color(0xFFB0B0B0),
+                    disabledBackgroundColor: AppColors.divider,
                   ),
                   child: _isLoading
                       ? const SizedBox(
                           height: 24,
                           width: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                         )
-                      : const Text(
-                          'Change Password',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      : Text(
+                          'Change PIN',
+                          style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
                         ),
                 ),
               ),
@@ -275,7 +248,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     );
   }
 
-  Widget _buildPasswordField({
+  Widget _buildPinField({
     required TextEditingController controller,
     required String label,
     required String hint,
@@ -283,34 +256,24 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     required VoidCallback onToggleVisibility,
     required String? Function(String?) validator,
   }) {
-    return TextFormField(
+    return AppTextField(
       controller: controller,
       enabled: !_isLoading,
+      label: label,
+      hint: hint,
+      icon: Icons.lock_outline_rounded,
+      required: true,
       obscureText: obscure,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        prefixIcon: const Icon(Icons.lock_outline),
-        suffixIcon: IconButton(
-          icon: Icon(
-            obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-            color: const Color(0xFF6B6B6B),
-          ),
-          onPressed: onToggleVisibility,
+      keyboardType: TextInputType.number,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      maxLength: 6,
+      suffixIcon: IconButton(
+        icon: Icon(
+          obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+          size: 20,
+          color: AppColors.textSecondary,
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFE8E8E8)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF4CAF50), width: 2),
-        ),
-        filled: true,
-        fillColor: Colors.white,
+        onPressed: onToggleVisibility,
       ),
       validator: validator,
     );

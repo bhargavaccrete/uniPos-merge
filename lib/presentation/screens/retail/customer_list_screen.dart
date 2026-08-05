@@ -3,7 +3,7 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/di/service_locator.dart';
-import '../../../data/models/retail/hive_model/customer_model_208.dart';
+import '../../../data/models/common/customer_model_125.dart';
 import '../../../domain/services/restaurant/notification_service.dart';
 import 'customer_detail_screen.dart';
 class CustomerListScreen extends StatefulWidget {
@@ -23,7 +23,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   }
 
   void _onSearchChanged(String query) {
-    customerStoreRestail.searchCustomers(query);
+    customerStore.searchCustomers(query);
   }
 
   void _showAddCustomerDialog() {
@@ -223,7 +223,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
               final creditLimit = double.tryParse(creditLimitController.text.trim()) ?? 0.0;
               final openingBalance = double.tryParse(openingBalanceController.text.trim()) ?? 0.0;
 
-              final newCustomer = CustomerModel.create(
+              final newCustomer = Customer.create(
                 customerId: const Uuid().v4(),
                 name: nameController.text.trim(),
                 phone: phoneController.text.trim(),
@@ -235,7 +235,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                 openingBalance: openingBalance,
               );
 
-              await customerStoreRestail.addCustomer(newCustomer);
+              await customerStore.addCustomer(newCustomer);
 
               if (mounted) {
                 Navigator.pop(context);
@@ -257,7 +257,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     );
   }
 
-  void _openCustomerDetails(CustomerModel customer) {
+  void _openCustomerDetails(Customer customer) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -265,7 +265,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       ),
     ).then((_) {
       // Refresh customer list when returning from detail screen
-      customerStoreRestail.loadCustomers();
+      customerStore.loadCustomers();
     });
   }
 
@@ -287,14 +287,14 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
               builder: (context) {
                 // Show all customers when search is empty
                 if (_searchController.text.isEmpty) {
-                  if (customerStoreRestail.customerCount == 0) {
+                  if (customerStore.customerCount == 0) {
                     return _buildEmptyState();
                   }
                   return _buildAllCustomersList();
                 }
 
                 // Show no results when searching but no matches
-                if (customerStoreRestail.searchResults.isEmpty) {
+                if (customerStore.searchResults.isEmpty) {
                   return _buildNoResultsState();
                 }
 
@@ -422,7 +422,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   Widget _buildAllCustomersList() {
     return Observer(
       builder: (context) {
-        final customers = customerStoreRestail.customers;
+        final customers = customerStore.customers;
 
         return ListView.builder(
           padding: const EdgeInsets.all(16),
@@ -441,9 +441,9 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       builder: (context) {
         return ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: customerStoreRestail.searchResults.length,
+          itemCount: customerStore.searchResults.length,
           itemBuilder: (context, index) {
-            final customer = customerStoreRestail.searchResults[index];
+            final customer = customerStore.searchResults[index];
             return _buildCustomerCard(customer);
           },
         );
@@ -451,7 +451,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     );
   }
 
-  Widget _buildCustomerCard(CustomerModel customer) {
+  Widget _buildCustomerCard(Customer customer) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -464,7 +464,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
         leading: CircleAvatar(
           backgroundColor: const Color(0xFF4CAF50).withOpacity(0.1),
           child: Text(
-            customer.name[0].toUpperCase(),
+            (customer.name?.isNotEmpty ?? false) ? customer.name![0].toUpperCase() : '?',
             style: const TextStyle(
               color: Color(0xFF4CAF50),
               fontWeight: FontWeight.w600,
@@ -475,7 +475,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
           children: [
             Expanded(
               child: Text(
-                customer.name,
+                customer.name ?? '',
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
@@ -511,7 +511,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                   '+91 ${customer.phone}',
                   style: const TextStyle(fontSize: 13, color: Color(0xFF6B6B6B)),
                 ),
-                if (customer.visitCount > 0) ...[
+                if (customer.totalVisites > 0) ...[
                   const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
@@ -520,7 +520,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      '${customer.visitCount} visits',
+                      '${customer.totalVisites} visits',
                       style: const TextStyle(
                         fontSize: 10,
                         color: Color(0xFF6B6B6B),
@@ -545,12 +545,12 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                     ),
                   ),
                 ],
-                if (customer.pointsBalance > 0) ...[
+                if (customer.loyaltyPoints > 0) ...[
                   const SizedBox(width: 12),
                   const Icon(Icons.star_outline, size: 14, color: Color(0xFFFFA726)),
                   const SizedBox(width: 4),
                   Text(
-                    '${customer.pointsBalance} pts',
+                    '${customer.loyaltyPoints} pts',
                     style: const TextStyle(
                       fontSize: 12,
                       color: Color(0xFFFFA726),
@@ -558,7 +558,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                     ),
                   ),
                 ],
-                if (customer.totalPurchaseAmount == 0 && customer.pointsBalance == 0)
+                if (customer.totalPurchaseAmount == 0 && customer.loyaltyPoints == 0)
                   const Text(
                     'No purchases yet',
                     style: TextStyle(

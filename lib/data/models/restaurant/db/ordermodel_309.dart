@@ -88,7 +88,7 @@ class OrderModel extends HiveObject {
   final int? orderNumber; // Daily order number (resets every day, starts from 1)
 
   @HiveField(26)
-  final String? customerId; // Customer ID linking to RestaurantCustomer
+  final String? customerId; // Customer ID linking to Customer
 
   // --- SPLIT PAYMENT SUPPORT ---
   @HiveField(27)

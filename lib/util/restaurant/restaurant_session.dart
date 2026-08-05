@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../data/models/restaurant/db/staffModel_310.dart';
+import '../../data/models/common/staffModel_310.dart';
 
 /// Tracks who is currently logged in to the restaurant POS.
 /// Persists across hot-restarts via SharedPreferences.

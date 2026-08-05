@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
@@ -10,18 +11,22 @@ import 'package:uuid/uuid.dart';
 import 'dart:io';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/config/tax_feature.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/retail/hive_model/attribute_model_219.dart';
 import '../../../data/models/retail/hive_model/attribute_value_model_220.dart';
 import '../../../data/models/retail/hive_model/variante_model_201.dart';
-import '../../../data/repositories/tax_details_repository.dart';
 import '../../../domain/store/common/add_product_form_store.dart';
 import '../../../domain/store/retail/product_store.dart';
 import '../../../domain/store/retail/attribute_store.dart';
 import '../../../util/responsive.dart';
+import '../../../util/common/app_responsive.dart';
+import '../../../presentation/widget/componets/common/app_text_field.dart';
+import '../../../presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/screens/retail/import_product/bulk_import_screen.dart';
 import 'package:billberrylite/presentation/screens/restaurant/import/restaurant_bulk_import_service.dart';
 import 'package:billberrylite/presentation/screens/restaurant/import/bulk_import_screen.dart';
+import 'package:billberrylite/data/models/common/categorymodel_300.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/category_selector_sheet.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
@@ -82,6 +87,35 @@ class _AddProductScreenState extends State<AddProductScreen>
   final _bulkSellingPriceController = TextEditingController();
   final _bulkStockController = TextEditingController();
 
+  // Persistent per-variant field controllers, keyed by variant id then field
+  // name (sku/barcode/costPrice/price/mrp/stockQuantity). AppTextField needs
+  // a real controller — this is what lets externally-triggered changes
+  // (bulk edit, SKU auto-generate) show up immediately in an open card.
+  final Map<String, Map<String, TextEditingController>> _variantControllers = {};
+
+  TextEditingController _variantController(String variantId, String field, String initialText) {
+    final fields = _variantControllers.putIfAbsent(variantId, () => {});
+    return fields.putIfAbsent(field, () => TextEditingController(text: initialText));
+  }
+
+  void _disposeVariantControllers(String variantId) {
+    final fields = _variantControllers.remove(variantId);
+    if (fields != null) {
+      for (final c in fields.values) {
+        c.dispose();
+      }
+    }
+  }
+
+  void _disposeAllVariantControllers() {
+    for (final fields in _variantControllers.values) {
+      for (final c in fields.values) {
+        c.dispose();
+      }
+    }
+    _variantControllers.clear();
+  }
+
   // Edit mode tracking
   String? _editingProductId;
   String? _editingRestaurantItemId;
@@ -101,6 +135,11 @@ class _AddProductScreenState extends State<AddProductScreen>
   String? _selectedStatusFilter; // 'all', 'active', 'disabled'
   String _restaurantSortBy = 'name_asc'; // 'name_asc', 'name_desc', 'price_asc', 'price_desc'
 
+  // Shown above attribute value chips until the user long-presses one for the
+  // first time; dismissal is persisted so it never shows again after that.
+  static const _longPressTipPrefsKey = 'attribute_value_longpress_tip_dismissed';
+  bool _showLongPressTip = false;
+
   @override
   void initState() {
     super.initState();
@@ -114,7 +153,20 @@ class _AddProductScreenState extends State<AddProductScreen>
         final attributeStore = locator<AttributeStore>();
         attributeStore.loadAttributes();
       });
+      SharedPreferences.getInstance().then((prefs) {
+        if (!mounted) return;
+        if (!(prefs.getBool(_longPressTipPrefsKey) ?? false)) {
+          setState(() => _showLongPressTip = true);
+        }
+      });
     }
+  }
+
+  Future<void> _dismissLongPressTip() async {
+    if (!_showLongPressTip) return;
+    setState(() => _showLongPressTip = false);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_longPressTipPrefsKey, true);
   }
 
   @override
@@ -140,6 +192,7 @@ class _AddProductScreenState extends State<AddProductScreen>
     _bulkSellingPriceController.dispose();
     _bulkStockController.dispose();
     _searchController.dispose();
+    _disposeAllVariantControllers();
     super.dispose();
   }
 
@@ -180,6 +233,7 @@ class _AddProductScreenState extends State<AddProductScreen>
     _unitController.clear();
     _restaurantStockController.clear();
     _formStore.reset();
+    _disposeAllVariantControllers();
 
     // Clear edit mode
     setState(() {
@@ -238,6 +292,34 @@ class _AddProductScreenState extends State<AddProductScreen>
 
   // ==================== UPDATE METHODS ====================
 
+  /// Resolves the display name of the form's selected category, used as the
+  /// SKU prefix when auto-generating.
+  String? _selectedCategoryName() {
+    for (final c in categoryStore.categories) {
+      if (c.id == _formStore.selectedCategoryId) return c.name;
+    }
+    return null;
+  }
+
+  /// Auto-generates a SKU only when [currentSku] is blank — an existing SKU
+  /// (user-typed or previously generated) is never touched.
+  Future<String> _skuOrGenerated(String currentSku) async {
+    if (currentSku.trim().isNotEmpty) return currentSku;
+    return skuGeneratorService.generate(_selectedCategoryName());
+  }
+
+  /// "Auto-generate" button next to the SKU field — never overwrites an
+  /// existing value, matching the same rule applied at save time.
+  Future<void> _onAutoGenerateSkuPressed() async {
+    if (_skuController.text.trim().isNotEmpty) {
+      NotificationService.instance.showError('SKU is already set — clear it first to generate a new one.');
+      return;
+    }
+    final sku = await skuGeneratorService.generate(_selectedCategoryName());
+    if (!mounted) return;
+    setState(() => _skuController.text = sku);
+  }
+
   Future<bool> _updateRetailProduct() async {
     try {
       final productStore = locator<ProductStore>();
@@ -270,7 +352,7 @@ class _AddProductScreenState extends State<AddProductScreen>
           final variant = VarianteModel.create(
             varianteId: variantData.id,
             productId: _editingProductId!,
-            sku: variantData.sku,
+            sku: await _skuOrGenerated(variantData.sku),
             barcode: variantData.barcode,
             size: variantData.attributes['Size'],
             color: variantData.attributes['Color'],
@@ -303,7 +385,7 @@ class _AddProductScreenState extends State<AddProductScreen>
           );
 
           final updatedVariant = defaultVariant.copyWith(
-            sku: _formStore.sku,
+            sku: await _skuOrGenerated(_formStore.sku),
             barcode: _formStore.barcode,
             mrp: _formStore.mrp,
             costPrice: _formStore.costPrice,
@@ -422,17 +504,25 @@ class _AddProductScreenState extends State<AddProductScreen>
       //   icon: const Icon(Icons.arrow_back, color: AppColors.darkNeutral),
       //   onPressed: () => Navigator.pop(context),
       // ),
+      // Retail's bulk-import entry point lives in the "Bulk Import via Excel"
+      // card on the Add Product tab instead — these icons were fully redundant
+      // with it there (both just re-opened the same BulkImportScreen), and
+      // "Download Template" didn't actually download anything for retail.
+      // Restaurant keeps them: Download saves a real template file and Upload
+      // does its own inline pick/parse flow, distinct from the card's screen.
       actions: [
-        IconButton(
-          icon: const Icon(Icons.download, color: AppColors.primary),
-          onPressed: () => _downloadTemplate(),
-          tooltip: 'Download Template',
-        ),
-        IconButton(
-          icon: const Icon(Icons.upload_file, color: AppColors.success),
-          onPressed: () => _uploadExcel(),
-          tooltip: 'Upload Excel',
-        ),
+        if (AppConfig.isRestaurant) ...[
+          IconButton(
+            icon: const Icon(Icons.download, color: AppColors.primary),
+            onPressed: () => _downloadTemplate(),
+            tooltip: 'Download Template',
+          ),
+          IconButton(
+            icon: const Icon(Icons.upload_file, color: AppColors.success),
+            onPressed: () => _uploadExcel(),
+            tooltip: 'Upload Excel',
+          ),
+        ],
       ],
       bottom: TabBar(
         controller: _tabController,
@@ -466,8 +556,10 @@ class _AddProductScreenState extends State<AddProductScreen>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Excel Import Card
-                if (AppConfig.isRetail) _buildExcelImportCard(),
-                const SizedBox(height: 24),
+                if (AppConfig.isRetail) ...[
+                  _buildExcelImportCard(),
+                  const SizedBox(height: 16),
+                ],
 
                 // Main Form Card
                 Container(
@@ -642,13 +734,13 @@ class _AddProductScreenState extends State<AddProductScreen>
               children: [
                 _buildTextField(
                   controller: _brandController,
-                  label: 'Brand Name',
+                  label: 'Brand Name (optional)',
                   icon: Icons.business,
                 ),
                 const SizedBox(height: 16),
                 _buildTextField(
                   controller: _subCategoryController,
-                  label: 'Sub-category',
+                  label: 'Sub-category (optional)',
                   icon: Icons.category_outlined,
                 ),
               ],
@@ -659,7 +751,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                 Expanded(
                   child: _buildTextField(
                     controller: _brandController,
-                    label: 'Brand Name',
+                    label: 'Brand Name (optional)',
                     icon: Icons.business,
                   ),
                 ),
@@ -667,7 +759,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                 Expanded(
                   child: _buildTextField(
                     controller: _subCategoryController,
-                    label: 'Sub-category',
+                    label: 'Sub-category (optional)',
                     icon: Icons.category_outlined,
                   ),
                 ),
@@ -710,7 +802,7 @@ class _AddProductScreenState extends State<AddProductScreen>
         // Description
         _buildTextField(
           controller: _descriptionController,
-          label: 'Description',
+          label: 'Description (optional)',
           icon: Icons.description,
           maxLines: 3,
           iconColor: AppColors.secondary,
@@ -807,109 +899,91 @@ class _AddProductScreenState extends State<AddProductScreen>
   }
 
   Widget _buildCategoryDropdown() {
-    if (AppConfig.isRetail) {
-      final productStore = locator<ProductStore>();
-      return Observer(
-        builder: (_) {
-          // Ensure the selected value is valid or null
-          final selectedValue = productStore.categories.contains(_formStore.selectedCategoryId)
-              ? _formStore.selectedCategoryId
-              : null;
+    return Observer(
+      builder: (_) {
+        final categories = categoryStore.categories.toList();
+        final categoryIds = categories.map((c) => c.id).toList();
 
-          return DropdownButtonFormField<String>(
-            value: selectedValue,
-            decoration: _fieldDec('Category*', Icons.category_rounded),
-            style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
-            items: productStore.categories.map((category) {
-              return DropdownMenuItem(
-                value: category,
-                child: Text(category, style: GoogleFonts.poppins(fontSize: 14)),
-              );
-            }).toList(),
-            onChanged: (value) => _formStore.setSelectedCategoryId(value),
-            hint: Text('Select category', style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textSecondary)),
-          );
-        },
-      );
-    } else {
-      // Restaurant mode - use category store
-      return Observer(
-        builder: (_) {
-          final categories = categoryStore.categories.toList();
-          final categoryIds = categories.map((c) => c.id).toList();
+        // Ensure selected value is valid
+        final selectedValue = categoryIds.contains(_formStore.selectedCategoryId)
+            ? _formStore.selectedCategoryId
+            : null;
 
-          // Ensure selected value is valid
-          final selectedValue = categoryIds.contains(_formStore.selectedCategoryId)
-              ? _formStore.selectedCategoryId
-              : null;
+        return InkWell(
+          onTap: () async {
+            // Show category selector bottom sheet — lets the user create a
+            // new category inline instead of only picking from existing ones.
+            final result = await CategorySelectorSheet.show(
+              context,
+              selectedCategoryId: selectedValue,
+              onAddCategory: () async {
+                Navigator.pop(context);
+                await AddCategoryDialog.show(context);
+              },
+            );
 
-          return InkWell(
-            onTap: () async {
-              // Show category selector bottom sheet
-              final result = await CategorySelectorSheet.show(
-                context,
-                selectedCategoryId: selectedValue,
-                onAddCategory: () async {
-                  Navigator.pop(context);
-                  await AddCategoryDialog.show(context);
-                },
-              );
-
-              if (result != null) {
-                setState(() {
-                  _formStore.setSelectedCategoryId(result.id);
-                });
-              }
-            },
-            child: InputDecorator(
-              decoration: _fieldDec('Category*', Icons.category_rounded,
-                  suffixIcon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary)),
-              child: Text(
-                selectedValue != null && categories.isNotEmpty
-                    ? categories.firstWhere((c) => c.id == selectedValue, orElse: () => categories.first).name
-                    : 'Select or Add Category',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: selectedValue != null ? AppColors.textPrimary : AppColors.textSecondary,
-                ),
+            if (result != null) {
+              setState(() {
+                _formStore.setSelectedCategoryId(result.id);
+              });
+            }
+          },
+          child: InputDecorator(
+            decoration: _fieldDec('Category*', Icons.category_rounded,
+                suffixIcon: const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary)),
+            child: Text(
+              selectedValue != null && categories.isNotEmpty
+                  ? categories.firstWhere((c) => c.id == selectedValue, orElse: () => categories.first).name
+                  : 'Select or Add Category',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: selectedValue != null ? AppColors.textPrimary : AppColors.textSecondary,
               ),
             ),
-          );
-        },
-      );
-    }
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildGstDropdown() {
-    // Fetch tax rates from saved tax details (for retail)
-    final taxDetailsRepo = locator<TaxDetailsRepository>();
-    final savedTax = taxDetailsRepo.get();
+    // Fetch tax rates from the shared TaxStore (retail) — same source
+    // restaurant's dropdown below already uses.
+    final taxes = taxStore.taxes;
 
-    // Get tax rates from saved details, or use default if none saved
+    // Get tax rates from the store, or use default if none added yet
     List<String> gstRates = [];
-    if (savedTax != null && savedTax.taxRates != null && savedTax.taxRates!.isNotEmpty) {
-      gstRates = savedTax.taxRates!.map((tax) => tax.rate.toString()).toList();
+    if (taxes.isNotEmpty) {
+      gstRates = taxes.map((tax) => (tax.taxperecentage ?? 0).toString()).toList();
     } else {
       // Fallback to common GST rates if no tax rates were added during setup
       gstRates = ['0', '5', '12', '18', '28'];
     }
 
-    return DropdownButtonFormField<String>(
-      value: _taxRateController.text.isEmpty ? null : _taxRateController.text,
-      decoration: _fieldDec('GST Rate (%)', Icons.percent),
-      style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
-      items: gstRates.map((rate) {
-        return DropdownMenuItem(
-          value: rate,
-          child: Text('$rate%', style: GoogleFonts.poppins(fontSize: 14)),
-        );
-      }).toList(),
-      onChanged: (value) {
-        setState(() {
-          _taxRateController.text = value ?? '';
-        });
-      },
-      hint: Text('Select GST rate', style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textSecondary)),
+    return Theme(
+      data: Theme.of(context).copyWith(
+        highlightColor: AppColors.primary.withOpacity(0.08),
+        splashColor: AppColors.primary.withOpacity(0.08),
+        hoverColor: AppColors.primary.withOpacity(0.06),
+      ),
+      child: DropdownButtonFormField<String>(
+        value: _taxRateController.text.isEmpty ? null : _taxRateController.text,
+        decoration: _fieldDec('GST Rate (%)', Icons.percent),
+        style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
+        dropdownColor: Colors.white,
+        items: gstRates.map((rate) {
+          return DropdownMenuItem(
+            value: rate,
+            child: Text('$rate%', style: GoogleFonts.poppins(fontSize: 14)),
+          );
+        }).toList(),
+        onChanged: (value) {
+          setState(() {
+            _taxRateController.text = value ?? '';
+          });
+        },
+        hint: Text('Select GST rate', style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textSecondary)),
+      ),
     );
   }
 
@@ -957,25 +1031,28 @@ class _AddProductScreenState extends State<AddProductScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSubSectionTitle('Pricing & Tax'),
+        _buildSubSectionTitle(TaxFeature.enabled ? 'Pricing & Tax' : 'Pricing'),
 
-        // GST/Tax Rate Dropdown for both Retail and Restaurant
-        if (isMobile)
-          AppConfig.isRetail
-              ? _buildGstDropdown()
-              : _buildRestaurantTaxDropdown()
-        else
-          Row(
-            children: [
-              Expanded(
-                child: AppConfig.isRetail
-                    ? _buildGstDropdown()
-                    : _buildRestaurantTaxDropdown(),
-              ),
-              const SizedBox(width: 16),
-              const Expanded(child: SizedBox.shrink()),
-            ],
-          ),
+        // GST/Tax Rate Dropdown for both Retail and Restaurant — hidden
+        // entirely when tax is disabled for this business.
+        if (TaxFeature.enabled) ...[
+          if (isMobile)
+            AppConfig.isRetail
+                ? _buildGstDropdown()
+                : _buildRestaurantTaxDropdown()
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: AppConfig.isRetail
+                      ? _buildGstDropdown()
+                      : _buildRestaurantTaxDropdown(),
+                ),
+                const SizedBox(width: 16),
+                const Expanded(child: SizedBox.shrink()),
+              ],
+            ),
+        ],
 
         // Retail-specific pricing (only for Simple products, not Variable)
         if (AppConfig.isRetail) ...[
@@ -1012,12 +1089,14 @@ class _AddProductScreenState extends State<AddProductScreen>
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _hsnCodeController,
-                      label: 'HSN Code',
-                      icon: Icons.qr_code_2,
-                    ),
+                    if (TaxFeature.enabled) ...[
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _hsnCodeController,
+                        label: 'HSN Code',
+                        icon: Icons.qr_code_2,
+                      ),
+                    ],
                   ],
                 );
               }
@@ -1047,12 +1126,14 @@ class _AddProductScreenState extends State<AddProductScreen>
                     icon: Icons.price_check,
                     keyboardType: TextInputType.number,
                   ),
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    controller: _hsnCodeController,
-                    label: 'HSN Code',
-                    icon: Icons.qr_code_2,
-                  ),
+                  if (TaxFeature.enabled) ...[
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      controller: _hsnCodeController,
+                      label: 'HSN Code',
+                      icon: Icons.qr_code_2,
+                    ),
+                  ],
                 ],
               )
                   : Column(
@@ -1088,22 +1169,24 @@ class _AddProductScreenState extends State<AddProductScreen>
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildTextField(
-                          controller: _hsnCodeController,
-                          label: 'HSN Code',
-                          icon: Icons.qr_code_2,
+                  if (TaxFeature.enabled) ...[
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildTextField(
+                            controller: _hsnCodeController,
+                            label: 'HSN Code',
+                            icon: Icons.qr_code_2,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      const Expanded(child: SizedBox.shrink()),
-                      const SizedBox(width: 16),
-                      const Expanded(child: SizedBox.shrink()),
-                    ],
-                  ),
+                        const SizedBox(width: 16),
+                        const Expanded(child: SizedBox.shrink()),
+                        const SizedBox(width: 16),
+                        const Expanded(child: SizedBox.shrink()),
+                      ],
+                    ),
+                  ],
                 ],
               );
             },
@@ -1159,32 +1242,32 @@ class _AddProductScreenState extends State<AddProductScreen>
         _buildSubSectionTitle('Product Variants'),
 
         // Product Type Toggle
+        Text(
+          'Product Type',
+          style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 8),
         Observer(
-          builder: (_) => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey[300]!),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              children: [
-                const Text('Product Type: ', style: TextStyle(fontWeight: FontWeight.w500)),
-                const SizedBox(width: 16),
-                ChoiceChip(
-                  label: const Text('Simple'),
+          builder: (_) => Row(
+            children: [
+              Expanded(
+                child: _buildSelectableCard(
+                  icon: Icons.inventory_2_outlined,
+                  label: 'Simple',
                   selected: _formStore.productType == 'simple',
-                  onSelected: (_) => _formStore.setProductType('simple'),
-                  selectedColor: AppColors.primary.withOpacity(0.2),
+                  onTap: () => _formStore.setProductType('simple'),
                 ),
-                const SizedBox(width: 8),
-                ChoiceChip(
-                  label: const Text('Variable'),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildSelectableCard(
+                  icon: Icons.style_outlined,
+                  label: 'Variable',
                   selected: _formStore.productType == 'variable',
-                  onSelected: (_) => _formStore.setProductType('variable'),
-                  selectedColor: AppColors.secondary.withOpacity(0.2),
+                  onTap: () => _formStore.setProductType('variable'),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
 
@@ -1210,6 +1293,118 @@ class _AddProductScreenState extends State<AddProductScreen>
     );
   }
 
+  /// Icon+label selectable card — matches the AnimatedContainer idiom used
+  /// for option selectors elsewhere in the wizard (e.g. staff role picker).
+  Widget _buildSelectableCard({
+    required IconData icon,
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+    Color accent = AppColors.primary,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? accent.withOpacity(0.1) : AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: selected ? accent : AppColors.divider,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 22, color: selected ? accent : AppColors.textSecondary),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected ? accent : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Pill-shaped selectable chip — same idiom as [_buildSelectableCard], used
+  /// for attribute/value chips in place of stock FilterChip.
+  Widget _buildSelectableChip({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+    Color accent = AppColors.primary,
+    Widget? avatar,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? accent.withOpacity(0.1) : AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? accent : AppColors.divider,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (avatar != null) ...[avatar, const SizedBox(width: 6)],
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                color: selected ? accent : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Non-toggleable pill button ("+ Add Value" / "+ Add Attribute" style),
+  /// same visual weight as [_buildSelectableChip] but always in the
+  /// unselected/tinted-outline state since it triggers an action, not a
+  /// selection.
+  Widget _buildActionPill({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+    Color accent = AppColors.primary,
+  }) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: accent.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: accent.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: accent),
+            const SizedBox(width: 6),
+            Text(label, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: accent)),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildAttributeSelector() {
     final attributeStore = locator<AttributeStore>();
 
@@ -1220,14 +1415,14 @@ class _AddProductScreenState extends State<AddProductScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Select Attributes:',
-                style: TextStyle(fontWeight: FontWeight.w500),
+                style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
               ),
               TextButton.icon(
                 onPressed: () => _showAddAttributeDialog(attributeStore),
                 icon: const Icon(Icons.add, size: 16),
-                label: const Text('Add Attribute'),
+                label: Text('Add Attribute', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.primary,
                 ),
@@ -1241,35 +1436,38 @@ class _AddProductScreenState extends State<AddProductScreen>
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.shade200),
+                color: AppColors.info.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                border: Border.all(color: AppColors.info.withOpacity(0.3)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.info_outline, color: Colors.blue.shade700),
+                      const Icon(Icons.info_outline, color: AppColors.info),
                       const SizedBox(width: 8),
-                      const Text(
+                      Text(
                         'No attributes found',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                        style: GoogleFonts.poppins(fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Attributes define product variants like Size, Color, Material, etc.',
-                    style: TextStyle(fontSize: 12),
+                    style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary),
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton.icon(
                     onPressed: () => _createDefaultAttributes(attributeStore),
                     icon: const Icon(Icons.auto_awesome, size: 16),
-                    label: const Text('Create Default Attributes (Size, Color, Weight)'),
+                    label: Text('Create Default Attributes (Size, Color, Weight)', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context))),
                     ),
                   ),
                 ],
@@ -1281,14 +1479,29 @@ class _AddProductScreenState extends State<AddProductScreen>
               runSpacing: 8,
               children: attributeStore.attributes.map((attr) {
                 final isSelected = _formStore.selectedAttributeIds.contains(attr.attributeId);
-                return FilterChip(
-                  label: Text(attr.name),
+                return _buildSelectableChip(
+                  label: attr.name,
                   selected: isSelected,
-                  onSelected: (_) => _formStore.toggleAttribute(attr.attributeId),
-                  selectedColor: AppColors.primary.withOpacity(0.2),
+                  onTap: () => _formStore.toggleAttribute(attr.attributeId),
+                  accent: AppColors.primary,
                 );
               }).toList(),
             ),
+
+          // One-time hint that values support long-press for edit/delete
+          if (_formStore.selectedAttributeIds.isNotEmpty && _showLongPressTip) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.info_outline, size: 14, color: AppColors.textSecondary),
+                const SizedBox(width: 6),
+                Text(
+                  'Tip: Long press a value to edit or delete it.',
+                  style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary, fontStyle: FontStyle.italic),
+                ),
+              ],
+            ),
+          ],
 
           // Show values for selected attributes
           ..._formStore.selectedAttributeIds.map((attrId) {
@@ -1299,26 +1512,47 @@ class _AddProductScreenState extends State<AddProductScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 12),
-                Text('${attr.name} Values:', style: const TextStyle(fontWeight: FontWeight.w500)),
+                Text(
+                  '${attr.name} Values:',
+                  style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+                ),
                 const SizedBox(height: 4),
+                if (values.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      'No values yet for ${attr.name}.',
+                      style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                  ),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: values.map((val) {
-                    final isSelected = _formStore.selectedAttributeValues[attrId]?.contains(val.valueId) ?? false;
-                    return FilterChip(
-                      label: Text(val.value),
-                      selected: isSelected,
-                      onSelected: (_) => _formStore.toggleAttributeValue(attrId, val.valueId),
-                      selectedColor: AppColors.secondary.withOpacity(0.2),
-                      avatar: val.colorCode != null
-                          ? CircleAvatar(
-                        backgroundColor: _parseColor(val.colorCode!),
-                        radius: 10,
-                      )
-                          : null,
-                    );
-                  }).toList(),
+                  children: [
+                    ...values.map((val) {
+                      final isSelected = _formStore.selectedAttributeValues[attrId]?.contains(val.valueId) ?? false;
+                      return GestureDetector(
+                        onLongPress: () => _showValueActionsSheet(attributeStore, attr, val),
+                        child: _buildSelectableChip(
+                          label: val.value,
+                          selected: isSelected,
+                          onTap: () => _formStore.toggleAttributeValue(attrId, val.valueId),
+                          accent: AppColors.secondary,
+                          avatar: val.colorCode != null
+                              ? CircleAvatar(
+                            backgroundColor: _parseColor(val.colorCode!),
+                            radius: 8,
+                          )
+                              : null,
+                        ),
+                      );
+                    }),
+                    _buildActionPill(
+                      icon: Icons.add,
+                      label: 'Add Value',
+                      onPressed: () => _showAddValueToAttributeDialog(attributeStore, attr),
+                    ),
+                  ],
                 ),
               ],
             );
@@ -1332,9 +1566,12 @@ class _AddProductScreenState extends State<AddProductScreen>
                 _showVariantGenerationDialog(attributeStore);
               },
               icon: const Icon(Icons.auto_awesome),
-              label: const Text('Generate Variants'),
+              label: Text('Generate Variants', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.secondary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context))),
               ),
             ),
           ],
@@ -1408,9 +1645,9 @@ class _AddProductScreenState extends State<AddProductScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF8E1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFFFE082)),
+        color: AppColors.warning.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+        border: Border.all(color: AppColors.warning.withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1418,15 +1655,15 @@ class _AddProductScreenState extends State<AddProductScreen>
           // Header with Select All / Unselect All
           Row(
             children: [
-              const Icon(Icons.edit_note, color: Color(0xFFF57C00), size: 20),
+              const Icon(Icons.edit_note, color: AppColors.warning, size: 20),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Bulk Edit - $selectedCount / $variantCount selected',
-                  style: const TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFFF57C00),
+                    color: AppColors.warning,
                   ),
                 ),
               ),
@@ -1445,13 +1682,14 @@ class _AddProductScreenState extends State<AddProductScreen>
                 },
                 child: Text(
                   'Select All',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: 12,
-                    color: allSelected ? Colors.grey : const Color(0xFFF57C00),
+                    fontWeight: FontWeight.w600,
+                    color: allSelected ? AppColors.textSecondary : AppColors.warning,
                   ),
                 ),
               ),
-              const Text(' | ', style: TextStyle(color: Colors.grey)),
+              Text(' | ', style: GoogleFonts.poppins(color: AppColors.textSecondary)),
               TextButton(
                 onPressed: noneSelected
                     ? null
@@ -1462,9 +1700,10 @@ class _AddProductScreenState extends State<AddProductScreen>
                 },
                 child: Text(
                   'Unselect All',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: 12,
-                    color: noneSelected ? Colors.grey : Colors.red,
+                    fontWeight: FontWeight.w600,
+                    color: noneSelected ? AppColors.textSecondary : AppColors.danger,
                   ),
                 ),
               ),
@@ -1476,42 +1715,27 @@ class _AddProductScreenState extends State<AddProductScreen>
           if (isMobile)
             Column(
               children: [
-                TextField(
+                AppTextField(
                   controller: _bulkCostPriceController,
-                  decoration: const InputDecoration(
-                    labelText: 'Cost Price',
-                    hintText: '0.00',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
+                  label: 'Cost Price',
+                  hint: '0.00',
+                  icon: Icons.money_off,
                   keyboardType: TextInputType.number,
                 ),
                 const SizedBox(height: 8),
-                TextField(
+                AppTextField(
                   controller: _bulkSellingPriceController,
-                  decoration: const InputDecoration(
-                    labelText: 'Selling Price',
-                    hintText: '0.00',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
+                  label: 'Selling Price',
+                  hint: '0.00',
+                  icon: Icons.attach_money,
                   keyboardType: TextInputType.number,
                 ),
                 const SizedBox(height: 8),
-                TextField(
+                AppTextField(
                   controller: _bulkStockController,
-                  decoration: const InputDecoration(
-                    labelText: 'Stock',
-                    hintText: '0',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
+                  label: 'Stock',
+                  hint: '0',
+                  icon: Icons.inventory_2,
                   keyboardType: TextInputType.number,
                 ),
               ],
@@ -1520,46 +1744,31 @@ class _AddProductScreenState extends State<AddProductScreen>
             Row(
               children: [
                 Expanded(
-                  child: TextField(
+                  child: AppTextField(
                     controller: _bulkCostPriceController,
-                    decoration: const InputDecoration(
-                      labelText: 'Cost Price',
-                      hintText: '0.00',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
+                    label: 'Cost Price',
+                    hint: '0.00',
+                    icon: Icons.money_off,
                     keyboardType: TextInputType.number,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: TextField(
+                  child: AppTextField(
                     controller: _bulkSellingPriceController,
-                    decoration: const InputDecoration(
-                      labelText: 'Selling Price',
-                      hintText: '0.00',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
+                    label: 'Selling Price',
+                    hint: '0.00',
+                    icon: Icons.attach_money,
                     keyboardType: TextInputType.number,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: TextField(
+                  child: AppTextField(
                     controller: _bulkStockController,
-                    decoration: const InputDecoration(
-                      labelText: 'Stock',
-                      hintText: '0',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
+                    label: 'Stock',
+                    hint: '0',
+                    icon: Icons.inventory_2,
                     keyboardType: TextInputType.number,
                   ),
                 ),
@@ -1571,10 +1780,12 @@ class _AddProductScreenState extends State<AddProductScreen>
             child: ElevatedButton.icon(
               onPressed: _applyBulkPricing,
               icon: const Icon(Icons.done_all),
-              label: const Text('Apply to Selected Variants'),
+              label: Text('Apply to Selected Variants', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFF57C00),
+                backgroundColor: AppColors.warning,
                 foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context))),
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
               ),
             ),
@@ -1582,9 +1793,9 @@ class _AddProductScreenState extends State<AddProductScreen>
           const SizedBox(height: 8),
           Text(
             'Workflow: 1) Enter price/stock above  2) Select variants  3) Click Apply. Fields will clear automatically for next group. You can repeat for different prices.',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: 11,
-              color: Colors.grey[600],
+              color: AppColors.textSecondary,
               fontStyle: FontStyle.italic,
             ),
           ),
@@ -1618,14 +1829,20 @@ class _AddProductScreenState extends State<AddProductScreen>
       for (int i = 0; i < _formStore.retailVariants.length; i++) {
         final variant = _formStore.retailVariants[i];
         if (selectedIds.contains(variant.id)) {
-          _formStore.updateRetailVariant(
-            i,
-            variant.copyWith(
-              costPrice: costPrice ?? variant.costPrice,
-              price: sellingPrice ?? variant.price,
-              stockQuantity: stock ?? variant.stockQuantity,
-            ),
+          final updated = variant.copyWith(
+            costPrice: costPrice ?? variant.costPrice,
+            price: sellingPrice ?? variant.price,
+            stockQuantity: stock ?? variant.stockQuantity,
           );
+          _formStore.updateRetailVariant(i, updated);
+
+          // Keep an already-open card's fields in sync with the bulk update.
+          final fields = _variantControllers[variant.id];
+          if (fields != null) {
+            if (costPrice != null) fields['costPrice']?.text = updated.costPrice.toString();
+            if (sellingPrice != null) fields['price']?.text = updated.price.toString();
+            if (stock != null) fields['stockQuantity']?.text = updated.stockQuantity.toString();
+          }
         }
       }
 
@@ -1646,16 +1863,17 @@ class _AddProductScreenState extends State<AddProductScreen>
   Widget _buildVariantCard(VariantFormData variant, int index, bool isMobile) {
     final isSelected = _selectedVariantsForBulk.contains(variant.id);
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      color: isSelected ? Colors.orange.shade50 : null,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(
-          color: isSelected ? Colors.orange : Colors.grey.shade300,
-          width: isSelected ? 2 : 1,
+      decoration: BoxDecoration(
+        color: isSelected ? AppColors.warning.withOpacity(0.08) : AppColors.white,
+        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+        border: Border.all(
+          color: isSelected ? AppColors.warning : AppColors.divider,
+          width: isSelected ? 1.5 : 1,
         ),
       ),
+      clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
         leading: Checkbox(
           value: isSelected,
@@ -1668,13 +1886,23 @@ class _AddProductScreenState extends State<AddProductScreen>
               }
             });
           },
-          activeColor: Colors.orange,
+          activeColor: AppColors.warning,
         ),
-        title: Text(variant.name.isEmpty ? 'Variant ${index + 1}' : variant.name),
-        subtitle: Text('Price: ₹${variant.price} | Stock: ${variant.stockQuantity}'),
+        title: Text(
+          variant.name.isEmpty ? 'Variant ${index + 1}' : variant.name,
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+        ),
+        subtitle: Text(
+          'SKU: ${variant.sku.trim().isEmpty ? "Auto" : variant.sku} | '
+          'Price: ₹${variant.price} | Stock: ${variant.stockQuantity}',
+          style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary),
+        ),
         trailing: IconButton(
           icon: const Icon(Icons.delete, color: AppColors.danger),
-          onPressed: () => _formStore.removeRetailVariant(index),
+          onPressed: () {
+            _disposeVariantControllers(variant.id);
+            _formStore.removeRetailVariant(index);
+          },
         ),
         children: [
           Padding(
@@ -1684,116 +1912,134 @@ class _AddProductScreenState extends State<AddProductScreen>
                 if (isMobile)
                   Column(
                     children: [
-                      TextFormField(
-                        initialValue: variant.sku,
-                        decoration: const InputDecoration(
-                          labelText: 'SKU',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (v) => _formStore.updateRetailVariant(
-                          index,
-                          variant.copyWith(sku: v),
-                        ),
-                      ),
+                      _buildVariantSkuField(variant, index),
                       const SizedBox(height: 8),
-                      TextFormField(
+                      _buildVariantField(
+                        variant: variant,
+                        field: 'barcode',
+                        label: 'Barcode',
+                        icon: Icons.qr_code_2,
                         initialValue: variant.barcode,
-                        decoration: const InputDecoration(
-                          labelText: 'Barcode',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (v) => _formStore.updateRetailVariant(
-                          index,
-                          variant.copyWith(barcode: v),
-                        ),
+                        onChanged: (v) => _formStore.updateRetailVariant(index, variant.copyWith(barcode: v)),
                       ),
                       const SizedBox(height: 8),
-                      TextFormField(
+                      _buildVariantField(
+                        variant: variant,
+                        field: 'costPrice',
+                        label: 'Cost Price',
+                        icon: Icons.money_off,
+                        initialValue: variant.costPrice.toString(),
+                        numeric: true,
+                        onChanged: (v) => _formStore.updateRetailVariant(index, variant.copyWith(costPrice: double.tryParse(v) ?? 0)),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildVariantField(
+                        variant: variant,
+                        field: 'price',
+                        label: 'Selling Price',
+                        icon: Icons.attach_money,
                         initialValue: variant.price.toString(),
-                        decoration: const InputDecoration(
-                          labelText: 'Price',
-                          border: OutlineInputBorder(),
-                        ),
-                        keyboardType: TextInputType.number,
-                        onChanged: (v) => _formStore.updateRetailVariant(
-                          index,
-                          variant.copyWith(price: double.tryParse(v) ?? 0),
-                        ),
+                        numeric: true,
+                        onChanged: (v) => _formStore.updateRetailVariant(index, variant.copyWith(price: double.tryParse(v) ?? 0)),
                       ),
                       const SizedBox(height: 8),
-                      TextFormField(
+                      _buildVariantField(
+                        variant: variant,
+                        field: 'mrp',
+                        label: 'MRP',
+                        icon: Icons.price_check,
+                        initialValue: variant.mrp.toString(),
+                        numeric: true,
+                        onChanged: (v) => _formStore.updateRetailVariant(index, variant.copyWith(mrp: double.tryParse(v) ?? 0)),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildVariantField(
+                        variant: variant,
+                        field: 'stockQuantity',
+                        label: 'Initial Stock',
+                        icon: Icons.inventory_2,
                         initialValue: variant.stockQuantity.toString(),
-                        decoration: const InputDecoration(
-                          labelText: 'Stock',
-                          border: OutlineInputBorder(),
-                        ),
-                        keyboardType: TextInputType.number,
-                        onChanged: (v) => _formStore.updateRetailVariant(
-                          index,
-                          variant.copyWith(stockQuantity: int.tryParse(v) ?? 0),
-                        ),
+                        numeric: true,
+                        onChanged: (v) => _formStore.updateRetailVariant(index, variant.copyWith(stockQuantity: int.tryParse(v) ?? 0)),
                       ),
                     ],
                   )
                 else
-                  Row(
+                  Column(
                     children: [
-                      Expanded(
-                        child: TextFormField(
-                          initialValue: variant.sku,
-                          decoration: const InputDecoration(
-                            labelText: 'SKU',
-                            border: OutlineInputBorder(),
+                      Row(
+                        children: [
+                          Expanded(child: _buildVariantSkuField(variant, index)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildVariantField(
+                              variant: variant,
+                              field: 'barcode',
+                              label: 'Barcode',
+                              icon: Icons.qr_code_2,
+                              initialValue: variant.barcode,
+                              onChanged: (v) => _formStore.updateRetailVariant(index, variant.copyWith(barcode: v)),
+                            ),
                           ),
-                          onChanged: (v) => _formStore.updateRetailVariant(
-                            index,
-                            variant.copyWith(sku: v),
-                          ),
-                        ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextFormField(
-                          initialValue: variant.barcode,
-                          decoration: const InputDecoration(
-                            labelText: 'Barcode',
-                            border: OutlineInputBorder(),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildVariantField(
+                              variant: variant,
+                              field: 'costPrice',
+                              label: 'Cost Price',
+                              icon: Icons.money_off,
+                              initialValue: variant.costPrice.toString(),
+                              numeric: true,
+                              onChanged: (v) => _formStore.updateRetailVariant(index, variant.copyWith(costPrice: double.tryParse(v) ?? 0)),
+                            ),
                           ),
-                          onChanged: (v) => _formStore.updateRetailVariant(
-                            index,
-                            variant.copyWith(barcode: v),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildVariantField(
+                              variant: variant,
+                              field: 'price',
+                              label: 'Selling Price',
+                              icon: Icons.attach_money,
+                              initialValue: variant.price.toString(),
+                              numeric: true,
+                              onChanged: (v) => _formStore.updateRetailVariant(index, variant.copyWith(price: double.tryParse(v) ?? 0)),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildVariantField(
+                              variant: variant,
+                              field: 'mrp',
+                              label: 'MRP',
+                              icon: Icons.price_check,
+                              initialValue: variant.mrp.toString(),
+                              numeric: true,
+                              onChanged: (v) => _formStore.updateRetailVariant(index, variant.copyWith(mrp: double.tryParse(v) ?? 0)),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextFormField(
-                          initialValue: variant.price.toString(),
-                          decoration: const InputDecoration(
-                            labelText: 'Price',
-                            border: OutlineInputBorder(),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildVariantField(
+                              variant: variant,
+                              field: 'stockQuantity',
+                              label: 'Initial Stock',
+                              icon: Icons.inventory_2,
+                              initialValue: variant.stockQuantity.toString(),
+                              numeric: true,
+                              onChanged: (v) => _formStore.updateRetailVariant(index, variant.copyWith(stockQuantity: int.tryParse(v) ?? 0)),
+                            ),
                           ),
-                          keyboardType: TextInputType.number,
-                          onChanged: (v) => _formStore.updateRetailVariant(
-                            index,
-                            variant.copyWith(price: double.tryParse(v) ?? 0),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextFormField(
-                          initialValue: variant.stockQuantity.toString(),
-                          decoration: const InputDecoration(
-                            labelText: 'Stock',
-                            border: OutlineInputBorder(),
-                          ),
-                          keyboardType: TextInputType.number,
-                          onChanged: (v) => _formStore.updateRetailVariant(
-                            index,
-                            variant.copyWith(stockQuantity: int.tryParse(v) ?? 0),
-                          ),
-                        ),
+                          const SizedBox(width: 8),
+                          const Expanded(child: SizedBox.shrink()),
+                        ],
                       ),
                     ],
                   ),
@@ -1803,6 +2049,60 @@ class _AddProductScreenState extends State<AddProductScreen>
         ],
       ),
     );
+  }
+
+  /// `AppTextField` bound to a persistent per-(variant,field) controller, so
+  /// externally-triggered changes (bulk edit) show up immediately without
+  /// needing a key-remount trick.
+  Widget _buildVariantField({
+    required VariantFormData variant,
+    required String field,
+    required String label,
+    required IconData icon,
+    required String initialValue,
+    required ValueChanged<String> onChanged,
+    bool numeric = false,
+  }) {
+    final controller = _variantController(variant.id, field, initialValue);
+    return AppTextField(
+      controller: controller,
+      label: label,
+      icon: icon,
+      keyboardType: numeric ? TextInputType.number : TextInputType.text,
+      onChanged: onChanged,
+    );
+  }
+
+  /// SKU field with an "Auto-generate" suffix button. Writes directly to the
+  /// persistent controller so the generated value appears immediately.
+  Widget _buildVariantSkuField(VariantFormData variant, int index) {
+    final controller = _variantController(variant.id, 'sku', variant.sku);
+    return AppTextField(
+      controller: controller,
+      label: 'SKU',
+      icon: Icons.qr_code,
+      suffixIcon: IconButton(
+        icon: const Icon(Icons.auto_awesome, size: 20),
+        onPressed: () => _onAutoGenerateVariantSkuPressed(index, variant, controller),
+        tooltip: 'Auto-generate',
+      ),
+      onChanged: (v) => _formStore.updateRetailVariant(index, variant.copyWith(sku: v)),
+    );
+  }
+
+  Future<void> _onAutoGenerateVariantSkuPressed(
+    int index,
+    VariantFormData variant,
+    TextEditingController skuController,
+  ) async {
+    if (variant.sku.trim().isNotEmpty) {
+      NotificationService.instance.showError('SKU is already set — clear it first to generate a new one.');
+      return;
+    }
+    final sku = await skuGeneratorService.generate(_selectedCategoryName());
+    if (!mounted) return;
+    _formStore.updateRetailVariant(index, variant.copyWith(sku: sku));
+    skuController.text = sku;
   }
 
   Widget _buildRestaurantSizesSection(bool isMobile) {
@@ -2110,45 +2410,59 @@ class _AddProductScreenState extends State<AddProductScreen>
                 );
               }
 
-              return isMobile
-                  ? Column(
+              return Column(
                 children: [
-                  _buildTextField(
-                    controller: _stockController,
-                    label: 'Initial Stock',
-                    icon: Icons.inventory_2,
-                    keyboardType: TextInputType.number,
+                  SwitchListTile(
+                    title: const Text('Track Inventory'),
+                    subtitle: const Text('Enable stock tracking for this product'),
+                    value: _formStore.trackInventory,
+                    onChanged: (v) => _formStore.setTrackInventory(v),
+                    activeColor: AppColors.primary,
                   ),
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    controller: _minStockController,
-                    label: 'Min Stock (Alert)',
-                    icon: Icons.warning_amber,
-                    keyboardType: TextInputType.number,
-                    iconColor: AppColors.warning,
-                  ),
-                ],
-              )
-                  : Row(
-                children: [
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _stockController,
-                      label: 'Initial Stock',
-                      icon: Icons.inventory_2,
-                      keyboardType: TextInputType.number,
+                  if (_formStore.trackInventory) ...[
+                    const SizedBox(height: 16),
+                    isMobile
+                        ? Column(
+                      children: [
+                        _buildTextField(
+                          controller: _stockController,
+                          label: 'Initial Stock',
+                          icon: Icons.inventory_2,
+                          keyboardType: TextInputType.number,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _minStockController,
+                          label: 'Min Stock (Alert)',
+                          icon: Icons.warning_amber,
+                          keyboardType: TextInputType.number,
+                          iconColor: AppColors.warning,
+                        ),
+                      ],
+                    )
+                        : Row(
+                      children: [
+                        Expanded(
+                          child: _buildTextField(
+                            controller: _stockController,
+                            label: 'Initial Stock',
+                            icon: Icons.inventory_2,
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _buildTextField(
+                            controller: _minStockController,
+                            label: 'Min Stock (Alert)',
+                            icon: Icons.warning_amber,
+                            keyboardType: TextInputType.number,
+                            iconColor: AppColors.warning,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildTextField(
-                      controller: _minStockController,
-                      label: 'Min Stock (Alert)',
-                      icon: Icons.warning_amber,
-                      keyboardType: TextInputType.number,
-                      iconColor: AppColors.warning,
-                    ),
-                  ),
+                  ],
                 ],
               );
             },
@@ -2242,11 +2556,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                     iconColor: AppColors.info,
                     suffixIcon: IconButton(
                       icon: const Icon(Icons.auto_awesome),
-                      onPressed: () {
-                        // Auto-generate SKU
-                        final sku = 'SKU-${DateTime.now().millisecondsSinceEpoch}';
-                        _skuController.text = sku;
-                      },
+                      onPressed: _onAutoGenerateSkuPressed,
                       tooltip: 'Auto-generate',
                     ),
                   ),
@@ -2278,10 +2588,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                       iconColor: AppColors.info,
                       suffixIcon: IconButton(
                         icon: const Icon(Icons.auto_awesome),
-                        onPressed: () {
-                          final sku = 'SKU-${DateTime.now().millisecondsSinceEpoch}';
-                          _skuController.text = sku;
-                        },
+                        onPressed: _onAutoGenerateSkuPressed,
                         tooltip: 'Auto-generate',
                       ),
                     ),
@@ -2357,6 +2664,7 @@ class _AddProductScreenState extends State<AddProductScreen>
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -2415,50 +2723,31 @@ class _AddProductScreenState extends State<AddProductScreen>
 
   Widget _buildExcelImportCard() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.primary.withOpacity(0.1),
-            AppColors.secondary.withOpacity(0.1),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.primary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: AppColors.primary.withOpacity(0.3),
+          color: AppColors.primary.withOpacity(0.35),
         ),
       ),
       child: Row(
         children: [
           const Icon(
             Icons.table_chart,
-            size: 48,
+            size: 28,
             color: AppColors.primary,
           ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Bulk Import via Excel',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.darkNeutral,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  AppConfig.isRetail
-                      ? 'Upload multiple products at once using Excel'
-                      : 'Upload multiple menu items at once using Excel',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Bulk Import via Excel',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: AppColors.darkNeutral,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           const SizedBox(width: 12),
@@ -2473,11 +2762,13 @@ class _AddProductScreenState extends State<AddProductScreen>
                 ),
               );
             },
-            icon: const Icon(Icons.upload_file, size: 18),
-            label: const Text('Start Import'),
+            icon: const Icon(Icons.upload_file, size: 16),
+            label: const Text('Import'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             ),
           ),
         ],
@@ -2671,6 +2962,9 @@ class _AddProductScreenState extends State<AddProductScreen>
     _formStore.setSelectedCategoryId(product.category);
     _formStore.setTaxRate(product.gstRate ?? 0);
     _formStore.setProductType(product.hasVariants ? 'variable' : 'simple');
+    // Existing products already have stock data — keep it visible on edit
+    // instead of hiding it behind the Track Inventory toggle.
+    _formStore.setTrackInventory(true);
 
     // Load variants from the database
     final productStore = locator<ProductStore>();
@@ -2678,6 +2972,7 @@ class _AddProductScreenState extends State<AddProductScreen>
 
     if (product.hasVariants && variants.isNotEmpty) {
       // Variable product: Load all variants into the form
+      _disposeAllVariantControllers();
       _formStore.retailVariants.clear();
       for (final variant in variants) {
         _formStore.retailVariants.add(VariantFormData(
@@ -2829,7 +3124,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                                 style: const TextStyle(fontWeight: FontWeight.w600),
                               ),
                               subtitle: Text(
-                                '${product.category} • ${product.hasVariants ? "Variable" : "Simple"}',
+                                '${categoryStore.getCategoryById(product.category)?.name ?? product.category} • ${product.hasVariants ? "Variable" : "Simple"}',
                               ),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -3124,7 +3419,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                 // Category filter badges
                 if (_selectedCategories.isNotEmpty)
                   ..._selectedCategories.map((cat) => Chip(
-                    label: Text('Category: $cat'),
+                    label: Text('Category: ${categoryStore.getCategoryById(cat)?.name ?? cat}'),
                     onDeleted: () {
                       setState(() {
                         _selectedCategories.remove(cat);
@@ -3239,6 +3534,7 @@ class _AddProductScreenState extends State<AddProductScreen>
             label: Text('Add First ${type == 'products' ? 'Product' : 'Item'}'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
             ),
           ),
         ],
@@ -3326,38 +3622,34 @@ class _AddProductScreenState extends State<AddProductScreen>
 
         return DialogDisposeScope(
           disposables: [nameController],
-          child: AlertDialog(
-            title: const Text('Add New Attribute'),
-            content: Column(
+          child: AppDialogShell(
+            title: 'Add New Attribute',
+            icon: Icons.label_outline,
+            accent: AppColors.primary,
+            body: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TextField(
+                AppTextField(
                   controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Attribute Name',
-                    hintText: 'e.g., Size, Color, Material',
-                    border: OutlineInputBorder(),
-                  ),
+                  label: 'Attribute Name',
+                  hint: 'e.g., Size, Color, Material',
+                  icon: Icons.label_outline,
                   autofocus: true,
                   textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => create(),
+                  onFieldSubmitted: (_) => create(),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'You can add values for this attribute after creating it.',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                  style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary),
                 ),
               ],
             ),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () => create(),
-                child: const Text('Create'),
-              ),
+              appDialogCancelButton(context),
+              const SizedBox(width: 12),
+              appDialogPrimaryButton(label: 'Create', onPressed: create),
             ],
           ),
         );
@@ -3372,52 +3664,278 @@ class _AddProductScreenState extends State<AddProductScreen>
       context: context,
       builder: (context) => DialogDisposeScope(
         disposables: [valueController],
-        child: AlertDialog(
-        title: Text('Add Values for ${attribute.name}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: valueController,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Value',
-                hintText: 'e.g., Small, Medium, Large',
-                border: OutlineInputBorder(),
+        child: AppDialogShell(
+          title: 'Add Values for ${attribute.name}',
+          icon: Icons.playlist_add,
+          accent: AppColors.primary,
+          body: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppTextField(
+                controller: valueController,
+                label: 'Value',
+                hint: 'e.g., Small, Medium, Large',
+                icon: Icons.label_outline,
+                autofocus: true,
+                onFieldSubmitted: (value) async {
+                  if (value.trim().isNotEmpty) {
+                    await attributeStore.addValue(attribute.attributeId, value.trim());
+                    valueController.clear();
+                  }
+                },
               ),
-              onSubmitted: (value) async {
-                if (value.trim().isNotEmpty) {
-                  await attributeStore.addValue(attribute.attributeId, value.trim());
+              const SizedBox(height: 16),
+              Text(
+                'Press Enter to add each value. Click Done when finished.',
+                style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+          actions: [
+            appDialogCancelButton(context, label: 'Done'),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: 'Add Value',
+              onPressed: () async {
+                final value = valueController.text.trim();
+                if (value.isNotEmpty) {
+                  await attributeStore.addValue(attribute.attributeId, value);
                   valueController.clear();
                 }
               },
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'Press Enter to add each value. Click Done when finished.',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showValueActionsSheet(
+    AttributeStore attributeStore,
+    AttributeModel attribute,
+    AttributeValueModel value,
+  ) {
+    _dismissLongPressTip();
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                value.value,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined, color: AppColors.primary),
+              title: const Text('Edit Value'),
+              onTap: () {
+                Navigator.pop(context);
+                _showEditAttributeValueDialog(attributeStore, attribute, value);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.red),
+              title: const Text('Delete Value'),
+              onTap: () {
+                Navigator.pop(context);
+                _confirmDeleteAttributeValue(attributeStore, attribute, value);
+              },
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Done'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final value = valueController.text.trim();
-              if (value.isNotEmpty) {
-                await attributeStore.addValue(attribute.attributeId, value);
-                valueController.clear();
-              }
-            },
-            child: const Text('Add Value'),
-          ),
-        ],
-      ),
       ),
     );
+  }
+
+  void _showAddValueToAttributeDialog(AttributeStore attributeStore, AttributeModel attribute) {
+    final valueController = TextEditingController();
+    final colorController = TextEditingController();
+    final isColor = attribute.name.toLowerCase().contains('color') ||
+        attribute.name.toLowerCase().contains('colour');
+
+    showDialog(
+      context: context,
+      builder: (context) => DialogDisposeScope(
+        disposables: [valueController, colorController],
+        child: AppDialogShell(
+          title: 'Add ${attribute.name} Value',
+          icon: Icons.add_circle_outline,
+          accent: AppColors.primary,
+          body: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppTextField(
+                controller: valueController,
+                label: 'Value',
+                icon: Icons.label_outline,
+                autofocus: true,
+              ),
+              if (isColor) ...[
+                const SizedBox(height: 16),
+                AppTextField(
+                  controller: colorController,
+                  label: 'Color Code (optional)',
+                  hint: '#FF0000',
+                  icon: Icons.palette_outlined,
+                ),
+              ],
+              const SizedBox(height: 12),
+              Text(
+                'Tip: separate multiple values with commas',
+                style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+          actions: [
+            appDialogCancelButton(context),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: 'Add',
+              onPressed: () async {
+                final input = valueController.text.trim();
+                if (input.isEmpty) {
+                  NotificationService.instance.showError('Please enter a value');
+                  return;
+                }
+
+                final values = input.split(',').map((v) => v.trim()).where((v) => v.isNotEmpty).toList();
+
+                bool success;
+                if (values.length > 1) {
+                  success = await attributeStore.addMultipleValues(attribute.attributeId, values);
+                } else {
+                  success = await attributeStore.addValue(
+                    attribute.attributeId,
+                    values.first,
+                    colorCode: colorController.text.trim().isNotEmpty ? colorController.text.trim() : null,
+                  );
+                }
+
+                if (context.mounted) {
+                  Navigator.pop(context);
+                }
+                if (success) {
+                  NotificationService.instance.showSuccess('Added ${values.length} value(s)');
+                } else {
+                  NotificationService.instance.showError(attributeStore.errorMessage ?? 'Failed to add value');
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditAttributeValueDialog(
+    AttributeStore attributeStore,
+    AttributeModel attribute,
+    AttributeValueModel value,
+  ) {
+    final valueController = TextEditingController(text: value.value);
+    final colorController = TextEditingController(text: value.colorCode ?? '');
+    final isColor = attribute.name.toLowerCase().contains('color') ||
+        attribute.name.toLowerCase().contains('colour');
+
+    showDialog(
+      context: context,
+      builder: (context) => DialogDisposeScope(
+        disposables: [valueController, colorController],
+        child: AppDialogShell(
+          title: 'Edit ${attribute.name} Value',
+          icon: Icons.edit_outlined,
+          accent: AppColors.primary,
+          body: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppTextField(
+                controller: valueController,
+                label: 'Value',
+                icon: Icons.label_outline,
+                autofocus: true,
+              ),
+              if (isColor) ...[
+                const SizedBox(height: 16),
+                AppTextField(
+                  controller: colorController,
+                  label: 'Color Code (optional)',
+                  hint: '#FF0000',
+                  icon: Icons.palette_outlined,
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            appDialogCancelButton(context),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: 'Update',
+              onPressed: () async {
+                final newValue = valueController.text.trim();
+                if (newValue.isEmpty) {
+                  NotificationService.instance.showError('Please enter a value');
+                  return;
+                }
+
+                final success = await attributeStore.updateValue(
+                  value.valueId,
+                  value: newValue,
+                  colorCode: colorController.text.trim().isNotEmpty ? colorController.text.trim() : null,
+                );
+
+                if (context.mounted) {
+                  Navigator.pop(context);
+                }
+                if (success) {
+                  NotificationService.instance.showSuccess('Value "$newValue" updated');
+                } else {
+                  NotificationService.instance.showError(attributeStore.errorMessage ?? 'Failed to update value');
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteAttributeValue(
+    AttributeStore attributeStore,
+    AttributeModel attribute,
+    AttributeValueModel value,
+  ) async {
+    final confirmed = await showAppConfirmDialog(
+      context: context,
+      title: 'Delete Value?',
+      message: 'Are you sure you want to delete "${value.value}"?',
+      confirmLabel: 'Delete',
+      accent: AppColors.danger,
+      icon: Icons.delete_outline,
+    );
+    if (!confirmed || !mounted) return;
+
+    final success = await attributeStore.deleteValue(value.valueId);
+    if (success) {
+      // Deselecting a deleted value so it can't linger selected —
+      // reassign (not mutate in place) to trigger MobX reactivity,
+      // matching _formStore.toggleAttributeValue's own pattern.
+      final selected = _formStore.selectedAttributeValues[attribute.attributeId];
+      if (selected != null && selected.contains(value.valueId)) {
+        _formStore.selectedAttributeValues[attribute.attributeId] =
+            selected.where((id) => id != value.valueId).toList();
+      }
+      NotificationService.instance.showSuccess('Value "${value.value}" deleted');
+    } else {
+      NotificationService.instance.showError(attributeStore.errorMessage ?? 'Failed to delete value');
+    }
   }
 
   void _showVariantGenerationDialog(AttributeStore attributeStore) {
@@ -3442,108 +3960,104 @@ class _AddProductScreenState extends State<AddProductScreen>
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Select Variants to Generate'),
-          content: SizedBox(
-            width: 500,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+        builder: (context, setState) => AppDialogShell(
+          title: 'Select Variants to Generate',
+          icon: Icons.auto_awesome,
+          accent: AppColors.secondary,
+          body: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Info message
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.info.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                  border: Border.all(color: AppColors.info.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline, color: AppColors.info, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Select which variants you want to create. You can set prices and stock after generation using the bulk edit tool.',
+                        style: GoogleFonts.poppins(color: AppColors.textPrimary, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Variant Selection Section
+              Text(
+                'Select Variants to Generate (${combinations.length} total)',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  // Info message
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Select which variants you want to create. You can set prices and stock after generation using the bulk edit tool.',
-                            style: TextStyle(
-                              color: Colors.blue.shade900,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        for (int i = 0; i < selectedCombinations.length; i++) {
+                          selectedCombinations[i] = true;
+                        }
+                      });
+                    },
+                    child: Text('Select All', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: AppColors.primary)),
                   ),
-                  const SizedBox(height: 16),
-
-                  // Variant Selection Section
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Select Variants to Generate (${combinations.length} total)',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                      ),
-                      Row(
-                        children: [
-                          TextButton(
-                            onPressed: () {
-                              setState(() {
-                                for (int i = 0; i < selectedCombinations.length; i++) {
-                                  selectedCombinations[i] = true;
-                                }
-                              });
-                            },
-                            child: const Text('Select All'),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              setState(() {
-                                for (int i = 0; i < selectedCombinations.length; i++) {
-                                  selectedCombinations[i] = false;
-                                }
-                              });
-                            },
-                            child: const Text('Deselect All'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    constraints: const BoxConstraints(maxHeight: 300),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: combinations.length,
-                      itemBuilder: (context, index) {
-                        final combo = combinations[index];
-                        final variantName = combo.values.map((v) => v.value).join(' - ');
-
-                        return CheckboxListTile(
-                          dense: true,
-                          title: Text(variantName),
-                          value: selectedCombinations[index],
-                          onChanged: (bool? value) {
-                            setState(() {
-                              selectedCombinations[index] = value ?? false;
-                            });
-                          },
-                        );
-                      },
-                    ),
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        for (int i = 0; i < selectedCombinations.length; i++) {
+                          selectedCombinations[i] = false;
+                        }
+                      });
+                    },
+                    child: Text('Deselect All', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: AppColors.danger)),
                   ),
                 ],
               ),
-            ),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 300),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.divider),
+                  borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: combinations.length,
+                  itemBuilder: (context, index) {
+                    final combo = combinations[index];
+                    final variantName = combo.values.map((v) => v.value).join(' - ');
+
+                    return CheckboxListTile(
+                      dense: true,
+                      title: Text(variantName, style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textPrimary)),
+                      value: selectedCombinations[index],
+                      activeColor: AppColors.secondary,
+                      onChanged: (bool? value) {
+                        setState(() {
+                          selectedCombinations[index] = value ?? false;
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
+            appDialogCancelButton(context),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: 'Generate Selected Variants',
+              color: AppColors.secondary,
               onPressed: () {
                 // Count selected variants
                 final selectedCount = selectedCombinations.where((s) => s).length;
@@ -3555,6 +4069,7 @@ class _AddProductScreenState extends State<AddProductScreen>
 
                 // Generate only selected variants with default values (0)
                 // User will set prices using bulk edit bar after generation
+                _disposeAllVariantControllers();
                 _formStore.retailVariants.clear();
                 for (int i = 0; i < combinations.length; i++) {
                   if (selectedCombinations[i]) {
@@ -3582,8 +4097,6 @@ class _AddProductScreenState extends State<AddProductScreen>
 
                 NotificationService.instance.showSuccess('✓ Generated $selectedCount variant(s). Now set prices using bulk edit below.');
               },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.secondary),
-              child: const Text('Generate Selected Variants'),
             ),
           ],
         ),
@@ -3625,8 +4138,9 @@ class _AddProductScreenState extends State<AddProductScreen>
     if (_searchQuery.isNotEmpty) {
       filtered = filtered.where((product) {
         final searchLower = _searchQuery.toLowerCase();
+        final categoryName = categoryStore.getCategoryById(product.category)?.name ?? product.category;
         return product.productName.toLowerCase().contains(searchLower) ||
-            (product.category?.toLowerCase().contains(searchLower) ?? false) ||
+            categoryName.toLowerCase().contains(searchLower) ||
             (product.brandName?.toLowerCase().contains(searchLower) ?? false);
       }).toList();
     }
@@ -3740,13 +4254,7 @@ class _AddProductScreenState extends State<AddProductScreen>
   Future<void> _showRetailFilterDialog() async {
     final productStore = locator<ProductStore>();
 
-    // Get unique categories and brands from products
-    final categories = productStore.products
-        .map((p) => p.category)
-        .where((c) => c.isNotEmpty)
-        .toSet()
-        .toList()..sort();
-
+    final categories = categoryStore.categories.toList();
     final brands = productStore.products
         .map((p) => p.brandName)
         .where((b) => b != null && b.isNotEmpty)
@@ -3826,19 +4334,19 @@ class _AddProductScreenState extends State<AddProductScreen>
                       spacing: 8,
                       runSpacing: 8,
                       children: categories.map((category) => FilterChip(
-                        label: Text(category),
-                        selected: tempCategories.contains(category),
+                        label: Text(category.name),
+                        selected: tempCategories.contains(category.id),
                         onSelected: (selected) {
                           setDialogState(() {
                             if (selected) {
-                              tempCategories.add(category);
+                              tempCategories.add(category.id);
                             } else {
-                              tempCategories.remove(category);
+                              tempCategories.remove(category.id);
                             }
                           });
                         },
                         selectedColor: AppColors.primary,
-                        labelStyle: TextStyle(color: tempCategories.contains(category) ? Colors.white : Colors.black),
+                        labelStyle: TextStyle(color: tempCategories.contains(category.id) ? Colors.white : Colors.black),
                       )).toList(),
                     ),
                     const SizedBox(height: 16),
@@ -4169,6 +4677,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 15),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),

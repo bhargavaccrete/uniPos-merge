@@ -9,6 +9,7 @@ import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 import 'package:billberrylite/core/routes/routes_name.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/repositories/business_details_repository.dart';
+import 'package:billberrylite/presentation/screens/retail/login_screen.dart';
 import '../../../util/color.dart';
 import '../../../util/responsive.dart';
 
@@ -125,7 +126,18 @@ class _SplashScreenState extends State<SplashScreen>
     if (AppConfig.isSetupComplete) {
       // Setup is complete - navigate to appropriate screen based on business mode
       if (AppConfig.isRetail) {
-        Navigator.pushReplacementNamed(context, '/retail-billing');
+        // Gate retail behind admin login — restores an existing session if
+        // one was saved (admin_session), otherwise sends to LoginScreen.
+        final loggedIn = await authService.initialize();
+        if (!mounted) return;
+        if (loggedIn) {
+          Navigator.pushReplacementNamed(context, '/retail-billing');
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+          );
+        }
       } else if (AppConfig.isRestaurant) {
         LicenseStore.navigateToNextScreen(context);
       } else {

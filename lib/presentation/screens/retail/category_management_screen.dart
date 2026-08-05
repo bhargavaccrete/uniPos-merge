@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:billberrylite/domain/services/retail/gst_service.dart';
-import 'package:billberrylite/util/responsive.dart';
-
-import 'package:uuid/uuid.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 
 import '../../../core/di/service_locator.dart';
-import '../../../data/models/retail/hive_model/category_model_215.dart';
+import '../../../util/responsive.dart';
+import '../../../data/models/common/categorymodel_300.dart';
 
 class CategoryManagementScreen extends StatefulWidget {
   const CategoryManagementScreen({super.key});
@@ -15,15 +13,13 @@ class CategoryManagementScreen extends StatefulWidget {
 }
 
 class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
-  List<CategoryModel> _categories = [];
-  bool _isLoading = true;
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _loadCategories();
+    categoryStore.loadCategories();
   }
 
   @override
@@ -32,28 +28,11 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
     super.dispose();
   }
 
-  Future<void> _loadCategories() async {
-    setState(() => _isLoading = true);
-    try {
-      _categories = await categoryModelRepository.getAllCategories();
-
-      // Add default categories if none exist
-      if (_categories.isEmpty) {
-        await categoryModelRepository.addDefaultCategories();
-        _categories = await categoryModelRepository.getAllCategories();
-      }
-    } catch (e) {
-      debugPrint('Error loading categories: $e');
-    }
-    setState(() => _isLoading = false);
-  }
-
-  List<CategoryModel> get _filteredCategories {
-    if (_searchQuery.isEmpty) return _categories;
-    return _categories.where((cat) =>
-      cat.categoryName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-      (cat.hsnCode?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false)
-    ).toList();
+  List<Category> get _filteredCategories {
+    if (_searchQuery.isEmpty) return categoryStore.categories;
+    return categoryStore.categories
+        .where((cat) => cat.name.toLowerCase().contains(_searchQuery.toLowerCase()))
+        .toList();
   }
 
   @override
@@ -94,17 +73,18 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
         _buildCategoryCount(),
         const Divider(height: 1),
         Expanded(
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _filteredCategories.isEmpty
-                  ? _buildEmptyState()
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _filteredCategories.length,
-                      itemBuilder: (context, index) {
-                        return _buildCategoryCard(_filteredCategories[index]);
-                      },
-                    ),
+          child: Observer(builder: (context) {
+            if (categoryStore.isLoading) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final categories = _filteredCategories;
+            if (categories.isEmpty) return _buildEmptyState();
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: categories.length,
+              itemBuilder: (context, index) => _buildCategoryCard(categories[index]),
+            );
+          }),
         ),
       ],
     );
@@ -118,23 +98,24 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
         _buildCategoryCount(),
         const Divider(height: 1),
         Expanded(
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _filteredCategories.isEmpty
-                  ? _buildEmptyState()
-                  : GridView.builder(
-                      padding: const EdgeInsets.all(20),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                        childAspectRatio: 1.8,
-                      ),
-                      itemCount: _filteredCategories.length,
-                      itemBuilder: (context, index) {
-                        return _buildCategoryGridCard(_filteredCategories[index]);
-                      },
-                    ),
+          child: Observer(builder: (context) {
+            if (categoryStore.isLoading) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final categories = _filteredCategories;
+            if (categories.isEmpty) return _buildEmptyState();
+            return GridView.builder(
+              padding: const EdgeInsets.all(20),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 2.2,
+              ),
+              itemCount: categories.length,
+              itemBuilder: (context, index) => _buildCategoryGridCard(categories[index]),
+            );
+          }),
         ),
       ],
     );
@@ -163,21 +144,23 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                 ),
               ),
               const SizedBox(width: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF4CAF50).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '${_categories.length} categories',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF4CAF50),
+              Observer(builder: (context) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4CAF50).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                ),
-              ),
+                  child: Text(
+                    '${categoryStore.categories.length} categories',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF4CAF50),
+                    ),
+                  ),
+                );
+              }),
             ],
           ),
         ),
@@ -186,23 +169,24 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
           child: _buildSearchBar(),
         ),
         Expanded(
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _filteredCategories.isEmpty
-                  ? _buildEmptyState()
-                  : GridView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        crossAxisSpacing: 24,
-                        mainAxisSpacing: 24,
-                        childAspectRatio: 2.0,
-                      ),
-                      itemCount: _filteredCategories.length,
-                      itemBuilder: (context, index) {
-                        return _buildCategoryGridCard(_filteredCategories[index]);
-                      },
-                    ),
+          child: Observer(builder: (context) {
+            if (categoryStore.isLoading) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final categories = _filteredCategories;
+            if (categories.isEmpty) return _buildEmptyState();
+            return GridView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 24,
+                mainAxisSpacing: 24,
+                childAspectRatio: 2.4,
+              ),
+              itemCount: categories.length,
+              itemBuilder: (context, index) => _buildCategoryGridCard(categories[index]),
+            );
+          }),
         ),
       ],
     );
@@ -234,34 +218,37 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
   }
 
   Widget _buildCategoryCount() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          Text(
-            '${_filteredCategories.length} categories',
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey[600],
+    return Observer(builder: (context) {
+      return Container(
+        color: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            Text(
+              '${_filteredCategories.length} categories',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[600],
+              ),
             ),
-          ),
-          const Spacer(),
-          TextButton.icon(
-            onPressed: _showAddCategoryDialog,
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('Add'),
-            style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFF4CAF50),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: _showAddCategoryDialog,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Add'),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF4CAF50),
+              ),
             ),
-          ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
+    });
   }
 
   // ==================== GRID CARD (For Tablet & Desktop) ====================
-  Widget _buildCategoryGridCard(CategoryModel category) {
+  Widget _buildCategoryGridCard(Category category) {
+    final itemCount = categoryStore.getItemCountForCategory(category.id);
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -301,7 +288,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      category.categoryName,
+                      category.name,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -346,53 +333,10 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                 ],
               ),
               const Spacer(),
-              Row(
-                children: [
-                  if (category.hsnCode != null && category.hsnCode!.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'HSN: ${category.hsnCode}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: _getGstColor(category.gstRate ?? 0).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      'GST ${(category.gstRate ?? 0).toInt()}%',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: _getGstColor(category.gstRate ?? 0),
-                      ),
-                    ),
-                  ),
-                ],
+              Text(
+                '$itemCount product${itemCount == 1 ? '' : 's'}',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
-              if (category.description != null && category.description!.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(
-                  category.description!,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[500],
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
             ],
           ),
         ),
@@ -423,7 +367,8 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
     );
   }
 
-  Widget _buildCategoryCard(CategoryModel category) {
+  Widget _buildCategoryCard(Category category) {
+    final itemCount = categoryStore.getItemCountForCategory(category.id);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -438,7 +383,6 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              // Category Icon
               Container(
                 width: 48,
                 height: 48,
@@ -453,14 +397,12 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                 ),
               ),
               const SizedBox(width: 16),
-
-              // Category Info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      category.categoryName,
+                      category.name,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -468,63 +410,13 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        if (category.hsnCode != null && category.hsnCode!.isNotEmpty) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              'HSN: ${category.hsnCode}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                        if (category.description != null && category.description!.isNotEmpty)
-                          Expanded(
-                            child: Text(
-                              category.description!,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[500],
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                      ],
+                    Text(
+                      '$itemCount product${itemCount == 1 ? '' : 's'}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                     ),
                   ],
                 ),
               ),
-
-              // GST Rate Badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _getGstColor(category.gstRate ?? 0).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  'GST ${(category.gstRate ?? 0).toInt()}%',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: _getGstColor(category.gstRate ?? 0),
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 8),
-
-              // More Options
               PopupMenuButton<String>(
                 icon: Icon(Icons.more_vert, color: Colors.grey[400]),
                 onSelected: (value) {
@@ -564,259 +456,128 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
     );
   }
 
-  Color _getGstColor(double rate) {
-    if (rate == 0) return Colors.green;
-    if (rate <= 5) return Colors.teal;
-    if (rate <= 12) return Colors.blue;
-    if (rate <= 18) return Colors.orange;
-    return Colors.red;
-  }
-
   Future<void> _showAddCategoryDialog() async {
     final nameController = TextEditingController();
-    final hsnController = TextEditingController();
-    final descriptionController = TextEditingController();
-    double selectedRate = 0;
 
     await showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Add Category'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Category Name *',
-                    hintText: 'e.g., Electronics, Clothing',
-                    border: OutlineInputBorder(),
-                  ),
-                  textCapitalization: TextCapitalization.words,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Description (Optional)',
-                    hintText: 'Brief description of this category',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: hsnController,
-                  decoration: const InputDecoration(
-                    labelText: 'HSN Code (Optional)',
-                    hintText: 'e.g., 6109, 8517',
-                    border: OutlineInputBorder(),
-                    helperText: 'Harmonized System code for GST',
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'GST Rate *',
-                  style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: GstService.commonGstRates.map((rate) {
-                    final isSelected = selectedRate == rate;
-                    return ChoiceChip(
-                      label: Text('${rate.toInt()}%'),
-                      selected: isSelected,
-                      onSelected: (selected) {
-                        setDialogState(() => selectedRate = rate);
-                      },
-                      selectedColor: const Color(0xFF4CAF50).withOpacity(0.2),
-                      labelStyle: TextStyle(
-                        color: isSelected ? const Color(0xFF4CAF50) : Colors.black87,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
+      builder: (context) => AlertDialog(
+        title: const Text('Add Category'),
+        content: TextField(
+          controller: nameController,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Category Name *',
+            hintText: 'e.g., Electronics, Clothing',
+            border: OutlineInputBorder(),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (nameController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter category name')),
-                  );
-                  return;
-                }
-
-                // Check for duplicate name
-                final existing = await categoryModelRepository.getCategoryByName(nameController.text.trim());
-                if (existing != null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Category with this name already exists')),
-                  );
-                  return;
-                }
-
-                final category = CategoryModel.create(
-                  categoryId: const Uuid().v4(),
-                  categoryName: nameController.text.trim(),
-                  gstRate: selectedRate,
-                  hsnCode: hsnController.text.trim().isEmpty ? null : hsnController.text.trim(),
-                  description: descriptionController.text.trim().isEmpty ? null : descriptionController.text.trim(),
-                );
-
-                await categoryModelRepository.addCategory(category);
-                Navigator.pop(context);
-                _loadCategories();
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Category "${category.categoryName}" added')),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4CAF50),
-              ),
-              child: const Text('Add'),
-            ),
-          ],
+          textCapitalization: TextCapitalization.words,
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final name = nameController.text.trim();
+              if (name.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter category name')),
+                );
+                return;
+              }
+
+              final category = Category(
+                id: DateTime.now().millisecondsSinceEpoch.toString(),
+                name: name,
+                createdTime: DateTime.now(),
+              );
+
+              final success = await categoryStore.addCategory(category);
+              if (!context.mounted) return;
+
+              if (success) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Category "${category.name}" added')),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(categoryStore.errorMessage ?? 'Failed to add category')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4CAF50)),
+            child: const Text('Add'),
+          ),
+        ],
       ),
     );
   }
 
-  Future<void> _showEditCategoryDialog(CategoryModel category) async {
-    final nameController = TextEditingController(text: category.categoryName);
-    final hsnController = TextEditingController(text: category.hsnCode ?? '');
-    final descriptionController = TextEditingController(text: category.description ?? '');
-    double selectedRate = category.gstRate ?? 0;
+  Future<void> _showEditCategoryDialog(Category category) async {
+    final nameController = TextEditingController(text: category.name);
 
     await showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Edit Category'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Category Name *',
-                    border: OutlineInputBorder(),
-                  ),
-                  textCapitalization: TextCapitalization.words,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Description (Optional)',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: hsnController,
-                  decoration: const InputDecoration(
-                    labelText: 'HSN Code (Optional)',
-                    border: OutlineInputBorder(),
-                    helperText: 'Harmonized System code for GST',
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'GST Rate *',
-                  style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: GstService.commonGstRates.map((rate) {
-                    final isSelected = selectedRate == rate;
-                    return ChoiceChip(
-                      label: Text('${rate.toInt()}%'),
-                      selected: isSelected,
-                      onSelected: (selected) {
-                        setDialogState(() => selectedRate = rate);
-                      },
-                      selectedColor: const Color(0xFF4CAF50).withOpacity(0.2),
-                      labelStyle: TextStyle(
-                        color: isSelected ? const Color(0xFF4CAF50) : Colors.black87,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Category'),
+        content: TextField(
+          controller: nameController,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Category Name *',
+            border: OutlineInputBorder(),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (nameController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter category name')),
-                  );
-                  return;
-                }
-
-                // Check for duplicate name (excluding current category)
-                final existing = await categoryModelRepository.getCategoryByName(nameController.text.trim());
-                if (existing != null && existing.categoryId != category.categoryId) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Category with this name already exists')),
-                  );
-                  return;
-                }
-
-                final updated = category.copyWith(
-                  categoryName: nameController.text.trim(),
-                  gstRate: selectedRate,
-                  hsnCode: hsnController.text.trim().isEmpty ? null : hsnController.text.trim(),
-                  description: descriptionController.text.trim().isEmpty ? null : descriptionController.text.trim(),
-                );
-
-                await categoryModelRepository.updateCategory(updated);
-                Navigator.pop(context);
-                _loadCategories();
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Category "${updated.categoryName}" updated')),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4CAF50),
-              ),
-              child: const Text('Save'),
-            ),
-          ],
+          textCapitalization: TextCapitalization.words,
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final name = nameController.text.trim();
+              if (name.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter category name')),
+                );
+                return;
+              }
+
+              final updated = category.copyWith(
+                name: name,
+                lastEditedTime: DateTime.now(),
+                editCount: category.editCount + 1,
+              );
+
+              final success = await categoryStore.updateCategory(updated);
+              if (!context.mounted) return;
+
+              if (success) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Category "${updated.name}" updated')),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(categoryStore.errorMessage ?? 'Failed to update category')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4CAF50)),
+            child: const Text('Save'),
+          ),
+        ],
       ),
     );
   }
 
-  Future<void> _confirmDelete(CategoryModel category) async {
+  Future<void> _confirmDelete(Category category) async {
+    final itemCount = categoryStore.getItemCountForCategory(category.id);
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -825,27 +586,29 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Are you sure you want to delete "${category.categoryName}"?'),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.warning_amber, color: Colors.orange, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Products using this category will not be affected.',
-                      style: TextStyle(fontSize: 12, color: Colors.orange[800]),
+            Text('Are you sure you want to delete "${category.name}"?'),
+            if (itemCount > 0) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber, color: Colors.orange, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '$itemCount product${itemCount == 1 ? '' : 's'} will be moved to Uncategorized.',
+                        style: TextStyle(fontSize: 12, color: Colors.orange[800]),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+            ],
           ],
         ),
         actions: [
@@ -863,11 +626,15 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
     );
 
     if (confirm == true) {
-      await categoryModelRepository.deleteCategory(category.categoryId);
-      _loadCategories();
+      final success = await categoryStore.deleteCategory(category.id);
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Category "${category.categoryName}" deleted')),
+        SnackBar(
+          content: Text(success
+              ? 'Category "${category.name}" deleted'
+              : categoryStore.errorMessage ?? 'Failed to delete category'),
+        ),
       );
     }
   }

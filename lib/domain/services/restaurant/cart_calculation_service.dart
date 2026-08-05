@@ -3,6 +3,7 @@
 import '../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../presentation/screens/restaurant/start order/cart/customerdetails.dart';
 import '../../../util/restaurant/staticswitch.dart';
+import '../../../core/config/tax_feature.dart';
 
 class CartCalculationService {
   final List<CartItem> items;
@@ -78,9 +79,10 @@ class CartCalculationService {
     double accumulatedDiscount = 0;
 
     // STEP 3: Loop through items
+    final bool taxFeatureEnabled = TaxFeature.enabled;
     for (final item in items) {
       final double itemOriginalAmount = item.price * item.quantity;
-      final double itemTaxRate = item.taxRate ?? 0;
+      final double itemTaxRate = taxFeatureEnabled ? (item.taxRate ?? 0) : 0;
 
       double itemDiscount = 0;
       double itemBase;

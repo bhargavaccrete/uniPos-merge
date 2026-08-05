@@ -62,7 +62,7 @@ class _CustomerListReportState extends State<CustomerListReport> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     await Future.wait([
-      restaurantCustomerStore.loadCustomers(),
+      customerStore.loadCustomers(),
       pastOrderStore.loadPastOrders(),
     ]);
     _buildCustomerData();
@@ -104,7 +104,7 @@ class _CustomerListReportState extends State<CustomerListReport> {
     }
 
     // Step 2: Map customers to report data — O(customers)
-    final customers = restaurantCustomerStore.customers;
+    final customers = customerStore.customers;
     final result = <CustomerReportData>[];
 
     for (final customer in customers) {

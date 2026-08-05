@@ -1,7 +1,7 @@
 
 
 import '../../../core/di/service_locator.dart';
-import '../../../data/models/retail/hive_model/customer_model_208.dart';
+import '../../../data/models/common/customer_model_125.dart';
 import '../../../data/repositories/retail/credit_payment_repository.dart';
 
 /// End of Day Report Service
@@ -87,7 +87,7 @@ class EODReportService {
     totalProfit = totalSales - totalCost;
 
     // Customer Outstanding Summary
-    final customersWithCredit = await customerStoreRestail.getCustomersWithCredit();
+    final customersWithCredit = await customerStore.getCustomersWithCredit();
     final totalOutstanding = await saleStore.getTotalDueAmount();
 
     // Expenses for the day
@@ -187,7 +187,7 @@ class EODReport {
   // Outstanding Summary
   final int customersWithDue;
   final double totalOutstanding;
-  final List<CustomerModel> customersWithCredit;
+  final List<Customer> customersWithCredit;
 
   EODReport({
     required this.date,

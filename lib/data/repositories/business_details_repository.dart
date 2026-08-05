@@ -19,6 +19,10 @@ class BusinessDetailsRepository {
     return _box.get(_key);
   }
 
+  // Does this business use tax features right now? Set during onboarding's
+  // tax-registration question. Prefer TaxFeature.enabled at call sites.
+  bool get isTaxEnabled => get()?.taxEnabled ?? true;
+
   // READ - check exists
   bool exists() {
     return _box.containsKey(_key);

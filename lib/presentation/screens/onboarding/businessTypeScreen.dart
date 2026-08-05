@@ -144,20 +144,20 @@ class BusinessTypeStep extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
-        color: Colors.amber.withValues(alpha: 0.08),
+        color: AppColors.warning.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          Icon(Icons.lock_outline, size: 15, color: Colors.amber.shade700),
+          Icon(Icons.lock_outline, size: 15, color: AppColors.warning),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               'You cannot change your business type after setup.',
               style: GoogleFonts.poppins(
                 fontSize: AppResponsive.getValue<double>(context, mobile: 12, tablet: 13, desktop: 13),
-                color: Colors.amber.shade800,
+                color: AppColors.warning,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -269,7 +269,7 @@ class _BusinessTypeCard extends StatelessWidget {
   Color get _accentColor {
     switch (type['id']) {
       case 'restaurant':
-        return const Color(0xFFEF6C00);
+        return AppColors.orange;
       default:
         return AppColors.primary;
     }

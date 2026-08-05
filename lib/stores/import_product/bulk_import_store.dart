@@ -3,18 +3,18 @@ import 'dart:io';
 import 'package:csv/csv.dart';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' hide Category;
 import 'package:mobx/mobx.dart';
 import 'package:billberrylite/data/models/retail/hive_model/attribute_model_219.dart';
-import 'package:billberrylite/data/models/retail/hive_model/attribute_value_model_220.dart';
-import 'package:billberrylite/data/models/retail/hive_model/product_attribute_model_221.dart';
 import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
-import 'package:billberrylite/data/repositories/retail/category_repository.dart';
+import 'package:billberrylite/data/models/common/categorymodel_300.dart';
 import 'package:billberrylite/data/repositories/retail/product_repository.dart';
 import 'package:billberrylite/data/repositories/retail/variant_repository.dart';
 import 'package:billberrylite/domain/store/retail/attribute_store.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/config/tax_feature.dart';
+import 'package:billberrylite/presentation/screens/retail/import_product/retail_import_template_builder.dart';
 import 'package:uuid/uuid.dart';
 
 part 'bulk_import_store.g.dart';
@@ -25,13 +25,11 @@ abstract class _BulkImportStore with Store {
   // Repositories
   late final ProductRepository _productRepository;
   late final VariantRepository _variantRepository;
-  late final CategoryRepository _categoryRepository;
 
   _BulkImportStore() {
     // Lazy initialization to prevent early Hive access
     _productRepository = ProductRepository();
     _variantRepository = VariantRepository();
-    _categoryRepository = CategoryRepository();
   }
 
   // Get AttributeStore from injector (MobX store with observable lists)
@@ -67,67 +65,10 @@ abstract class _BulkImportStore with Store {
     isLoading = true;
     errorMessage = null;
     try {
-      // 2. Define Headers
-      List<String> headers = [
-        'Handle', // 0. Group ID (Required)
-        'Name', // 1. Product Name (Required for Parent)
-        'Category', // 2. Category Name
-        'Description', // 3. Product Description
-        'Option1 Name', // 4. Attribute 1 Name (e.g. Size)
-        'Option1 Value', // 5. Attribute 1 Value (e.g. Small)
-        'Option2 Name', // 6. Attribute 2 Name (e.g. Color)
-        'Option2 Value', // 7. Attribute 2 Value (e.g. Red)
-        'Option3 Name', // 8. Attribute 3 Name
-        'Option3 Value', // 9. Attribute 3 Value
-        'Cost Price', // 10. Cost Price
-        'Selling Price', // 11. Selling Price (Required)
-        'Stock', // 12. Stock Quantity
-        'Barcode', // 13. Barcode/SKU (Unique)
-        'Min Stock', // 14. Low Stock Alert Level
-      ];
-
-      // 3. Create Excel Object
-      var excel = Excel.createExcel();
-      Sheet sheetObject = excel['Sheet1'];
-      
-      // Add Header Row
-      sheetObject.appendRow(headers.map((e) => TextCellValue(e)).toList());
-
-      // Add Sample Data
-      // Sample 1: Simple Product
-      sheetObject.appendRow([
-        'coke_can', 'Coca Cola 330ml', 'Drinks', 'Refreshing drink',
-        '', '', '', '', '', '',
-        '0.50', '1.00', '100', '1234567890', '10'
-      ].map((e) => TextCellValue(e)).toList());
-
-      // Sample 2: Variable Product (T-Shirt)
-      // Parent Row
-      sheetObject.appendRow([
-        'tshirt_vneck', 'V-Neck T-Shirt', 'Clothing', 'Cotton T-Shirt',
-        'Size', 'S', 'Color', 'Red', '', '',
-        '5.00', '15.00', '20', 'TS-RED-S', '5'
-      ].map((e) => TextCellValue(e)).toList());
-      
-      // Child Rows
-      sheetObject.appendRow([
-        'tshirt_vneck', 'V-Neck T-Shirt', 'Clothing', 'Cotton T-Shirt',
-        'Size', 'M', 'Color', 'Red', '', '',
-        '5.00', '15.00', '15', 'TS-RED-M', '5'
-      ].map((e) => TextCellValue(e)).toList());
-      
-      sheetObject.appendRow([
-        'tshirt_vneck', 'V-Neck T-Shirt', 'Clothing', 'Cotton T-Shirt',
-        'Size', 'L', 'Color', 'Blue', '', '',
-        '6.00', '16.00', '10', 'TS-BLU-L', '5'
-      ].map((e) => TextCellValue(e)).toList());
-
-      // 4. Encode
-      final bytes = excel.encode();
-      if (bytes == null) {
-        errorMessage = 'Failed to generate template.';
-        return null;
-      }
+      // Build the template with Syncfusion xlsio so Category/Tax Rate get real
+      // Excel dropdowns (live-seeded from the shop's existing categories/taxes)
+      // — same technique as the restaurant side's ImportTemplateBuilder.
+      final bytes = RetailImportTemplateBuilder().build();
 
       // 5. Save File via native picker — handles web download, desktop
       //    Save dialog, and Android/iOS Downloads + permissions uniformly.
@@ -241,9 +182,20 @@ abstract class _BulkImportStore with Store {
         } else if (extension == 'xlsx' || extension == 'xls') {
           // --- Excel Parsing ---
           var excel = Excel.decodeBytes(fileBytes);
-          // Assume data is in the first sheet or 'Sheet1'
+          // The downloaded template has multiple sheets (Instructions,
+          // Categories, Taxes, Products) — product data lives specifically in
+          // "Products", not whichever sheet happens to come first (that's
+          // "Instructions", which silently made every import fail with
+          // "Product Name is required" since instruction lines have no name).
           if (excel.tables.isNotEmpty) {
-            var table = excel.tables[excel.tables.keys.first];
+            var table = excel.tables['Products'];
+            if (table == null) {
+              final match = excel.tables.keys.firstWhere(
+                (name) => name.toLowerCase() == 'products',
+                orElse: () => excel.tables.keys.first,
+              );
+              table = excel.tables[match];
+            }
 
             if (table != null) {
               for (var row in table.rows) {
@@ -317,6 +269,11 @@ abstract class _BulkImportStore with Store {
     errorMessage = null;
     successMessage = null;
 
+    if (!TaxFeature.enabled) {
+      logMessages.add(
+          'ℹ Tax data in file ignored — tax is disabled for this business.');
+    }
+
     // Ensure AttributeStore has loaded existing attributes before we start importing
     try {
       await _attributeStore.loadAttributes();
@@ -326,7 +283,16 @@ abstract class _BulkImportStore with Store {
 
     try {
       // 1. Group rows by 'Handle' (Column 0)
-      final dataRows = parsedRows.skip(1).toList();
+      // The downloaded template has a second "instruction" row (yellow,
+      // italic) with per-column hint text instead of real data — e.g. its
+      // Selling Price cell literally says "Required: number only". Detect
+      // and drop it instead of assuming a fixed single header row, so a
+      // hand-typed CSV without an instruction row still imports its first
+      // real row correctly.
+      final rawRows = parsedRows.skip(1).toList();
+      final dataRows = rawRows.isNotEmpty && !_looksLikeRealDataRow(rawRows.first)
+          ? rawRows.skip(1).toList()
+          : rawRows;
 
       Map<String, List<List<dynamic>>> groups = {};
 
@@ -336,8 +302,8 @@ abstract class _BulkImportStore with Store {
         }
 
         // Ensure row has enough columns (pad if needed)
-        if (row.length < 15) {
-           while (row.length < 15) {
+        if (row.length < 18) {
+           while (row.length < 18) {
              row.add('');
            }
         }
@@ -399,29 +365,86 @@ abstract class _BulkImportStore with Store {
 
     if (name.isEmpty) throw Exception("Product Name is required");
 
+    String categoryId = '';
     if (categoryName.isNotEmpty) {
-      await _categoryRepository.addCategory(categoryName);
+      Category? category;
+      try {
+        category = categoryStore.categories.firstWhere(
+          (c) => c.name.toLowerCase() == categoryName.toLowerCase(),
+        );
+      } catch (_) {
+        category = null;
+      }
+
+      if (category != null) {
+        categoryId = category.id;
+      } else {
+        final newCategory = Category(
+          id: const Uuid().v4(),
+          name: categoryName,
+          createdTime: DateTime.now(),
+        );
+        final success = await categoryStore.addCategory(newCategory);
+        if (success) {
+          categoryId = newCategory.id;
+        } else {
+          try {
+            final retry = categoryStore.categories.firstWhere(
+              (c) => c.name.toLowerCase() == categoryName.toLowerCase(),
+            );
+            categoryId = retry.id;
+          } catch (_) {
+            categoryId = '';
+          }
+        }
+      }
     } else {
-      categoryName = "Uncategorized";
+      final uncategorizedName = "Uncategorized";
+      Category? category;
+      try {
+        category = categoryStore.categories.firstWhere(
+          (c) => c.name.toLowerCase() == uncategorizedName.toLowerCase(),
+        );
+      } catch (_) {
+        category = null;
+      }
+
+      if (category != null) {
+        categoryId = category.id;
+      } else {
+        final newCategory = Category(
+          id: const Uuid().v4(),
+          name: uncategorizedName,
+          createdTime: DateTime.now(),
+        );
+        await categoryStore.addCategory(newCategory);
+        categoryId = newCategory.id;
+      }
     }
 
     bool hasVariants = rows.length > 1 || _rowHasVariants(parentRow);
     String productId = const Uuid().v4();
 
+    // Tax Rate and HSN Code are read from the parent row only — apply to the
+    // product and every variant in this group, same as Category above.
+    final taxLabel = parentRow.length > 16 ? parentRow[16].toString().trim() : '';
+    final resolvedTax = _resolveTaxFromLabel(taxLabel);
+    final hsnCode = parentRow.length > 17 ? parentRow[17].toString().trim() : '';
+
     ProductModel product = ProductModel(
       productId: productId,
       productName: name,
       description: description.isNotEmpty ? description : null,
-      category: categoryName,
+      category: categoryId,
       hasVariants: hasVariants,
       brandName: '',
-      gstRate: 0.0,
+      hsnCode: hsnCode.isNotEmpty ? hsnCode : null,
+      gstRate: resolvedTax.gstRate,
+      taxId: resolvedTax.taxId,
       createdAt: DateTime.now().toIso8601String(),
       updateAt: DateTime.now().toIso8601String(),
       productType: hasVariants ? 'variable' : 'simple',
     );
-
-    // Debug: Print product details
 
     await _productRepository.addProduct(product);
 
@@ -439,12 +462,39 @@ abstract class _BulkImportStore with Store {
     }
 
     for (var row in rows) {
-      await _createVariant(productId, row);
+      await _createVariant(productId, row, resolvedTax.taxId, resolvedTax.gstRate);
     }
+  }
+
+  /// Resolves a "Name (Rate%)" dropdown label (from the Tax Rate column) back
+  /// to the matching shared Tax entity's id + percentage. Falls back to
+  /// parsing just the trailing "(NN%)" as a raw rate if no exact name+rate
+  /// match is found (e.g. the owner typed a value not in the dropdown).
+  ({String? taxId, double? gstRate}) _resolveTaxFromLabel(String label) {
+    if (label.isEmpty || !TaxFeature.enabled) return (taxId: null, gstRate: null);
+
+    for (final tax in taxStore.taxes) {
+      final rate = tax.taxperecentage ?? 0;
+      if (label == '${tax.taxname} (${rate}%)') {
+        return (taxId: tax.id, gstRate: rate);
+      }
+    }
+
+    final match = RegExp(r'\(([\d.]+)%\)').firstMatch(label);
+    final rate = match != null ? double.tryParse(match.group(1)!) : double.tryParse(label);
+    return (taxId: null, gstRate: rate);
   }
 
   bool _rowHasVariants(List<dynamic> row) {
     return row[4].toString().isNotEmpty;
+  }
+
+  /// A real product row always has a numeric Selling Price (it's required).
+  /// The template's instruction row has hint text there instead — use that
+  /// to tell the two apart rather than assuming a fixed header-row count.
+  bool _looksLikeRealDataRow(List<dynamic> row) {
+    if (row.length <= 11) return false;
+    return double.tryParse(row[11].toString().trim()) != null;
   }
 
   /// Ensure an attribute exists in the global attribute system
@@ -635,12 +685,14 @@ abstract class _BulkImportStore with Store {
         .replaceAll(RegExp(r'\s+'), '-');
   }
 
-  Future<void> _createVariant(String productId, List<dynamic> row) async {
+  Future<void> _createVariant(
+      String productId, List<dynamic> row, String? taxId, double? gstRate) async {
     double cost = double.tryParse(row[10].toString()) ?? 0.0;
     double price = double.tryParse(row[11].toString()) ?? 0.0;
-    int stock = int.tryParse(row[12].toString()) ?? 0;
-    String barcode = row[13].toString().trim();
-    int minStock = int.tryParse(row[14].toString()) ?? 5;
+    double? mrp = double.tryParse(row[12].toString());
+    int stock = int.tryParse(row[13].toString()) ?? 0;
+    String barcode = row[14].toString().trim();
+    int minStock = int.tryParse(row[15].toString()) ?? 5;
 
     Map<String, String> attributes = {};
     
@@ -666,12 +718,15 @@ abstract class _BulkImportStore with Store {
       productId: productId,
       costPrice: cost,
       sellingPrice: price,
+      mrp: mrp,
       stockQty: stock,
       minStock: minStock,
       barcode: barcode,
       sku: barcode,
-      customAttributes: attributes, 
+      customAttributes: attributes,
       status: 'active',
+      taxId: taxId,
+      taxRate: gstRate,
       createdAt: DateTime.now().toIso8601String(),
       updateAt: DateTime.now().toIso8601String(),
     );

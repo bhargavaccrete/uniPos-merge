@@ -350,7 +350,7 @@ class _EODReportScreenState extends State<EODReportScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      customer.name,
+                      customer.name ?? '',
                       style: const TextStyle(fontSize: 14),
                     ),
                     Text(

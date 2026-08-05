@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
-import 'package:billberrylite/data/models/restaurant/db/customer_model_125.dart';
+import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'add_edit_customer_screen.dart';
 import 'customer_detail_screen.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
@@ -26,11 +26,11 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   @override
   void initState() {
     super.initState();
-    restaurantCustomerStore.setSearchQuery(''); // Ensure clean state on entry
-    restaurantCustomerStore.loadCustomers();
+    customerStore.setSearchQuery(''); // Ensure clean state on entry
+    customerStore.loadCustomers();
   }
 
-  List<RestaurantCustomer> _getSortedCustomers(List<RestaurantCustomer> customers) {
+  List<Customer> _getSortedCustomers(List<Customer> customers) {
     final sorted = customers.toList();
     switch (sortBy) {
       case 'name':
@@ -51,7 +51,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   }
 
   void _searchCustomers(String query) {
-    restaurantCustomerStore.setSearchQuery(query);
+    customerStore.setSearchQuery(query);
   }
 
   void _navigateToAddCustomer() async {
@@ -63,14 +63,14 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     );
 
     if (result == 'added') {
-      await restaurantCustomerStore.loadCustomers();
+      await customerStore.loadCustomers();
       if (mounted) {
         NotificationService.instance.showSuccess('Customer added successfully');
       }
     }
   }
 
-  void _navigateToEditCustomer(RestaurantCustomer customer) async {
+  void _navigateToEditCustomer(Customer customer) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -79,14 +79,14 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     );
 
     if (result == 'updated') {
-      await restaurantCustomerStore.loadCustomers();
+      await customerStore.loadCustomers();
       if (mounted) {
         NotificationService.instance.showSuccess('Customer updated successfully');
       }
     }
   }
 
-  void _navigateToCustomerDetail(RestaurantCustomer customer) async {
+  void _navigateToCustomerDetail(Customer customer) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -95,16 +95,16 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     );
 
     if (result == 'deleted') {
-      await restaurantCustomerStore.loadCustomers();
+      await customerStore.loadCustomers();
       if (mounted) {
         NotificationService.instance.showSuccess('Customer deleted successfully');
       }
     } else if (result != null) {
-      await restaurantCustomerStore.loadCustomers();
+      await customerStore.loadCustomers();
     }
   }
 
-  void _deleteCustomer(RestaurantCustomer customer) async {
+  void _deleteCustomer(Customer customer) async {
     final confirm = await showAppConfirmDialog(
       context: context,
       title: 'Delete "${customer.name ?? 'Customer'}"?',
@@ -115,7 +115,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     );
 
     if (confirm) {
-      final success = await restaurantCustomerStore.deleteCustomer(customer.customerId);
+      final success = await customerStore.deleteCustomer(customer.customerId);
       if (mounted && success) {
         NotificationService.instance.showSuccess('Customer deleted successfully');
       }
@@ -125,7 +125,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   @override
   void dispose() {
     _searchController.dispose();
-    restaurantCustomerStore.setSearchQuery(''); // Clear filter so next visit shows all
+    customerStore.setSearchQuery(''); // Clear filter so next visit shows all
     super.dispose();
   }
 
@@ -279,7 +279,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
           // Stats Row
           Observer(
             builder: (context) {
-              final customers = restaurantCustomerStore.customers;
+              final customers = customerStore.customers;
               if (customers.isEmpty) return const SizedBox.shrink();
 
               final totalVisits = customers.fold(0, (sum, c) => sum + c.totalVisites);
@@ -304,7 +304,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
           Expanded(
             child: Observer(
               builder: (context) {
-                if (restaurantCustomerStore.isLoading) {
+                if (customerStore.isLoading) {
                   return Center(
                     child: CircularProgressIndicator(
                       color: AppColors.primary,
@@ -313,7 +313,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                 }
 
                 final filteredCustomers = _getSortedCustomers(
-                  restaurantCustomerStore.filteredCustomers,
+                  customerStore.filteredCustomers,
                 );
 
                 if (filteredCustomers.isEmpty) {
@@ -388,7 +388,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     );
   }
 
-  Widget _buildCustomerCard(RestaurantCustomer customer, bool isTablet) {
+  Widget _buildCustomerCard(Customer customer, bool isTablet) {
     return Container(
       margin: EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(

@@ -58,8 +58,10 @@ class HiveBoxNames {
   /// Sale line items box
   static const String saleItems = 'saleItems';
 
-  /// Customer records box
-  static const String customers = 'customers';
+  /// Customer records box — shared between Restaurant and Retail (a device
+  /// only ever runs one mode, so one physical box is enough; see
+  /// CustomerRepository).
+  static const String customer = 'customers';
 
   /// Supplier records box
   static const String suppliers = 'suppliers';
@@ -91,14 +93,15 @@ class HiveBoxNames {
   /// Retail categories box (string list)
   static const String retailCategories = 'retail_categories';
 
-  /// Retail category models box (with GST support)
-  static const String categoryModels = 'category_models';
+  /// Category box — shared between Restaurant and Retail (a device only ever
+  /// runs one mode, so one physical box is enough; see CategoryRepository).
+  static const String category = 'categories';
 
   /// Payment entries box
   static const String paymentEntries = 'paymentEntries';
 
-  /// Admin box
-  static const String adminBox = 'admin_box';
+  // 'admin_box' retired — admin credential is now a SharedPreferences value
+  // (see domain/services/retail/auth_service.dart), not a Hive box.
 
   /// Credit payments box
   static const String creditPayments = 'credit_payments';
@@ -112,8 +115,13 @@ class HiveBoxNames {
   /// Product attributes box
   static const String productAttributes = 'product_attributes';
 
-  /// Retail staff box
-  static const String retailStaff = 'retail_staff';
+  /// Staff box — shared between Restaurant and Retail (a device only ever
+  /// runs one mode, so one physical box is enough; see StaffRepository).
+  static const String staff = 'staffBox';
+
+  /// Tax rates box — shared between Restaurant and Retail (a device only
+  /// ever runs one mode, so one physical box is enough; see TaxRepository).
+  static const String tax = 'taxes';
 
   /// Billing tabs box
   static const String billingTabs = 'billingTabs';
@@ -128,9 +136,6 @@ class HiveBoxNames {
   static const String retailExpense = 'expenseBox';
 
   // ==================== RESTAURANT BOXES ====================
-
-  /// Restaurant categories box
-  static const String restaurantCategories = 'categories';
 
   /// Restaurant menu items box
   static const String restaurantItems = 'itemBoxs';
@@ -147,11 +152,6 @@ class HiveBoxNames {
   /// Restaurant cart box
   static const String restaurantCart = 'cart_box';
 
-  /// Restaurant company/business details box
-  static const String restaurantCompany = 'companyBox';
-
-  /// Restaurant staff box
-  static const String restaurantStaff = 'staffBox';
 
   /// Restaurant tables box
   static const String restaurantTables = 'tablesBox';
@@ -162,9 +162,6 @@ class HiveBoxNames {
   /// Restaurant past/completed orders box
   static const String restaurantPastOrders = 'pastorderBox';
 
-  /// Restaurant taxes box
-  static const String restaurantTaxes = 'restaurant_taxes';
-
   /// Restaurant end-of-day reports box
   static const String restaurantEOD = 'restaurant_eodBox';
 
@@ -174,12 +171,12 @@ class HiveBoxNames {
   /// Restaurant expenses box
   static const String restaurantExpense = 'restaurant_expenseBox';
 
-  /// Restaurant app counters box (for order numbering)
+  /// Generic named-sequence counters box, shared by both business modes
+  /// (restaurant order/bill/KOT numbering, retail SKU sequence, etc.)
   static const String appCounters = 'appCounters';
 
   /// Restaurant test bill box
   static const String testBillBox = 'testBillBox';
-  static const String restaurantCustomer = 'restaurantCustomers';
 
   /// Restaurant shift management box
   static const String restaurantShift = 'shiftBox';
@@ -243,7 +240,7 @@ class HiveBoxNames {
     cartItems,
     sales,
     saleItems,
-    customers,
+    customer,
     suppliers,
     purchases,
     purchaseItems,
@@ -254,40 +251,39 @@ class HiveBoxNames {
     holdSales,
     holdSaleItems,
     retailCategories,
-    categoryModels,
+    category,
     paymentEntries,
-    adminBox,
     creditPayments,
     attributes,
     attributeValues,
     productAttributes,
-    retailStaff,
+    staff,
     billingTabs,
     retailEOD,
     retailExpenseCategory,
     retailExpense,
+    tax,
   ];
 
   /// All restaurant box names (for bulk operations like clearing/backup)
   static const List<String> allRestaurantBoxes = [
-    restaurantCategories,
+    category,
     restaurantItems,
     restaurantVariants,
     restaurantChoices,
     restaurantExtras,
     restaurantCart,
-    restaurantCompany,
-    restaurantStaff,
+    staff,
     restaurantTables,
     restaurantOrders,
     restaurantPastOrders,
-    restaurantTaxes,
+    tax,
     restaurantEOD,
     restaurantExpenseCategory,
     restaurantExpense,
     appCounters,
     testBillBox,
-    restaurantCustomer,
+    customer,
     restaurantShift,
     restaurantCashMovements,
     restaurantStockMovements,

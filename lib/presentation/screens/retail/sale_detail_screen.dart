@@ -4,7 +4,7 @@ import '../../../core/di/service_locator.dart';
 import '../../../domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
-import 'package:billberrylite/data/models/retail/hive_model/customer_model_208.dart';
+import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/presentation/screens/retail/sale_return_screen.dart';
 import 'package:billberrylite/domain/services/retail/print_service.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
@@ -23,7 +23,7 @@ class SaleDetailScreen extends StatefulWidget {
 class _SaleDetailScreenState extends State<SaleDetailScreen> {
   SaleModel? _sale;
   List<SaleItemModel> _saleItems = [];
-  CustomerModel? _customer;
+  Customer? _customer;
   bool _isLoading = true;
   bool _hasBeenRefunded = false;
 
@@ -46,9 +46,9 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
       final items = await saleItemRepository.getItemsBySaleId(widget.saleId);
 
       // Load customer if exists
-      CustomerModel? customer;
+      Customer? customer;
       if (sale?.customerId != null) {
-        customer = await customerStoreRestail.getCustomerById(sale!.customerId!);
+        customer = await customerStore.getCustomerById(sale!.customerId!);
       }
 
       // Check if this sale has been refunded (look for return transactions)

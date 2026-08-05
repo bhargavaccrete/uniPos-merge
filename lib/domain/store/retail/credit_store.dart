@@ -1,7 +1,7 @@
 import 'package:mobx/mobx.dart';
 import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model_218.dart';
 import 'package:billberrylite/data/repositories/retail/credit_payment_repository.dart';
-import 'package:billberrylite/data/repositories/retail/customer_repository.dart';
+import 'package:billberrylite/data/repositories/common/customer_repository.dart';
 import 'package:billberrylite/data/repositories/retail/sale_repository.dart';
 import 'package:uuid/uuid.dart';
 

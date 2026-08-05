@@ -9,14 +9,6 @@ part of 'product_store.dart';
 // ignore_for_file: non_constant_identifier_names, unnecessary_brace_in_string_interps, unnecessary_lambdas, prefer_expression_function_bodies, lines_longer_than_80_chars, avoid_as, avoid_annotating_with_dynamic, no_leading_underscores_for_local_identifiers
 
 mixin _$ProductStore on _ProductStore, Store {
-  Computed<List<String>>? _$sortedCategoriesComputed;
-
-  @override
-  List<String> get sortedCategories => (_$sortedCategoriesComputed ??=
-          Computed<List<String>>(() => super.sortedCategories,
-              name: '_ProductStore.sortedCategories'))
-      .value;
-
   late final _$productsAtom =
       Atom(name: '_ProductStore.products', context: context);
 
@@ -30,22 +22,6 @@ mixin _$ProductStore on _ProductStore, Store {
   set products(ObservableList<ProductModel> value) {
     _$productsAtom.reportWrite(value, super.products, () {
       super.products = value;
-    });
-  }
-
-  late final _$categoriesAtom =
-      Atom(name: '_ProductStore.categories', context: context);
-
-  @override
-  ObservableList<String> get categories {
-    _$categoriesAtom.reportRead();
-    return super.categories;
-  }
-
-  @override
-  set categories(ObservableList<String> value) {
-    _$categoriesAtom.reportWrite(value, super.categories, () {
-      super.categories = value;
     });
   }
 
@@ -123,31 +99,6 @@ mixin _$ProductStore on _ProductStore, Store {
         .run(() => super.updateVariantCostPrice(variantId, newCostPrice));
   }
 
-  late final _$loadCategoriesAsyncAction =
-      AsyncAction('_ProductStore.loadCategories', context: context);
-
-  @override
-  Future<void> loadCategories() {
-    return _$loadCategoriesAsyncAction.run(() => super.loadCategories());
-  }
-
-  late final _$addCategoryAsyncAction =
-      AsyncAction('_ProductStore.addCategory', context: context);
-
-  @override
-  Future<void> addCategory(String category) {
-    return _$addCategoryAsyncAction.run(() => super.addCategory(category));
-  }
-
-  late final _$deleteCategoryAsyncAction =
-      AsyncAction('_ProductStore.deleteCategory', context: context);
-
-  @override
-  Future<void> deleteCategory(String category) {
-    return _$deleteCategoryAsyncAction
-        .run(() => super.deleteCategory(category));
-  }
-
   late final _$clearAllDataAsyncAction =
       AsyncAction('_ProductStore.clearAllData', context: context);
 
@@ -159,9 +110,7 @@ mixin _$ProductStore on _ProductStore, Store {
   @override
   String toString() {
     return '''
-products: ${products},
-categories: ${categories},
-sortedCategories: ${sortedCategories}
+products: ${products}
     ''';
   }
 }

@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
-import 'package:billberrylite/data/models/retail/hive_model/staff_model_222.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/restaurant/restaurant_auth_helper.dart';
@@ -35,21 +32,20 @@ class SecuritySetupStep extends StatefulWidget {
 }
 
 class _SecuritySetupStepState extends State<SecuritySetupStep> {
-  // Admin login PIN (key matches admin_login.dart / changePassword.dart).
-  static const String _adminPasswordKey = 'restaurant_admin_password';
-
+  // Admin login PIN — shared by both modes (RestaurantAuthHelper.adminPinKey).
   final _pinController = TextEditingController();
   final _pinConfirmController = TextEditingController();
-  final _pwdController = TextEditingController();
-  final _pwdConfirmController = TextEditingController();
-
   final _pinFocusNode = FocusNode();
   final _pinConfirmFocusNode = FocusNode();
+  bool _obscurePin = true;
+
+  // Shared: backup password.
+  final _pwdController = TextEditingController();
+  final _pwdConfirmController = TextEditingController();
   final _pwdFocusNode = FocusNode();
   final _pwdConfirmFocusNode = FocusNode();
-
-  bool _obscurePin = true;
   bool _obscurePwd = true;
+
   bool _saving = false;
   String? _error;
 
@@ -84,15 +80,11 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
   }
 
   /// True when [pin] is already assigned to a staff member, so the admin PIN
-  /// can't reuse it (keeps PIN-only login unambiguous). Staff are persisted by
-  /// the previous Staff step, so we read them straight from storage. Restaurant
-  /// staff store a hashed PIN (verify); retail staff store it in plaintext.
+  /// can't reuse it (keeps PIN-only login unambiguous — both modes now log in
+  /// by PIN, admin checked first then staff, see AuthService.login). Staff are
+  /// persisted by the previous Staff step, so we read them straight from
+  /// storage. The stored PIN is always hashed — verify against the new pin.
   Future<bool> _pinUsedByStaff(String pin) async {
-    if (AppConfig.isRetail) {
-      if (!Hive.isBoxOpen('retail_staff')) return false;
-      final box = Hive.box<RetailStaffModel>('retail_staff');
-      return box.values.any((s) => s.pin == pin);
-    }
     await staffStore.loadStaff();
     return staffStore.staff
         .any((s) => RestaurantAuthHelper.verifyPassword(pin, s.pinNo));
@@ -118,11 +110,13 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
       _saving = true;
     });
 
-    // Save admin PIN (hashed) + backup password. Saved immediately (same pattern
-    // as the payment-setup step) so they persist even before wizard completion.
+    // Save admin PIN + backup password. Saved immediately (same pattern as the
+    // payment-setup step) so they persist even before wizard completion.
+    // Written directly (not via AuthService, which is only DI-registered for
+    // retail) to the shared key both modes read at login.
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-        _adminPasswordKey, RestaurantAuthHelper.hashPassword(_pinController.text.trim()));
+    await prefs.setString(RestaurantAuthHelper.adminPinKey,
+        RestaurantAuthHelper.hashPassword(_pinController.text.trim()));
     // Only set a backup password when the plan includes backups; otherwise it's
     // collected lazily later (ensureBackupPassword) if the plan is upgraded.
     if (PlanEnforce.allows(EntKeys.settings)) {
@@ -148,7 +142,7 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
             _buildHeader(context),
             SizedBox(height: AppResponsive.largeSpacing(context)),
 
-            // ── Admin login PIN ──
+            // ── Admin login PIN — same mechanism for both modes ──
             _sectionLabel(context, 'Admin Login PIN', Icons.admin_panel_settings_rounded),
             SizedBox(height: AppResponsive.smallSpacing(context)),
             AppTextField(

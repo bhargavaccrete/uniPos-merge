@@ -6,6 +6,12 @@ import 'package:crypto/crypto.dart';
 class RestaurantAuthHelper {
   static const _salt = 'unipos_restaurant_salt_2024';
 
+  /// The one shared SharedPreferences key both modes store the admin PIN
+  /// hash under. Retail and restaurant are never active in the same install,
+  /// so a single canonical key (rather than a per-mode one) keeps admin PIN
+  /// storage/login logic identical across both.
+  static const String adminPinKey = 'restaurant_admin_password';
+
   /// Hash a plaintext password.
   static String hashPassword(String password) {
     final bytes = utf8.encode(password + _salt);

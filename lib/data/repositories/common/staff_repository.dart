@@ -1,13 +1,19 @@
 import 'package:hive/hive.dart';
-import '../../models/restaurant/db/staffModel_310.dart';
+import '../../../core/constants/hive_box_names.dart';
+import '../../models/common/staffModel_310.dart';
 
-/// Repository layer for Staff data access (Restaurant)
-/// Handles all Hive database operations for staff members
+/// Repository layer for Staff data access.
+///
+/// Shared between Restaurant and Retail — both business modes use the same
+/// `StaffModel` AND the same physical box. A device only ever runs one
+/// business mode for its whole lifetime, so there's never a moment where
+/// restaurant and retail staff would need to be told apart in storage —
+/// unlike Category/Customer, no per-mode box split is needed here.
 class StaffRepository {
   late Box<StaffModel> _staffBox;
 
   StaffRepository() {
-    _staffBox = Hive.box<StaffModel>('staffBox');
+    _staffBox = Hive.box<StaffModel>(HiveBoxNames.staff);
   }
 
   /// Add a new staff member

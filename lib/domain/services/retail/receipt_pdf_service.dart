@@ -4,7 +4,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:intl/intl.dart';
-import '../../../data/models/retail/hive_model/customer_model_208.dart';
+import '../../../data/models/common/customer_model_125.dart';
 import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
 import '../../../data/models/retail/hive_model/sale_model_203.dart';
 import '../../../data/models/retail/printer_settings_model.dart';
@@ -24,7 +24,7 @@ import 'retail_printer_settings_service.dart';
 class ReceiptData {
   final SaleModel sale;
   final List<SaleItemModel> items;
-  final CustomerModel? customer;
+  final Customer? customer;
   final String? storeName;
   final String? storeAddress;
   final String? storePhone;
@@ -56,6 +56,12 @@ class ReceiptData {
 
   // Tax mode stored at order creation time (use this instead of live AppSettings)
   final bool? isTaxInclusive;
+
+  // Does this business use tax features at all (TaxFeature.enabled at the time
+  // this receipt was built)? Gates GSTIN, tax summary rows, and the "includes
+  // GST" footer across every renderer — authoritative, unlike per-item gstRate/
+  // taxRate which can be stale on old records.
+  final bool taxEnabled;
 
   // Service / Delivery charge (pre-calculated by CartCalculationService)
   final double? serviceCharge;
@@ -97,6 +103,7 @@ class ReceiptData {
     this.itemTotal,
     this.loyaltyPointsDiscount,
     this.isTaxInclusive,
+    this.taxEnabled = true,
     this.serviceCharge,
     this.isDeliveryOrder,
     this.roundOff,
@@ -329,7 +336,8 @@ class ReceiptPdfService {
     final showStoreName = isKot ? false : (isRetail ? (retailSettings?.showStoreName ?? true) : PrintSettings.showRestaurantName);
     final showStoreAddress = isKot ? false : (isRetail ? (retailSettings?.showStoreAddress ?? true) : PrintSettings.showRestaurantAddress);
     final showStorePhone = isKot ? false : (isRetail ? (retailSettings?.showStorePhone ?? true) : PrintSettings.showRestaurantMobile);
-    final showGST = isKot ? false : (isRetail ? (retailSettings?.showGSTNumber ?? true) : true);
+    final showGST = data.taxEnabled &&
+        (isKot ? false : (isRetail ? (retailSettings?.showGSTNumber ?? true) : true));
 
     final bool hasHeaderDetails = (showLogo && data.logoBytes != null) ||
         showStoreName ||
@@ -342,7 +350,7 @@ class ReceiptPdfService {
     final showPaymentMethod = isRetail ? (retailSettings?.showPaymentMethod ?? true) : PrintSettings.showPaymentType;
     final showCustomer = isRetail ? (retailSettings?.showCustomerDetails ?? true) : PrintSettings.showCustomerName;
     final showSubtotal = isRetail ? (retailSettings?.showSubtotal ?? true) : PrintSettings.showSubtotal;
-    final showTax = isRetail ? (retailSettings?.showTax ?? true) : PrintSettings.showTax;
+    final showTax = data.taxEnabled && (isRetail ? (retailSettings?.showTax ?? true) : PrintSettings.showTax);
     final showPaymentPaid = isRetail ? (retailSettings?.showSplitPayment ?? true) : PrintSettings.showPaymentPaid;
     final showFooter = isRetail ? (retailSettings?.showFooter ?? true) : PrintSettings.showPoweredBy;
 
@@ -555,7 +563,7 @@ class ReceiptPdfService {
               children: [
                 pw.Text('Customer:', style: pw.TextStyle(fontSize: labelSize, fontWeight: pw.FontWeight.bold)),
                 pw.Text(
-                  data.customer!.name,
+                  data.customer!.name ?? '',
                   style: pw.TextStyle(fontSize: labelSize, fontWeight: pw.FontWeight.bold),
                 ),
               ],
@@ -686,7 +694,7 @@ class ReceiptPdfService {
             final double totalGst = data.sale.taxAmount;
             // Tax toggle OFF → collapse the per-rate table to a single summary
             // line so Sub Total + Tax still reconcile to the Grand Total.
-            final bool showTaxSummaryLine = !showTax && totalGst > 0.009;
+            final bool showTaxSummaryLine = data.taxEnabled && !showTax && totalGst > 0.009;
 
             return pw.Column(
               children: [
@@ -788,7 +796,7 @@ class ReceiptPdfService {
 
           // Footer
           if (AppConfig.isRestaurant) ...[
-            if (data.isTaxInclusive ?? false)
+            if (data.taxEnabled && (data.isTaxInclusive ?? false))
               pw.Text(
                 'All prices include GST',
                 style: pw.TextStyle(fontSize: isSmallMedia ? 8 : 10),
@@ -857,7 +865,7 @@ class ReceiptPdfService {
                     style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
                   ),
                   pw.Text(
-                    'Total Points: ${data.customer!.pointsBalance}',
+                    'Total Points: ${data.customer!.loyaltyPoints}',
                     style: const pw.TextStyle(fontSize: 8),
                   ),
                 ],
@@ -889,14 +897,14 @@ class ReceiptPdfService {
     final showStoreAddress = isRetail ? (retailSettings?.showStoreAddress ?? true) : true;
     final showStorePhone = isRetail ? (retailSettings?.showStorePhone ?? true) : true;
     final showStoreEmail = isRetail ? (retailSettings?.showStoreEmail ?? false) : true;
-    final showGST = isRetail ? (retailSettings?.showGSTNumber ?? true) : true;
+    final showGST = data.taxEnabled && (isRetail ? (retailSettings?.showGSTNumber ?? true) : true);
     final showInvoiceNumber = isRetail ? (retailSettings?.showInvoiceNumber ?? true) : true;
     final showInvoiceDate = isRetail ? (retailSettings?.showInvoiceDate ?? true) : true;
     final showCustomer = isRetail ? (retailSettings?.showCustomerDetails ?? true) : true;
     final showPaymentMethod = isRetail ? (retailSettings?.showPaymentMethod ?? true) : true;
     final showSubtotal = isRetail ? (retailSettings?.showSubtotal ?? true) : true;
     final showDiscount = isRetail ? (retailSettings?.showDiscount ?? true) : true;
-    final showTax = isRetail ? (retailSettings?.showTax ?? true) : true;
+    final showTax = data.taxEnabled && (isRetail ? (retailSettings?.showTax ?? true) : true);
     final showGrandTotal = isRetail ? (retailSettings?.showGrandTotal ?? true) : true;
     final showLoyaltyPoints = isRetail ? (retailSettings?.showLoyaltyPoints ?? true) : true;
 
@@ -1063,10 +1071,10 @@ class ReceiptPdfService {
                     pw.SizedBox(height: 8),
                     if (data.customer != null) ...[
                       pw.Text(
-                        data.customer!.name,
+                        data.customer!.name ?? '',
                         style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
                       ),
-                      pw.Text(data.customer!.phone, style: const pw.TextStyle(fontSize: 10)),
+                      pw.Text(data.customer!.phone ?? '', style: const pw.TextStyle(fontSize: 10)),
                       if (data.customer!.email != null)
                         pw.Text(data.customer!.email!, style: const pw.TextStyle(fontSize: 10)),
                       if (data.customer!.address != null)
@@ -1166,11 +1174,11 @@ class ReceiptPdfService {
                       _buildInvoiceTotalRow('Sub Total (Before Tax)', data.sale.subtotal),
                     // GST summary row (exclusive) — always shown so the invoice
                     // reconciles even when the detailed table above is toggled off.
-                    if (!isRestaurantInclusive && data.sale.taxAmount > 0)
+                    if (data.taxEnabled && !isRestaurantInclusive && data.sale.taxAmount > 0)
                       _buildInvoiceTotalRow('GST', data.sale.taxAmount),
                     // Inclusive mode: the detailed table carries tax; when it's
                     // toggled off, show a single informational line instead.
-                    if (isRestaurantInclusive && !showTax && data.sale.taxAmount > 0)
+                    if (data.taxEnabled && isRestaurantInclusive && !showTax && data.sale.taxAmount > 0)
                       _buildInvoiceTotalRow('Tax (Incl.)', data.sale.taxAmount),
                     // Service / Delivery Charge
                     if ((data.serviceCharge ?? 0) > 0.009)
@@ -1285,7 +1293,7 @@ class ReceiptPdfService {
                 textAlign: pw.TextAlign.center,
               ),
               pw.SizedBox(height: 4),
-              if (AppConfig.isRestaurant && (data.isTaxInclusive ?? false))
+              if (AppConfig.isRestaurant && data.taxEnabled && (data.isTaxInclusive ?? false))
                 pw.Text(
                   'All prices include GST',
                   style: pw.TextStyle(fontSize: 9, color: PdfColors.grey700),

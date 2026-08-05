@@ -1,11 +1,12 @@
 import 'package:hive/hive.dart';
 import 'package:mobx/mobx.dart';
-import 'package:billberrylite/data/models/retail/hive_model/category_model_215.dart';
+import 'package:billberrylite/data/models/common/categorymodel_300.dart';
 import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/di/service_locator.dart';
+import '../../../core/config/tax_feature.dart';
 import '../../../data/models/retail/hive_model/cart_model_202.dart';
 import '../../../data/models/retail/hive_model/billing_tab_model_173.dart';
 import '../../services/retail/gst_service.dart';
@@ -195,7 +196,7 @@ abstract class _CartStore with Store {
   }
 
   @action
-  Future<CartOperationResult> addItem(ProductModel product, VarianteModel variant, {CategoryModel? category}) async {
+  Future<CartOperationResult> addItem(ProductModel product, VarianteModel variant, {Category? category}) async {
     final availableStock = variant.stockQty;
 
     // Check if the same variant is already in the cart
@@ -216,15 +217,19 @@ abstract class _CartStore with Store {
       );
     }
 
-    // Fetch category if not provided (to get category GST rate)
-    CategoryModel? effectiveCategory = category;
+    // Fetch category if not provided (to resolve its display name for the receipt)
+    Category? effectiveCategory = category;
     if (effectiveCategory == null && product.category.isNotEmpty) {
-      effectiveCategory = await categoryModelRepository.getCategoryByName(product.category);
+      effectiveCategory = categoryStore.getCategoryById(product.category) ??
+                          await categoryRepository.getCategoryById(product.category);
     }
+    final categoryDisplayName = effectiveCategory?.name ?? product.category;
 
-    // Get GST rate using priority: Variant > Product > Category > Default (0%)
-    final effectiveGstRate = await _getEffectiveGstRate(variant, product, effectiveCategory);
-    final effectiveHsnCode = _getEffectiveHsnCode(variant, product, effectiveCategory);
+    // Get GST rate using priority: Variant > Product > Default (0%). GST/HSN
+    // live on the product/variant, not the category (a category can contain
+    // items with different tax classes — e.g. cotton vs synthetic garments).
+    final effectiveGstRate = await _getEffectiveGstRate(variant, product);
+    final effectiveHsnCode = _getEffectiveHsnCode(variant, product);
 
     // Check if tax inclusive mode is enabled
     final taxInclusive = await gstService.isTaxInclusiveMode();
@@ -275,7 +280,7 @@ abstract class _CartStore with Store {
       barcode: variant.barcode,
       gstRate: effectiveGstRate,
       hsnCode: effectiveHsnCode,
-      categoryName: product.category,
+      categoryName: categoryDisplayName,
       taxInclusive: taxInclusive,
     );
 
@@ -287,8 +292,10 @@ abstract class _CartStore with Store {
     return CartOperationResult.success();
   }
 
-  /// Get effective GST rate using priority: Variant > Product > Category > Default (0%)
-  Future<double> _getEffectiveGstRate(VarianteModel variant, ProductModel product, CategoryModel? category) async {
+  /// Get effective GST rate using priority: Variant > Product > Default (0%)
+  Future<double> _getEffectiveGstRate(VarianteModel variant, ProductModel product) async {
+    if (!TaxFeature.enabled) return 0;
+
     // 1. Check variant level GST
     if (variant.taxRate != null && variant.taxRate! > 0) {
       return variant.taxRate!;
@@ -299,17 +306,12 @@ abstract class _CartStore with Store {
       return product.gstRate!;
     }
 
-    // 3. Check category level GST
-    if (category != null && category.gstRate != null && category.gstRate! > 0) {
-      return category.gstRate!;
-    }
-
-    // 4. Return default GST (0%)
+    // 3. Return default GST (0%)
     return await gstService.getDefaultGstRate();
   }
 
-  /// Get effective HSN code using priority: Variant > Product > Category
-  String? _getEffectiveHsnCode(VarianteModel variant, ProductModel product, CategoryModel? category) {
+  /// Get effective HSN code using priority: Variant > Product
+  String? _getEffectiveHsnCode(VarianteModel variant, ProductModel product) {
     // 1. Check variant level HSN
     if (variant.hsnCode != null && variant.hsnCode!.isNotEmpty) {
       return variant.hsnCode;
@@ -318,11 +320,6 @@ abstract class _CartStore with Store {
     // 2. Check product level HSN
     if (product.hsnCode != null && product.hsnCode!.isNotEmpty) {
       return product.hsnCode;
-    }
-
-    // 3. Check category level HSN
-    if (category != null && category.hsnCode != null && category.hsnCode!.isNotEmpty) {
-      return category.hsnCode;
     }
 
     return null;
@@ -578,7 +575,7 @@ abstract class _CartStore with Store {
   /// Update all cart methods to save to active tab
 
   @action
-  Future<CartOperationResult> addItemToTab(ProductModel product, VarianteModel variant, {CategoryModel? category}) async {
+  Future<CartOperationResult> addItemToTab(ProductModel product, VarianteModel variant, {Category? category}) async {
     final result = await addItem(product, variant, category: category);
     if (result.success) {
       await _saveCurrentTabItems();

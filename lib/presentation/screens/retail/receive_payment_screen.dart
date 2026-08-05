@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../domain/services/restaurant/notification_service.dart';
-import 'package:billberrylite/data/models/retail/hive_model/customer_model_208.dart';
+import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 
 /// Receive Payment Screen - Collect due payments from customers
 class ReceivePaymentScreen extends StatefulWidget {
-  final CustomerModel customer;
+  final Customer customer;
 
   const ReceivePaymentScreen({
     super.key,
@@ -87,7 +87,7 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
         // Reload invoices
         await _loadDueInvoices();
         // Reload customer store
-        await customerStoreRestail.loadCustomers();
+        await customerStore.loadCustomers();
 
         if (mounted) {
           // Show success message
@@ -260,7 +260,7 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.customer.name,
+                  widget.customer.name ?? '',
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -269,7 +269,7 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  widget.customer.phone,
+                  widget.customer.phone ?? '',
                   style: const TextStyle(
                     fontSize: 14,
                     color: Color(0xFF6B6B6B),

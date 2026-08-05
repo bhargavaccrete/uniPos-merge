@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/stores/setup_wizard_store.dart';
-import 'package:billberrylite/data/models/restaurant/db/taxmodel_314.dart';
-import 'package:billberrylite/data/models/restaurant/db/database/hive_tax.dart';
-import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/data/models/common/taxmodel_314.dart';
+import 'package:billberrylite/domain/services/common/notification_service.dart';
 import 'package:billberrylite/models/tax_details.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -40,13 +39,19 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
 
   List<TaxItem> _taxes = [];
 
-  // Quick-add preset rates
-  static const _presets = [
-    {'label': 'GST 5%', 'name': 'GST', 'rate': 5.0},
-    {'label': 'GST 12%', 'name': 'GST', 'rate': 12.0},
-    {'label': 'GST 18%', 'name': 'GST', 'rate': 18.0},
-    {'label': 'VAT 10%', 'name': 'VAT', 'rate': 10.0},
-  ];
+  // Country-adaptive quick-add preset rates. India gets its official GST slabs;
+  // every other country gets none (VAT/Sales-Tax rates vary too much per country
+  // to guess safely) — just the "Create Custom Tax" button.
+  bool get _isIndia => widget.store.country.trim().toLowerCase() == 'india';
+
+  List<Map<String, Object>> get _presets => _isIndia
+      ? const [
+          {'label': 'GST 5%', 'name': 'GST', 'rate': 5.0},
+          {'label': 'GST 12%', 'name': 'GST', 'rate': 12.0},
+          {'label': 'GST 18%', 'name': 'GST', 'rate': 18.0},
+          {'label': 'GST 28%', 'name': 'GST', 'rate': 28.0},
+        ]
+      : const [];
 
   @override
   void initState() {
@@ -77,25 +82,25 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
   Future<void> _loadRestaurantSettings() async {
     if (AppConfig.isRestaurant) {
       await AppSettings.load();
-      widget.store.setTaxEnabled(AppSettings.isTaxInclusive);
+      widget.store.setTaxInclusiveRestaurant(AppSettings.isTaxInclusive);
     }
   }
 
   Future<void> _loadFromDatabase() async {
     try {
-      if (AppConfig.isRestaurant) {
-        final existingTaxes = await taxStore.taxes.toList();
-        if (existingTaxes.isNotEmpty && _taxes.isEmpty) {
-          setState(() {
-            _taxes = existingTaxes.map((tax) {
-              return TaxItem(tax.taxname, tax.taxperecentage ?? 0, false);
-            }).toList();
-            if (_taxes.isNotEmpty) {
-              _taxes[0] = TaxItem(_taxes[0].name, _taxes[0].rate, true);
-            }
-          });
-          _syncToStore();
-        }
+      // Shared TaxStore — both modes may have pre-existing rates (e.g. a
+      // re-run of onboarding after a backup restore).
+      final existingTaxes = await taxStore.taxes.toList();
+      if (existingTaxes.isNotEmpty && _taxes.isEmpty) {
+        setState(() {
+          _taxes = existingTaxes.map((tax) {
+            return TaxItem(tax.taxname, tax.taxperecentage ?? 0, false);
+          }).toList();
+          if (_taxes.isNotEmpty) {
+            _taxes[0] = TaxItem(_taxes[0].name, _taxes[0].rate, true);
+          }
+        });
+        _syncToStore();
       }
     } catch (e) {
       debugPrint('Error loading taxes from database: $e');
@@ -103,7 +108,8 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
   }
 
   Future<void> _saveTaxesToDatabase() async {
-    if (!AppConfig.isRestaurant) return;
+    // Shared TaxStore — both modes persist every named rate entered here, not
+    // just the one marked default (retail used to discard the rest).
     try {
       final existingTaxes = taxStore.taxes.toList();
 
@@ -241,7 +247,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
         Container(
           padding: EdgeInsets.fromLTRB(hPad, 12, hPad, vPad),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.white,
             border: Border(
               top: BorderSide(color: AppColors.divider.withValues(alpha: 0.6)),
             ),
@@ -300,7 +306,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
 
   Future<void> _setInclusive(bool value) async {
     if (AppConfig.isRestaurant) {
-      widget.store.setTaxEnabled(value);
+      widget.store.setTaxInclusiveRestaurant(value);
       await AppSettings.updateSetting('Tax Is Inclusive', value);
     } else {
       widget.store.setTaxInclusive(value);
@@ -323,7 +329,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
         Observer(
           builder: (_) {
             final isInclusive = AppConfig.isRestaurant
-                ? widget.store.taxEnabled
+                ? widget.store.taxInclusiveRestaurant
                 : widget.store.taxInclusive;
             return Column(
               children: [
@@ -382,7 +388,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
                 ),
               ),
               child: selected
-                  ? const Icon(Icons.check, size: 13, color: Colors.white)
+                  ? const Icon(Icons.check, size: 13, color: AppColors.white)
                   : null,
             ),
             const SizedBox(width: 14),
@@ -421,19 +427,20 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Recommended Tax Rates',
-          style: GoogleFonts.poppins(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
+        if (_presets.isNotEmpty) ...[
+          Text(
+            'Recommended Tax Rates',
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _presets.map((p) {
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _presets.map((p) {
             final alreadyAdded = _taxes.any(
               (t) => t.name == p['name'] && t.rate == (p['rate'] as double),
             );
@@ -481,8 +488,9 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
                 ),
               ),
             );
-          }).toList(),
-        ),
+            }).toList(),
+          ),
+        ],
         const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,
@@ -673,7 +681,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
               tax.isDefault ? Icons.check : Icons.circle_outlined,
               size: 16,
               color: tax.isDefault
-                  ? Colors.white
+                  ? AppColors.white
                   : AppColors.textSecondary,
             ),
           ),
@@ -831,7 +839,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
                         }
                       } else if (AppConfig.isRestaurant) {
                         await AppSettings.updateSetting(
-                            'Tax Is Inclusive', widget.store.taxEnabled);
+                            'Tax Is Inclusive', widget.store.taxInclusiveRestaurant);
                       }
                       await _saveTaxesToDatabase();
                       widget.onNext();
@@ -841,7 +849,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
                       height: 18,
                       width: 18,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
+                          strokeWidth: 2, color: AppColors.white),
                     )
                   : const Icon(Icons.arrow_forward, size: 18),
               label: Text(
@@ -851,7 +859,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
+                foregroundColor: AppColors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),

@@ -14,7 +14,7 @@ import 'package:billberrylite/core/plan/entitlements.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
-import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
+import 'package:billberrylite/data/models/common/categorymodel_300.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Button.dart';
@@ -24,7 +24,7 @@ import 'package:billberrylite/presentation/screens/restaurant/item/add_more_info
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/tax_selector_sheet.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/widgets/tax_selector_button.dart';
 import 'package:billberrylite/presentation/screens/restaurant/import/bulk_import_screen.dart';
-import 'package:billberrylite/data/models/restaurant/db/taxmodel_314.dart';
+import 'package:billberrylite/data/models/common/taxmodel_314.dart';
 import 'package:billberrylite/util/restaurant/staticswitch.dart';
 import 'package:billberrylite/domain/services/restaurant/stock_adjust_service.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';

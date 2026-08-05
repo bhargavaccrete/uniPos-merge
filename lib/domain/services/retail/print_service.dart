@@ -15,9 +15,10 @@ import 'package:billberrylite/domain/services/retail/retail_printer_settings_ser
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/config/tax_feature.dart';
 import 'package:billberrylite/domain/services/restaurant/esc_pos_receipt_builder.dart';
 
-import '../../../data/models/retail/hive_model/customer_model_208.dart';
+import '../../../data/models/common/customer_model_125.dart';
 import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
 import '../../../data/models/retail/hive_model/sale_model_203.dart';
 
@@ -60,7 +61,7 @@ class PrintService {
     required BuildContext context,
     required SaleModel sale,
     required List<SaleItemModel> items,
-    CustomerModel? customer,
+    Customer? customer,
     ReceiptFormat format = ReceiptFormat.thermal,
     String? storeName,
     String? storeAddress,
@@ -94,6 +95,7 @@ class PrintService {
       storePhone: storePhone,
       storeEmail: storeEmail,
       gstNumber: gstNumber,
+      taxEnabled: TaxFeature.enabled,
       orderType: orderType,
       tableNo: tableNo,
       kotNumber: kotNumber,
@@ -168,7 +170,7 @@ class PrintService {
   Future<List<int>?> buildThermalRasterTicket({
     required SaleModel sale,
     required List<SaleItemModel> items,
-    CustomerModel? customer,
+    Customer? customer,
     String? storeName,
     String? storeAddress,
     String? storePhone,
@@ -199,6 +201,7 @@ class PrintService {
         storePhone: storePhone,
         storeEmail: storeEmail,
         gstNumber: gstNumber,
+        taxEnabled: TaxFeature.enabled,
         orderType: orderType,
         tableNo: tableNo,
         kotNumbers: kotNumbers,
@@ -241,7 +244,7 @@ class PrintService {
     required BuildContext context,
     required SaleModel sale,
     required List<SaleItemModel> items,
-    CustomerModel? customer,
+    Customer? customer,
     ReceiptFormat format = ReceiptFormat.a4Invoice,
     String? storeName,
     String? storeAddress,
@@ -281,6 +284,7 @@ class PrintService {
       storePhone: storePhone,
       storeEmail: storeEmail,
       gstNumber: gstNumber,
+      taxEnabled: TaxFeature.enabled,
       orderType: orderType,
       tableNo: tableNo,
       kotNumber: kotNumber,
@@ -351,7 +355,7 @@ class PrintService {
   Future<void> sharePdf({
     required SaleModel sale,
     required List<SaleItemModel> items,
-    CustomerModel? customer,
+    Customer? customer,
     ReceiptFormat format = ReceiptFormat.a4Invoice,
     String? storeName,
     String? storeAddress,
@@ -383,6 +387,7 @@ class PrintService {
       storePhone: storePhone,
       storeEmail: storeEmail,
       gstNumber: gstNumber,
+      taxEnabled: TaxFeature.enabled,
       orderType: orderType,
       tableNo: tableNo,
       kotNumber: kotNumber,
@@ -432,7 +437,7 @@ class PrintService {
   Future<String?> savePdfToDownloads({
     required SaleModel sale,
     required List<SaleItemModel> items,
-    CustomerModel? customer,
+    Customer? customer,
     ReceiptFormat format = ReceiptFormat.a4Invoice,
     String? storeName,
     String? storeAddress,
@@ -460,6 +465,7 @@ class PrintService {
       storePhone: storePhone,
       storeEmail: storeEmail,
       gstNumber: gstNumber,
+      taxEnabled: TaxFeature.enabled,
       billNumber: billNumber,
       logoBytes: logoBytes,
       itemTotal: itemTotal,
@@ -547,7 +553,7 @@ class PrintService {
     required BuildContext context,
     required SaleModel sale,
     required List<SaleItemModel> items,
-    CustomerModel? customer,
+    Customer? customer,
     String? storeName,
     String? storeAddress,
     String? storePhone,
@@ -620,6 +626,7 @@ class PrintService {
                     storePhone: storePhone,
                     storeEmail: storeEmail,
                     gstNumber: gstNumber,
+                    taxEnabled: TaxFeature.enabled,
                     orderType: orderType,
                     billNumber: billNumber,
                     kotNumbers: kotNumbers,

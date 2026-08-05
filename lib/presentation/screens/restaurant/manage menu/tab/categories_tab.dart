@@ -12,7 +12,7 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/images.dart';
-import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
+import '../../../../../data/models/common/categorymodel_300.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../util/restaurant/audit_trail_helper.dart';
 import '../../../../../util/restaurant/restaurant_session.dart';

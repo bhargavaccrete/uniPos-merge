@@ -26,7 +26,7 @@ class AppConfig {
   /// Feature flag: retail mode is hidden for now (restaurant-only release).
   /// The retail code is intact — flip this to `true` to re-enable retail in
   /// onboarding (business-type selection, splash/walkthrough copy, etc.).
-  static const bool retailEnabled = false;
+  static const bool retailEnabled = true;
 
   static const String _boxName = 'appConfigBox';
   static const String _businessModeKey = 'businessMode';

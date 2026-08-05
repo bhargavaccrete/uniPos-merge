@@ -3,13 +3,13 @@ import 'package:intl/intl.dart';
 import 'package:billberrylite/domain/store/retail/credit_store.dart';
 
 import '../../../core/di/service_locator.dart';
-import '../../../data/models/retail/hive_model/customer_model_208.dart';
+import '../../../data/models/common/customer_model_125.dart';
 
 
 
 /// Customer Ledger Screen - Timeline view of customer transactions
 class CustomerLedgerScreen extends StatefulWidget {
-  final CustomerModel customer;
+  final Customer customer;
 
   const CustomerLedgerScreen({
     super.key,
@@ -186,7 +186,9 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                 radius: 24,
                 backgroundColor: const Color(0xFF4CAF50).withOpacity(0.1),
                 child: Text(
-                  widget.customer.name.substring(0, 1).toUpperCase(),
+                  (widget.customer.name?.isNotEmpty ?? false)
+                      ? widget.customer.name!.substring(0, 1).toUpperCase()
+                      : '?',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
@@ -200,14 +202,14 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.customer.name,
+                      widget.customer.name ?? '',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     Text(
-                      widget.customer.phone,
+                      widget.customer.phone ?? '',
                       style: const TextStyle(
                         fontSize: 13,
                         color: Color(0xFF6B6B6B),
@@ -236,7 +238,7 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
               ),
               _buildStatItem(
                 'Visits',
-                widget.customer.visitCount.toString(),
+                widget.customer.totalVisites.toString(),
                 Colors.purple,
               ),
             ],

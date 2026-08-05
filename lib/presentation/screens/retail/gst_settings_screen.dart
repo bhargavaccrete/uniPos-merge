@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:billberrylite/core/di/service_locator.dart';
-import 'package:billberrylite/data/models/retail/hive_model/category_model_215.dart';
-import 'package:billberrylite/domain/services/retail/gst_service.dart';
-
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:uuid/uuid.dart';
+import 'package:billberrylite/domain/services/retail/gst_service.dart';
+import 'package:billberrylite/data/models/common/taxmodel_314.dart';
+
+import '../../../core/di/service_locator.dart';
+import '../../../core/config/tax_feature.dart';
 
 class GstSettingsScreen extends StatefulWidget {
   const GstSettingsScreen({super.key});
@@ -15,27 +18,21 @@ class GstSettingsScreen extends StatefulWidget {
 class _GstSettingsScreenState extends State<GstSettingsScreen> {
   bool _taxInclusiveMode = false;
   double _defaultGstRate = 0;
-  List<CategoryModel> _categories = [];
   bool _isLoading = true;
+  final GstService _gstService = GstService();
 
   @override
   void initState() {
     super.initState();
+    taxStore.loadTaxes();
     _loadSettings();
   }
 
   Future<void> _loadSettings() async {
     setState(() => _isLoading = true);
     try {
-      _taxInclusiveMode = await gstService.isTaxInclusiveMode();
-      _defaultGstRate = await gstService.getDefaultGstRate();
-      _categories = await categoryModelRepository.getAllCategories();
-
-      // Add default categories if none exist
-      if (_categories.isEmpty) {
-        await categoryModelRepository.addDefaultCategories();
-        _categories = await categoryModelRepository.getAllCategories();
-      }
+      _taxInclusiveMode = await _gstService.isTaxInclusiveMode();
+      _defaultGstRate = await _gstService.getDefaultGstRate();
     } catch (e) {
       debugPrint('Error loading GST settings: $e');
     }
@@ -43,12 +40,12 @@ class _GstSettingsScreenState extends State<GstSettingsScreen> {
   }
 
   Future<void> _toggleTaxInclusiveMode(bool value) async {
-    await gstService.setTaxInclusiveMode(value);
+    await _gstService.setTaxInclusiveMode(value);
     setState(() => _taxInclusiveMode = value);
   }
 
   Future<void> _updateDefaultGstRate(double rate) async {
-    await gstService.setDefaultGstRate(rate);
+    await _gstService.setDefaultGstRate(rate);
     setState(() => _defaultGstRate = rate);
   }
 
@@ -69,35 +66,19 @@ class _GstSettingsScreenState extends State<GstSettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // General Settings Section
                   _buildSectionTitle('General Settings'),
                   const SizedBox(height: 12),
                   _buildGeneralSettingsCard(),
                   const SizedBox(height: 24),
 
-                  // Category-wise GST Rates Section
-                  _buildSectionTitle('Category-wise GST Rates'),
+                  // Note: GST/HSN is set per product (and can be overridden per
+                  // variant) — not per category, since one category can hold
+                  // items with different tax classes.
+                  _buildSectionTitle('Tax Rates'),
                   const SizedBox(height: 12),
-                  _buildCategoryGstCard(),
-                  const SizedBox(height: 16),
-
-                  // Add Category Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _showAddCategoryDialog,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Add Category'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: const BorderSide(color: Color(0xFF4CAF50)),
-                        foregroundColor: const Color(0xFF4CAF50),
-                      ),
-                    ),
-                  ),
+                  _buildTaxRatesCard(),
                   const SizedBox(height: 24),
 
-                  // GST Rate Reference Section
                   _buildSectionTitle('Common GST Rates (India)'),
                   const SizedBox(height: 12),
                   _buildGstRateReferenceCard(),
@@ -118,9 +99,28 @@ class _GstSettingsScreenState extends State<GstSettingsScreen> {
     );
   }
 
-  Widget _buildGeneralSettingsCard() {
+  Widget _buildTaxDisabledNotice(String message) {
     return Container(
       padding: const EdgeInsets.all(16),
+      color: const Color(0xFFFFF8E1),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, size: 20, color: Color(0xFFB28900)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(fontSize: 13, color: Color(0xFF7A5C00)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGeneralSettingsCard() {
+    final enabled = TaxFeature.enabled;
+    return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
@@ -128,162 +128,255 @@ class _GstSettingsScreenState extends State<GstSettingsScreen> {
       ),
       child: Column(
         children: [
-          // Tax Inclusive Mode Toggle
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          if (!enabled)
+            _buildTaxDisabledNotice(
+                'Tax is currently disabled. This business is marked as not registered for tax during setup.'),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                // Tax Inclusive Mode Toggle
+                Row(
                   children: [
-                    const Text(
-                      'Tax Inclusive Pricing',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF1A1A1A),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Tax Inclusive Pricing',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF1A1A1A),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Product prices include GST',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Product prices include GST',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
+                    Switch(
+                      value: _taxInclusiveMode,
+                      onChanged: enabled ? _toggleTaxInclusiveMode : null,
+                      activeColor: const Color(0xFF4CAF50),
                     ),
                   ],
                 ),
-              ),
-              Switch(
-                value: _taxInclusiveMode,
-                onChanged: _toggleTaxInclusiveMode,
-                activeColor: const Color(0xFF4CAF50),
-              ),
-            ],
-          ),
-          const Divider(height: 24),
+                const Divider(height: 24),
 
-          // Default GST Rate
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                // Default GST Rate
+                Row(
                   children: [
-                    const Text(
-                      'Default GST Rate',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF1A1A1A),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Default GST Rate',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF1A1A1A),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Applied when no product/variant tax is set',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Applied when no category/product GST is set',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
+                    GestureDetector(
+                      onTap: enabled ? () => _showDefaultGstRateDialog() : null,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${_defaultGstRate.toInt()}%',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: enabled ? const Color(0xFF4CAF50) : Colors.grey,
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
-              GestureDetector(
-                onTap: () => _showDefaultGstRateDialog(),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF5F5F5),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    '${_defaultGstRate.toInt()}%',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF4CAF50),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCategoryGstCard() {
-    if (_categories.isEmpty) {
+  Widget _buildTaxRatesCard() {
+    if (!TaxFeature.enabled) {
       return Container(
-        padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
         ),
-        child: const Center(
-          child: Text(
-            'No categories found. Add categories to set GST rates.',
-            style: TextStyle(color: Color(0xFF6B6B6B)),
-          ),
-        ),
+        child: _buildTaxDisabledNotice(
+            'Tax rate management is unavailable while tax is disabled for this business.'),
       );
     }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
-      ),
-      child: ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: _categories.length,
-        separatorBuilder: (_, __) => const Divider(height: 1),
-        itemBuilder: (context, index) {
-          final category = _categories[index];
-          return ListTile(
-            title: Text(
-              category.categoryName,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            subtitle: category.hsnCode != null && category.hsnCode!.isNotEmpty
-                ? Text('HSN: ${category.hsnCode}', style: const TextStyle(fontSize: 12))
-                : null,
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF4CAF50).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
+    return Observer(
+      builder: (_) {
+        final taxes = taxStore.taxes;
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
+          ),
+          child: Column(
+            children: [
+              if (taxes.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(16),
                   child: Text(
-                    '${(category.gstRate ?? 0).toInt()}%',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF4CAF50),
-                    ),
+                    'No named tax rates yet. Add one to pick it on products/variants.',
+                    style: TextStyle(fontSize: 13, color: Colors.grey),
+                  ),
+                )
+              else
+                ...taxes.map((tax) => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  tax.taxname,
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                                ),
+                                Text(
+                                  '${tax.taxperecentage ?? 0}%',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => _showTaxDialog(existingTax: tax),
+                            icon: const Icon(Icons.edit_outlined, size: 20),
+                            color: const Color(0xFF4CAF50),
+                          ),
+                          IconButton(
+                            onPressed: () => _confirmDeleteTax(tax),
+                            icon: const Icon(Icons.delete_outline, size: 20),
+                            color: Colors.red,
+                          ),
+                        ],
+                      ),
+                    )),
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: TextButton.icon(
+                    onPressed: () => _showTaxDialog(),
+                    icon: const Icon(Icons.add, color: Color(0xFF4CAF50)),
+                    label: const Text('Add Tax Rate', style: TextStyle(color: Color(0xFF4CAF50))),
                   ),
                 ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined, size: 20),
-                  onPressed: () => _showEditCategoryDialog(category),
-                  color: Colors.grey[600],
-                ),
-              ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmDeleteTax(Tax tax) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Tax?'),
+        content: Text('Delete "${tax.taxname}" (${tax.taxperecentage ?? 0}%)? '
+            'Products already using it keep their stored rate.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await taxStore.deleteTax(tax.id);
+    }
+  }
+
+  Future<void> _showTaxDialog({Tax? existingTax}) async {
+    final nameController = TextEditingController(text: existingTax?.taxname ?? '');
+    final rateController = TextEditingController(
+      text: existingTax?.taxperecentage != null ? existingTax!.taxperecentage.toString() : '',
+    );
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(existingTax == null ? 'Add Tax Rate' : 'Edit Tax Rate'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'Tax Name', hintText: 'e.g. GST'),
+              textInputAction: TextInputAction.next,
             ),
-          );
-        },
+            const SizedBox(height: 12),
+            TextField(
+              controller: rateController,
+              decoration: const InputDecoration(labelText: 'Rate %', hintText: 'e.g. 18'),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              final name = nameController.text.trim();
+              final rate = double.tryParse(rateController.text.trim());
+              if (name.isEmpty || rate == null || rate < 0 || rate > 100) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Enter a valid name and rate (0-100)')),
+                );
+                return;
+              }
+              if (existingTax == null) {
+                await taxStore.addTax(Tax(id: const Uuid().v4(), taxname: name, taxperecentage: rate));
+              } else {
+                await taxStore.updateTax(existingTax.copyWith(taxname: name, taxperecentage: rate));
+              }
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: Text(existingTax == null ? 'Add' : 'Update'),
+          ),
+        ],
       ),
     );
   }
@@ -347,7 +440,10 @@ class _GstSettingsScreenState extends State<GstSettingsScreen> {
   }
 
   Future<void> _showDefaultGstRateDialog() async {
-    final rates = GstService.commonGstRates;
+    final taxes = taxStore.taxes;
+    final rates = taxes.isNotEmpty
+        ? taxes.map((t) => t.taxperecentage ?? 0).toSet().toList()
+        : GstService.commonGstRates;
 
     await showDialog(
       context: context,
@@ -375,207 +471,6 @@ class _GstSettingsScreenState extends State<GstSettingsScreen> {
               },
             );
           }).toList(),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showAddCategoryDialog() async {
-    final nameController = TextEditingController();
-    final hsnController = TextEditingController();
-    double selectedRate = 0;
-
-    await showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Add Category'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Category Name',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: hsnController,
-                  decoration: const InputDecoration(
-                    labelText: 'HSN Code (Optional)',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text('GST Rate', style: TextStyle(fontWeight: FontWeight.w500)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: GstService.commonGstRates.map((rate) {
-                    final isSelected = selectedRate == rate;
-                    return ChoiceChip(
-                      label: Text('${rate.toInt()}%'),
-                      selected: isSelected,
-                      onSelected: (selected) {
-                        setDialogState(() => selectedRate = rate);
-                      },
-                      selectedColor: const Color(0xFF4CAF50).withOpacity(0.2),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (nameController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter category name')),
-                  );
-                  return;
-                }
-
-                final category = CategoryModel.create(
-                  categoryId: const Uuid().v4(),
-                  categoryName: nameController.text.trim(),
-                  gstRate: selectedRate,
-                  hsnCode: hsnController.text.trim().isEmpty ? null : hsnController.text.trim(),
-                );
-
-                await categoryModelRepository.addCategory(category);
-                Navigator.pop(context);
-                _loadSettings();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4CAF50),
-              ),
-              child: const Text('Add'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showEditCategoryDialog(CategoryModel category) async {
-    final nameController = TextEditingController(text: category.categoryName);
-    final hsnController = TextEditingController(text: category.hsnCode ?? '');
-    double selectedRate = category.gstRate ?? 0;
-
-    await showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Edit Category'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Category Name',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: hsnController,
-                  decoration: const InputDecoration(
-                    labelText: 'HSN Code (Optional)',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text('GST Rate', style: TextStyle(fontWeight: FontWeight.w500)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: GstService.commonGstRates.map((rate) {
-                    final isSelected = selectedRate == rate;
-                    return ChoiceChip(
-                      label: Text('${rate.toInt()}%'),
-                      selected: isSelected,
-                      onSelected: (selected) {
-                        setDialogState(() => selectedRate = rate);
-                      },
-                      selectedColor: const Color(0xFF4CAF50).withOpacity(0.2),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Delete Category?'),
-                    content: Text('Are you sure you want to delete "${category.categoryName}"?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Cancel'),
-                      ),
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                        child: const Text('Delete'),
-                      ),
-                    ],
-                  ),
-                );
-
-                if (confirm == true) {
-                  await categoryModelRepository.deleteCategory(category.categoryId);
-                  Navigator.pop(context);
-                  _loadSettings();
-                }
-              },
-              child: const Text('Delete', style: TextStyle(color: Colors.red)),
-            ),
-            const Spacer(),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (nameController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please enter category name')),
-                  );
-                  return;
-                }
-
-                final updated = category.copyWith(
-                  categoryName: nameController.text.trim(),
-                  gstRate: selectedRate,
-                  hsnCode: hsnController.text.trim().isEmpty ? null : hsnController.text.trim(),
-                );
-
-                await categoryModelRepository.updateCategory(updated);
-                Navigator.pop(context);
-                _loadSettings();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4CAF50),
-              ),
-              child: const Text('Save'),
-            ),
-          ],
         ),
       ),
     );

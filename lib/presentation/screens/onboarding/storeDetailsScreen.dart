@@ -5,7 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/stores/setup_wizard_store.dart';
 import '../../../presentation/widget/componets/common/app_text_field.dart';
 import '../../../presentation/widget/componets/common/location_dropdown_field.dart';
-import '../../../domain/services/restaurant/notification_service.dart';
+import '../../../domain/services/common/notification_service.dart';
 import '../../../util/common/country_state_city_data.dart';
 import '../../../util/color.dart';
 import '../../../util/common/app_responsive.dart';
@@ -92,6 +92,12 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
     widget.store.setCountry(country);
     widget.store.setState('');
     widget.store.setCity('');
+    // PAN only applies to India; if the user switches away after typing one,
+    // drop it so the store never silently retains a now-hidden field's value.
+    if (!_isIndia && _panController.text.isNotEmpty) {
+      _panController.clear();
+      widget.store.setPan('');
+    }
     final states = await _location.states(country);
     if (!mounted) return;
     setState(() {
@@ -117,6 +123,33 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
 
   String _val(String? v, String fallback) =>
       (v != null && v.isNotEmpty) ? v : fallback;
+
+  /// True when the selected country is India — the single switch that drives
+  /// the Tax & Legal section's fields/labels/validators.
+  bool get _isIndia =>
+      _countryController.text.trim().toLowerCase() == 'india';
+
+  /// Gates the registration-number field's visibility — a legal-status question,
+  /// separate from `widget.store.taxEnabled` (behavioral; read by the Tax Setup
+  /// step and billing logic). V1 onboarding always sets both together (see
+  /// _onTaxRegistrationStatusChanged) but they're independently persisted.
+  bool get _isRegisteredForTax => widget.store.isRegisteredForTax;
+
+  // isRegisteredForTax and taxEnabled are distinct fields in the data model (see
+  // SetupWizardStore), but V1 onboarding only ever sets them together via this one
+  // Yes/No question — no separate control for taxEnabled exists in this wizard.
+  void _onTaxRegistrationStatusChanged(bool registered) {
+    setState(() {
+      widget.store.setIsRegisteredForTax(registered);
+      widget.store.setTaxEnabled(registered);
+      if (!registered) {
+        _gstController.clear();
+        _panController.clear();
+        widget.store.setGstin('');
+        widget.store.setPan('');
+      }
+    });
+  }
 
   void _initializeControllers() {
     _storeNameController = TextEditingController(text: widget.store.storeName ?? '');
@@ -572,7 +605,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                       child: Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: Colors.red,
+                          color: AppColors.danger,
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 2),
                         ),
@@ -619,6 +652,30 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
     return null;
   }
 
+  /// Always optional; format-checked only when non-empty, and only against the
+  /// GSTIN pattern when country is India (Rest of World has no format check).
+  String? _validateGstin(String? v) {
+    final value = (v ?? '').trim();
+    if (value.isEmpty) return null;
+    if (!_isIndia) return null;
+    final pattern = RegExp(
+      r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$',
+      caseSensitive: false,
+    );
+    if (!pattern.hasMatch(value)) return 'Enter a valid 15-character GSTIN';
+    return null;
+  }
+
+  /// Always optional; format-checked only when non-empty. Only ever rendered
+  /// (and therefore only ever has user-entered content) when country is India.
+  String? _validatePan(String? v) {
+    final value = (v ?? '').trim();
+    if (value.isEmpty) return null;
+    final pattern = RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$', caseSensitive: false);
+    if (!pattern.hasMatch(value)) return 'Enter a valid 10-character PAN';
+    return null;
+  }
+
   /// First invalid required field, top-to-bottom → its focus node (null for the
   /// Country/State/City dropdowns, which have none) + the message to show. Used
   /// to notify + scroll-to-error when validation fails with an off-screen field.
@@ -647,6 +704,14 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
     }
     final pinErr = _validatePincode(_pincodeController.text);
     if (pinErr != null) return (focus: _pincodeFocus, message: pinErr);
+    if (_isRegisteredForTax) {
+      final gstErr = _validateGstin(_gstController.text);
+      if (gstErr != null) return (focus: _gstFocus, message: gstErr);
+      if (_isIndia) {
+        final panErr = _validatePan(_panController.text);
+        if (panErr != null) return (focus: _panFocus, message: panErr);
+      }
+    }
     return null;
   }
 
@@ -792,44 +857,161 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
     );
   }
 
-  // ── Legal section (GST + PAN) ──────────────────────────────────────────────────
+  // ── Legal section (registration status + GST/PAN) ──────────────────────────────
 
   Widget _buildLegalSection(BuildContext context) {
+    final isIndia = _isIndia;
     return _sectionCard(
       context,
       title: 'Tax & Legal (Optional)',
       icon: Icons.receipt_long_rounded,
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: AppTextField(
-              controller: _gstController,
-              focusNode: _gstFocus,
-              textInputAction: TextInputAction.next,
-              onFieldSubmitted: (_) => _panFocus.requestFocus(),
-              label: 'Tax ID',
-              hint: 'Optional',
-              icon: Icons.receipt_long_rounded,
-              maxLength: 15,
-              onChanged: (v) => widget.store.setGstin(v),
-            ),
+          _buildTaxRegistrationSelector(context, isIndia: isIndia),
+          if (_isRegisteredForTax) ...[
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
+            isIndia
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: AppTextField(
+                          controller: _gstController,
+                          focusNode: _gstFocus,
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) => _panFocus.requestFocus(),
+                          label: 'GSTIN',
+                          hint: 'Optional',
+                          icon: Icons.receipt_long_rounded,
+                          maxLength: 15,
+                          onChanged: (v) => widget.store.setGstin(v),
+                          validator: _validateGstin,
+                        ),
+                      ),
+                      SizedBox(width: AppResponsive.mediumSpacing(context)),
+                      Expanded(
+                        child: AppTextField(
+                          controller: _panController,
+                          focusNode: _panFocus,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => _panFocus.unfocus(),
+                          label: 'PAN',
+                          hint: 'Optional',
+                          icon: Icons.credit_card_rounded,
+                          maxLength: 10,
+                          onChanged: (v) => widget.store.setPan(v),
+                          validator: _validatePan,
+                        ),
+                      ),
+                    ],
+                  )
+                : AppTextField(
+                    controller: _gstController,
+                    focusNode: _gstFocus,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
+                    label: 'Tax Registration Number',
+                    hint: 'VAT / EIN / Tax ID (optional)',
+                    icon: Icons.receipt_long_rounded,
+                    maxLength: 20,
+                    onChanged: (v) => widget.store.setGstin(v),
+                    validator: _validateGstin,
+                  ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTaxRegistrationSelector(BuildContext context, {required bool isIndia}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          isIndia ? 'GST Registration' : 'Tax Registration',
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w600,
+            color: AppColors.darkNeutral,
           ),
-          SizedBox(width: AppResponsive.mediumSpacing(context)),
-          Expanded(
-            child: AppTextField(
-              controller: _panController,
-              focusNode: _panFocus,
-              textInputAction: TextInputAction.done,
-              onFieldSubmitted: (_) => _panFocus.unfocus(),
-              label: 'Business ID',
-              hint: 'Optional',
-              icon: Icons.credit_card_rounded,
-              maxLength: 10,
-              onChanged: (v) => widget.store.setPan(v),
+        ),
+        if (!isIndia) ...[
+          const SizedBox(height: 2),
+          Text(
+            'Used for VAT, Sales Tax, GST and similar tax systems.',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
             ),
           ),
         ],
+        SizedBox(height: AppResponsive.smallSpacing(context)),
+        _buildTaxRegistrationOption(
+          context,
+          label: 'Registered',
+          selected: _isRegisteredForTax,
+          onTap: () => _onTaxRegistrationStatusChanged(true),
+        ),
+        const SizedBox(height: 8),
+        _buildTaxRegistrationOption(
+          context,
+          label: 'Not Registered',
+          selected: !_isRegisteredForTax,
+          onTap: () => _onTaxRegistrationStatusChanged(false),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTaxRegistrationOption(
+    BuildContext context, {
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary.withValues(alpha: 0.04) : AppColors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.divider,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: selected ? AppColors.primary : Colors.transparent,
+                border: Border.all(
+                  color: selected ? AppColors.primary : AppColors.textSecondary,
+                  width: 2,
+                ),
+              ),
+              child: selected
+                  ? const Icon(Icons.check, size: 12, color: Colors.white)
+                  : null,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: selected ? AppColors.primary : AppColors.darkNeutral,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

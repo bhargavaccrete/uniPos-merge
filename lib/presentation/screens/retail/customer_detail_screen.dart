@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../domain/services/restaurant/notification_service.dart';
-import 'package:billberrylite/data/models/retail/hive_model/customer_model_208.dart';
+import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/presentation/screens/retail/sale_detail_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/receive_payment_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/customer_ledger_screen.dart';
 
 class CustomerDetailScreen extends StatefulWidget {
-  final CustomerModel customer;
+  final Customer customer;
 
   const CustomerDetailScreen({super.key, required this.customer});
 
@@ -22,7 +22,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
   late TabController _tabController;
   List<SaleModel> _customerSales = [];
   bool _isLoading = true;
-  late CustomerModel _customer;
+  late Customer _customer;
 
   @override
   void initState() {
@@ -52,7 +52,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
   }
 
   Future<void> _refreshCustomer() async {
-    final updated = await customerStoreRestail.getCustomerById(_customer.customerId);
+    final updated = await customerStore.getCustomerById(_customer.customerId);
     if (updated != null) {
       setState(() => _customer = updated);
     }
@@ -196,7 +196,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                 updatedAt: DateTime.now().toIso8601String(),
               );
 
-              await customerStoreRestail.updateCustomer(updatedCustomer);
+              await customerStore.updateCustomer(updatedCustomer);
               setState(() => _customer = updatedCustomer);
 
               if (mounted) {
@@ -227,7 +227,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Available Points: ${_customer.pointsBalance}',
+              'Available Points: ${_customer.loyaltyPoints}',
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -257,12 +257,12 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                 NotificationService.instance.showError('Please enter valid points');
                 return;
               }
-              if (points > _customer.pointsBalance) {
+              if (points > _customer.loyaltyPoints) {
                 NotificationService.instance.showError('Insufficient points');
                 return;
               }
 
-              await customerStoreRestail.redeemCustomerPoints(
+              await customerStore.redeemCustomerPoints(
                   _customer.customerId, points);
               await _refreshCustomer();
 
@@ -287,7 +287,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
       appBar: AppBar(
-        title: Text(_customer.name,
+        title: Text(_customer.name ?? '',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
         centerTitle: true,
         elevation: 0,
@@ -356,11 +356,11 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
               children: [
                 _buildInfoRow('Total Purchase',
                     '\u20B9${_customer.totalPurchaseAmount.toStringAsFixed(2)}'),
-                _buildInfoRow('Visit Count', _customer.visitCount.toString()),
+                _buildInfoRow('Visit Count', _customer.totalVisites.toString()),
                 _buildInfoRow(
                   'Last Visited',
-                  _customer.lastVisited != null
-                      ? _formatShortDate(_customer.lastVisited!)
+                  _customer.lastVisitAt != null
+                      ? _formatShortDate(_customer.lastVisitAt!)
                       : 'Never',
                 ),
                 _buildInfoRow('Total Bills', _customerSales.length.toString()),
@@ -373,7 +373,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
               title: 'Loyalty Points',
               icon: Icons.star,
               iconColor: const Color(0xFFFFA726),
-              trailing: _customer.pointsBalance > 0
+              trailing: _customer.loyaltyPoints > 0
                   ? TextButton(
                       onPressed: _showRedeemPointsDialog,
                       child: const Text('Redeem'),
@@ -381,7 +381,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                   : null,
               children: [
                 _buildInfoRow(
-                    'Points Balance', _customer.pointsBalance.toString(),
+                    'Points Balance', _customer.loyaltyPoints.toString(),
                     valueColor: const Color(0xFFFFA726)),
                 _buildInfoRow(
                     'Total Earned', _customer.totalPointEarned.toString()),
@@ -454,7 +454,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
             radius: 35,
             backgroundColor: Colors.white.withOpacity(0.2),
             child: Text(
-              _customer.name[0].toUpperCase(),
+              (_customer.name?.isNotEmpty ?? false) ? _customer.name![0].toUpperCase() : '?',
               style: const TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
@@ -468,7 +468,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _customer.name,
+                  _customer.name ?? '',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -493,7 +493,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                     const SizedBox(width: 12),
                     _buildHeaderBadge(
                       Icons.star,
-                      '${_customer.pointsBalance} pts',
+                      '${_customer.loyaltyPoints} pts',
                     ),
                   ],
                 ),

@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:uuid/uuid.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
-import 'package:billberrylite/data/models/retail/hive_model/customer_model_208.dart';
+import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
@@ -28,7 +28,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
   @override
   void initState() {
     super.initState();
-    customerStoreRestail.loadCustomers();
+    customerStore.loadCustomers();
   }
 
   @override
@@ -37,14 +37,14 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
     super.dispose();
   }
 
-  List<CustomerModel> _getFilteredCustomers() {
+  List<Customer> _getFilteredCustomers() {
     if (_searchQuery.isEmpty) {
-      return customerStoreRestail.customers.toList();
+      return customerStore.customers.toList();
     }
 
-    return customerStoreRestail.customers.where((customer) {
-      final name = customer.name.toLowerCase();
-      final phone = customer.phone.toLowerCase();
+    return customerStore.customers.where((customer) {
+      final name = customer.name?.toLowerCase() ?? '';
+      final phone = customer.phone?.toLowerCase() ?? '';
       final email = customer.email?.toLowerCase() ?? '';
       return name.contains(_searchQuery) ||
           phone.contains(_searchQuery) ||
@@ -106,7 +106,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
           Expanded(
             child: Observer(
               builder: (context) {
-                if (customerStoreRestail.customerCount == 0) {
+                if (customerStore.customerCount == 0) {
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -172,7 +172,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
     );
   }
 
-  Widget _buildCustomerCard(BuildContext context, CustomerModel customer) {
+  Widget _buildCustomerCard(BuildContext context, Customer customer) {
     final width = MediaQuery.of(context).size.width;
 
     final height = MediaQuery.of(context).size.height;
@@ -400,7 +400,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
                 // FIX 8: Duplicate phone check before adding.
                 final phone = phoneController.text.trim();
                 if (phone.isNotEmpty) {
-                  final exists = customerStoreRestail.customers.any(
+                  final exists = customerStore.customers.any(
                     (c) => (c.phone ?? '') == phone,
                   );
                   if (exists) {
@@ -427,7 +427,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
     );
   }
 
-  void _showEditCustomerDialog(BuildContext context, CustomerModel customer) {
+  void _showEditCustomerDialog(BuildContext context, Customer customer) {
     final nameController = TextEditingController(text: customer.name);
     final phoneController = TextEditingController(text: customer.phone);
     final emailController = TextEditingController(text: customer.email);
@@ -535,7 +535,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
     );
   }
 
-  void _showCustomerDetailsDialog(BuildContext context, CustomerModel customer) {
+  void _showCustomerDetailsDialog(BuildContext context, Customer customer) {
     showDialog(
       context: context,
       builder: (context) => AppDialogShell(
@@ -554,8 +554,8 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
               _buildDetailRow(Icons.location_on, 'Address', customer.address!),
             if (customer.notes?.isNotEmpty == true)
               _buildDetailRow(Icons.note, 'Notes', customer.notes!),
-            if (customer.visitCount != null && customer.visitCount! > 0)
-              _buildDetailRow(Icons.shopping_bag, 'Visits', '${customer.visitCount}'),
+            if (customer.totalVisites != null && customer.totalVisites! > 0)
+              _buildDetailRow(Icons.shopping_bag, 'Visits', '${customer.totalVisites}'),
             if (customer.totalPurchaseAmount != null && customer.totalPurchaseAmount! > 0)
               _buildDetailRow(Icons.attach_money, 'Total Purchases',
                   '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(customer.totalPurchaseAmount!)}'),
@@ -607,7 +607,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
     );
   }
 
-  Future<void> _confirmDeleteCustomer(BuildContext context, CustomerModel customer) async {
+  Future<void> _confirmDeleteCustomer(BuildContext context, Customer customer) async {
     final ok = await showAppConfirmDialog(
       context: context,
       title: 'Delete Customer',
@@ -622,7 +622,7 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
   }
 
   Future<void> _addCustomer(String name, String phone, String email, String address, String notes) async {
-    final customer = CustomerModel.create(
+    final customer = Customer.create(
       customerId: const Uuid().v4(),
       name: name,
       phone: phone,
@@ -631,12 +631,12 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
       notes: notes.isNotEmpty ? notes : null,
     );
 
-    await customerStoreRestail.addCustomer(customer);
+    await customerStore.addCustomer(customer);
 
     NotificationService.instance.showSuccess('Customer added successfully');
   }
 
-  Future<void> _updateCustomer(CustomerModel customer, String name, String phone, String email, String address, String notes) async {
+  Future<void> _updateCustomer(Customer customer, String name, String phone, String email, String address, String notes) async {
     final updatedCustomer = customer.copyWith(
       name: name,
       phone: phone,
@@ -646,13 +646,13 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
       updatedAt: DateTime.now().toIso8601String(),
     );
 
-    await customerStoreRestail.updateCustomer(updatedCustomer);
+    await customerStore.updateCustomer(updatedCustomer);
 
     NotificationService.instance.showSuccess('Customer updated successfully');
   }
 
-  Future<void> _deleteCustomer(CustomerModel customer) async {
-    await customerStoreRestail.deleteCustomer(customer.customerId);
+  Future<void> _deleteCustomer(Customer customer) async {
+    await customerStore.deleteCustomer(customer.customerId);
 
     NotificationService.instance.showSuccess('Customer deleted successfully');
   }

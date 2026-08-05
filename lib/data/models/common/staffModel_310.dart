@@ -2,7 +2,7 @@ import 'package:hive/hive.dart';
 import 'package:billberrylite/core/constants/hive_type_ids.dart';
 part 'staffModel_310.g.dart';
 
-@HiveType(typeId:HiveTypeIds.restaurantStaff)
+@HiveType(typeId:HiveTypeIds.staff)
 class StaffModel extends HiveObject{
 
   @HiveField(0)

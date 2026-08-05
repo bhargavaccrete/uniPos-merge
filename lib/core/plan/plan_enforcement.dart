@@ -1,17 +1,22 @@
 import '../di/service_locator.dart';
 import '../../domain/store/restaurant/license_store.dart';
+import '../config/app_config.dart';
 import 'entitlements.dart';
 
 /// Single source of truth for entitlement enforcement, used by BOTH the UI
 /// (hide/disable) and the business logic (validate before execution).
 ///
 /// Strict / deny-by-default: with a real manifest a key resolves to its granted
-/// value (missing ⇒ off/0). The only escape hatch is license bypass (web/dev).
+/// value (missing ⇒ off/0). Escape hatches: license bypass (web/dev), and
+/// retail mode — retail has no licensing/entitlement system of its own, so it
+/// must never be denied by restaurant's deny-by-default catalog when shared
+/// stores (e.g. CategoryStore) call through here.
 /// Keep all enforcement going through here so UI and logic can never diverge.
 class PlanEnforce {
   PlanEnforce._();
 
-  static bool get _bypassed => locator<LicenseStore>().licenseBypassed;
+  static bool get _bypassed =>
+      AppConfig.isRetail || locator<LicenseStore>().licenseBypassed;
 
   /// Action / module / submodule permission (add/edit/delete/export/view/create…).
   static bool allows(String key) => _bypassed || Entitlements.instance.can(key);

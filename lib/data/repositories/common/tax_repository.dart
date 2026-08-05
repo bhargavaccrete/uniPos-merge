@@ -1,13 +1,14 @@
 import 'package:hive/hive.dart';
-import '../../models/restaurant/db/taxmodel_314.dart';
+import '../../../core/constants/hive_box_names.dart';
+import '../../models/common/taxmodel_314.dart';
 
-/// Repository layer for Tax data access (Restaurant)
-/// Handles all Hive database operations for taxes
+/// Repository layer for Tax data access — shared between Restaurant and
+/// Retail (a device only ever runs one mode, so one physical box is enough).
 class TaxRepository {
   late Box<Tax> _taxBox;
 
   TaxRepository() {
-    _taxBox = Hive.box<Tax>('restaurant_taxes');
+    _taxBox = Hive.box<Tax>(HiveBoxNames.tax);
   }
 
   /// Add a new tax

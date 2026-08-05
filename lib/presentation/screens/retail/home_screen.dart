@@ -264,7 +264,7 @@ class HomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Observer(
-                  builder: (context) => _buildStatItem(Icons.people, 'Customers', '${customerStoreRestail.customers.length}', Colors.white),
+                  builder: (context) => _buildStatItem(Icons.people, 'Customers', '${customerStore.customers.length}', Colors.white),
                 ),
               ],
             ),
@@ -383,7 +383,7 @@ class HomeScreen extends StatelessWidget {
             children: [
               Icon(Icons.lock_outline, size: 20, color: const Color(0xFF6B6B6B)),
               const SizedBox(width: 12),
-              const Text('Change Password'),
+              const Text('Change PIN'),
             ],
           ),
         ),

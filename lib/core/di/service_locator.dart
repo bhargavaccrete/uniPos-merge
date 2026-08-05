@@ -8,9 +8,7 @@ import 'package:billberrylite/stores/setup_wizard_store.dart';
 import 'package:billberrylite/stores/payment_method_store.dart';
 
 // ==================== RETAIL IMPORTS ====================
-import 'package:billberrylite/data/repositories/retail/admin_repository.dart';
 import 'package:billberrylite/data/repositories/retail/attribute_repository.dart';
-import 'package:billberrylite/data/repositories/retail/category_model_repository.dart';
 import 'package:billberrylite/data/repositories/retail/credit_payment_repository.dart';
 import 'package:billberrylite/data/repositories/retail/hold_sale_repository.dart';
 import 'package:billberrylite/data/repositories/retail/variant_repository.dart' as retail;
@@ -18,6 +16,7 @@ import 'package:billberrylite/data/repositories/retail/sale_item_repository.dart
 import 'package:billberrylite/domain/services/retail/auth_service.dart';
 import 'package:billberrylite/domain/services/retail/backup_service.dart';
 import 'package:billberrylite/domain/services/retail/gst_service.dart';
+import 'package:billberrylite/domain/services/retail/sku_generator_service.dart';
 import 'package:billberrylite/domain/services/retail/print_service.dart';
 import 'package:billberrylite/domain/services/retail/report_service.dart';
 import 'package:billberrylite/domain/services/retail/stock_alert_service.dart';
@@ -25,7 +24,7 @@ import 'package:billberrylite/domain/services/retail/variant_generator_service.d
 import 'package:billberrylite/domain/store/retail/attribute_store.dart';
 import 'package:billberrylite/domain/store/retail/cart_store.dart' as retail;
 import 'package:billberrylite/domain/store/retail/credit_store.dart';
-import 'package:billberrylite/domain/store/retail/customer_store.dart';
+import 'package:billberrylite/domain/store/common/customer_store.dart';
 import 'package:billberrylite/domain/store/retail/hold_sale_store.dart';
 import 'package:billberrylite/domain/store/retail/product_store.dart';
 import 'package:billberrylite/domain/store/retail/purchase_order_store.dart';
@@ -35,7 +34,7 @@ import 'package:billberrylite/domain/store/retail/stock_alert_store.dart';
 import 'package:billberrylite/domain/store/retail/supplier_store.dart';
 
 // ==================== RESTAURANT IMPORTS ====================
-import 'package:billberrylite/data/repositories/restaurant/category_repository.dart';
+import 'package:billberrylite/data/repositories/common/category_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/item_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/variant_repository.dart' as restaurant;
 import 'package:billberrylite/data/repositories/restaurant/choice_repository.dart';
@@ -44,20 +43,19 @@ import 'package:billberrylite/data/repositories/restaurant/order_repository.dart
 import 'package:billberrylite/data/repositories/restaurant/past_order_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/cart_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/table_repository.dart';
-import 'package:billberrylite/data/repositories/restaurant/customer_repository.dart' as restaurant;
-import 'package:billberrylite/data/repositories/restaurant/staff_repository.dart';
+import 'package:billberrylite/data/repositories/common/customer_repository.dart';
+import 'package:billberrylite/data/repositories/common/staff_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/shift_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/cash_movement_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/cash_handover_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/expense_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/expense_category_repository.dart';
-import 'package:billberrylite/data/repositories/restaurant/tax_repository.dart';
-import 'package:billberrylite/data/repositories/restaurant/company_repository.dart';
+import 'package:billberrylite/data/repositories/common/tax_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/eod_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/item_cancellation_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/printer_repository.dart';
 
-import 'package:billberrylite/domain/store/restaurant/category_store.dart';
+import 'package:billberrylite/domain/store/common/category_store.dart';
 import 'package:billberrylite/domain/store/restaurant/item_store.dart';
 import 'package:billberrylite/domain/store/restaurant/variant_store.dart';
 import 'package:billberrylite/domain/store/restaurant/choice_store.dart';
@@ -66,16 +64,14 @@ import 'package:billberrylite/domain/store/restaurant/order_store.dart';
 import 'package:billberrylite/domain/store/restaurant/past_order_store.dart';
 import 'package:billberrylite/domain/store/restaurant/cart_store.dart' as restaurant;
 import 'package:billberrylite/domain/store/restaurant/table_store.dart';
-import 'package:billberrylite/domain/store/restaurant/customer_store.dart' as restaurant;
-import 'package:billberrylite/domain/store/restaurant/staff_store.dart';
+import 'package:billberrylite/domain/store/common/staff_store.dart';
 import 'package:billberrylite/domain/store/restaurant/shift_store.dart';
 import 'package:billberrylite/domain/store/restaurant/cash_movement_store.dart';
 import 'package:billberrylite/domain/store/restaurant/cash_handover_store.dart';
 import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:billberrylite/domain/store/restaurant/expense_store.dart';
 import 'package:billberrylite/domain/store/restaurant/expense_category_store.dart';
-import 'package:billberrylite/domain/store/restaurant/tax_store.dart';
-import 'package:billberrylite/domain/store/restaurant/company_store.dart';
+import 'package:billberrylite/domain/store/common/tax_store.dart';
 import 'package:billberrylite/domain/store/restaurant/eod_store.dart';
 import 'package:billberrylite/domain/store/restaurant/appStore.dart';
 import 'package:billberrylite/domain/store/restaurant/printer_store.dart';
@@ -90,8 +86,6 @@ import 'package:billberrylite/data/repositories/restaurant/notification_reposito
 
 // Type aliases for convenience getters (to avoid prefixing with 'restaurant.')
 typedef CartStoreRes = restaurant.CartStoreRes;
-typedef CustomerStoreRes = restaurant.CustomerStoreRes;
-typedef CustomerRepositoryRes = restaurant.CustomerRepositoryRes;
 typedef VariantRepositoryRes = restaurant.VariantRepositoryRes;
 
 final locator = GetIt.instance;
@@ -162,16 +156,30 @@ Future<void> _registerRetailDependencies() async {
   locator.registerLazySingleton<ReportService>(() => ReportService());
   locator.registerLazySingleton<StockAlertService>(() => StockAlertService());
   locator.registerLazySingleton<GstService>(() => GstService());
+  locator.registerLazySingleton<SkuGeneratorService>(() => SkuGeneratorService());
 
   // Register Repositories
-  locator.registerLazySingleton<CategoryModelRepository>(() => CategoryModelRepository());
   locator.registerLazySingleton<retail.VariantRepository>(() => retail.VariantRepository());
-  locator.registerLazySingleton<AdminRepository>(() => AdminRepository());
 
-  // Register AuthService (depends on AdminRepository)
-  locator.registerLazySingleton<AuthService>(
-        () => AuthService(locator<AdminRepository>()),
+  // Category CRUD (add/edit/delete) — shared store+repository with restaurant.
+  // Same `Category` model, retail's own box; plan-gating and item-cascade
+  // logic inside are business-mode-aware (see CategoryRepository/CategoryStore).
+  locator.registerLazySingleton<CategoryRepository>(() => CategoryRepository());
+  locator.registerLazySingleton<CategoryStore>(
+    () => CategoryStore(locator<CategoryRepository>()),
   );
+
+  // Tax — shared with restaurant (same Tax entity/box, unified this branch).
+  // Add Product's tax dropdown reads `taxStore.taxes`; without this
+  // registration it throws as soon as the screen loads.
+  locator.registerLazySingleton<TaxRepository>(() => TaxRepository());
+  locator.registerLazySingleton<TaxStore>(
+    () => TaxStore(locator<TaxRepository>()),
+  );
+
+  // Register AuthService — single admin password, SharedPreferences-backed
+  // (same storage approach as restaurant's admin PIN), no Hive model.
+  locator.registerLazySingleton<AuthService>(() => AuthService());
 
   // Ensure default admin account exists
   await locator<AuthService>().ensureDefaultAdmin();
@@ -180,7 +188,23 @@ Future<void> _registerRetailDependencies() async {
   locator.registerLazySingleton<retail.CartStore>(() => retail.CartStore());
   locator.registerLazySingleton<ProductStore>(() => ProductStore());
   locator.registerLazySingleton<SaleStore>(() => SaleStore());
-  locator.registerLazySingleton<CustomerStoreRetail>(() => CustomerStoreRetail());
+
+  // Customer CRUD — shared store+repository with restaurant. Same `Customer`
+  // model, retail's own box; plan-gating inside is a no-op for retail (see
+  // PlanEnforce._bypassed).
+  locator.registerLazySingleton<CustomerRepository>(() => CustomerRepository());
+  locator.registerLazySingleton<CustomerStore>(
+    () => CustomerStore(locator<CustomerRepository>()),
+  );
+
+  // Staff CRUD — shared store+repository with restaurant. Same `StaffModel`
+  // (restaurant's shape only — retail's onboarding no longer collects the
+  // extra permission/employment fields), retail's own box.
+  locator.registerLazySingleton<StaffRepository>(() => StaffRepository());
+  locator.registerLazySingleton<StaffStore>(
+    () => StaffStore(locator<StaffRepository>()),
+  );
+
   locator.registerLazySingleton<SupplierStore>(() => SupplierStore());
   locator.registerLazySingleton<PurchaseStore>(() => PurchaseStore());
   locator.registerLazySingleton<PurchaseOrderStore>(() => PurchaseOrderStore());
@@ -247,7 +271,7 @@ Future<void> _registerRestaurantDependencies() async {
   locator.registerLazySingleton<PastOrderRepository>(() => PastOrderRepository());
   locator.registerLazySingleton<CartRepository>(() => CartRepository());
   locator.registerLazySingleton<TableRepository>(() => TableRepository());
-  locator.registerLazySingleton<CustomerRepositoryRes>(() => CustomerRepositoryRes());
+  locator.registerLazySingleton<CustomerRepository>(() => CustomerRepository());
   locator.registerLazySingleton<StaffRepository>(() => StaffRepository());
   locator.registerLazySingleton<ShiftRepository>(() => ShiftRepository());
   locator.registerLazySingleton<CashMovementRepository>(() => CashMovementRepository());
@@ -255,7 +279,6 @@ Future<void> _registerRestaurantDependencies() async {
   locator.registerLazySingleton<ExpenseRepository>(() => ExpenseRepository());
   locator.registerLazySingleton<ExpenseCategoryRepository>(() => ExpenseCategoryRepository());
   locator.registerLazySingleton<TaxRepository>(() => TaxRepository());
-  locator.registerLazySingleton<CompanyRepository>(() => CompanyRepository());
   locator.registerLazySingleton<EodRepository>(() => EodRepository());
   locator.registerLazySingleton<ItemCancellationRepository>(
       () => ItemCancellationRepository());
@@ -292,8 +315,8 @@ Future<void> _registerRestaurantDependencies() async {
   locator.registerLazySingleton<TableStore>(
     () => TableStore(locator<TableRepository>()),
   );
-  locator.registerLazySingleton<restaurant.CustomerStoreRes>(
-    () => restaurant.CustomerStoreRes(locator<restaurant.CustomerRepositoryRes>()),
+  locator.registerLazySingleton<CustomerStore>(
+    () => CustomerStore(locator<CustomerRepository>()),
   );
   locator.registerLazySingleton<StaffStore>(
     () => StaffStore(locator<StaffRepository>()),
@@ -321,9 +344,6 @@ Future<void> _registerRestaurantDependencies() async {
   );
   locator.registerLazySingleton<TaxStore>(
     () => TaxStore(locator<TaxRepository>()),
-  );
-  locator.registerLazySingleton<CompanyStore>(
-    () => CompanyStore(locator<CompanyRepository>()),
   );
   locator.registerLazySingleton<EodStore>(
     () => EodStore(locator<EodRepository>()),
@@ -370,6 +390,11 @@ Future<void> resetLocator() async {
   await setupServiceLocator();
 }
 
+/// Business details (store name, owner, GST, logo, etc.) — shared between
+/// Restaurant and Retail, populated by the setup wizard's Store Details step.
+BusinessDetailsRepository get businessDetailsRepository =>
+    locator<BusinessDetailsRepository>();
+
 // ==================== MODE-AWARE CONVENIENCE GETTERS ====================
 
 /// Mode-aware cart store getter - works for both retail and restaurant
@@ -388,7 +413,6 @@ dynamic get cartStore {
 retail.CartStore get retailCartStore => locator<retail.CartStore>();
 ProductStore get productStore => locator<ProductStore>();
 SaleStore get saleStore => locator<SaleStore>();
-CustomerStoreRetail get customerStoreRestail => locator<CustomerStoreRetail>();
 SupplierStore get supplierStore => locator<SupplierStore>();
 PurchaseStore get purchaseStore => locator<PurchaseStore>();
 PurchaseOrderStore get purchaseOrderStore => locator<PurchaseOrderStore>();
@@ -403,15 +427,14 @@ ReportService get reportService => locator<ReportService>();
 PrintService get printService => locator<PrintService>();
 StockAlertService get stockAlertService => locator<StockAlertService>();
 GstService get gstService => locator<GstService>();
+SkuGeneratorService get skuGeneratorService => locator<SkuGeneratorService>();
 AuthService get authService => locator<AuthService>();
 VariantGeneratorService get variantGeneratorService => locator<VariantGeneratorService>();
 
 /// Retail Repositories
 SaleItemRepository get saleItemRepository => locator<SaleItemRepository>();
 HoldSaleRepository get holdSaleRepository => locator<HoldSaleRepository>();
-CategoryModelRepository get categoryModelRepository => locator<CategoryModelRepository>();
 retail.VariantRepository get variantRepository => locator<retail.VariantRepository>();
-AdminRepository get adminRepository => locator<AdminRepository>();
 CreditPaymentRepository get creditPaymentRepository => locator<CreditPaymentRepository>();
 AttributeRepository get attributeRepository => locator<AttributeRepository>();
 
@@ -428,7 +451,7 @@ OrderStore get orderStore => locator<OrderStore>();
 PastOrderStore get pastOrderStore => locator<PastOrderStore>();
 CartStoreRes get restaurantCartStore => locator<CartStoreRes>();
 TableStore get tableStore => locator<TableStore>();
-CustomerStoreRes get restaurantCustomerStore => locator<CustomerStoreRes>();
+CustomerStore get customerStore => locator<CustomerStore>();
 StaffStore get staffStore => locator<StaffStore>();
 ShiftStore get shiftStore => locator<ShiftStore>();
 CashMovementStore get cashMovementStore => locator<CashMovementStore>();
@@ -436,7 +459,6 @@ CashHandoverStore  get cashHandoverStore  => locator<CashHandoverStore>();
 ExpenseStore get expenseStore => locator<ExpenseStore>();
 ExpenseCategoryStore get expenseCategoryStore => locator<ExpenseCategoryStore>();
 TaxStore get taxStore => locator<TaxStore>();
-CompanyStore get companyStore => locator<CompanyStore>();
 EodStore get eodStore => locator<EodStore>();
 AppStore get appStore => locator<AppStore>();
 PrinterStore get printerStore => locator<PrinterStore>();
@@ -454,12 +476,11 @@ OrderRepository get orderRepository => locator<OrderRepository>();
 PastOrderRepository get pastOrderRepository => locator<PastOrderRepository>();
 CartRepository get cartRepository => locator<CartRepository>();
 TableRepository get tableRepository => locator<TableRepository>();
-CustomerRepositoryRes get restaurantCustomerRepository => locator<CustomerRepositoryRes>();
+CustomerRepository get customerRepository => locator<CustomerRepository>();
 StaffRepository get staffRepository => locator<StaffRepository>();
 ExpenseRepository get expenseRepository => locator<ExpenseRepository>();
 ExpenseCategoryRepository get expenseCategoryRepository => locator<ExpenseCategoryRepository>();
 TaxRepository get taxRepository => locator<TaxRepository>();
-CompanyRepository get companyRepository => locator<CompanyRepository>();
 EodRepository get eodRepository => locator<EodRepository>();
 
 // ==================== GLOBAL REFRESH FUNCTION ====================

@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
@@ -401,7 +402,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
               children: [
                 Text(
                   currentStepInfo.title,
-                  style: const TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: 26,
                     fontWeight: FontWeight.bold,
                     color: AppColors.darkNeutral,
@@ -410,7 +411,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
                 const SizedBox(height: 4),
                 Text(
                   currentStepInfo.description,
-                  style: TextStyle(fontSize: 15, color: Colors.grey[600]),
+                  style: GoogleFonts.poppins(fontSize: 15, color: AppColors.textSecondary),
                 ),
               ],
             ),
@@ -427,7 +428,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
                 const SizedBox(width: 8),
                 Text(
                   'Est. ${currentStepInfo.estimatedTime}',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: 14,
                     color: AppColors.info,
                     fontWeight: FontWeight.w500,
@@ -462,7 +463,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
               children: [
                 Text(
                   'Setup Wizard',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: AppResponsive.headingFontSize(context),
                     fontWeight: FontWeight.bold,
                     color: AppColors.darkNeutral,
@@ -470,7 +471,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
                 ),
                 Text(
                   'Step ${_store.currentStep + 1} of $_totalSteps · ~${currentStepInfo.estimatedTime}',
-                  style: TextStyle(fontSize: AppResponsive.smallFontSize(context), color: Colors.grey[600]),
+                  style: GoogleFonts.poppins(fontSize: AppResponsive.smallFontSize(context), color: AppColors.textSecondary),
                 ),
               ],
             ),
@@ -489,7 +490,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
       height: 5,
       margin: EdgeInsets.symmetric(horizontal: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
-        color: Colors.grey[300],
+        color: AppColors.divider,
         borderRadius: BorderRadius.circular(2),
       ),
       child: LayoutBuilder(
@@ -550,21 +551,24 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         ),
       ),
 
-      // Step 3: Verify Email - self-signup OTP + license key
-      SlideTransition(
-        position: _slideAnimation,
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: EmailVerificationStep(
-            store: _store,
-            onNext: _nextStep,
-            onPrevious: _previousStep,
+      // Step 3: Verify Email - self-signup OTP + license key. Restaurant only —
+      // retail has no licensing/entitlement system yet (see PlanEnforce._bypassed).
+      if (AppConfig.isRestaurant)
+        SlideTransition(
+          position: _slideAnimation,
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: EmailVerificationStep(
+              store: _store,
+              onNext: _nextStep,
+              onPrevious: _previousStep,
+            ),
           ),
         ),
-      ),
 
-      // Tax Setup — settings module; hidden when the plan excludes it.
-      if (PlanEnforce.allows(EntKeys.settings))
+      // Tax Setup — settings module; hidden when the plan excludes it, or when the
+      // business answered "Not Registered" on Store Details (taxEnabled == false).
+      if (PlanEnforce.allows(EntKeys.settings) && _store.taxEnabled)
         SlideTransition(
           position: _slideAnimation,
           child: FadeTransition(
@@ -725,9 +729,9 @@ class SetupSidebar extends StatelessWidget {
             child: const Center(child: Icon(Icons.store, size: 40, color: Colors.white)),
           ),
           const SizedBox(height: 15),
-          const Text(
+          Text(
             'Bill Berry Lite Setup',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               color: Colors.white,
               fontSize: 22,
               fontWeight: FontWeight.bold,
@@ -743,7 +747,7 @@ class SetupSidebar extends StatelessWidget {
             ),
             child: Text(
               '${currentStep + 1} of $totalSteps Steps',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 color: Colors.white.withOpacity(0.9),
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -771,11 +775,11 @@ class SetupSidebar extends StatelessWidget {
             children: [
               Text(
                 'Progress',
-                style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13),
+                style: GoogleFonts.poppins(color: Colors.white.withOpacity(0.8), fontSize: 13),
               ),
               Text(
                 '${((currentStep + 1) / totalSteps * 100).round()}%',
-                style: const TextStyle(
+                style: GoogleFonts.poppins(
                   color: Colors.white,
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -870,7 +874,7 @@ class SetupSidebar extends StatelessWidget {
                         children: [
                           Text(
                             step.title,
-                            style: TextStyle(
+                            style: GoogleFonts.poppins(
                               fontSize: 14,
                               fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                               color: isActive
@@ -881,9 +885,9 @@ class SetupSidebar extends StatelessWidget {
                           if (isCompleted)
                             Container(
                               margin: const EdgeInsets.only(top: 2),
-                              child: const Text(
+                              child: Text(
                                 'Completed',
-                                style: TextStyle(
+                                style: GoogleFonts.poppins(
                                   fontSize: 11,
                                   color: AppColors.success,
                                   fontWeight: FontWeight.w500,
@@ -900,9 +904,9 @@ class SetupSidebar extends StatelessWidget {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Text(
+                        child: Text(
                           'Current',
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             fontSize: 10,
                             color: AppColors.primary,
                             fontWeight: FontWeight.bold,
@@ -927,7 +931,7 @@ class SetupSidebar extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: onGetHelp,
             icon: const Icon(Icons.help_outline, size: 18),
-            label: const Text('Get Help'),
+            label: Text('Get Help', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.white,
               side: BorderSide(color: Colors.white.withOpacity(0.3)),
@@ -940,7 +944,7 @@ class SetupSidebar extends StatelessWidget {
           TextButton.icon(
             onPressed: onExit,
             icon: const Icon(Icons.exit_to_app, size: 18),
-            label: const Text('Save & Exit'),
+            label: Text('Save & Exit', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
             style: TextButton.styleFrom(
               foregroundColor: Colors.white.withOpacity(0.8),
             ),
@@ -986,13 +990,16 @@ class SetupStep {
         description: 'Basic details about your store',
         estimatedTime: '2 min',
       ),
-      const SetupStep(
-        title: 'Verify Email',
-        icon: Icons.mark_email_read_rounded,
-        description: 'Verify your email and activate your license',
-        estimatedTime: '2 min',
-      ),
-      if (PlanEnforce.allows(EntKeys.settings))
+      // Restaurant only — retail has no licensing/entitlement system yet.
+      if (AppConfig.isRestaurant)
+        const SetupStep(
+          title: 'Verify Email',
+          icon: Icons.mark_email_read_rounded,
+          description: 'Verify your email and activate your license',
+          estimatedTime: '2 min',
+        ),
+      if (PlanEnforce.allows(EntKeys.settings) &&
+          locator<SetupWizardStore>().taxEnabled)
         const SetupStep(
           title: 'Tax Setup',
           icon: Icons.receipt,
@@ -1121,7 +1128,7 @@ class WelcomeStep extends StatelessWidget {
                   // Title
                   Text(
                     'Welcome to Bill Berry Lite Setup',
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.getValue(context, mobile: 22.0, tablet: 26.0, desktop: 30.0),
                       fontWeight: FontWeight.bold,
                       color: AppColors.darkNeutral,
@@ -1131,7 +1138,7 @@ class WelcomeStep extends StatelessWidget {
                   SizedBox(height: AppResponsive.smallSpacing(context)),
                   Text(
                     "Let's get your store up and running in just a few minutes",
-                    style: TextStyle(fontSize: AppResponsive.bodyFontSize(context), color: Colors.grey[600]),
+                    style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), color: AppColors.textSecondary),
                     textAlign: TextAlign.center,
                   ),
                   SizedBox(height: AppResponsive.largeSpacing(context)),
@@ -1164,7 +1171,7 @@ class WelcomeStep extends StatelessWidget {
                       ),
                       child: Text(
                         "Let's Start",
-                        style: TextStyle(
+                        style: GoogleFonts.poppins(
                           fontSize: AppResponsive.buttonFontSize(context),
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
@@ -1196,7 +1203,7 @@ class WelcomeStep extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             label,
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.smallFontSize(context),
               color: AppColors.primary,
               fontWeight: FontWeight.w500,
@@ -1252,7 +1259,7 @@ class ReviewStep extends StatelessWidget {
             SizedBox(height: AppResponsive.mediumSpacing(context)),
             Text(
               'Setup Complete!',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: AppResponsive.getValue(context, mobile: 22.0, tablet: 26.0, desktop: 28.0),
                 fontWeight: FontWeight.bold,
                 color: AppColors.darkNeutral,
@@ -1261,7 +1268,7 @@ class ReviewStep extends StatelessWidget {
             SizedBox(height: AppResponsive.smallSpacing(context)),
             Text(
               'Your store is ready to use',
-              style: TextStyle(fontSize: AppResponsive.bodyFontSize(context), color: Colors.grey[600]),
+              style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), color: AppColors.textSecondary),
             ),
             SizedBox(height: AppResponsive.largeSpacing(context)),
             Container(
@@ -1290,6 +1297,7 @@ class ReviewStep extends StatelessWidget {
               onPressed: onComplete,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.success,
+                elevation: 0,
                 padding: EdgeInsets.symmetric(
                   horizontal: AppResponsive.getValue(context, mobile: 32.0, tablet: 44.0, desktop: 50.0),
                   vertical: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 15.0),
@@ -1298,7 +1306,7 @@ class ReviewStep extends StatelessWidget {
               ),
               child: Text(
                 'Go to Dashboard',
-                style: TextStyle(color: AppColors.white, fontSize: AppResponsive.buttonFontSize(context), fontWeight: FontWeight.w600),
+                style: GoogleFonts.poppins(color: AppColors.white, fontSize: AppResponsive.buttonFontSize(context), fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -1316,10 +1324,10 @@ class ReviewStep extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(fontSize: AppResponsive.smallFontSize(context), color: Colors.grey[600])),
+          Text(label, style: GoogleFonts.poppins(fontSize: AppResponsive.smallFontSize(context), color: AppColors.textSecondary)),
           Text(
             value,
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.smallFontSize(context),
               fontWeight: FontWeight.w600,
               color: AppColors.darkNeutral,

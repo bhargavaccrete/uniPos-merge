@@ -9,7 +9,7 @@ import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
-import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
+import 'package:billberrylite/data/models/common/categorymodel_300.dart';
 import 'package:billberrylite/presentation/screens/restaurant/manage%20menu/tab/edit_item.dart' show EdititemScreen;
 import 'package:billberrylite/presentation/widget/componets/restaurant/componets/bottomsheet.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
