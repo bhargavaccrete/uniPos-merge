@@ -1,4 +1,5 @@
 import 'package:mobx/mobx.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../data/models/retail/hive_model/product_model_200.dart';
 import '../../../data/models/retail/hive_model/variante_model_201.dart';
@@ -8,6 +9,10 @@ import '../../../core/di/service_locator.dart';
 
 
 part 'product_store.g.dart';
+
+/// Stock tiers, aligned with the canonical rule in `report_service`/`StockAlertService`
+/// so Inventory and the Stock Alerts screen never disagree.
+enum RetailStockStatus { outOfStock, critical, low, inStock }
 
 class ProductStore = _ProductStore with _$ProductStore;
 
@@ -19,6 +24,12 @@ abstract class _ProductStore with Store {
   @observable
   ObservableList<ProductModel> products = ObservableList<ProductModel>();
 
+  /// Variants live in their own box — products and variants stay separate models.
+  /// Holding them here lets screens read stock/price synchronously inside an
+  /// `Observer`, without a `FutureBuilder` per card.
+  @observable
+  ObservableList<VarianteModel> variants = ObservableList<VarianteModel>();
+
   _ProductStore() {
     _productRepository = ProductRepository();
     _variantRepository = VariantRepository();
@@ -28,6 +39,7 @@ abstract class _ProductStore with Store {
   Future<void> _init() async {
     // Load data from repositories
     await loadProducts();
+    await loadVariants();
   }
 
   // ==================== PRODUCT OPERATIONS ====================
@@ -51,6 +63,57 @@ abstract class _ProductStore with Store {
     products.add(product);
   }
 
+  /// Create a single-variant product in one step — used by the POS "product not
+  /// found for this barcode" flow. Model construction lives here rather than in
+  /// the screen so the id/timestamp rules stay in one place.
+  @action
+  Future<(ProductModel, VarianteModel)> createSimpleProduct({
+    required String name,
+    required String categoryId,
+    required String barcode,
+    required double sellingPrice,
+    double? mrp,
+    int stockQty = 1,
+  }) async {
+    const uuid = Uuid();
+    final productId = uuid.v4();
+    final now = DateTime.now().toIso8601String();
+    final effectiveMrp = mrp ?? sellingPrice;
+
+    final product = ProductModel(
+      productId: productId,
+      productName: name,
+      category: categoryId,
+      description: '',
+      hasVariants: false,
+      createdAt: now,
+      updateAt: now,
+      productType: 'simple',
+      defaultPrice: sellingPrice,
+      defaultMrp: effectiveMrp,
+    );
+
+    final variant = VarianteModel(
+      varianteId: uuid.v4(),
+      productId: productId,
+      barcode: barcode,
+      sellingPrice: sellingPrice,
+      mrp: effectiveMrp,
+      costPrice: 0,
+      stockQty: stockQty,
+      sku: '',
+      createdAt: now,
+      updateAt: now,
+      isDefault: true,
+      status: 'active',
+    );
+
+    await addProduct(product);
+    await addVariant(variant);
+
+    return (product, variant);
+  }
+
   @action
   Future<void> updateProduct(ProductModel product) async {
     // Update in database
@@ -68,8 +131,10 @@ abstract class _ProductStore with Store {
     // Delete from database (also deletes variants)
     await _productRepository.deleteProduct(productId);
 
-    // Update UI state
+    // Update UI state — the repository cascades the variant delete, so the
+    // in-memory list has to be pruned to match.
     products.removeWhere((p) => p.productId == productId);
+    variants.removeWhere((v) => v.productId == productId);
   }
 
   /// Find product by barcode (searches through variants)
@@ -117,6 +182,75 @@ abstract class _ProductStore with Store {
 
   // ==================== VARIANT OPERATIONS ====================
 
+  @action
+  Future<void> loadVariants() async {
+    final loaded = await _variantRepository.getAllVariants();
+    variants
+      ..clear()
+      ..addAll(loaded);
+  }
+
+  /// Product id → its variants. This is the join between the two separate
+  /// models; MobX memoises it, so reading it repeatedly inside one reaction is
+  /// free. Building it once is O(V) instead of O(products × variants).
+  @computed
+  Map<String, List<VarianteModel>> get variantsByProduct {
+    final map = <String, List<VarianteModel>>{};
+    for (final v in variants) {
+      (map[v.productId] ??= <VarianteModel>[]).add(v);
+    }
+    return map;
+  }
+
+  /// Synchronous variant lookup — safe to call inside an `Observer`.
+  List<VarianteModel> variantsFor(String productId) =>
+      variantsByProduct[productId] ?? const <VarianteModel>[];
+
+  int variantCountFor(String productId) => variantsFor(productId).length;
+
+  int totalStockFor(String productId) =>
+      variantsFor(productId).fold<int>(0, (sum, v) => sum + v.stockQty);
+
+  /// The variant whose price represents the product on a card. Deliberately
+  /// `.first` (Hive insertion order) to preserve existing display behaviour.
+  VarianteModel? primaryVariantFor(String productId) {
+    final vs = variantsFor(productId);
+    return vs.isEmpty ? null : vs.first;
+  }
+
+  double costPriceFor(String productId) =>
+      primaryVariantFor(productId)?.costPrice ?? 0.0;
+
+  // ==================== STOCK CLASSIFICATION ====================
+
+  /// Canonical threshold, from the same SharedPreferences key the Stock Alerts
+  /// screen uses. Observable, so changing it re-renders every dependent view.
+  int get lowStockThreshold => stockAlertStore.threshold;
+
+  RetailStockStatus stockStatusForQty(int qty) {
+    if (qty <= 0) return RetailStockStatus.outOfStock;
+    if (qty <= 3) return RetailStockStatus.critical;
+    if (qty <= lowStockThreshold) return RetailStockStatus.low;
+    return RetailStockStatus.inStock;
+  }
+
+  RetailStockStatus stockStatusForVariant(VarianteModel variant) =>
+      stockStatusForQty(variant.stockQty);
+
+  RetailStockStatus stockStatusForProduct(String productId) =>
+      stockStatusForQty(totalStockFor(productId));
+
+  /// Replace in place, never remove-then-add: card prices key off
+  /// `variants.first`, so reordering would silently change what's displayed.
+  void _upsertVariantInMemory(VarianteModel variant) {
+    final i = variants.indexWhere((v) => v.varianteId == variant.varianteId);
+    if (i == -1) {
+      variants.add(variant);
+    } else {
+      variants[i] = variant;
+    }
+  }
+
   /// Get all variants for a product
   Future<List<VarianteModel>> getVariantsForProduct(String productId) async {
     return await _variantRepository.getVariantsByProductId(productId);
@@ -125,28 +259,37 @@ abstract class _ProductStore with Store {
   @action
   Future<void> addVariant(VarianteModel variant) async {
     await _variantRepository.addVariant(variant);
+    _upsertVariantInMemory(variant);
   }
 
   @action
   Future<void> updateVariant(VarianteModel variant) async {
     await _variantRepository.updateVariant(variant);
+    _upsertVariantInMemory(variant);
   }
 
   @action
   Future<void> deleteVariant(String variantId) async {
     await _variantRepository.deleteVariant(variantId);
+    variants.removeWhere((v) => v.varianteId == variantId);
   }
 
   /// Update stock for a variant
   @action
   Future<void> updateVariantStock(String variantId, int newStock) async {
     await _variantRepository.updateStock(variantId, newStock);
+    // Re-read rather than rebuilding with copyWith — copyWith bumps `updateAt`
+    // to now, which would drift the in-memory copy from what was persisted.
+    final persisted = await _variantRepository.getVariantById(variantId);
+    if (persisted != null) _upsertVariantInMemory(persisted);
   }
 
   /// Update cost price for a variant
   @action
   Future<void> updateVariantCostPrice(String variantId, double newCostPrice) async {
     await _variantRepository.updateCostPrice(variantId, newCostPrice);
+    final persisted = await _variantRepository.getVariantById(variantId);
+    if (persisted != null) _upsertVariantInMemory(persisted);
   }
 
   /// Find variant by barcode
@@ -207,8 +350,8 @@ abstract class _ProductStore with Store {
             final variant = VarianteModel.create(
               varianteId: 'p${index}_v$variantIndex',
               productId: 'p$index',
-              size: size,
-              color: color,
+
+
               costPrice: (index + 1) * 10.0 + variantIndex,
               stockQty: (index + 1) * 5,
               barcode: '123456789$index$variantIndex',
@@ -240,5 +383,6 @@ abstract class _ProductStore with Store {
     await categoryRepository.clearAll();
     await categoryStore.loadCategories();
     products.clear();
+    variants.clear();
   }
 }

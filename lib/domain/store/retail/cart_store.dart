@@ -1,4 +1,3 @@
-import 'package:hive/hive.dart';
 import 'package:mobx/mobx.dart';
 import 'package:billberrylite/data/models/common/categorymodel_300.dart';
 import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
@@ -9,7 +8,9 @@ import '../../../core/di/service_locator.dart';
 import '../../../core/config/tax_feature.dart';
 import '../../../data/models/retail/hive_model/cart_model_202.dart';
 import '../../../data/models/retail/hive_model/billing_tab_model_173.dart';
+import '../../../data/repositories/retail/cart_repository.dart';
 import '../../services/retail/gst_service.dart';
+import '../../services/retail/retail_billing_service.dart';
 
 
 
@@ -52,22 +53,23 @@ class CartOperationResult {
 class CartStore = _CartStore with _$CartStore;
 
 abstract class _CartStore with Store {
-  late Box<CartItemModel> _cartBox;
-  late Box<BillingTabModel> _tabBox;
+  final CartRepository _repository;
 
-  _CartStore() {
-    _cartBox = Hive.box<CartItemModel>('cartItems');
-    _tabBox = Hive.box<BillingTabModel>('billingTabs');
-
-    // Initialize tabs from Hive or create default tab
-    if (_tabBox.isEmpty) {
+  _CartStore(this._repository) {
+    // Restore saved tabs, or create the default one on a fresh install
+    final savedTabs = _repository.getAllTabs();
+    if (savedTabs.isEmpty) {
       _createInitialTab();
     } else {
-      tabs.addAll(_tabBox.values);
+      tabs.addAll(savedTabs);
     }
 
     // Load cart items from the active tab
     _loadActiveTabItems();
+
+    // Tax mode lives in SharedPreferences, so it can't be read synchronously
+    // here. Load it in the background; `bill` recomputes when it lands.
+    loadTaxMode();
   }
 
   @observable
@@ -79,6 +81,69 @@ abstract class _CartStore with Store {
   @observable
   int activeTabIndex = 0;
 
+  // ==================== BILLING INPUTS ====================
+  // The inputs to the bill live here rather than in a screen, so the POS
+  // footer, checkout and receipt all read the same numbers.
+
+  /// Retail's own tax-inclusive setting (GstService), NOT the restaurant
+  /// AppSettings toggle — they are separate keys.
+  @observable
+  bool isTaxInclusive = false;
+
+  @observable
+  DiscountType discountType = DiscountType.amount;
+
+  /// Raw discount input as typed. The engine clamps it to the bill.
+  @observable
+  double discountValue = 0;
+
+  /// Currency value of loyalty points being redeemed.
+  @observable
+  double loyaltyRedemption = 0;
+
+  /// The single source of truth for every money figure in retail.
+  ///
+  /// MobX memoises this, so reading it repeatedly in a build is free; it only
+  /// recomputes when the cart or a billing input actually changes.
+  ///
+  /// Note: it also reads `AppSettings.roundOff` and `TaxFeature.enabled`, which
+  /// are not observables — changing those mid-bill won't invalidate this. They
+  /// are set in settings screens that rebuild anyway.
+  @computed
+  RetailBill get bill => RetailBillingService.compute(
+        items: items,
+        isTaxInclusive: isTaxInclusive,
+        discountType: discountType,
+        discountValue: discountValue,
+        loyaltyRedemption: loyaltyRedemption,
+      );
+
+  @action
+  Future<void> loadTaxMode() async {
+    isTaxInclusive = await RetailBillingService.loadTaxInclusive();
+  }
+
+  @action
+  void setDiscount({DiscountType? type, double? value}) {
+    if (type != null) discountType = type;
+    if (value != null) discountValue = value;
+  }
+
+  @action
+  void setLoyaltyRedemption(double value) {
+    loyaltyRedemption = value < 0 ? 0 : value;
+  }
+
+  /// Reset the bill inputs. Must run whenever we move to a different sale —
+  /// clearing the cart or switching tabs — or a discount silently carries over
+  /// onto the next customer's bill.
+  @action
+  void resetBillingInputs() {
+    discountType = DiscountType.amount;
+    discountValue = 0;
+    loyaltyRedemption = 0;
+  }
+
   /// Create initial default tab
   void _createInitialTab() {
     final defaultTab = BillingTabModel(
@@ -88,16 +153,21 @@ abstract class _CartStore with Store {
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
-    _tabBox.put(defaultTab.id, defaultTab);
+    _repository.saveTab(defaultTab);
     tabs.add(defaultTab);
   }
 
-  /// Load items from the active tab
+  /// Load items from the active tab.
+  ///
+  /// This is the one choke point for "the active sale changed", so the bill
+  /// inputs reset here too — a discount typed on Tab 1 must not follow you to
+  /// Tab 2.
   void _loadActiveTabItems() {
     items.clear();
     if (tabs.isNotEmpty && activeTabIndex < tabs.length) {
       items.addAll(tabs[activeTabIndex].items);
     }
+    resetBillingInputs();
   }
 
   @computed
@@ -195,14 +265,26 @@ abstract class _CartStore with Store {
     return breakdown;
   }
 
+  /// Add [variant] to the cart.
+  ///
+  /// [priceOverride]/[gstRateOverride]/[qty] exist for restoring a parked sale:
+  /// the bill was frozen when it was parked, so it must be replayed at the
+  /// parked figures rather than re-priced from whatever the rates are now.
   @action
-  Future<CartOperationResult> addItem(ProductModel product, VarianteModel variant, {Category? category}) async {
+  Future<CartOperationResult> addItem(
+    ProductModel product,
+    VarianteModel variant, {
+    Category? category,
+    double? priceOverride,
+    double? gstRateOverride,
+    int qty = 1,
+  }) async {
     final availableStock = variant.stockQty;
 
     // Check if the same variant is already in the cart
     final index = items.indexWhere((item) => item.variantId == variant.varianteId);
     final currentQtyInCart = index != -1 ? items[index].qty : 0;
-    final requestedQty = currentQtyInCart + 1;
+    final requestedQty = currentQtyInCart + qty;
 
     // Stock validation: Check if item is out of stock
     if (availableStock <= 0) {
@@ -228,7 +310,8 @@ abstract class _CartStore with Store {
     // Get GST rate using priority: Variant > Product > Default (0%). GST/HSN
     // live on the product/variant, not the category (a category can contain
     // items with different tax classes — e.g. cotton vs synthetic garments).
-    final effectiveGstRate = await _getEffectiveGstRate(variant, product);
+    final effectiveGstRate =
+        gstRateOverride ?? await _getEffectiveGstRate(variant, product);
     final effectiveHsnCode = _getEffectiveHsnCode(variant, product);
 
     // Check if tax inclusive mode is enabled
@@ -237,15 +320,13 @@ abstract class _CartStore with Store {
     if (index != -1) {
       // Update quantity for existing item
       final item = items[index];
-      final updatedQty = item.qty + 1;
+      final updatedQty = item.qty + qty;
       final updatedItem = CartItemModel.create(
         cartItemId: item.cartItemId,
         variantId: item.variantId,
         productId: item.productId,
         productName: item.productName,
-        size: item.size,
-        color: item.color,
-        weight: item.weight,
+        attributes: item.attributes,
         price: item.price,
         qty: updatedQty,
         barcode: item.barcode,
@@ -255,8 +336,7 @@ abstract class _CartStore with Store {
         taxInclusive: taxInclusive,
       );
 
-      // Update in Hive
-      await _cartBox.put(item.cartItemId, updatedItem);
+      await _repository.saveCartItem(updatedItem);
 
       // Update in observable list - use removeAt + insert for better reactivity
       items.removeAt(index);
@@ -266,17 +346,17 @@ abstract class _CartStore with Store {
 
     // If not, add it as a new item
     final cartItemId = '${variant.varianteId}_${DateTime.now().millisecondsSinceEpoch}';
-    final price = variant.sellingPrice ?? variant.mrp ?? 0.0;
+    final price = priceOverride ?? variant.sellingPrice ?? variant.mrp ?? 0.0;
     final newItem = CartItemModel.create(
       cartItemId: cartItemId,
       variantId: variant.varianteId,
       productId: product.productId,
       productName: product.productName,
-      size: variant.size,
-      color: variant.color,
-      weight: variant.weight,
+      // Capture ALL descriptors, not just the three legacy columns, so a
+      // configured attribute (Flavour, Storage…) survives into the sale.
+      attributes: attributeStore.attributesOf(variant),
       price: price,
-      qty: 1,
+      qty: qty,
       barcode: variant.barcode,
       gstRate: effectiveGstRate,
       hsnCode: effectiveHsnCode,
@@ -284,8 +364,7 @@ abstract class _CartStore with Store {
       taxInclusive: taxInclusive,
     );
 
-    // Save to Hive
-    await _cartBox.put(cartItemId, newItem);
+    await _repository.saveCartItem(newItem);
 
     // Add to observable list at the top
     items.insert(0, newItem);
@@ -334,8 +413,7 @@ abstract class _CartStore with Store {
 
     final item = items[index];
 
-    // Remove from Hive
-    await _cartBox.delete(item.cartItemId);
+    await _repository.deleteCartItem(item.cartItemId);
 
     // Remove from observable list
     items.removeWhere((item) => item.variantId == variantId);
@@ -373,9 +451,7 @@ abstract class _CartStore with Store {
       variantId: item.variantId,
       productId: item.productId,
       productName: item.productName,
-      size: item.size,
-      color: item.color,
-      weight: item.weight,
+      attributes: item.attributes,
       price: item.price,
       qty: requestedQty,
       barcode: item.barcode,
@@ -385,8 +461,7 @@ abstract class _CartStore with Store {
       taxInclusive: taxInclusive,
     );
 
-    // Update in Hive
-    await _cartBox.put(item.cartItemId, updatedItem);
+    await _repository.saveCartItem(updatedItem);
 
     // Update in observable list - use removeAt + insert for better reactivity
     items.removeAt(index);
@@ -410,9 +485,7 @@ abstract class _CartStore with Store {
           variantId: item.variantId,
           productId: item.productId,
           productName: item.productName,
-          size: item.size,
-          color: item.color,
-          weight: item.weight,
+          attributes: item.attributes,
           price: item.price,
           qty: updatedQty,
           barcode: item.barcode,
@@ -422,8 +495,7 @@ abstract class _CartStore with Store {
           taxInclusive: taxInclusive,
         );
 
-        // Update in Hive
-        await _cartBox.put(item.cartItemId, updatedItem);
+        await _repository.saveCartItem(updatedItem);
 
         // Update in observable list - use removeAt + insert for better reactivity
         items.removeAt(index);
@@ -436,8 +508,11 @@ abstract class _CartStore with Store {
 
   @action
   Future<void> clearCart() async {
-    await _cartBox.clear();
+    await _repository.clearCartItems();
     items.clear();
+    // The sale is over — drop the discount/loyalty so they can't leak onto
+    // the next customer.
+    resetBillingInputs();
   }
 
   /// Check if a variant is in cart
@@ -455,13 +530,18 @@ abstract class _CartStore with Store {
     return 0;
   }
 
-  /// Get display name for cart item (with variant details)
+  /// Get display name for cart item (with variant details).
+  ///
+  /// Reads the item's own stored attributes, falling back to the legacy
+  /// columns for lines added before generic attributes existed.
   String getDisplayName(CartItemModel item) {
-    final parts = <String>[item.productName];
-    if (item.size != null) parts.add('Size: ${item.size}');
-    if (item.color != null) parts.add('Color: ${item.color}');
-    if (item.weight != null) parts.add('Weight: ${item.weight}');
-    return parts.join(' - ');
+    final descriptor = attributeStore.describeAttributes(
+      item.attributes,
+      separator: ' - ',
+    );
+    return descriptor.isEmpty
+        ? item.productName
+        : '${item.productName} - $descriptor';
   }
 
   /// Get available stock for a variant
@@ -493,6 +573,11 @@ abstract class _CartStore with Store {
   /// Create a new tab
   @action
   Future<void> createNewTab() async {
+    // Persist the current tab's cart before switching away from it,
+    // otherwise its items never make it into its BillingTabModel and
+    // _loadActiveTabItems() below wipes them from view.
+    await _saveCurrentTabItems();
+
     final tabNumber = tabs.length + 1;
     final newTab = BillingTabModel(
       id: const Uuid().v4(),
@@ -502,8 +587,7 @@ abstract class _CartStore with Store {
       updatedAt: DateTime.now(),
     );
 
-    // Save to Hive
-    await _tabBox.put(newTab.id, newTab);
+    await _repository.saveTab(newTab);
 
     // Add to tabs list
     tabs.add(newTab);
@@ -538,8 +622,7 @@ abstract class _CartStore with Store {
 
     final tabToClose = tabs[index];
 
-    // Remove from Hive
-    await _tabBox.delete(tabToClose.id);
+    await _repository.deleteTab(tabToClose.id);
 
     // Remove from tabs list
     tabs.removeAt(index);
@@ -565,8 +648,7 @@ abstract class _CartStore with Store {
       updatedAt: DateTime.now(),
     );
 
-    // Update in Hive
-    await _tabBox.put(updatedTab.id, updatedTab);
+    await _repository.saveTab(updatedTab);
 
     // Update in observable list
     tabs[activeTabIndex] = updatedTab;
@@ -622,8 +704,7 @@ abstract class _CartStore with Store {
       updatedAt: DateTime.now(),
     );
 
-    // Update in Hive
-    await _tabBox.put(updatedTab.id, updatedTab);
+    await _repository.saveTab(updatedTab);
 
     // Update in observable list
     tabs[activeTabIndex] = updatedTab;
@@ -632,7 +713,7 @@ abstract class _CartStore with Store {
   /// Clear all tabs
   @action
   Future<void> clearAllTabs() async {
-    await _tabBox.clear();
+    await _repository.clearTabs();
     tabs.clear();
     _createInitialTab();
     activeTabIndex = 0;

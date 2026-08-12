@@ -20,14 +20,13 @@ class HoldSaleItemModel extends HiveObject {
   @HiveField(4)
   final String productName;
 
-  @HiveField(5)
-  final String? size;
 
-  @HiveField(6)
-  final String? color;
 
-  @HiveField(7)
-  final String? weight;
+
+  /// Variant descriptors as `{attributeName: value}`, captured when the sale
+  /// was parked.
+  @HiveField(17)
+  final Map<String, String>? attributes;
 
   @HiveField(8)
   final double price;
@@ -44,20 +43,38 @@ class HoldSaleItemModel extends HiveObject {
   @HiveField(12)
   final String createdAt;
 
+  // ==================== TAX BASIS ====================
+  // Parked with the line so restoring reproduces the bill it was parked at.
+  // Without these a park/restore across a rate change silently reprices.
+
+  @HiveField(13)
+  final double? gstRate; // percent, e.g. 18
+
+  @HiveField(14)
+  final double? taxableAmount; // after this line's share of the discount
+
+  @HiveField(15)
+  final double? gstAmount;
+
+  @HiveField(16)
+  final double? discountAmount;
+
   HoldSaleItemModel({
     required this.holdSaleItemId,
     required this.holdSaleId,
     required this.variantId,
     required this.productId,
     required this.productName,
-    this.size,
-    this.color,
-    this.weight,
+    this.attributes,
     required this.price,
     required this.qty,
     required this.total,
     this.barcode,
     required this.createdAt,
+    this.gstRate,
+    this.taxableAmount,
+    this.gstAmount,
+    this.discountAmount,
   });
 
   factory HoldSaleItemModel.create({
@@ -65,12 +82,14 @@ class HoldSaleItemModel extends HiveObject {
     required String variantId,
     required String productId,
     required String productName,
-    String? size,
-    String? color,
-    String? weight,
+    Map<String, String>? attributes,
     required double price,
     required int qty,
     String? barcode,
+    double? gstRate,
+    double? taxableAmount,
+    double? gstAmount,
+    double? discountAmount,
   }) {
     final now = DateTime.now().toIso8601String();
     final holdSaleItemId = '${holdSaleId}_${variantId}_${DateTime.now().millisecondsSinceEpoch}';
@@ -81,14 +100,16 @@ class HoldSaleItemModel extends HiveObject {
       variantId: variantId,
       productId: productId,
       productName: productName,
-      size: size,
-      color: color,
-      weight: weight,
+      attributes: attributes,
       price: price,
       qty: qty,
       total: price * qty,
       barcode: barcode,
       createdAt: now,
+      gstRate: gstRate,
+      taxableAmount: taxableAmount,
+      gstAmount: gstAmount,
+      discountAmount: discountAmount,
     );
   }
 
@@ -99,14 +120,16 @@ class HoldSaleItemModel extends HiveObject {
       'variantId': variantId,
       'productId': productId,
       'productName': productName,
-      'size': size,
-      'color': color,
-      'weight': weight,
+      'attributes': attributes,
       'price': price,
       'qty': qty,
       'total': total,
       'barcode': barcode,
       'createdAt': createdAt,
+      'gstRate': gstRate,
+      'taxableAmount': taxableAmount,
+      'gstAmount': gstAmount,
+      'discountAmount': discountAmount,
     };
   }
 
@@ -117,14 +140,17 @@ class HoldSaleItemModel extends HiveObject {
       variantId: map['variantId'] as String,
       productId: map['productId'] as String,
       productName: map['productName'] as String,
-      size: map['size'] as String?,
-      color: map['color'] as String?,
-      weight: map['weight'] as String?,
+      attributes: (map['attributes'] as Map?)
+          ?.map((k, v) => MapEntry(k.toString(), v.toString())),
       price: (map['price'] as num).toDouble(),
       qty: (map['qty'] as num).toInt(),
       total: (map['total'] as num).toDouble(),
       barcode: map['barcode'] as String?,
       createdAt: map['createdAt'] as String,
+      gstRate: (map['gstRate'] as num?)?.toDouble(),
+      taxableAmount: (map['taxableAmount'] as num?)?.toDouble(),
+      gstAmount: (map['gstAmount'] as num?)?.toDouble(),
+      discountAmount: (map['discountAmount'] as num?)?.toDouble(),
     );
   }
 }

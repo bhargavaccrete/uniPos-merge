@@ -4,9 +4,17 @@ import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:billberrylite/data/models/restaurant/db/ordermodel_309.dart';
 import 'package:billberrylite/data/models/restaurant/db/toppingmodel_304.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/repositories/business_details_repository.dart';
 import 'package:billberrylite/domain/services/restaurant/cart_calculation_service.dart';
-import 'package:billberrylite/presentation/screens/restaurant/start%20order/cart/customerdetails.dart';
 import '../../../helpers/test_helpers.dart';
+
+/// `TaxFeature.enabled` reads `BusinessDetailsRepository.isTaxEnabled`, which
+/// hits a Hive box. This fake lets the engine be tested without Hive.
+class _FakeBusinessDetailsRepository extends BusinessDetailsRepository {
+  @override
+  bool get isTaxEnabled => true;
+}
 
 /// Tests for gaps identified in coverage analysis.
 ///
@@ -19,6 +27,13 @@ import '../../../helpers/test_helpers.dart';
 /// 6. OrderModel.getItemsByKot() (KOT boundary grouping)
 /// 7. Topping.getPriceForVariant() (variant-specific extra pricing)
 void main() {
+  setUpAll(() {
+    if (!locator.isRegistered<BusinessDetailsRepository>()) {
+      locator.registerSingleton<BusinessDetailsRepository>(
+          _FakeBusinessDetailsRepository());
+    }
+  });
+
   // ════════════════════════════════════════════════════════════════════════
   // 1. DISCOUNT ON ITEMS MODE
   //

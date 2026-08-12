@@ -42,13 +42,19 @@ class SaleModelAdapter extends TypeAdapter<SaleModel> {
       paidAmount: fields[22] == null ? 0.0 : fields[22] as double?,
       dueAmount: fields[23] == null ? 0.0 : fields[23] as double?,
       status: fields[24] == null ? 'paid' : fields[24] as String?,
+      discountType: fields[25] as String?,
+      discountValue: fields[26] as double?,
+      discountReason: fields[27] as String?,
+      loyaltyPointsUsed: fields[28] as int?,
+      roundOff: fields[29] as double?,
+      isTaxInclusive: fields[30] as bool?,
     );
   }
 
   @override
   void write(BinaryWriter writer, SaleModel obj) {
     writer
-      ..writeByte(25)
+      ..writeByte(31)
       ..writeByte(0)
       ..write(obj.saleId)
       ..writeByte(1)
@@ -98,7 +104,19 @@ class SaleModelAdapter extends TypeAdapter<SaleModel> {
       ..writeByte(23)
       ..write(obj.dueAmount)
       ..writeByte(24)
-      ..write(obj.status);
+      ..write(obj.status)
+      ..writeByte(25)
+      ..write(obj.discountType)
+      ..writeByte(26)
+      ..write(obj.discountValue)
+      ..writeByte(27)
+      ..write(obj.discountReason)
+      ..writeByte(28)
+      ..write(obj.loyaltyPointsUsed)
+      ..writeByte(29)
+      ..write(obj.roundOff)
+      ..writeByte(30)
+      ..write(obj.isTaxInclusive);
   }
 
   @override

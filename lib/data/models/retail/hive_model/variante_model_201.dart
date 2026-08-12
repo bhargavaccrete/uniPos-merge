@@ -10,15 +10,6 @@ class VarianteModel extends HiveObject {
   @HiveField(1)
   final String productId;
 
-  @HiveField(2)
-  final String? size;
-
-  @HiveField(3)
-  final String? color;
-
-  @HiveField(4)
-  final String? weight;
-
   @HiveField(5)
   final String? sku;
 
@@ -85,9 +76,6 @@ class VarianteModel extends HiveObject {
   VarianteModel({
     required this.varianteId,
     required this.productId,
-    this.size,
-    this.color,
-    this.weight,
     this.sku,
     this.barcode,
     this.mrp,
@@ -111,9 +99,6 @@ class VarianteModel extends HiveObject {
   factory VarianteModel.create({
     required String varianteId,
     required String productId,
-    String? size,
-    String? color,
-    String? weight,
     String? sku,
     String? barcode,
     double? mrp,
@@ -134,9 +119,6 @@ class VarianteModel extends HiveObject {
     return VarianteModel(
       varianteId: varianteId,
       productId: productId,
-      size: size,
-      color: color,
-      weight: weight,
       sku: sku,
       barcode: barcode,
       mrp: mrp,
@@ -160,66 +142,45 @@ class VarianteModel extends HiveObject {
   /// Get the effective selling price (sellingPrice > mrp > 0)
   double get effectivePrice => sellingPrice ?? mrp ?? 0;
 
-  /// Get variant description including custom attributes
+  /// Labelled descriptor, e.g. "Storage: 1tb, Colour: Black".
+  ///
+  /// Reads only [customAttributes], so the labels are whatever the shop
+  /// actually named its fields. For a variant built from the global attribute
+  /// system, prefer `attributeStore.attributesOf` — it also resolves
+  /// [attributeValueIds].
   String get variantDescription {
-    List<String> parts = [];
-    if (size != null && size!.isNotEmpty) parts.add('Size: $size');
-    if (color != null && color!.isNotEmpty) parts.add('Color: $color');
-    if (weight != null && weight!.isNotEmpty) parts.add('Weight: $weight');
-
-    // Add custom attributes
-    if (customAttributes != null && customAttributes!.isNotEmpty) {
-      for (var entry in customAttributes!.entries) {
-        parts.add('${entry.key}: ${entry.value}');
-      }
-    }
-
-    return parts.isEmpty ? 'Default' : parts.join(', ');
+    final attrs = customAttributes;
+    if (attrs == null || attrs.isEmpty) return 'Default';
+    return attrs.entries.map((e) => '${e.key}: ${e.value}').join(', ');
   }
 
-  /// Get short variant description (for compact display)
+  /// Label used in inventory lists and variant pickers.
+  String get displayName {
+    final parts = <String>[];
+    customAttributes?.forEach((key, value) {
+      if (value.isNotEmpty) parts.add('$key: $value');
+    });
+    return parts.isEmpty ? 'Default Variant' : parts.join(' • ');
+  }
+
+  /// Values only, no labels (for compact display).
   String get shortDescription {
-    List<String> parts = [];
-    if (size != null && size!.isNotEmpty) parts.add(size!);
-    if (color != null && color!.isNotEmpty) parts.add(color!);
-    if (weight != null && weight!.isNotEmpty) parts.add(weight!);
-
-    // Add custom attribute values only
-    if (customAttributes != null && customAttributes!.isNotEmpty) {
-      parts.addAll(customAttributes!.values);
-    }
-
-    return parts.isEmpty ? 'Default' : parts.join(' • ');
+    final values = customAttributes?.values.where((v) => v.isNotEmpty) ?? const [];
+    return values.isEmpty ? 'Default' : values.join(' • ');
   }
 
   /// Check if variant has any attributes defined
-  bool get hasAttributes {
-    return (size != null && size!.isNotEmpty) ||
-           (color != null && color!.isNotEmpty) ||
-           (weight != null && weight!.isNotEmpty) ||
-           (customAttributes != null && customAttributes!.isNotEmpty);
-  }
+  bool get hasAttributes => customAttributes?.isNotEmpty ?? false;
 
-  /// Get all attributes as a map (including standard + custom)
-  Map<String, String> get allAttributes {
-    final attrs = <String, String>{};
-    if (size != null && size!.isNotEmpty) attrs['Size'] = size!;
-    if (color != null && color!.isNotEmpty) attrs['Color'] = color!;
-    if (weight != null && weight!.isNotEmpty) attrs['Weight'] = weight!;
-    if (customAttributes != null) {
-      attrs.addAll(customAttributes!);
-    }
-    return attrs;
-  }
+  /// All descriptors as a map.
+  Map<String, String> get allAttributes =>
+      Map<String, String>.from(customAttributes ?? const {});
 
   // Convert to Map
   Map<String, dynamic> toMap() {
     return {
       'varianteId': varianteId,
       'productId': productId,
-      'size': size,
-      'color': color,
-      'weight': weight,
       'sku': sku,
       'barcode': barcode,
       'mrp': mrp,
@@ -245,9 +206,6 @@ class VarianteModel extends HiveObject {
     return VarianteModel(
       varianteId: map['varianteId'] as String,
       productId: map['productId'] as String,
-      size: map['size'] as String?,
-      color: map['color'] as String?,
-      weight: map['weight'] as String?,
       sku: map['sku'] as String?,
       barcode: map['barcode'] as String?,
       mrp: (map['mrp'] as num?)?.toDouble(),
@@ -282,9 +240,6 @@ class VarianteModel extends HiveObject {
   VarianteModel copyWith({
     String? varianteId,
     String? productId,
-    String? size,
-    String? color,
-    String? weight,
     String? sku,
     String? barcode,
     double? mrp,
@@ -306,9 +261,6 @@ class VarianteModel extends HiveObject {
     return VarianteModel(
       varianteId: varianteId ?? this.varianteId,
       productId: productId ?? this.productId,
-      size: size ?? this.size,
-      color: color ?? this.color,
-      weight: weight ?? this.weight,
       sku: sku ?? this.sku,
       barcode: barcode ?? this.barcode,
       mrp: mrp ?? this.mrp,

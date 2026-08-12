@@ -1,7 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/repositories/business_details_repository.dart';
 import 'package:billberrylite/domain/services/restaurant/cart_calculation_service.dart';
-import 'package:billberrylite/presentation/screens/restaurant/start%20order/cart/customerdetails.dart';
 import '../../../helpers/test_helpers.dart';
+
+/// `TaxFeature.enabled` reads `BusinessDetailsRepository.isTaxEnabled`, which
+/// hits a Hive box. Registering this fake lets the engine be tested without
+/// standing up Hive — without it every test here throws a GetIt lookup error.
+class _FakeBusinessDetailsRepository extends BusinessDetailsRepository {
+  @override
+  bool get isTaxEnabled => true;
+}
 
 /// Unit tests for CartCalculationService — the financial engine of the app.
 ///
@@ -11,6 +20,13 @@ import '../../../helpers/test_helpers.dart';
 /// WHY THIS MATTERS: If these calculations are wrong, every bill is wrong.
 /// A ₹1 error × 50 orders/day × 30 days = ₹1,500/month lost.
 void main() {
+  setUpAll(() {
+    if (!locator.isRegistered<BusinessDetailsRepository>()) {
+      locator.registerSingleton<BusinessDetailsRepository>(
+          _FakeBusinessDetailsRepository());
+    }
+  });
+
   // Helper shortcut — wraps makeCartItem from test_helpers.dart
   makeItem({required double price, int quantity = 1, double? taxRate}) =>
       makeCartItem(price: price, quantity: quantity, taxRate: taxRate);

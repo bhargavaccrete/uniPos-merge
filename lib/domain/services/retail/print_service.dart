@@ -373,6 +373,7 @@ class PrintService {
     double? serviceCharge,
     bool? isDeliveryOrder,
     bool? isTaxInclusive,
+    double? roundOff, // Rounding adjustment baked into the total
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -451,6 +452,7 @@ class PrintService {
     double? serviceCharge,
     bool? isDeliveryOrder,
     bool? isTaxInclusive,
+    double? roundOff, // Rounding adjustment baked into the total
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -568,6 +570,7 @@ class PrintService {
     double? serviceCharge, // Service or delivery charge amount
     bool? isDeliveryOrder, // True if delivery order
     bool? isTaxInclusive, // Tax inclusive mode
+    double? roundOff, // Rounding adjustment baked into the total
   }) async {
     await showModalBottomSheet(
       context: context,
@@ -636,6 +639,7 @@ class PrintService {
                     isDeliveryOrder: isDeliveryOrder,
                     paymentBreakdown: paymentBreakdown,
                     isTaxInclusive: isTaxInclusive,
+                    roundOff: roundOff,
                   );
                   final printer = printerStore.defaultReceiptPrinter!;
                   final bytes = EscPosReceiptBuilder.buildReceiptTicket(
@@ -685,6 +689,7 @@ class PrintService {
                   serviceCharge: serviceCharge,
                   isDeliveryOrder: isDeliveryOrder,
                   isTaxInclusive: isTaxInclusive,
+                  roundOff: roundOff,
                 );
               },
             ),
@@ -716,6 +721,7 @@ class PrintService {
                   serviceCharge: serviceCharge,
                   isDeliveryOrder: isDeliveryOrder,
                   isTaxInclusive: isTaxInclusive,
+                  roundOff: roundOff,
                 );
               },
             ),
@@ -744,6 +750,7 @@ class PrintService {
                   serviceCharge: serviceCharge,
                   isDeliveryOrder: isDeliveryOrder,
                   isTaxInclusive: isTaxInclusive,
+                  roundOff: roundOff,
                 );
               },
             ),
@@ -772,6 +779,7 @@ class PrintService {
                   serviceCharge: serviceCharge,
                   isDeliveryOrder: isDeliveryOrder,
                   isTaxInclusive: isTaxInclusive,
+                  roundOff: roundOff,
                 );
                 if (context.mounted && path != null) {
                   ScaffoldMessenger.of(context).showSnackBar(

@@ -343,6 +343,13 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantStockLog)) {
       Hive.registerAdapter(StockMovementModelAdapter());
     }
+
+    // RestaurantSessionModel - 131 (shared with restaurant mode). The open
+    // business day is stored as a session record, so Start Day and EOD need
+    // this adapter in retail too.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantSession)) {
+      Hive.registerAdapter(RestaurantSessionModelAdapter());
+    }
   }
 
   /// Clean up old incorrectly-named attribute boxes
@@ -427,6 +434,11 @@ class HiveInit {
 
     // Day Management box (for opening balance tracking)
     await Hive.openBox(HiveBoxNames.dayManagementBox);
+
+    // Session box (shared with restaurant mode). DayManagementService stores the
+    // open day as a session record, so Start Day / EOD need this box in retail
+    // too — without it both throw "Box not found".
+    await Hive.openBox<RestaurantSessionModel>(HiveBoxNames.restaurantSessions);
 
     // Expense boxes (shared with restaurant mode - needed for EOD)
     await Hive.openBox<ExpenseCategory>(HiveBoxNames.retailExpenseCategory);

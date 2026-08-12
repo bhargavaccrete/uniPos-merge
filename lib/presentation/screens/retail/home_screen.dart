@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/presentation/screens/retail/ex/posscreen.dart';
 import 'package:billberrylite/util/color.dart';
-import 'package:billberrylite/util/responsive.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dashboard_menu_card.dart';
+import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 
-import 'package:billberrylite/presentation/screens/retail/pos_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/inventory_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/customer_list_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/reports_screen.dart';
@@ -21,80 +25,152 @@ import 'package:billberrylite/presentation/screens/retail/category_management_sc
 import 'package:billberrylite/presentation/screens/retail/login_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/change_password_screen.dart';
 
-import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
-
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  String _storeName = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStoreName();
+  }
+
+  Future<void> _loadStoreName() async {
+    final name = await StoreSettingsService().getStoreName();
+    if (mounted && name != null && name.isNotEmpty) {
+      setState(() => _storeName = name);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isTablet = !AppResponsive.isMobile(context);
+    final isDesktop = AppResponsive.isDesktop(context);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: AppColors.surfaceLight,
       // Desktop keeps its sidebar + content header; mobile/tablet use the
       // unified primary AppBar so retail matches the restaurant standard.
-      appBar: Responsive.isDesktop(context)
+      appBar: isDesktop
           ? null
           : buildPrimaryAppBar(
-              title: 'Bill Berry Lite Dashboard',
               automaticallyImplyLeading: false,
+              titleWidget: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Dashboard',
+                    style: GoogleFonts.poppins(
+                      fontSize: isTablet ? 22 : 20,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Text(
+                    _storeName.isNotEmpty ? _storeName : 'Bill Berry Lite',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: isTablet ? 14 : 13,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ],
+              ),
               actions: _buildDashboardAppBarActions(context),
             ),
       body: SafeArea(
-        child: Responsive(
-          mobile: _buildMobileLayout(context),
-          tablet: _buildTabletLayout(context),
-          desktop: _buildDesktopLayout(context),
-        ),
+        child: isDesktop
+            // No AppBar on this branch, so nothing sets the status-bar style —
+            // declare it here (dark icons over the light background).
+            ? AnnotatedRegion<SystemUiOverlayStyle>(
+                value: SystemUiOverlayStyle.dark,
+                child: _buildDesktopLayout(context),
+              )
+            : _buildCardGrid(context),
       ),
     );
   }
 
-  // ==================== MOBILE LAYOUT ====================
-  Widget _buildMobileLayout(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 1.0,
-                  children: _buildAllMenuCards(context),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  // ==================== CARD GRID ====================
+  /// One self-adapting grid for every breakpoint (2/3/4 columns via
+  /// [AppResponsive.gridColumns]) — replaces the old three hardcoded layouts.
+  /// Mirrors the restaurant dashboard: stretch the rows to fill the viewport
+  /// when they fit, otherwise fall back to scrolling at the natural ratio.
+  Widget _buildCardGrid(BuildContext context) {
+    final isTablet = !AppResponsive.isMobile(context);
+    final isDesktop = AppResponsive.isDesktop(context);
 
-  // ==================== TABLET LAYOUT ====================
-  Widget _buildTabletLayout(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: Center(
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 900),
-              padding: const EdgeInsets.all(24),
-              child: GridView.count(
-                crossAxisCount: 3,
-                crossAxisSpacing: 20,
-                mainAxisSpacing: 20,
-                childAspectRatio: 1.1,
-                children: _buildAllMenuCards(context),
-              ),
+    final cards = _buildAllMenuCards(context);
+    final columns = AppResponsive.gridColumns(context);
+    final rows = (cards.length / columns).ceil();
+
+    final spacing = isDesktop ? 20.0 : isTablet ? 16.0 : 12.0;
+    final padH = isDesktop ? 28.0 : isTablet ? 24.0 : 16.0;
+    final padTop = isDesktop ? 12.0 : isTablet ? 8.0 : 4.0;
+    final pad = EdgeInsets.fromLTRB(padH, padTop, padH, padH);
+
+    // The densest the cards should ever be.
+    final naturalRatio = isDesktop ? 1.4 : isTablet ? 1.3 : 1.2;
+
+    final grid = LayoutBuilder(
+      builder: (context, constraints) {
+        final availW = constraints.maxWidth - padH * 2;
+        final availH = constraints.maxHeight - padTop - padH;
+        final cellW = (availW - (columns - 1) * spacing) / columns;
+        final naturalGridH =
+            (cellW / naturalRatio) * rows + (rows - 1) * spacing;
+
+        // Taller than the viewport (e.g. phone, many rows) → scroll.
+        if (naturalGridH > availH) {
+          return SingleChildScrollView(
+            padding: pad,
+            child: GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: columns,
+              crossAxisSpacing: spacing,
+              mainAxisSpacing: spacing,
+              childAspectRatio: naturalRatio,
+              children: cards,
             ),
+          );
+        }
+
+        // Fits → stretch the rows to fill the leftover vertical space.
+        final cellH = (availH - (rows - 1) * spacing) / rows;
+        final fillRatio = (cellW / cellH).clamp(0.85, naturalRatio);
+        return Padding(
+          padding: pad,
+          child: GridView.count(
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: columns,
+            crossAxisSpacing: spacing,
+            mainAxisSpacing: spacing,
+            childAspectRatio: fillRatio,
+            children: cards,
           ),
-        ),
-      ],
+        );
+      },
+    );
+
+    // Constrain OUTSIDE the LayoutBuilder — measuring the full screen width and
+    // then discarding part of it would silently skew every cell.
+    final maxWidth = AppResponsive.maxContentWidth(context);
+    if (maxWidth == double.infinity) return grid;
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: grid,
+      ),
     );
   }
 
@@ -107,21 +183,9 @@ class HomeScreen extends StatelessWidget {
           child: Column(
             children: [
               _buildDesktopHeader(context),
-              Expanded(
-                child: Center(
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 1200),
-                    padding: const EdgeInsets.all(32),
-                    child: GridView.count(
-                      crossAxisCount: 4,
-                      crossAxisSpacing: 24,
-                      mainAxisSpacing: 24,
-                      childAspectRatio: 0.95,
-                      children: _buildAllMenuCards(context),
-                    ),
-                  ),
-                ),
-              ),
+              // Inside the content Expanded, so the 280px sidebar is already
+              // excluded from the width the grid measures.
+              Expanded(child: _buildCardGrid(context)),
             ],
           ),
         ),
@@ -132,8 +196,8 @@ class HomeScreen extends StatelessWidget {
   // ==================== HEADERS ====================
   /// Action widgets shown on the right of the dashboard AppBar (mobile/tablet).
   List<Widget> _buildDashboardAppBarActions(BuildContext context) {
-    // Faithful port of the old in-body header: the account menu (logout,
-    // change password, etc.). White tint to read on the primary AppBar.
+    // The account menu (change PIN, logout). White tint to read on the
+    // primary AppBar.
     return [
       _buildUserMenuButton(context, Colors.white),
       const SizedBox(width: 4),
@@ -144,7 +208,7 @@ class HomeScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -159,18 +223,21 @@ class HomeScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Dashboard',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.darkNeutral,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Manage your business operations',
-                  style: TextStyle(fontSize: 15, color: Colors.grey[600]),
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -205,20 +272,40 @@ class HomeScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Icon(Icons.store, color: AppColors.primary, size: 28),
+                  child: Icon(Icons.store_rounded,
+                      color: AppColors.primary, size: 28),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'Bill Berry Lite',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Bill Berry Lite',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      if (_storeName.isNotEmpty)
+                        Text(
+                          _storeName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white70,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ],
@@ -232,9 +319,9 @@ class HomeScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Quick Stats',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     color: Colors.white70,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -255,16 +342,16 @@ class HomeScreen extends StatelessWidget {
                       }
                     });
                     final total = todaySales.fold(0.0, (sum, sale) => sum + (sale.grandTotal ?? sale.totalAmount));
-                    return _buildStatItem(Icons.receipt_long, 'Today\'s Sales', '₹${total.toStringAsFixed(2)}', Colors.white);
+                    return _buildSidebarStat(Icons.receipt_long_rounded, 'Today\'s Sales', '₹${total.toStringAsFixed(2)}');
                   },
                 ),
                 const SizedBox(height: 12),
                 Observer(
-                  builder: (context) => _buildStatItem(Icons.inventory, 'Products', '${productStore.products.length}', Colors.white),
+                  builder: (context) => _buildSidebarStat(Icons.inventory_2_rounded, 'Products', '${productStore.products.length}'),
                 ),
                 const SizedBox(height: 12),
                 Observer(
-                  builder: (context) => _buildStatItem(Icons.people, 'Customers', '${customerStore.customers.length}', Colors.white),
+                  builder: (context) => _buildSidebarStat(Icons.people_rounded, 'Customers', '${customerStore.customers.length}'),
                 ),
               ],
             ),
@@ -281,9 +368,9 @@ class HomeScreen extends StatelessWidget {
                 const SizedBox(height: 16),
                 Text(
                   '© 2025 Bill Berry Lite',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.5),
-                    fontSize: 12,
+                  style: GoogleFonts.poppins(
+                    color: Colors.white54,
+                    fontSize: 11,
                   ),
                 ),
               ],
@@ -294,16 +381,27 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatItem(IconData icon, String label, String value, Color color) {
+  /// Stat block for the primary-coloured sidebar. Deliberately keeps its
+  /// white/white70 text and translucent fills hardcoded — the AppColors text
+  /// and divider tokens are dark-on-light and would vanish or glare here.
+  Widget _buildSidebarStat(IconData icon, String label, String value) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
+        color: Colors.white.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.12)),
       ),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 20),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: Colors.white, size: 18),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -311,17 +409,20 @@ class HomeScreen extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: TextStyle(
-                    color: color.withOpacity(0.8),
+                  style: GoogleFonts.poppins(
+                    color: Colors.white70,
                     fontSize: 11,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 Text(
                   value,
-                  style: TextStyle(
-                    color: color,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
                     fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
@@ -346,28 +447,17 @@ class HomeScreen extends StatelessWidget {
             );
             break;
           case 'logout':
-            final confirmed = await showDialog<bool>(
+            final confirmed = await showAppConfirmDialog(
               context: context,
-              builder: (context) => AlertDialog(
-                title: const Text('Logout'),
-                content: const Text('Are you sure you want to logout?'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.red,
-                    ),
-                    child: const Text('Logout'),
-                  ),
-                ],
-              ),
+              title: 'Logout',
+              message: 'Are you sure you want to logout?',
+              confirmLabel: 'Logout',
+              accent: AppColors.danger,
+              icon: Icons.logout_rounded,
             );
-            if (confirmed == true && context.mounted) {
+            if (confirmed && context.mounted) {
               await authService.logout();
+              if (!context.mounted) return;
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (context) => const LoginScreen()),
                 (route) => false,
@@ -381,9 +471,12 @@ class HomeScreen extends StatelessWidget {
           value: 'change_password',
           child: Row(
             children: [
-              Icon(Icons.lock_outline, size: 20, color: const Color(0xFF6B6B6B)),
+              const Icon(Icons.lock_outline_rounded,
+                  size: 20, color: AppColors.textSecondary),
               const SizedBox(width: 12),
-              const Text('Change PIN'),
+              Text('Change PIN',
+                  style: GoogleFonts.poppins(
+                      fontSize: 14, color: AppColors.textPrimary)),
             ],
           ),
         ),
@@ -392,9 +485,12 @@ class HomeScreen extends StatelessWidget {
           value: 'logout',
           child: Row(
             children: [
-              Icon(Icons.logout, size: 20, color: Colors.red),
+              const Icon(Icons.logout_rounded,
+                  size: 20, color: AppColors.danger),
               const SizedBox(width: 12),
-              Text('Logout', style: TextStyle(color: Colors.red)),
+              Text('Logout',
+                  style: GoogleFonts.poppins(
+                      fontSize: 14, color: AppColors.danger)),
             ],
           ),
         ),
@@ -403,172 +499,112 @@ class HomeScreen extends StatelessWidget {
   }
 
   // ==================== MENU CARDS ====================
+  /// Built fresh on every build so the reactive Stock Alerts tile keeps
+  /// tracking its observables — never hoist or memoise this list.
   List<Widget> _buildAllMenuCards(BuildContext context) {
     return [
-      _buildMenuCard(
-        context,
-        icon: Icons.point_of_sale,
+      DashboardMenuCard(
+        icon: Icons.point_of_sale_rounded,
         title: 'Billing',
-        // onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PosScreen())),
+        color: Colors.blue,
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RetailPosScreen())),
       ),
-      _buildMenuCard(
-        context,
-        icon: Icons.inventory,
+      DashboardMenuCard(
+        icon: Icons.inventory_2_rounded,
         title: 'Inventory',
+        color: Colors.amber,
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const InventoryScreen())),
       ),
-      _buildMenuCard(
-        context,
-        icon: Icons.category,
+      DashboardMenuCard(
+        icon: Icons.category_rounded,
         title: 'Categories',
+        color: Colors.purple,
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CategoryManagementScreen())),
       ),
-      _buildMenuCard(
-        context,
-        icon: Icons.people,
+      DashboardMenuCard(
+        icon: Icons.people_rounded,
         title: 'Customers',
+        color: Colors.indigo,
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CustomerListScreen())),
       ),
-      _buildMenuCard(
-        context,
-        icon: Icons.storefront,
+      DashboardMenuCard(
+        icon: Icons.storefront_rounded,
         title: 'Suppliers',
+        color: Colors.brown,
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SupplierListScreen())),
       ),
-      _buildMenuCard(
-        context,
-        icon: Icons.assignment,
+      DashboardMenuCard(
+        icon: Icons.assignment_rounded,
         title: 'Purchase Orders',
+        color: Colors.cyan,
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PurchaseOrderListScreen())),
       ),
-      _buildMenuCard(
-        context,
-        icon: Icons.shopping_cart,
+      DashboardMenuCard(
+        icon: Icons.shopping_cart_rounded,
         title: 'Purchases',
+        color: Colors.deepPurple,
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PurchaseHistoryScreen())),
       ),
-      _buildMenuCard(
-        context,
-        icon: Icons.receipt_long,
+      DashboardMenuCard(
+        icon: Icons.receipt_long_rounded,
         title: 'Sales',
+        color: Colors.green,
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SalesHistoryScreen())),
       ),
-      _buildMenuCard(
-        context,
-        icon: Icons.account_balance_wallet,
+      DashboardMenuCard(
+        icon: Icons.account_balance_wallet_rounded,
         title: 'Cash Drawer',
+        color: const Color(0xFF00897B),
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CashDrawerScreen())),
       ),
-      _buildMenuCard(
-        context,
-        icon: Icons.bar_chart,
+      DashboardMenuCard(
+        icon: Icons.bar_chart_rounded,
         title: 'Reports',
+        color: Colors.orange,
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ReportsScreen())),
       ),
       _buildStockAlertCard(context),
-      _buildMenuCard(
-        context,
-        icon: Icons.settings,
+      DashboardMenuCard(
+        icon: Icons.settings_rounded,
         title: 'Settings',
+        color: Colors.blueGrey,
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen())),
       ),
 
-      // _buildMenuCard(
-      //   context,
-      //   icon: Icons.settings,
+      // DashboardMenuCard(
+      //   icon: Icons.settings_rounded,
       //   title: 'ex pos',
+      //   color: Colors.blueGrey,
       //   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RetailPosScreen())),
       // ),
     ];
   }
 
-  Widget _buildMenuCard(BuildContext context,
-      {required IconData icon,
-      required String title,
-      required VoidCallback onTap}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Card(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 40, color: AppColors.primary),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
+  /// The whole card sits inside the Observer — the accent colour is reactive
+  /// too, not just the badge count.
   Widget _buildStockAlertCard(BuildContext context) {
-    return InkWell(
-      onTap: () {
-        Navigator.push(
-
-          context,
-          MaterialPageRoute(builder: (context) => const StockAlertsScreen()),
+    return Observer(
+      builder: (_) {
+        final alertCount = stockAlertStore.totalAlerts;
+        final hasCritical = stockAlertStore.hasCriticalAlerts;
+        return DashboardMenuCard(
+          icon: Icons.notifications_active_rounded,
+          title: 'Stock Alerts',
+          color: hasCritical ? AppColors.danger : Colors.deepOrange,
+          badge: alertCount > 0
+              ? DashboardCardBadge(
+                  count: alertCount,
+                  color: hasCritical
+                      ? AppColors.danger
+                      : const Color(0xFFFF9800),
+                )
+              : null,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const StockAlertsScreen()),
+          ),
         );
       },
-      borderRadius: BorderRadius.circular(12),
-      child: Card(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Observer(
-              builder: (_) {
-                final alertCount = stockAlertStore.totalAlerts;
-                final hasCritical = stockAlertStore.hasCriticalAlerts;
-                return Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Icon(
-                      Icons.notifications_active,
-                      size: 40,
-                      color: hasCritical ? Colors.red : AppColors.primary,
-                    ),
-                    if (alertCount > 0)
-                      Positioned(
-                        right: -8,
-                        top: -8,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: hasCritical ? Colors.red : const Color(0xFFFF9800),
-                            shape: BoxShape.circle,
-                          ),
-                          constraints: const BoxConstraints(
-                            minWidth: 20,
-                            minHeight: 20,
-                          ),
-                          child: Text(
-                            alertCount > 99 ? '99+' : '$alertCount',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Stock Alerts',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

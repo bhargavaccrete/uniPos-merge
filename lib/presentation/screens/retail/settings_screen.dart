@@ -5,9 +5,10 @@ import 'package:billberrylite/presentation/screens/retail/backup_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/gst_settings_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/gst_report_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/attributes_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/simple_product_fields_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/store_info_settings_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/settings/printer_settings_screen.dart';
-import 'package:billberrylite/presentation/screens/retail/start_day_screen.dart';
+import 'package:billberrylite/presentation/widget/restaurant/opening_balance_dialog.dart';
 import 'package:billberrylite/presentation/screens/retail/eod_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/eod_reports_list_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/payment_methods_screen.dart';
@@ -131,10 +132,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         : 'Set opening balance to begin operations',
                     iconColor: const Color(0xFF4CAF50),
                     onTap: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const StartDayScreen()),
-                      );
+                      // Same opening-balance dialog restaurant uses — one
+                      // amount, no denomination counting.
+                      await promptStartDay(context);
                       // Refresh the day status after returning
                       _refreshDayStatus();
                     },
@@ -212,6 +212,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const AttributesScreen()),
+              );
+            },
+          ),
+          _buildSettingsCard(
+            context,
+            icon: Icons.checklist_rtl,
+            title: 'Simple Product Fields',
+            subtitle: 'Choose the fields shown on simple products',
+            iconColor: const Color(0xFF3F51B5),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const SimpleProductFieldsScreen()),
               );
             },
           ),

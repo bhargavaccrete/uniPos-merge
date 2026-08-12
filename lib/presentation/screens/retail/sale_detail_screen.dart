@@ -43,7 +43,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
       final sale = await saleStore.getSaleById(widget.saleId);
 
       // Load sale items
-      final items = await saleItemRepository.getItemsBySaleId(widget.saleId);
+      final items = await saleStore.getItemsForSale(widget.saleId);
 
       // Load customer if exists
       Customer? customer;
@@ -550,10 +550,12 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                       spacing: 8,
                       runSpacing: 4,
                       children: [
-                        if (item.size != null)
-                          _buildPropertyChip('Size: ${item.size}'),
-                        if (item.color != null)
-                          _buildPropertyChip('Color: ${item.color}'),
+                        ...attributeStore
+                            .describeAttributes(item.attributes,
+                                size: item.size, color: item.color)
+                            .split(' · ')
+                            .where((p) => p.isNotEmpty)
+                            .map(_buildPropertyChip),
                         if (item.barcode != null)
                           _buildPropertyChip('📦 ${item.barcode}'),
                       ],

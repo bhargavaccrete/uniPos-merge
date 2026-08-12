@@ -6,7 +6,8 @@ import 'package:billberrylite/util/restaurant/print_settings.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'package:billberrylite/domain/services/restaurant/tax_breakdown.dart';
-import 'package:billberrylite/core/di/service_locator.dart' show taxStore;
+import 'package:billberrylite/core/di/service_locator.dart'
+    show taxStore, attributeStore;
 
 /// Builds raw ESC/POS byte arrays for thermal printers.
 ///
@@ -314,10 +315,20 @@ class EscPosReceiptBuilder {
 
     // ── ITEM ROWS ──
     for (final item in receiptData.items) {
-      // Item name (truncated to fit) + variant
+      // Item name (truncated to fit) + variant.
+      // Labelled only when real attribute names exist → "(Storage: 1tb)".
+      // Restaurant items carry no map and fall back to the legacy columns,
+      // where `size` holds the variant name — those stay bare: "(Large)".
       String name = item.productName ?? 'Item';
-      if (item.size != null && item.size!.isNotEmpty) {
-        name += ' (${item.size})';
+      final hasNamedAttributes = item.attributes?.isNotEmpty ?? false;
+      final descriptor = attributeStore.describeAttributes(
+        item.attributes,
+        size: item.size,
+        color: item.color,
+        labelled: hasNamedAttributes,
+      );
+      if (descriptor.isNotEmpty) {
+        name += ' ($descriptor)';
       }
 
       // Truncate name to fit columns (leave room for qty + amount)

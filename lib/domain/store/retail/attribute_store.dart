@@ -4,10 +4,17 @@ import 'package:uuid/uuid.dart';
 import '../../../data/models/retail/hive_model/attribute_model_219.dart';
 import '../../../data/models/retail/hive_model/attribute_value_model_220.dart';
 import '../../../data/models/retail/hive_model/product_attribute_model_221.dart';
+import '../../../data/models/retail/hive_model/variante_model_201.dart';
 import '../../../data/repositories/retail/attribute_repository.dart';
 
 
 part 'attribute_store.g.dart';
+
+/// Attribute names a retail store starts with — the same three the Simple
+/// product form used to hardcode. Top-level (not a class static) because the
+/// MobX `class AttributeStore = _AttributeStoreBase with ...` form does not
+/// expose the base class's statics.
+const List<String> kBaseAttributeNames = ['Size', 'Color', 'Weight'];
 
 class AttributeStore = _AttributeStoreBase with _$AttributeStore;
 
@@ -468,5 +475,145 @@ abstract class _AttributeStoreBase with Store {
         'values': getValues(attr.attributeId),
       };
     }).toList();
+  }
+
+  /// Resolve attribute ids to models, preserving the given order and skipping
+  /// ids that no longer exist.
+  ///
+  /// Used by stored configuration that holds only ids (e.g. Simple Product
+  /// Fields) — a deleted attribute must drop out quietly rather than surface a
+  /// phantom entry or throw. Call after [loadAttributes].
+  List<AttributeModel> attributesByIds(List<String> attributeIds) {
+    final result = <AttributeModel>[];
+    for (final id in attributeIds) {
+      final attribute = getAttributeById(id);
+      if (attribute != null) result.add(attribute);
+    }
+    return result;
+  }
+
+  /// Create the base attributes and their starter values if they don't exist.
+  ///
+  /// Idempotent: [addAttribute] returns false for a name that already exists,
+  /// so values are only seeded alongside a freshly created attribute.
+  @action
+  Future<void> ensureBaseAttributes() async {
+    const seed = <String, List<String>>{
+      'Size': ['Small', 'Medium', 'Large', 'Extra Large'],
+      'Color': ['Red', 'Blue', 'Green', 'Black', 'White'],
+      'Weight': ['250g', '500g', '1kg'],
+    };
+    const colorCodes = <String?>[
+      '#FF0000',
+      '#0000FF',
+      '#00FF00',
+      '#000000',
+      '#FFFFFF',
+    ];
+
+    for (final entry in seed.entries) {
+      final created = await addAttribute(entry.key);
+      if (!created) continue; // already present — leave the user's edits alone
+
+      final attribute = getAttributeByName(entry.key);
+      if (attribute == null) continue;
+
+      await addMultipleValues(
+        attribute.attributeId,
+        entry.value,
+        colorCodes: entry.key == 'Color' ? colorCodes : null,
+      );
+    }
+  }
+
+  // ==================== CANONICAL DESCRIPTORS ====================
+
+  /// A variant's descriptors as `{attributeName: value}`.
+  ///
+  /// Precedence, richest source first:
+  ///   1. `attributeValueIds` — the real attribute system
+  ///   2. `customAttributes` — free-text pairs
+  ///   3. legacy `size` / `color` / `weight` columns
+  ///
+  /// Later sources never overwrite an earlier one, so a variant carrying both
+  /// keeps the authoritative value.
+  ///
+  /// Use this for CATALOGUE display and when populating a cart line. Do NOT use
+  /// it to render a completed sale — read that sale's own stored map instead,
+  /// or editing a variant would rewrite history.
+  Map<String, String> attributesOf(VarianteModel variant) {
+    final result = <String, String>{};
+
+    final valueIds = variant.attributeValueIds;
+    if (valueIds != null) {
+      for (final entry in valueIds.entries) {
+        final attribute = getAttributeById(entry.key);
+        final value = getValueById(entry.value);
+        if (attribute != null && value != null) {
+          result[attribute.name] = value.value;
+        }
+      }
+    }
+
+    variant.customAttributes?.forEach((key, value) {
+      if (key.trim().isEmpty || value.trim().isEmpty) return;
+      result.putIfAbsent(key, () => value);
+    });
+
+
+    // addLegacy('Size', variant.size);
+    // addLegacy('Color', variant.color);
+    // addLegacy('Weight', variant.weight);
+
+    return result;
+  }
+
+  /// Human-readable descriptor for a stored attribute map, falling back to the
+  /// legacy columns for records saved before generic attributes existed.
+  ///
+  /// [labelled] true → `Size: L · Color: Red`; false → `L · Red`.
+  /// Returns an empty string when there is nothing to show, so callers can
+  /// decide whether to render a line at all.
+  String describeAttributes(
+    Map<String, String>? attributes, {
+    String? size,
+    String? color,
+    String? weight,
+    bool labelled = true,
+    String separator = ' · ',
+  }) {
+    final source = <String, String>{};
+
+    if (attributes != null) {
+      attributes.forEach((key, value) {
+        if (key.trim().isNotEmpty && value.trim().isNotEmpty) {
+          source[key] = value.trim();
+        }
+      });
+    }
+
+    if (source.isEmpty) {
+      // Legacy fallback — pre-migration records carry only these three.
+      if (size != null && size.trim().isNotEmpty) source['Size'] = size.trim();
+      if (color != null && color.trim().isNotEmpty) source['Color'] = color.trim();
+      if (weight != null && weight.trim().isNotEmpty) {
+        source['Weight'] = weight.trim();
+      }
+    }
+
+    if (source.isEmpty) return '';
+
+    return source.entries
+        .map((e) => labelled ? '${e.key}: ${e.value}' : e.value)
+        .join(separator);
+  }
+
+  /// Case-insensitive lookup by name.
+  AttributeModel? getAttributeByName(String name) {
+    final lower = name.toLowerCase();
+    for (final attribute in attributes) {
+      if (attribute.name.toLowerCase() == lower) return attribute;
+    }
+    return null;
   }
 }

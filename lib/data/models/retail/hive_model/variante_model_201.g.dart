@@ -19,9 +19,6 @@ class VarianteModelAdapter extends TypeAdapter<VarianteModel> {
     return VarianteModel(
       varianteId: fields[0] as String,
       productId: fields[1] as String,
-      size: fields[2] as String?,
-      color: fields[3] as String?,
-      weight: fields[4] as String?,
       sku: fields[5] as String?,
       barcode: fields[6] as String?,
       mrp: fields[7] as double?,
@@ -45,17 +42,11 @@ class VarianteModelAdapter extends TypeAdapter<VarianteModel> {
   @override
   void write(BinaryWriter writer, VarianteModel obj) {
     writer
-      ..writeByte(22)
+      ..writeByte(19)
       ..writeByte(0)
       ..write(obj.varianteId)
       ..writeByte(1)
       ..write(obj.productId)
-      ..writeByte(2)
-      ..write(obj.size)
-      ..writeByte(3)
-      ..write(obj.color)
-      ..writeByte(4)
-      ..write(obj.weight)
       ..writeByte(5)
       ..write(obj.sku)
       ..writeByte(6)

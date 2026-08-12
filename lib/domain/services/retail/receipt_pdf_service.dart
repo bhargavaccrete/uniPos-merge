@@ -12,7 +12,7 @@ import '../../../util/restaurant/print_settings.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/plan/plan_enforcement.dart';
 import '../../../core/plan/entitlement_keys.dart';
-import '../../../core/di/service_locator.dart' show taxStore;
+import '../../../core/di/service_locator.dart' show taxStore, attributeStore;
 import '../../../util/restaurant/staticswitch.dart';
 import '../restaurant/tax_breakdown.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
@@ -1597,9 +1597,18 @@ class ReceiptPdfService {
     final name = item.productName ?? 'Unknown';
     // Full name + variant — let it WRAP (no truncation) so variant/extra details
     // in parentheses aren't hidden behind an ellipsis.
-    final displayName = item.size != null && item.size!.isNotEmpty
-        ? '$name (${item.size})'
-        : name;
+    // Label only when we have real attribute names to show, i.e. a retail sale
+    // recorded with generic attributes → "(Storage: 1tb)". Restaurant items
+    // carry no map and fall back to the legacy columns, where `size` holds the
+    // variant name — those stay bare, so KOT/bills still read "(Large)".
+    final hasNamedAttributes = item.attributes?.isNotEmpty ?? false;
+    final descriptor = attributeStore.describeAttributes(
+      item.attributes,
+      size: item.size,
+      color: item.color,
+      labelled: hasNamedAttributes,
+    );
+    final displayName = descriptor.isEmpty ? name : '$name ($descriptor)';
 
     // Calculate unit price (total / quantity)
     final unitPrice = item.qty > 0 ? item.total / item.qty : item.total;
@@ -1880,12 +1889,17 @@ class ReceiptPdfService {
             item.productName ?? 'Unknown Product',
             style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
           ),
-          if (item.size != null || item.color != null)
+          // Any configured attribute (Storage, Flavour…), falling back to the
+          // legacy size/color columns for sales recorded before generic
+          // attributes existed. `weight` is deliberately excluded — restaurant
+          // reuses it as the extras blob rendered separately below.
+          if (attributeStore
+              .describeAttributes(item.attributes,
+                  size: item.size, color: item.color, separator: ' | ')
+              .isNotEmpty)
             pw.Text(
-              [
-                if (item.size != null) 'Size: ${item.size}',
-                if (item.color != null) 'Color: ${item.color}',
-              ].join(' | '),
+              attributeStore.describeAttributes(item.attributes,
+                  size: item.size, color: item.color, separator: ' | '),
               style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
             ),
           // Variant/choice/extras info (stored in weight) — must read as a

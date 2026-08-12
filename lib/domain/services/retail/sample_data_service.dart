@@ -110,7 +110,7 @@ class SampleDataService {
     variants.add(VarianteModel(
       varianteId: _uuid.v4(),
       productId: mouseId,
-      color: 'Black',
+      customAttributes: {'Color': 'Black'},
       sku: 'MOUSE-BLK-001',
       barcode: '1234567890001',
       mrp: 599.00,
@@ -123,7 +123,7 @@ class SampleDataService {
     variants.add(VarianteModel(
       varianteId: _uuid.v4(),
       productId: mouseId,
-      color: 'White',
+      customAttributes: {'Color': 'White'},
       sku: 'MOUSE-WHT-001',
       barcode: '1234567890002',
       mrp: 599.00,
@@ -174,8 +174,7 @@ class SampleDataService {
     variants.add(VarianteModel(
       varianteId: _uuid.v4(),
       productId: notebookId,
-      size: 'A4',
-      color: 'Blue',
+      customAttributes: {'Size': 'A4', 'Color': 'Blue'},
       sku: 'NOTE-A4-BLU',
       barcode: '1234567890004',
       mrp: 299.00,
@@ -188,8 +187,7 @@ class SampleDataService {
     variants.add(VarianteModel(
       varianteId: _uuid.v4(),
       productId: notebookId,
-      size: 'A5',
-      color: 'Red',
+      customAttributes: {'Size': 'A5', 'Color': 'Red'},
       sku: 'NOTE-A5-RED',
       barcode: '1234567890005',
       mrp: 199.00,
@@ -277,7 +275,7 @@ class SampleDataService {
     variants.add(VarianteModel(
       varianteId: _uuid.v4(),
       productId: milkId,
-      size: '500ml',
+      customAttributes: {'Size': '500ml'},
       sku: 'MILK-500ML',
       barcode: '2234567890001',
       mrp: 30.00,
@@ -290,7 +288,7 @@ class SampleDataService {
     variants.add(VarianteModel(
       varianteId: _uuid.v4(),
       productId: milkId,
-      size: '1L',
+      customAttributes: {'Size': '1L'},
       sku: 'MILK-1L',
       barcode: '2234567890002',
       mrp: 58.00,
@@ -316,7 +314,7 @@ class SampleDataService {
     variants.add(VarianteModel(
       varianteId: _uuid.v4(),
       productId: juiceId,
-      size: '1L',
+      customAttributes: {'Size': '1L'},
       sku: 'JUICE-ORA-1L',
       barcode: '2234567890003',
       mrp: 120.00,
@@ -342,7 +340,7 @@ class SampleDataService {
     variants.add(VarianteModel(
       varianteId: _uuid.v4(),
       productId: chipsId,
-      size: '50g',
+      customAttributes: {'Size': '50g'},
       sku: 'CHIPS-50G',
       barcode: '2234567890004',
       mrp: 20.00,
@@ -355,7 +353,7 @@ class SampleDataService {
     variants.add(VarianteModel(
       varianteId: _uuid.v4(),
       productId: chipsId,
-      size: '100g',
+      customAttributes: {'Size': '100g'},
       sku: 'CHIPS-100G',
       barcode: '2234567890005',
       mrp: 35.00,
@@ -381,7 +379,7 @@ class SampleDataService {
     variants.add(VarianteModel(
       varianteId: _uuid.v4(),
       productId: cerealId,
-      size: '500g',
+      customAttributes: {'Size': '500g'},
       sku: 'CEREAL-CORN-500G',
       barcode: '2234567890006',
       mrp: 180.00,
@@ -407,7 +405,7 @@ class SampleDataService {
     variants.add(VarianteModel(
       varianteId: _uuid.v4(),
       productId: handwashId,
-      size: '200ml',
+      customAttributes: {'Size': '200ml'},
       sku: 'WASH-200ML',
       barcode: '2234567890007',
       mrp: 85.00,
@@ -420,7 +418,7 @@ class SampleDataService {
     variants.add(VarianteModel(
       varianteId: _uuid.v4(),
       productId: handwashId,
-      size: '500ml',
+      customAttributes: {'Size': '500ml'},
       sku: 'WASH-500ML',
       barcode: '2234567890008',
       mrp: 175.00,
@@ -463,8 +461,7 @@ class SampleDataService {
         variants.add(VarianteModel(
           varianteId: _uuid.v4(),
           productId: tshirtId,
-          size: size,
-          color: color,
+          customAttributes: {'Size': size, 'Color': color},
           sku: 'TSHIRT-$size-${color.substring(0, 3).toUpperCase()}',
           barcode: '334456789000${barcodeCounter++}',
           mrp: 499.00,
@@ -496,8 +493,7 @@ class SampleDataService {
         variants.add(VarianteModel(
           varianteId: _uuid.v4(),
           productId: kurtaId,
-          size: size,
-          color: color,
+          customAttributes: {'Size': size, 'Color': color},
           sku: 'KURTA-$size-${color.substring(0, 3).toUpperCase()}',
           barcode: '334456789000${barcodeCounter++}',
           mrp: 899.00,
@@ -529,8 +525,7 @@ class SampleDataService {
         variants.add(VarianteModel(
           varianteId: _uuid.v4(),
           productId: jeansId,
-          size: size,
-          color: color,
+          customAttributes: {'Size': size, 'Color': color},
           sku: 'JEANS-$size-${color.substring(0, 3).toUpperCase()}',
           barcode: '334456789000${barcodeCounter++}',
           mrp: 699.00,
@@ -562,8 +557,7 @@ class SampleDataService {
         variants.add(VarianteModel(
           varianteId: _uuid.v4(),
           productId: beltId,
-          size: size,
-          color: color,
+          customAttributes: {'Size': size, 'Color': color},
           sku: 'BELT-$size-${color.substring(0, 3).toUpperCase()}',
           barcode: '334456789000${barcodeCounter++}',
           mrp: 799.00,
@@ -608,8 +602,7 @@ class SampleDataService {
         variants.add(VarianteModel(
           varianteId: _uuid.v4(),
           productId: caseId,
-          size: model,
-          color: color,
+          customAttributes: {'Size': model, 'Color': color},
           sku: 'CASE-${model.replaceAll(' ', '')}-${color.substring(0, 3).toUpperCase()}',
           barcode: '434567890000${electronicsBarcode++}',
           mrp: 299.00,
@@ -637,7 +630,7 @@ class SampleDataService {
     variants.add(VarianteModel(
       varianteId: _uuid.v4(),
       productId: earphoneId,
-      color: 'Black',
+      customAttributes: {'Color': 'Black'},
       sku: 'TWS-BLK-001',
       barcode: '434567890100',
       mrp: 1999.00,
@@ -650,7 +643,7 @@ class SampleDataService {
     variants.add(VarianteModel(
       varianteId: _uuid.v4(),
       productId: earphoneId,
-      color: 'White',
+      customAttributes: {'Color': 'White'},
       sku: 'TWS-WHT-001',
       barcode: '434567890101',
       mrp: 1999.00,
@@ -680,7 +673,7 @@ class SampleDataService {
       variants.add(VarianteModel(
         varianteId: _uuid.v4(),
         productId: usbId,
-        size: capacity,
+        customAttributes: {'Size': capacity},
         sku: 'USB-$capacity',
         barcode: '434567890${capacities.indexOf(capacity) + 200}',
         mrp: price,
@@ -709,7 +702,7 @@ class SampleDataService {
       variants.add(VarianteModel(
         varianteId: _uuid.v4(),
         productId: watchId,
-        color: color,
+        customAttributes: {'Color': color},
         sku: 'WATCH-${color.substring(0, 3).toUpperCase()}',
         barcode: '434567890${300 + watchColors.indexOf(color)}',
         mrp: 2999.00,
@@ -773,7 +766,7 @@ class SampleDataService {
     variants.add(VarianteModel(
       varianteId: _uuid.v4(),
       productId: vitCId,
-      size: '30 tablets',
+      customAttributes: {'Size': '30 tablets'},
       sku: 'VIT-C-30',
       barcode: '534567890002',
       mrp: 180.00,
@@ -786,7 +779,7 @@ class SampleDataService {
     variants.add(VarianteModel(
       varianteId: _uuid.v4(),
       productId: vitCId,
-      size: '60 tablets',
+      customAttributes: {'Size': '60 tablets'},
       sku: 'VIT-C-60',
       barcode: '534567890003',
       mrp: 320.00,
@@ -812,7 +805,7 @@ class SampleDataService {
     variants.add(VarianteModel(
       varianteId: _uuid.v4(),
       productId: bandageId,
-      size: '10 pieces',
+      customAttributes: {'Size': '10 pieces'},
       sku: 'BAND-10',
       barcode: '534567890004',
       mrp: 45.00,
@@ -825,7 +818,7 @@ class SampleDataService {
     variants.add(VarianteModel(
       varianteId: _uuid.v4(),
       productId: bandageId,
-      size: '25 pieces',
+      customAttributes: {'Size': '25 pieces'},
       sku: 'BAND-25',
       barcode: '534567890005',
       mrp: 95.00,
@@ -851,7 +844,7 @@ class SampleDataService {
     variants.add(VarianteModel(
       varianteId: _uuid.v4(),
       productId: sanitizerId,
-      size: '50ml',
+      customAttributes: {'Size': '50ml'},
       sku: 'SAN-50ML',
       barcode: '534567890006',
       mrp: 40.00,
@@ -864,7 +857,7 @@ class SampleDataService {
     variants.add(VarianteModel(
       varianteId: _uuid.v4(),
       productId: sanitizerId,
-      size: '200ml',
+      customAttributes: {'Size': '200ml'},
       sku: 'SAN-200ML',
       barcode: '534567890007',
       mrp: 120.00,
@@ -894,7 +887,7 @@ class SampleDataService {
       variants.add(VarianteModel(
         varianteId: _uuid.v4(),
         productId: diaperId,
-        size: '$size (20 pcs)',
+        customAttributes: {'Size': '$size (20 pcs)'},
         sku: 'DIAPER-$size-20',
         barcode: '53456789001${sizes.indexOf(size)}',
         mrp: price,

@@ -73,6 +73,7 @@ class ProductAttributeSelectorState extends State<ProductAttributeSelector> {
       );
     }
 
+    if (!mounted) return;
     setState(() {});
   }
 

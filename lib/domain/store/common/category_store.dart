@@ -56,6 +56,13 @@ abstract class _CategoryStore with Store {
   @computed
   bool get hasCategories => categories.isNotEmpty;
 
+  /// Category id → name, for screens that resolve many ids per rebuild.
+  /// Reactive (unlike caching the map in widget State) and O(1) per lookup
+  /// instead of [getCategoryById]'s linear scan.
+  @computed
+  Map<String, String> get categoryNameById =>
+      {for (final c in categories) c.id: c.name};
+
   // ==================== ACTIONS ====================
 
   @action

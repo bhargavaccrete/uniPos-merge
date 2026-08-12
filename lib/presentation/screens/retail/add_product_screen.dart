@@ -6,6 +6,9 @@ import 'package:billberrylite/data/models/common/categorymodel_300.dart';
 import 'package:billberrylite/data/models/common/taxmodel_314.dart';
 import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
+import 'package:billberrylite/data/models/retail/hive_model/attribute_model_219.dart';
+import 'package:billberrylite/domain/services/retail/simple_product_fields_service.dart';
+import 'package:billberrylite/domain/services/retail/variant_attribute_mapper.dart';
 import 'package:billberrylite/domain/services/retail/variant_generator_service.dart';
 import 'package:billberrylite/presentation/screens/retail/category_management_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/scanner_screen.dart';
@@ -43,29 +46,32 @@ class CustomAttributeData {
 // Variant data model for form
 class VariantFormData {
   final String id;
-  final TextEditingController sizeController;
-  final TextEditingController colorController;
   final TextEditingController barcodeController;
   final TextEditingController costPriceController;
   final TextEditingController priceController;
   final TextEditingController mrpController;
   final TextEditingController stockController;
-  final TextEditingController weightController;
   final TextEditingController skuController;
   final List<CustomAttributeData> customAttributes;
 
+  /// Configurable descriptor fields (Settings → Simple Product Fields), keyed
+  /// by attributeId. Replaces the previously hardcoded size/color/weight
+  /// controllers so a shop can use Flavour, Volume, Capacity instead.
+  final Map<String, TextEditingController> fieldControllers = {};
+
   VariantFormData({
     required this.id,
-  })  : sizeController = TextEditingController(),
-        colorController = TextEditingController(),
-        barcodeController = TextEditingController(),
+  })  : barcodeController = TextEditingController(),
         costPriceController = TextEditingController(),
         priceController = TextEditingController(),
         mrpController = TextEditingController(),
         stockController = TextEditingController(),
-        weightController = TextEditingController(),
         skuController = TextEditingController(),
         customAttributes = [];
+
+  /// Controller for a configured field, created on first use.
+  TextEditingController fieldController(String attributeId) =>
+      fieldControllers.putIfAbsent(attributeId, () => TextEditingController());
 
   void addCustomAttribute() {
     customAttributes.add(CustomAttributeData(
@@ -91,15 +97,15 @@ class VariantFormData {
   }
 
   void dispose() {
-    sizeController.dispose();
-    colorController.dispose();
     barcodeController.dispose();
     costPriceController.dispose();
     priceController.dispose();
     mrpController.dispose();
     stockController.dispose();
-    weightController.dispose();
     skuController.dispose();
+    for (final controller in fieldControllers.values) {
+      controller.dispose();
+    }
     for (var attr in customAttributes) {
       attr.dispose();
     }
@@ -145,6 +151,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
   // List of variants (manual entry)
   final List<VariantFormData> _variants = [];
 
+  // Descriptor fields shown on each simple-product variant, from
+  // Settings → Simple Product Fields. Replaces the old hardcoded
+  // Color / Size / Weight boxes.
+  List<AttributeModel> _simpleFields = [];
+
   @override
   void initState() {
     super.initState();
@@ -154,6 +165,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
     // Load attributes
     attributeStore.loadAttributes();
     taxStore.loadTaxes();
+    _loadSimpleFields();
+  }
+
+  Future<void> _loadSimpleFields() async {
+    final fields = await SimpleProductFieldsService().resolveFields();
+    if (!mounted) return;
+    setState(() => _simpleFields = fields);
   }
 
   Future<void> _loadCategories() async {
@@ -388,19 +406,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
       for (var i = 0; i < _variants.length; i++) {
         final variantData = _variants[i];
         final variantId = _uuid.v4();
+        final fieldValues = _mapFieldValues(variantData);
 
         final variant = VarianteModel.create(
           varianteId: variantId,
           productId: productId,
-          size: variantData.sizeController.text.trim().isEmpty
-              ? null
-              : variantData.sizeController.text.trim(),
-          color: variantData.colorController.text.trim().isEmpty
-              ? null
-              : variantData.colorController.text.trim(),
-          weight: variantData.weightController.text.trim().isEmpty
-              ? null
-              : variantData.weightController.text.trim(),
+          // size: fieldValues.size,
+          // color: fieldValues.color,
+          // weight: fieldValues.weight,
           sku: variantData.skuController.text.trim().isEmpty
               ? null
               : variantData.skuController.text.trim(),
@@ -414,7 +427,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           stockQty: int.tryParse(variantData.stockController.text.trim()) ?? 0,
           taxRate: taxRate,
           taxId: _selectedTaxId,
-          customAttributes: variantData.getCustomAttributesMap(),
+          customAttributes: fieldValues,
         );
 
         await productStore.addVariant(variant);
@@ -431,6 +444,86 @@ class _AddProductScreenState extends State<AddProductScreen> {
       );
       Navigator.pop(context);
     }
+  }
+
+  /// Descriptor inputs for one variant, laid out two per row like the fields
+  /// they replaced. Empty when the shop has configured no fields — price,
+  /// stock, barcode and SKU are always shown regardless.
+  List<Widget> _buildConfiguredFields(VariantFormData variant) {
+    if (_simpleFields.isEmpty) return const [];
+
+    final rows = <Widget>[];
+    for (var i = 0; i < _simpleFields.length; i += 2) {
+      final left = _simpleFields[i];
+      final right =
+          i + 1 < _simpleFields.length ? _simpleFields[i + 1] : null;
+
+      rows.add(Row(
+        children: [
+          Expanded(child: _buildFieldInput(variant, left)),
+          const SizedBox(width: 12),
+          if (right != null)
+            Expanded(child: _buildFieldInput(variant, right))
+          else
+            const Expanded(child: SizedBox.shrink()),
+        ],
+      ));
+      rows.add(const SizedBox(height: 12));
+    }
+    return rows;
+  }
+
+  /// A single descriptor input. Offers the attribute's preset values as a
+  /// dropdown while still allowing free text, so the shared vocabulary is
+  /// reused without blocking one-off values.
+  Widget _buildFieldInput(VariantFormData variant, AttributeModel attribute) {
+    final controller = variant.fieldController(attribute.attributeId);
+    final values = attributeStore.getValues(attribute.attributeId);
+
+    return TextFormField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: attribute.name,
+        hintText: values.isEmpty ? null : 'e.g. ${values.first.value}',
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        isDense: true,
+        suffixIcon: values.isEmpty
+            ? null
+            : PopupMenuButton<String>(
+                icon: const Icon(Icons.arrow_drop_down, size: 22),
+                tooltip: 'Choose ${attribute.name}',
+                onSelected: (value) => setState(() => controller.text = value),
+                itemBuilder: (_) => values
+                    .map((v) => PopupMenuItem<String>(
+                          value: v.value,
+                          child: Text(v.value),
+                        ))
+                    .toList(),
+              ),
+      ),
+    );
+  }
+
+  /// Fold the configured descriptor fields (plus any ad-hoc custom attribute
+  /// rows) into what VarianteModel stores.
+  ///
+  /// A field named Size / Color / Colour / Weight still writes the legacy
+  /// column, so receipts and reports that read `variant.size` keep working —
+  /// the same rule VariantGeneratorService applies for variable products.
+  /// Everything else goes to `customAttributes`.
+  Map<String, String>? _mapFieldValues(VariantFormData variantData) {
+    final entered = <String, String>{};
+    for (final attribute in _simpleFields) {
+      final value =
+          variantData.fieldControllers[attribute.attributeId]?.text.trim() ?? '';
+      if (value.isNotEmpty) entered[attribute.name] = value;
+    }
+
+    // Ad-hoc per-variant rows stay supported alongside configured fields.
+    return mergeVariantAttributes(
+      entered,
+      extraCustomAttributes: variantData.getCustomAttributesMap(),
+    );
   }
 
   @override
@@ -614,57 +707,23 @@ class _AddProductScreenState extends State<AddProductScreen> {
           ),
           const SizedBox(height: 12),
 
-          // Variant Fields
-          Row(
-            children: [
-              Expanded(
-                child: _buildTextField(
-                  controller: variant.colorController,
-                  label: 'Color',
-                  hint: 'e.g., Green',
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildTextField(
-                  controller: variant.sizeController,
-                  label: 'Size',
-                  hint: 'e.g., M',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
+          // Configurable descriptor fields (Settings → Simple Product Fields).
+          ..._buildConfiguredFields(variant),
 
-          Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: TextFormField(
-                  controller: variant.barcodeController,
-                  decoration: InputDecoration(
-                    labelText: 'Barcode',
-                    hintText: 'Scan or enter',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    isDense: true,
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.qr_code_scanner, color: Color(0xFF4CAF50), size: 20),
-                      onPressed: () => _scanBarcode(variant),
-                    ),
-                  ),
-                ),
+          TextFormField(
+            controller: variant.barcodeController,
+            decoration: InputDecoration(
+              labelText: 'Barcode',
+              hintText: 'Scan or enter',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildTextField(
-                  controller: variant.weightController,
-                  label: 'Weight',
-                  hint: 'e.g., 500g',
-                ),
+              isDense: true,
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.qr_code_scanner, color: Color(0xFF4CAF50), size: 20),
+                onPressed: () => _scanBarcode(variant),
               ),
-            ],
+            ),
           ),
           const SizedBox(height: 12),
 
@@ -733,7 +792,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           Row(
             children: [
               const Text(
-                'Custom Attributes',
+                'One-off details (this product only)',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -768,10 +827,32 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: _buildTextField(
-                        controller: attr.keyController,
-                        label: 'Attribute',
-                        hint: 'e.g., Material',
+                      // Suggests existing global attributes so repeated
+                      // free-text keys don't fragment the vocabulary
+                      // ("Flavour" vs "Flavor" vs "flavor").
+                      child: Autocomplete<String>(
+                        optionsBuilder: (value) {
+                          final query = value.text.trim().toLowerCase();
+                          if (query.isEmpty) return const Iterable<String>.empty();
+                          return attributeStore.attributes
+                              .map((a) => a.name)
+                              .where((n) => n.toLowerCase().contains(query));
+                        },
+                        onSelected: (selection) =>
+                            attr.keyController.text = selection,
+                        fieldViewBuilder:
+                            (context, controller, focusNode, onSubmitted) {
+                          // Mirror the shared controller so save-time reads
+                          // still see what was typed.
+                          controller.value = attr.keyController.value;
+                          return _buildTextField(
+                            controller: controller,
+                            focusNode: focusNode,
+                            label: 'Detail',
+                            hint: 'e.g., Material',
+                            onChanged: (v) => attr.keyController.text = v,
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -799,7 +880,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
           ] else ...[
             const SizedBox(height: 4),
             Text(
-              'Add custom attributes like Material, Flavor, Capacity, etc.',
+              'For details you record just this once. Fields you use on every '
+              'product belong in Settings → Simple Product Fields.',
               style: TextStyle(
                 fontSize: 11,
                 color: Colors.grey[500],
@@ -831,9 +913,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
     String? Function(String?)? validator,
     int maxLines = 1,
     ValueChanged<String>? onChanged,
+    FocusNode? focusNode,
   }) {
     return TextFormField(
       controller: controller,
+      focusNode: focusNode,
       onChanged: onChanged,
       decoration: InputDecoration(
         labelText: label,

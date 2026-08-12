@@ -578,9 +578,6 @@ class BackupService {
               final variant = VarianteModel(
                 varianteId: variantMap['varianteId'] ?? const Uuid().v4(),
                 productId: variantMap['productId'] ?? '',
-                size: variantMap['size'],
-                color: variantMap['color'],
-                weight: variantMap['weight'],
                 sku: variantMap['sku'],
                 barcode: variantMap['barcode'],
                 mrp: (variantMap['mrp'] as num?)?.toDouble(),

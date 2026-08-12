@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobx/mobx.dart';
 import 'package:billberrylite/data/models/common/business_type.dart';
@@ -224,8 +224,12 @@ abstract class _SetupWizardStore with Store {
       // This must be done after Hive boxes are opened
       await _registerBusinessDependencies(mode);
       // ignore: avoid_print
-    } catch (e) {
-      // ignore: avoid_print
+    } catch (e, stack) {
+      // Never swallow this silently: a failure here used to surface much later
+      // as a confusing "not registered inside GetIt" crash on a wizard step.
+      // Flow is unchanged (this runs on back/forward too) — only now it's visible.
+      debugPrint('❌ Setup wizard: box/dependency init failed for $mode: $e');
+      debugPrint('$stack');
     }
   }
 

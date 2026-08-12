@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/di/service_locator.dart';
+import '../../services/retail/variant_attribute_mapper.dart';
 
 // Retail Models
 import '../../../data/models/retail/hive_model/product_model_200.dart';
@@ -565,10 +566,7 @@ abstract class _AddProductFormStore with Store {
           productId: productId,
           sku: await _skuOrGenerated(variantData.sku),
           barcode: variantData.barcode,
-          size: variantData.attributes['Size'],
-          color: variantData.attributes['Color'],
-          weight: variantData.attributes['Weight'],
-          customAttributes: variantData.attributes,
+          customAttributes: mergeVariantAttributes(variantData.attributes),
           attributeValueIds: variantData.attributeValueIds,
           mrp: variantData.mrp,
           costPrice: variantData.costPrice,

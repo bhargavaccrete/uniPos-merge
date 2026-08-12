@@ -1,7 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/data/models/retail/hive_model/hold_sale_item_model_210.dart';
 import 'package:billberrylite/data/models/retail/hive_model/hold_sale_model_209.dart';
+import 'package:billberrylite/domain/services/common/notification_service.dart';
+import 'package:billberrylite/domain/services/retail/hold_sale_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
 import '../../../core/di/service_locator.dart';
+
+/// House card elevation — same soft lift [ReportCard]/[ReportSummaryCard] use.
+const List<BoxShadow> _cardShadow = [
+  BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2)),
+];
 
 class ParkedSalesScreen extends StatefulWidget {
   const ParkedSalesScreen({super.key});
@@ -16,6 +32,13 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
     super.initState();
     holdSaleStore.loadHoldSales();
   }
+
+  /// Money string honouring the store's currency + decimal-precision settings.
+  String _money(double amount) => CurrencyHelper.formatAmountWithSymbol(
+        amount,
+        CurrencyHelper.currentSymbol,
+        decimalPlaces: DecimalSettings.precision,
+      );
 
   String _formatDate(String isoDate) {
     final date = DateTime.parse(isoDate);
@@ -37,102 +60,40 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
 
   Future<void> _restoreHoldSale(HoldSaleModel holdSale) async {
     try {
-      // Get hold sale items
-      final items = await holdSaleStore.getItemsForHoldSale(holdSale.holdSaleId);
-
-      if (items.isEmpty) {
-        throw Exception('No items found in parked sale');
-      }
-
-      // Clear current cart
-      await cartStore.clearCart();
-
-      // Add each item to cart
-      for (var holdItem in items) {
-        final product = productStore.getProductById(holdItem.productId);
-        final variant = await productStore.getVariantById(holdItem.variantId);
-
-        if (product != null && variant != null) {
-          // Add item with the exact quantity from hold sale
-          await cartStore.addItem(product, variant);
-
-          // Update quantity if needed
-          if (holdItem.qty > 1) {
-            for (int i = 1; i < holdItem.qty; i++) {
-              await cartStore.incrementQuantity(holdItem.variantId);
-            }
-          }
-        }
-      }
-
-      // Delete hold sale
-      await holdSaleStore.deleteHoldSale(holdSale.holdSaleId);
+      final skipped = await HoldSaleService.restore(holdSale);
 
       if (mounted) {
         Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Parked sale restored to cart!'),
-            backgroundColor: Color(0xFF4CAF50),
-            duration: Duration(seconds: 2),
-          ),
-        );
+      }
+      if (skipped > 0) {
+        NotificationService.instance.showWarning(
+            'Restored to cart — $skipped item(s) skipped (no longer available)');
+      } else {
+        NotificationService.instance
+            .showSuccess('Parked sale restored to cart');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error restoring sale: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      NotificationService.instance.showError('Error restoring sale: $e');
     }
   }
 
   Future<void> _deleteHoldSale(HoldSaleModel holdSale) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppConfirmDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Parked Sale'),
-        content: const Text('Are you sure you want to delete this parked sale? This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      title: 'Delete Parked Sale',
+      message:
+          'Are you sure you want to delete this parked sale? This action cannot be undone.',
+      confirmLabel: 'Delete',
+      accent: AppColors.danger,
+      icon: Icons.delete_outline_rounded,
     );
 
-    if (confirmed == true) {
+    if (confirmed) {
       try {
         await holdSaleStore.deleteHoldSale(holdSale.holdSaleId);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Parked sale deleted'),
-              backgroundColor: Color(0xFF4CAF50),
-            ),
-          );
-        }
+        NotificationService.instance.showSuccess('Parked sale deleted');
       } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error deleting sale: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+        NotificationService.instance.showError('Error deleting sale: $e');
       }
     }
   }
@@ -144,270 +105,277 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => Observer(
-        builder: (context) {
+      builder: (dialogContext) => Observer(
+        builder: (dialogContext) {
           final items = holdSaleStore.currentHoldSaleItems;
 
-          return AlertDialog(
-            title: const Text('Parked Sale Details'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildDetailRow('Parked At', _formatDate(holdSale.createdAt)),
-                  if (holdSale.note != null)
-                    _buildDetailRow('Note', holdSale.note!),
-                  _buildDetailRow('Total Items', '${holdSale.totalItems}'),
-                  _buildDetailRow('Subtotal', '₹${holdSale.subtotal.toStringAsFixed(2)}'),
-                  const Divider(height: 24),
-                  const Text(
-                    'Items:',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A1A1A),
-                    ),
+          return AppDialogShell(
+            title: holdSale.note ?? 'Parked Sale',
+            subtitle: 'Parked ${_formatDate(holdSale.createdAt)}',
+            accent: AppColors.warning,
+            icon: Icons.pause_circle_outline,
+            body: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Totals block — the two numbers that decide whether to restore
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.divider, width: 0.5),
                   ),
-                  const SizedBox(height: 12),
-                  ...items.map((item) => Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5F5F5),
-                        borderRadius: BorderRadius.circular(6),
+                  child: Column(
+                    children: [
+                      _buildDetailRow(
+                          'Total Items', '${holdSale.totalItems}'),
+                      const SizedBox(height: 8),
+                      Divider(height: 1, thickness: 1, color: AppColors.divider),
+                      const SizedBox(height: 8),
+                      _buildDetailRow(
+                        'Subtotal',
+                        _money(holdSale.subtotal),
+                        emphasis: true,
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item.productName,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Qty: ${item.qty}',
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                              Text(
-                                'Price: ₹${item.price.toStringAsFixed(2)}',
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                              Text(
-                                'Total: ₹${item.total.toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF4CAF50),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    )),
-                ],
-              ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'ITEMS (${items.length})',
+                  style: GoogleFonts.poppins(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.7,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ...items.map(_buildDetailItemRow),
+              ],
             ),
             actions: [
-              TextButton(
+              appDialogCancelButton(dialogContext, label: 'Close'),
+              const SizedBox(width: 12),
+              appDialogPrimaryButton(
+                label: 'Restore',
+                color: AppColors.success,
                 onPressed: () {
-                  holdSaleStore.clearSelection();
-                  Navigator.pop(context);
-                },
-                child: const Text('Close'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _deleteHoldSale(holdSale);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Delete'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
+                  Navigator.pop(dialogContext);
                   _restoreHoldSale(holdSale);
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4CAF50),
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Restore'),
               ),
             ],
           );
         },
       ),
-    );
+    ).then((_) => holdSaleStore.clearSelection());
   }
 
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+  Widget _buildDetailItemRow(HoldSaleItemModel item) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider, width: 0.5),
+        boxShadow: _cardShadow,
+      ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 100,
+          // Qty badge — scanning "how many" is faster than reading "3 ×"
+          Container(
+            width: 30,
+            height: 30,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+            ),
             child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF6B6B6B),
+              '${item.qty}',
+              style: GoogleFonts.poppins(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
               ),
             ),
           ),
+          const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF1A1A1A),
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.productName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '@ ${_money(item.price)}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _money(item.total),
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, {bool emphasis = false}) {
+    return Row(
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const Spacer(),
+        Text(
+          value,
+          style: GoogleFonts.poppins(
+            fontSize: emphasis ? 16 : 13.5,
+            fontWeight: emphasis ? FontWeight.w700 : FontWeight.w600,
+            color: emphasis ? AppColors.success : AppColors.textPrimary,
+          ),
+        ),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text('Parked Sales', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.white,
-      ),
-      body: Observer(
-        builder: (context) {
-          if (holdSaleStore.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(title: 'Parked Sales'),
+      // Currency/precision changes rebuild every money label on this screen.
+      body: ValueListenableBuilder<String>(
+        valueListenable: CurrencyHelper.currencyNotifier,
+        builder: (context, _, _) => ValueListenableBuilder<int>(
+          valueListenable: DecimalSettings.precisionNotifier,
+          builder: (context, _, _) => Observer(
+            builder: (context) {
+              if (holdSaleStore.isLoading) {
+                return const Center(
+                    child: CircularProgressIndicator(color: AppColors.primary));
+              }
 
-          if (holdSaleStore.holdSaleCount == 0) {
-            return _buildEmptyState();
-          }
+              if (holdSaleStore.holdSaleCount == 0) {
+                return const AppEmptyState(
+                  icon: Icons.pause_circle_outline,
+                  title: 'No parked sales',
+                  message:
+                      'Sales you hold from the billing screen will appear here.',
+                );
+              }
 
-          return Column(
-            children: [
-              _buildSummaryCard(),
-              Expanded(child: _buildHoldSalesList()),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.pause_circle_outline,
-            size: 80,
-            color: Colors.grey[300],
+              return Column(
+                children: [
+                  _buildSummaryCard(context),
+                  Expanded(child: _buildHoldSalesList()),
+                ],
+              );
+            },
           ),
-          const SizedBox(height: 16),
-          const Text(
-            'No parked sales',
-            style: TextStyle(
-              fontSize: 16,
-              color: Color(0xFF6B6B6B),
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Parked sales will appear here',
-            style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFFB0B0B0),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildSummaryCard() {
+  /// Header band, not a card — it reads as an extension of the app bar so it
+  /// can never be mistaken for one of the parked-sale cards below it.
+  Widget _buildSummaryCard(BuildContext context) {
     return Observer(
       builder: (context) {
+        final count = holdSaleStore.holdSaleCount;
+
         return Container(
-          color: Colors.white,
-          padding: const EdgeInsets.all(20),
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+          decoration: const BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(18)),
+          ),
           child: Row(
             children: [
               Expanded(
-                child: _buildStatItem(
-                  'Parked Sales',
-                  holdSaleStore.holdSaleCount.toString(),
-                  Icons.pause_circle_outline,
-                  Colors.orange,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      count == 1 ? '1 Parked Sale' : '$count Parked Sales',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.subheadingFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Waiting to be settled',
+                      style: GoogleFonts.poppins(
+                        fontSize: 11.5,
+                        color: AppColors.white.withValues(alpha: 0.75),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildStatItem(
-                  'Total Value',
-                  '₹${holdSaleStore.totalHoldSalesValue.toStringAsFixed(2)}',
-                  Icons.currency_rupee,
-                  const Color(0xFF4CAF50),
-                ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'TOTAL VALUE',
+                    style: GoogleFonts.poppins(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.7,
+                      color: AppColors.white.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    _money(holdSaleStore.totalHoldSalesValue),
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.subheadingFontSize(context) + 1,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.white,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         );
       },
-    );
-  }
-
-  Widget _buildStatItem(String label, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: color),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Color(0xFF6B6B6B),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1A1A1A),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -416,134 +384,174 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
       builder: (context) {
         final holdSales = holdSaleStore.holdSales;
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
+        return ListView.separated(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           itemCount: holdSales.length,
-          itemBuilder: (context, index) {
-            final holdSale = holdSales[index];
-            return _buildHoldSaleCard(holdSale);
-          },
+          separatorBuilder: (_, _) => const SizedBox(height: 12),
+          itemBuilder: (context, index) =>
+              _buildHoldSaleCard(context, holdSales[index]),
         );
       },
     );
   }
 
-  Widget _buildHoldSaleCard(HoldSaleModel holdSale) {
+  Widget _buildHoldSaleCard(BuildContext context, HoldSaleModel holdSale) {
+    final radius = BorderRadius.circular(AppResponsive.borderRadius(context));
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
+        color: AppColors.white,
+        borderRadius: radius,
+        border: Border.all(color: AppColors.divider, width: 0.5),
+        boxShadow: _cardShadow,
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: const CircleAvatar(
-          backgroundColor: Color(0xFFFFF3E0),
-          child: Icon(
-            Icons.pause_circle_outline,
-            color: Colors.orange,
-            size: 24,
-          ),
-        ),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                holdSale.note ?? 'Parked Sale',
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF1A1A1A),
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            Text(
-              _formatDate(holdSale.createdAt),
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF6B6B6B),
-              ),
-            ),
-          ],
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 6),
-            Row(
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: radius,
+        child: InkWell(
+          borderRadius: radius,
+          onTap: () => _showHoldSaleDetails(holdSale),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 8, 6),
+            child: Column(
               children: [
-                const Icon(Icons.inventory_2, size: 14, color: Color(0xFF2196F3)),
-                const SizedBox(width: 4),
-                Text(
-                  '${holdSale.totalItems} items',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF2196F3),
-                    fontWeight: FontWeight.w500,
-                  ),
+                // Identity row — who/when on the left, money on the right
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(11),
+                      ),
+                      child: const Icon(Icons.pause_circle_outline,
+                          color: AppColors.warning, size: 21),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            holdSale.note ?? 'Parked Sale',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.bodyFontSize(context),
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '${holdSale.totalItems} items  ·  ${_formatDate(holdSale.createdAt)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              fontSize: 11.5,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2, right: 6),
+                      child: Text(
+                        _money(holdSale.subtotal),
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.bodyFontSize(context) + 2,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                const Icon(Icons.currency_rupee, size: 14, color: Color(0xFF4CAF50)),
-                Text(
-                  holdSale.subtotal.toStringAsFixed(2),
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF4CAF50),
-                    fontWeight: FontWeight.w600,
-                  ),
+                const SizedBox(height: 10),
+                Divider(height: 1, thickness: 1, color: AppColors.divider),
+                // Action row — restore is the primary job of this screen, so it
+                // is visible; view/delete stay in the overflow.
+                Row(
+                  children: [
+                    TextButton.icon(
+                      onPressed: () => _restoreHoldSale(holdSale),
+                      icon: const Icon(Icons.play_circle_outline, size: 18),
+                      label: Text(
+                        'Restore to Cart',
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.success,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: const Size(0, 38),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert,
+                          color: AppColors.textSecondary, size: 20),
+                      tooltip: 'Options',
+                      // M3 tints menu surfaces lavender by default — pin it
+                      // to white so it matches the cards.
+                      color: AppColors.white,
+                      surfaceTintColor: AppColors.white,
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: AppColors.divider),
+                      ),
+                      onSelected: (value) {
+                        if (value == 'delete') {
+                          _deleteHoldSale(holdSale);
+                        } else if (value == 'details') {
+                          _showHoldSaleDetails(holdSale);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        _menuItem('details', Icons.info_outline, 'View Details',
+                            AppColors.info),
+                        _menuItem('delete', Icons.delete_outline, 'Delete',
+                            AppColors.danger),
+                      ],
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
-        trailing: PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert, color: Color(0xFF6B6B6B)),
-          onSelected: (value) {
-            if (value == 'restore') {
-              _restoreHoldSale(holdSale);
-            } else if (value == 'delete') {
-              _deleteHoldSale(holdSale);
-            } else if (value == 'details') {
-              _showHoldSaleDetails(holdSale);
-            }
-          },
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'restore',
-              child: Row(
-                children: [
-                  Icon(Icons.play_circle_outline, color: Color(0xFF4CAF50), size: 20),
-                  SizedBox(width: 12),
-                  Text('Restore to Cart'),
-                ],
-              ),
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _menuItem(
+      String value, IconData icon, String label, Color color) {
+    return PopupMenuItem<String>(
+      value: value,
+      height: 44,
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 19),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 13.5,
+              color: AppColors.textPrimary,
             ),
-            const PopupMenuItem(
-              value: 'details',
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, color: Color(0xFF2196F3), size: 20),
-                  SizedBox(width: 12),
-                  Text('View Details'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'delete',
-              child: Row(
-                children: [
-                  Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                  SizedBox(width: 12),
-                  Text('Delete'),
-                ],
-              ),
-            ),
-          ],
-        ),
-        onTap: () => _showHoldSaleDetails(holdSale),
+          ),
+        ],
       ),
     );
   }

@@ -11,6 +11,7 @@ import 'package:billberrylite/stores/payment_method_store.dart';
 import 'package:billberrylite/data/repositories/retail/attribute_repository.dart';
 import 'package:billberrylite/data/repositories/retail/credit_payment_repository.dart';
 import 'package:billberrylite/data/repositories/retail/hold_sale_repository.dart';
+import 'package:billberrylite/data/repositories/retail/cart_repository.dart' as retail;
 import 'package:billberrylite/data/repositories/retail/variant_repository.dart' as retail;
 import 'package:billberrylite/data/repositories/retail/sale_item_repository.dart';
 import 'package:billberrylite/domain/services/retail/auth_service.dart';
@@ -181,11 +182,12 @@ Future<void> _registerRetailDependencies() async {
   // (same storage approach as restaurant's admin PIN), no Hive model.
   locator.registerLazySingleton<AuthService>(() => AuthService());
 
-  // Ensure default admin account exists
-  await locator<AuthService>().ensureDefaultAdmin();
-
   // Register Stores (Singletons - lazy loaded)
-  locator.registerLazySingleton<retail.CartStore>(() => retail.CartStore());
+  // CartStore depends on CartRepository — the store never touches Hive itself.
+  locator.registerLazySingleton<retail.CartRepository>(
+      () => retail.CartRepository());
+  locator.registerLazySingleton<retail.CartStore>(
+      () => retail.CartStore(locator<retail.CartRepository>()));
   locator.registerLazySingleton<ProductStore>(() => ProductStore());
   locator.registerLazySingleton<SaleStore>(() => SaleStore());
 
@@ -252,6 +254,13 @@ Future<void> _registerRetailDependencies() async {
   locator.registerLazySingleton<CashMovementStore>(
     () => CashMovementStore(locator<CashMovementRepository>()),
   );
+
+  // Async side-effects go LAST, after every registration. The registrations
+  // above are synchronous and cannot fail, so the container is fully populated
+  // before this point — an error here can no longer strand ProductStore and
+  // everything after it as unregistered. (Restaurant does the same, see
+  // `loadSavedPrinters` at the end of _registerRestaurantDependencies.)
+  await locator<AuthService>().ensureDefaultAdmin();
 }
 
 /// Register restaurant-specific dependencies

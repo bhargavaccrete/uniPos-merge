@@ -71,6 +71,16 @@ class SaleItemModel extends HiveObject {
   @HiveField(19)
   final String? weight; // Weight attribute
 
+  /// Generic variant descriptors as `{attributeName: value}`, captured at sale
+  /// time. This is a HISTORICAL RECORD — render receipts and reports from this
+  /// map, never by re-reading the live variant, or editing a product would
+  /// rewrite past sales.
+  ///
+  /// [size], [color] and [weight] remain as a fallback for records written
+  /// before this field existed.
+  @HiveField(20)
+  final Map<String, String>? attributes;
+
   SaleItemModel({
     required this.saleItemId,
     required this.saleId,
@@ -92,6 +102,7 @@ class SaleItemModel extends HiveObject {
     this.cgstAmount,
     this.sgstAmount,
     this.weight,
+    this.attributes,
   });
 
   factory SaleItemModel.create({
@@ -102,6 +113,7 @@ class SaleItemModel extends HiveObject {
     String? size,
     String? color,
     String? weight,
+    Map<String, String>? attributes,
     required double price,
     required int qty,
     double? discountAmount,
@@ -157,6 +169,7 @@ class SaleItemModel extends HiveObject {
       size: size,
       color: color,
       weight: weight,
+      attributes: attributes,
       price: price,
       qty: qty,
       total: finalTotal,
@@ -181,6 +194,7 @@ class SaleItemModel extends HiveObject {
     String? size,
     String? color,
     String? weight,
+    Map<String, String>? attributes,
     required double price,
     required int qty,
     required double discountAmount,
@@ -203,6 +217,7 @@ class SaleItemModel extends HiveObject {
       size: size,
       color: color,
       weight: weight,
+      attributes: attributes,
       price: price,
       qty: qty,
       total: total,
@@ -232,6 +247,7 @@ class SaleItemModel extends HiveObject {
       'size': size,
       'color': color,
       'weight': weight,
+      'attributes': attributes,
       'price': price,
       'qty': qty,
       'total': total,
@@ -270,6 +286,8 @@ class SaleItemModel extends HiveObject {
       cgstAmount: (map['cgstAmount'] as num?)?.toDouble(),
       sgstAmount: (map['sgstAmount'] as num?)?.toDouble(),
       weight: map['weight'] as String?,
+      attributes: (map['attributes'] as Map?)
+          ?.map((k, v) => MapEntry(k.toString(), v.toString())),
     );
   }
 }

@@ -34,7 +34,6 @@ import '../../util/restaurant_print_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
-enum DiscountType { amount, percentage }
 
 class Customerdetails extends StatefulWidget {
   final OrderModel? existingModel;

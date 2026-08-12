@@ -602,9 +602,9 @@ class _AddPurchaseScreenState extends State<AddPurchaseScreen> {
 
   String _getVariantDescription(VarianteModel variant) {
     List<String> parts = [];
-    if (variant.size != null) parts.add(variant.size!);
-    if (variant.color != null) parts.add(variant.color!);
-    if (variant.weight != null) parts.add(variant.weight!);
+    // if (variant.size != null) parts.add(variant.size!);
+    // if (variant.color != null) parts.add(variant.color!);
+    // if (variant.weight != null) parts.add(variant.weight!);
     if (variant.sku != null) parts.add('SKU: ${variant.sku}');
     return parts.isEmpty ? 'Default Variant' : parts.join(' • ');
   }
@@ -701,9 +701,9 @@ class _AddPurchaseItemDialogState extends State<_AddPurchaseItemDialog> {
 
   String _getVariantDescription(VarianteModel variant) {
     List<String> parts = [];
-    if (variant.size != null) parts.add(variant.size!);
-    if (variant.color != null) parts.add(variant.color!);
-    if (variant.weight != null) parts.add(variant.weight!);
+    // if (variant.size != null) parts.add(variant.size!);
+    // if (variant.color != null) parts.add(variant.color!);
+    // if (variant.weight != null) parts.add(variant.weight!);
     if (variant.sku != null) parts.add('SKU: ${variant.sku}');
     return parts.isEmpty ? 'Default Variant' : parts.join(' • ');
   }

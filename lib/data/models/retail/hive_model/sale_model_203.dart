@@ -93,6 +93,34 @@ class SaleModel extends HiveObject {
   @HiveField(24, defaultValue: 'paid')
   final String status; // paid / partially_paid / due
 
+  // ==================== BILL COMPOSITION ====================
+  // Stored so a settled sale can be re-rendered exactly as it was charged.
+  // `discountAmount` (field 4) holds the resolved currency value; these record
+  // HOW that value was arrived at, which a receipt reprint otherwise can't show.
+
+  @HiveField(25)
+  final String? discountType; // 'amount' | 'percentage'
+
+  @HiveField(26)
+  final double? discountValue; // raw input, e.g. 10 for "10%"
+
+  @HiveField(27)
+  final String? discountReason;
+
+  @HiveField(28)
+  final int? loyaltyPointsUsed;
+
+  /// Rounding adjustment baked into [totalAmount]; may be negative.
+  /// Persisted rather than re-derived at print time, so changing the round-off
+  /// setting later cannot make a reprint disagree with the original receipt.
+  @HiveField(29)
+  final double? roundOff;
+
+  /// Tax mode in force when this sale was made. Frozen here so an old invoice
+  /// renders with the labels it was charged under.
+  @HiveField(30)
+  final bool? isTaxInclusive;
+
   SaleModel({
     required this.saleId,
     this.customerId,
@@ -119,6 +147,12 @@ class SaleModel extends HiveObject {
     double? paidAmount,
     double? dueAmount,
     String? status,
+    this.discountType,
+    this.discountValue,
+    this.discountReason,
+    this.loyaltyPointsUsed,
+    this.roundOff,
+    this.isTaxInclusive,
   })  : isReturn = isReturn ?? false,
         paidAmount = paidAmount ?? totalAmount,
         dueAmount = dueAmount ?? 0.0,
@@ -220,10 +254,27 @@ class SaleModel extends HiveObject {
     required double changeReturn,
     bool isReturn = false,
     String? originalSaleId,
+    String? discountType,
+    double? discountValue,
+    String? discountReason,
+    int? loyaltyPointsUsed,
+    double? roundOff,
+    bool? isTaxInclusive,
+    /// When the customer tenders less than [grandTotal], pass what was actually
+    /// collected. The remainder is recorded as due and the sale is marked
+    /// partially paid rather than paid.
+    double? amountCollected,
   }) {
     final now = DateTime.now().toIso8601String();
     final cgst = double.parse((totalGstAmount / 2).toStringAsFixed(2));
     final sgst = double.parse((totalGstAmount / 2).toStringAsFixed(2));
+
+    // Clamp to the bill: tendering more than the total is change, not an
+    // over-payment, so paidAmount must never exceed totalAmount.
+    final collected =
+        (amountCollected ?? grandTotal).clamp(0.0, grandTotal).toDouble();
+    final due = double.parse((grandTotal - collected).toStringAsFixed(2));
+    final isShort = due > 0.009;
 
     // Determine primary payment type (method with highest amount)
     String primaryPaymentType = 'split';
@@ -255,6 +306,15 @@ class SaleModel extends HiveObject {
       changeReturn: changeReturn,
       totalPaid: totalPaid,
       isSplitPayment: paymentList.length > 1,
+      discountType: discountType,
+      discountValue: discountValue,
+      discountReason: discountReason,
+      loyaltyPointsUsed: loyaltyPointsUsed,
+      roundOff: roundOff,
+      isTaxInclusive: isTaxInclusive,
+      paidAmount: collected,
+      dueAmount: isShort ? due : 0.0,
+      status: isShort ? SaleStatus.partiallyPaid : SaleStatus.paid,
     );
   }
 
@@ -288,6 +348,12 @@ class SaleModel extends HiveObject {
     required double grandTotal,
     bool isReturn = false,
     String? originalSaleId,
+    String? discountType,
+    double? discountValue,
+    String? discountReason,
+    int? loyaltyPointsUsed,
+    double? roundOff,
+    bool? isTaxInclusive,
   }) {
     final now = DateTime.now().toIso8601String();
     final cgst = double.parse((totalGstAmount / 2).toStringAsFixed(2));
@@ -319,6 +385,12 @@ class SaleModel extends HiveObject {
       paidAmount: 0, // No payment made
       dueAmount: grandTotal, // Full amount is due
       status: SaleStatus.due, // Status is due
+      discountType: discountType,
+      discountValue: discountValue,
+      discountReason: discountReason,
+      loyaltyPointsUsed: loyaltyPointsUsed,
+      roundOff: roundOff,
+      isTaxInclusive: isTaxInclusive,
     );
   }
 
@@ -433,6 +505,12 @@ class SaleModel extends HiveObject {
       'paidAmount': paidAmount,
       'dueAmount': dueAmount,
       'status': status,
+      'discountType': discountType,
+      'discountValue': discountValue,
+      'discountReason': discountReason,
+      'loyaltyPointsUsed': loyaltyPointsUsed,
+      'roundOff': roundOff,
+      'isTaxInclusive': isTaxInclusive,
     };
   }
 
@@ -464,6 +542,12 @@ class SaleModel extends HiveObject {
       paidAmount: (map['paidAmount'] as num?)?.toDouble(),
       dueAmount: (map['dueAmount'] as num?)?.toDouble(),
       status: (map['status'] as String?) ?? SaleStatus.paid,
+      discountType: map['discountType'] as String?,
+      discountValue: (map['discountValue'] as num?)?.toDouble(),
+      discountReason: map['discountReason'] as String?,
+      loyaltyPointsUsed: (map['loyaltyPointsUsed'] as num?)?.toInt(),
+      roundOff: (map['roundOff'] as num?)?.toDouble(),
+      isTaxInclusive: map['isTaxInclusive'] as bool?,
     );
   }
 }

@@ -864,9 +864,9 @@ class _AddPOItemDialogState extends State<_AddPOItemDialog> {
 
   String _getVariantDescription(VarianteModel variant) {
     List<String> parts = [];
-    if (variant.size != null) parts.add(variant.size!);
-    if (variant.color != null) parts.add(variant.color!);
-    if (variant.weight != null) parts.add(variant.weight!);
+    // if (variant.size != null) parts.add(variant.size!);
+    // if (variant.color != null) parts.add(variant.color!);
+    // if (variant.weight != null) parts.add(variant.weight!);
     // Add custom attributes
     if (variant.customAttributes != null && variant.customAttributes!.isNotEmpty) {
       for (var entry in variant.customAttributes!.entries) {
@@ -1072,9 +1072,9 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
 
   String _getVariantDescription(VarianteModel variant) {
     List<String> parts = [];
-    if (variant.size != null) parts.add(variant.size!);
-    if (variant.color != null) parts.add(variant.color!);
-    if (variant.weight != null) parts.add(variant.weight!);
+    // if (variant.size != null) parts.add(variant.size!);
+    // if (variant.color != null) parts.add(variant.color!);
+    // if (variant.weight != null) parts.add(variant.weight!);
     if (variant.customAttributes != null && variant.customAttributes!.isNotEmpty) {
       for (var entry in variant.customAttributes!.entries) {
         parts.add('${entry.key}: ${entry.value}');
@@ -1352,9 +1352,9 @@ class _QuantityConfirmationDialogState extends State<_QuantityConfirmationDialog
 
   String _getVariantDescription(VarianteModel variant) {
     List<String> parts = [];
-    if (variant.size != null) parts.add(variant.size!);
-    if (variant.color != null) parts.add(variant.color!);
-    if (variant.weight != null) parts.add(variant.weight!);
+    // if (variant.size != null) parts.add(variant.size!);
+    // if (variant.color != null) parts.add(variant.color!);
+    // if (variant.weight != null) parts.add(variant.weight!);
     if (variant.customAttributes != null && variant.customAttributes!.isNotEmpty) {
       for (var entry in variant.customAttributes!.entries) {
         parts.add('${entry.key}: ${entry.value}');

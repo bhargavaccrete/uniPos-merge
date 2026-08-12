@@ -1,11 +1,18 @@
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
+import 'package:billberrylite/util/common/loyalty_points.dart';
 import 'package:uuid/uuid.dart';
 
 
 /// Service for handling sale returns and refunds
 /// Manages stock adjustments, negative sales entries, and customer updates
+///
+/// NOTE ON MONEY: a return deliberately does NOT go through
+/// `RetailBillingService`. It refunds what was actually charged, so every figure
+/// is derived from the original sale's STORED values (pro-rated by the returned
+/// quantity). Recomputing would refund a different amount than was taken if a
+/// tax rate or the tax mode changed since the sale.
 class ReturnService {
   static const _uuid = Uuid();
 
@@ -60,6 +67,7 @@ class ReturnService {
         size: item.size,
         color: item.color,
         weight: item.weight,
+        attributes: item.attributes,
         price: item.price,
         qty: item.qty, // Keep positive for stock restoration
         discountAmount: item.discountAmount,
@@ -83,7 +91,9 @@ class ReturnService {
 
     // 6. Update customer points (deduct points if customer exists)
     if (originalSale.customerId != null) {
-      final pointsToDeduct = (originalSale.totalAmount / 10).floor();
+      // Deduct exactly what this amount granted, using the shared earn rule —
+      // a local `/10` here silently drifts if the rate ever changes.
+      final pointsToDeduct = LoyaltyPoints.earnedFor(originalSale.totalAmount);
       await customerStore.updateAfterPurchase(
         originalSale.customerId!,
         -originalSale.totalAmount, // Negative amount
@@ -172,6 +182,7 @@ class ReturnService {
         size: originalItem.size,
         color: originalItem.color,
         weight: originalItem.weight,
+        attributes: originalItem.attributes,
         price: originalItem.price,
         qty: returnQty,
         discountAmount: itemDiscount,
@@ -212,6 +223,7 @@ class ReturnService {
         size: item.size,
         color: item.color,
         weight: item.weight,
+        attributes: item.attributes,
         price: item.price,
         qty: item.qty,
         discountAmount: item.discountAmount,
@@ -234,7 +246,7 @@ class ReturnService {
 
     // 8. Update customer points (deduct proportional points)
     if (originalSale.customerId != null) {
-      final pointsToDeduct = (returnTotal / 10).floor();
+      final pointsToDeduct = LoyaltyPoints.earnedFor(returnTotal);
       await customerStore.updateAfterPurchase(
         originalSale.customerId!,
         -returnTotal, // Negative amount

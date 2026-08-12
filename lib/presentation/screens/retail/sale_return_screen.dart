@@ -42,7 +42,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
 
     try {
       final sale = await saleStore.getSaleById(widget.saleId);
-      final items = await saleItemRepository.getItemsBySaleId(widget.saleId);
+      final items = await saleStore.getItemsForSale(widget.saleId);
 
       setState(() {
         _sale = sale;
@@ -385,9 +385,13 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                       item.productName ?? 'Unknown',
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    if (item.size != null || item.color != null)
+                    if (attributeStore
+                        .describeAttributes(item.attributes,
+                            size: item.size, color: item.color, labelled: false)
+                        .isNotEmpty)
                       Text(
-                        '${item.size ?? ''} ${item.color ?? ''}'.trim(),
+                        attributeStore.describeAttributes(item.attributes,
+                            size: item.size, color: item.color, labelled: false),
                         style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
                       ),
                   ],

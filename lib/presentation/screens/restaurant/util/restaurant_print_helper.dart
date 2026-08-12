@@ -15,7 +15,6 @@ import 'package:billberrylite/domain/services/restaurant/notification_service.da
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
-import 'package:billberrylite/presentation/screens/restaurant/start%20order/cart/customerdetails.dart'; // Import for DiscountType
 import 'package:billberrylite/util/restaurant/staticswitch.dart'; // Import for AppSettings
 import 'package:billberrylite/util/restaurant/print_settings.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';

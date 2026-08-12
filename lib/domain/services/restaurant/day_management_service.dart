@@ -10,6 +10,7 @@ import 'package:billberrylite/data/models/restaurant/db/shift_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:billberrylite/data/models/restaurant/db/ordermodel_309.dart';
 import 'package:billberrylite/data/models/restaurant/db/expensel_316.dart';
+import 'package:billberrylite/domain/store/restaurant/order_store.dart';
 import 'package:billberrylite/util/restaurant/staticswitch.dart';
 
 class DayManagementService {
@@ -31,6 +32,15 @@ class DayManagementService {
 
   static Box<RestaurantSessionModel> _getSessionBox() {
     return Hive.box<RestaurantSessionModel>(HiveBoxNames.restaurantSessions);
+  }
+
+  /// Daily bill numbering lives on the restaurant OrderStore, which is only
+  /// registered in restaurant mode. Retail shares this service for its own
+  /// day/EOD lifecycle, so skip the reset rather than blowing up on a missing
+  /// DI registration.
+  static Future<void> _resetDailyBillNumberIfAvailable() async {
+    if (!locator.isRegistered<OrderStore>()) return;
+    await orderStore.resetDailyBillNumber();
   }
 
   /// Start a new POS session
@@ -56,7 +66,7 @@ class DayManagementService {
     await box.put(_lastDayDateKey, now.toIso8601String());
     await box.put(_dayStartTimestampKey, now.toIso8601String());
 
-    await orderStore.resetDailyBillNumber();
+    await _resetDailyBillNumberIfAvailable();
 
     // Clear legacy last_eod_date
     final prefs = await SharedPreferences.getInstance();
@@ -110,7 +120,7 @@ class DayManagementService {
     await box.put(_closingBalanceKey, closingCash);
     await box.delete(_currentSessionIdKey);
     
-    await orderStore.resetDailyBillNumber();
+    await _resetDailyBillNumberIfAvailable();
     debugPrint('🏁 Session ended: ${session?.sessionId}, closing cash: $closingCash');
   }
 

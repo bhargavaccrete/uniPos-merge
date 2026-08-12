@@ -317,14 +317,16 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
   String _buildVariantDescription(Map<String, dynamic> item) {
     final parts = <String>[];
 
-    if (item['size'] != null && item['size'].toString().isNotEmpty) {
-      parts.add('Size: ${item['size']}');
-    }
-    if (item['color'] != null && item['color'].toString().isNotEmpty) {
-      parts.add('Color: ${item['color']}');
-    }
-    if (item['weight'] != null && item['weight'].toString().isNotEmpty) {
-      parts.add('Weight: ${item['weight']}');
+    // Every configured attribute, not just the three legacy columns.
+    final label = (item['variantLabel'] as String?) ??
+        attributeStore.describeAttributes(
+          null,
+          size: item['size']?.toString(),
+          color: item['color']?.toString(),
+          weight: item['weight']?.toString(),
+        );
+    if (label.isNotEmpty) {
+      parts.add(label);
     }
     if (item['barcode'] != null && item['barcode'].toString().isNotEmpty) {
       parts.add('Barcode: ${item['barcode']}');

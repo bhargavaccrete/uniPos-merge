@@ -91,6 +91,24 @@ mixin _$SaleStore on _SaleStore, Store {
     return _$addSaleAsyncAction.run(() => super.addSale(sale));
   }
 
+  late final _$addSaleWithItemsAsyncAction =
+      AsyncAction('_SaleStore.addSaleWithItems', context: context);
+
+  @override
+  Future<void> addSaleWithItems(SaleModel sale, List<SaleItemModel> items) {
+    return _$addSaleWithItemsAsyncAction
+        .run(() => super.addSaleWithItems(sale, items));
+  }
+
+  late final _$getItemsForSaleAsyncAction =
+      AsyncAction('_SaleStore.getItemsForSale', context: context);
+
+  @override
+  Future<List<SaleItemModel>> getItemsForSale(String saleId) {
+    return _$getItemsForSaleAsyncAction
+        .run(() => super.getItemsForSale(saleId));
+  }
+
   late final _$updateSaleAsyncAction =
       AsyncAction('_SaleStore.updateSale', context: context);
 

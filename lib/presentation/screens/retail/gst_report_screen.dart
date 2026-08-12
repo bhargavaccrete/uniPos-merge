@@ -55,7 +55,7 @@ class _GstReportScreenState extends State<GstReportScreen> with SingleTickerProv
       // Get all sale items for these sales
       _saleItems = [];
       for (var sale in _sales) {
-        final items = await saleItemRepository.getItemsBySaleId(sale.saleId);
+        final items = await saleStore.getItemsForSale(sale.saleId);
         _saleItems.addAll(items);
       }
 

@@ -6,6 +6,7 @@ import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
 import 'package:billberrylite/domain/services/restaurant/eod_service.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/core/routes/routes_name.dart';
 
 class RetailEODScreen extends StatefulWidget {
   const RetailEODScreen({super.key});
@@ -178,9 +179,10 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
         NotificationService.instance.showSuccess('End of Day completed successfully!');
       }
 
-      // Navigate back
+      // Day is closed — go to the dashboard rather than back into a stack that
+      // still describes the day we just ended.
       if (mounted) {
-        Navigator.of(context).pop();
+        _exitToDashboard();
       }
     } catch (e) {
       setState(() {
@@ -196,6 +198,20 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
 
       _showError(errorMessage);
     }
+  }
+
+  /// Leave EOD for the dashboard, clearing the stack.
+  ///
+  /// A blind `pop()` here lands wherever EOD happened to be pushed from, which
+  /// after a fresh setup is the onboarding screen (create store / restore
+  /// backup). It is also the wrong destination on principle: once the day is
+  /// closed, the screens underneath (Settings, POS) describe a day that no
+  /// longer exists.
+  void _exitToDashboard() {
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      RouteNames.retailMenu,
+      (route) => false,
+    );
   }
 
   Future<bool> _showConfirmationDialog() async {
@@ -243,6 +259,10 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
       return Scaffold(
         appBar: AppBar(
           title: Text('End of Day', style: GoogleFonts.poppins()),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: _exitToDashboard,
+          ),
         ),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -253,6 +273,10 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
       return Scaffold(
         appBar: AppBar(
           title: Text('End of Day', style: GoogleFonts.poppins()),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: _exitToDashboard,
+          ),
         ),
         body: Center(
           child: Column(
@@ -287,6 +311,10 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('End of Day Settlement', style: GoogleFonts.poppins()),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: _exitToDashboard,
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

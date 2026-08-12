@@ -17,15 +17,6 @@ class CartItemModel extends HiveObject {
   @HiveField(3)
   final String productName;
 
-  @HiveField(4)
-  final String? size;
-
-  @HiveField(5)
-  final String? color;
-
-  @HiveField(6)
-  final String? weight;
-
   @HiveField(7)
   final double price;       // selling price (mrp or after discount)
 
@@ -69,14 +60,17 @@ class CartItemModel extends HiveObject {
   @HiveField(20)
   final int? tabIndex;
 
+  /// Variant descriptors as `{attributeName: value}`, captured from the variant
+  /// at add-to-cart time so every configured attribute survives into the sale.
+  @HiveField(21)
+  final Map<String, String>? attributes;
+
   CartItemModel({
     required this.cartItemId,
     required this.variantId,
     required this.productId,
     required this.productName,
-    this.size,
-    this.color,
-    this.weight,
+    this.attributes,
     required this.price,
     required this.qty,
     required this.total,
@@ -98,9 +92,7 @@ class CartItemModel extends HiveObject {
     required String variantId,
     required String productId,
     required String productName,
-    String? size,
-    String? color,
-    String? weight,
+    Map<String, String>? attributes,
     required double price,
     int qty = 1,
     String? barcode,
@@ -143,9 +135,7 @@ class CartItemModel extends HiveObject {
       variantId: variantId,
       productId: productId,
       productName: productName,
-      size: size,
-      color: color,
-      weight: weight,
+      attributes: attributes,
       price: price,
       qty: qty,
       total: finalTotal,
@@ -173,9 +163,7 @@ class CartItemModel extends HiveObject {
       'variantId': variantId,
       'productId': productId,
       'productName': productName,
-      'size': size,
-      'color': color,
-      'weight': weight,
+      'attributes': attributes,
       'price': price,
       'qty': qty,
       'total': total,
@@ -199,9 +187,8 @@ class CartItemModel extends HiveObject {
       variantId: map['variantId'] as String,
       productId: map['productId'] as String,
       productName: map['productName'] as String,
-      size: map['size'] as String?,
-      color: map['color'] as String?,
-      weight: map['weight'] as String?,
+      attributes: (map['attributes'] as Map?)
+          ?.map((k, v) => MapEntry(k.toString(), v.toString())),
       price: (map['price'] as num).toDouble(),
       qty: (map['qty'] as num).toInt(),
       total: (map['total'] as num).toDouble(),

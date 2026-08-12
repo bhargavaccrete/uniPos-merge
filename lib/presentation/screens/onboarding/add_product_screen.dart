@@ -354,9 +354,6 @@ class _AddProductScreenState extends State<AddProductScreen>
             productId: _editingProductId!,
             sku: await _skuOrGenerated(variantData.sku),
             barcode: variantData.barcode,
-            size: variantData.attributes['Size'],
-            color: variantData.attributes['Color'],
-            weight: variantData.attributes['Weight'],
             customAttributes: variantData.attributes,
             attributeValueIds: variantData.attributeValueIds,
             mrp: variantData.mrp,
@@ -638,8 +635,8 @@ class _AddProductScreenState extends State<AddProductScreen>
           title,
           style: const TextStyle(
             fontSize: 20,
-            fontWeight: FontWeight.bold,
             color: AppColors.darkNeutral,
+            fontWeight: FontWeight.bold,
           ),
         ),
       ],
@@ -653,8 +650,8 @@ class _AddProductScreenState extends State<AddProductScreen>
         title,
         style: const TextStyle(
           fontSize: 16,
-          fontWeight: FontWeight.w600,
           color: AppColors.darkNeutral,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -936,8 +933,8 @@ class _AddProductScreenState extends State<AddProductScreen>
                   ? categories.firstWhere((c) => c.id == selectedValue, orElse: () => categories.first).name
                   : 'Select or Add Category',
               style: GoogleFonts.poppins(
-                fontSize: 14,
                 color: selectedValue != null ? AppColors.textPrimary : AppColors.textSecondary,
+                fontSize: 14,
               ),
             ),
           ),
@@ -1210,15 +1207,15 @@ class _AddProductScreenState extends State<AddProductScreen>
                   child: Row(
                     children: [
                       Icon(
-                        profit >= 0 ? Icons.trending_up : Icons.trending_down,
                         color: profit >= 0 ? AppColors.success : AppColors.danger,
+                        profit >= 0 ? Icons.trending_up : Icons.trending_down,
                       ),
                       const SizedBox(width: 8),
                       Text(
                         'Profit: ₹${profit.toStringAsFixed(2)} (${margin.toStringAsFixed(1)}%)',
                         style: TextStyle(
-                          fontWeight: FontWeight.w600,
                           color: profit >= 0 ? AppColors.success : AppColors.danger,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
@@ -1324,8 +1321,8 @@ class _AddProductScreenState extends State<AddProductScreen>
               label,
               style: GoogleFonts.poppins(
                 fontSize: 13,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 color: selected ? accent : AppColors.textSecondary,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
               ),
             ),
           ],
@@ -1364,8 +1361,8 @@ class _AddProductScreenState extends State<AddProductScreen>
               label,
               style: GoogleFonts.poppins(
                 fontSize: 13,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                 color: selected ? accent : AppColors.textSecondary,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
               ),
             ),
           ],
@@ -1462,7 +1459,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                   ElevatedButton.icon(
                     onPressed: () => _createDefaultAttributes(attributeStore),
                     icon: const Icon(Icons.auto_awesome, size: 16),
-                    label: Text('Create Default Attributes (Size, Color, Weight)', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                    label: Text('Create Starter Attributes', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
@@ -1662,8 +1659,8 @@ class _AddProductScreenState extends State<AddProductScreen>
                   'Bulk Edit - $selectedCount / $variantCount selected',
                   style: GoogleFonts.poppins(
                     fontSize: 14,
-                    fontWeight: FontWeight.w600,
                     color: AppColors.warning,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -1684,8 +1681,8 @@ class _AddProductScreenState extends State<AddProductScreen>
                   'Select All',
                   style: GoogleFonts.poppins(
                     fontSize: 12,
-                    fontWeight: FontWeight.w600,
                     color: allSelected ? AppColors.textSecondary : AppColors.warning,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -1702,8 +1699,8 @@ class _AddProductScreenState extends State<AddProductScreen>
                   'Unselect All',
                   style: GoogleFonts.poppins(
                     fontSize: 12,
-                    fontWeight: FontWeight.w600,
                     color: noneSelected ? AppColors.textSecondary : AppColors.danger,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -1794,8 +1791,8 @@ class _AddProductScreenState extends State<AddProductScreen>
           Text(
             'Workflow: 1) Enter price/stock above  2) Select variants  3) Click Apply. Fields will clear automatically for next group. You can repeat for different prices.',
             style: GoogleFonts.poppins(
-              fontSize: 11,
               color: AppColors.textSecondary,
+              fontSize: 11,
               fontStyle: FontStyle.italic,
             ),
           ),
@@ -2652,8 +2649,8 @@ class _AddProductScreenState extends State<AddProductScreen>
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(
-                  strokeWidth: 2,
                   color: Colors.white,
+                  strokeWidth: 2,
                 ),
               )
                   : Icon(isEditMode ? Icons.update : Icons.add),
@@ -2734,9 +2731,9 @@ class _AddProductScreenState extends State<AddProductScreen>
       child: Row(
         children: [
           const Icon(
-            Icons.table_chart,
             size: 28,
             color: AppColors.primary,
+            Icons.table_chart,
           ),
           const SizedBox(width: 12),
           const Expanded(
@@ -2744,8 +2741,8 @@ class _AddProductScreenState extends State<AddProductScreen>
               'Bulk Import via Excel',
               style: TextStyle(
                 fontSize: 15,
-                fontWeight: FontWeight.bold,
                 color: AppColors.darkNeutral,
+                fontWeight: FontWeight.bold,
               ),
               overflow: TextOverflow.ellipsis,
             ),
@@ -3064,6 +3061,122 @@ class _AddProductScreenState extends State<AddProductScreen>
     }
   }
 
+  /// Product thumbnail. Falls back to the placeholder icon when the image file
+  /// is missing/unreadable (e.g. moved or cleared by the OS) instead of
+  /// letting Image.file throw and break the whole row.
+  Widget _buildProductThumb(String? imagePath) {
+    const placeholder = Icon(Icons.inventory, color: AppColors.primary);
+    return Container(
+      width: 50,
+      height: 50,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: imagePath == null
+          ? placeholder
+          : ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.file(
+                File(imagePath),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => placeholder,
+              ),
+            ),
+    );
+  }
+
+  /// A single tappable action row inside the product actions dialog.
+  Widget _productActionRow({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) =>
+      InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  /// Edit/Delete for a product, behind long-press or the ⋮ button so a
+  /// destructive action can't be hit by a stray tap on the row.
+  Future<void> _showProductActionsDialog(ProductModel product) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AppDialogShell(
+        title: 'Product Actions',
+        subtitle: product.productName,
+        accent: AppColors.primary,
+        icon: Icons.tune_rounded,
+        body: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _productActionRow(
+              icon: Icons.edit,
+              label: 'Edit',
+              color: AppColors.primary,
+              onTap: () {
+                Navigator.pop(dialogContext);
+                _editRetailProduct(product);
+              },
+            ),
+            const Divider(height: 8),
+            _productActionRow(
+              icon: Icons.delete_outline_rounded,
+              label: 'Delete',
+              color: AppColors.danger,
+              onTap: () {
+                Navigator.pop(dialogContext);
+                _confirmDeleteRetailProduct(product);
+              },
+            ),
+          ],
+        ),
+        actions: [appDialogCancelButton(dialogContext, label: 'Close')],
+      ),
+    );
+  }
+
+  /// Deleting a product also cascades to all its variants, so confirm first.
+  Future<void> _confirmDeleteRetailProduct(ProductModel product) async {
+    final confirmed = await showAppConfirmDialog(
+      context: context,
+      title: 'Delete Product?',
+      message: product.hasVariants
+          ? '"${product.productName}" and all of its variants will be permanently deleted. This cannot be undone.'
+          : '"${product.productName}" will be permanently deleted. This cannot be undone.',
+      confirmLabel: 'Delete',
+      accent: AppColors.danger,
+      icon: Icons.delete_outline_rounded,
+    );
+
+    if (!confirmed || !mounted) return;
+    await locator<ProductStore>().deleteProduct(product.productId);
+  }
+
   Widget _buildRetailProductList() {
     final productStore = locator<ProductStore>();
 
@@ -3102,23 +3215,8 @@ class _AddProductScreenState extends State<AddProductScreen>
                           itemBuilder: (context, index) {
                             final product = filteredProducts[index];
                             return ListTile(
-                              leading: Container(
-                                width: 50,
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: product.imagePath != null
-                                    ? ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Image.file(
-                                          File(product.imagePath!),
-                                          fit: BoxFit.cover,
-                                        ),
-                                      )
-                                    : const Icon(Icons.inventory, color: AppColors.primary),
-                              ),
+                              onLongPress: () => _showProductActionsDialog(product),
+                              leading: _buildProductThumb(product.imagePath),
                               title: Text(
                                 product.productName,
                                 style: const TextStyle(fontWeight: FontWeight.w600),
@@ -3126,18 +3224,10 @@ class _AddProductScreenState extends State<AddProductScreen>
                               subtitle: Text(
                                 '${categoryStore.getCategoryById(product.category)?.name ?? product.category} • ${product.hasVariants ? "Variable" : "Simple"}',
                               ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.edit, size: 20),
-                                    onPressed: () => _editRetailProduct(product),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete, size: 20, color: AppColors.danger),
-                                    onPressed: () => productStore.deleteProduct(product.productId),
-                                  ),
-                                ],
+                              trailing: IconButton(
+                                icon: const Icon(Icons.more_vert, size: 20),
+                                tooltip: 'Actions',
+                                onPressed: () => _showProductActionsDialog(product),
                               ),
                             );
                           },
@@ -3215,7 +3305,6 @@ class _AddProductScreenState extends State<AddProductScreen>
                           )
                               : Icon(
                             Icons.restaurant,
-                            color: item.isVeg == 'veg' ? AppColors.success : AppColors.danger,
                           ),
                         ),
                         title: Text(
@@ -3243,6 +3332,16 @@ class _AddProductScreenState extends State<AddProductScreen>
                             IconButton(
                               icon: const Icon(Icons.delete, size: 20, color: AppColors.danger),
                               onPressed: () async {
+                                final confirmed = await showAppConfirmDialog(
+                                  context: context,
+                                  title: 'Delete Item?',
+                                  message:
+                                      '"${item.name}" will be permanently deleted. This cannot be undone.',
+                                  confirmLabel: 'Delete',
+                                  accent: AppColors.danger,
+                                  icon: Icons.delete_outline_rounded,
+                                );
+                                if (!confirmed) return;
                                 await itemStore.deleteItem(item.id);
                               },
                             ),
@@ -3280,8 +3379,8 @@ class _AddProductScreenState extends State<AddProductScreen>
                 '$type List',
                 style: const TextStyle(
                   fontSize: 20,
-                  fontWeight: FontWeight.bold,
                   color: AppColors.darkNeutral,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
               Row(
@@ -3295,8 +3394,8 @@ class _AddProductScreenState extends State<AddProductScreen>
                     child: Text(
                       '$count items',
                       style: const TextStyle(
-                        fontSize: 14,
                         color: Colors.white,
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -3506,16 +3605,16 @@ class _AddProductScreenState extends State<AddProductScreen>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.inventory_2,
             size: 80,
             color: Colors.grey[300],
+            Icons.inventory_2,
           ),
           const SizedBox(height: 20),
           Text(
             'No $type added yet',
             style: TextStyle(
-              fontSize: 18,
               color: Colors.grey[500],
+              fontSize: 18,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -3523,8 +3622,8 @@ class _AddProductScreenState extends State<AddProductScreen>
           Text(
             'Add $type manually or upload Excel file',
             style: TextStyle(
-              fontSize: 14,
               color: Colors.grey[400],
+              fontSize: 14,
             ),
           ),
           const SizedBox(height: 24),
@@ -4056,8 +4155,8 @@ class _AddProductScreenState extends State<AddProductScreen>
             appDialogCancelButton(context),
             const SizedBox(width: 12),
             appDialogPrimaryButton(
-              label: 'Generate Selected Variants',
               color: AppColors.secondary,
+              label: 'Generate Selected Variants',
               onPressed: () {
                 // Count selected variants
                 final selectedCount = selectedCombinations.where((s) => s).length;
@@ -4251,6 +4350,103 @@ class _AddProductScreenState extends State<AddProductScreen>
     });
   }
 
+  // ── Filter dialog building blocks ──────────────────────────────────────────
+  // Shared by the retail and restaurant filter dialogs so both stay identical.
+
+  Widget _filterSectionLabel(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(
+          text,
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
+        ),
+      );
+
+  /// Single-select chip (product type, sort order). [accent] carries semantic
+  /// meaning where the option has one (Veg = green, Non-Veg = red) and
+  /// defaults to primary for neutral options.
+  Widget _filterChoiceChip({
+    required String label,
+    required bool selected,
+    required VoidCallback onSelected,
+    Color? accent,
+  }) {
+    final color = accent ?? AppColors.primary;
+    return ChoiceChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => onSelected(),
+        selectedColor: color,
+        backgroundColor: AppColors.white,
+        showCheckmark: false,
+        side: BorderSide(
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        labelStyle: GoogleFonts.poppins(
+          fontSize: 13,
+          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+        ),
+      );
+  }
+
+  /// Multi-select chip (categories, brands).
+  Widget _filterMultiChip({
+    required String label,
+    required bool selected,
+    required ValueChanged<bool> onSelected,
+  }) =>
+      FilterChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: onSelected,
+        selectedColor: AppColors.primary,
+        backgroundColor: AppColors.white,
+        showCheckmark: false,
+        side: BorderSide(
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        labelStyle: GoogleFonts.poppins(
+          fontSize: 13,
+          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+        ),
+      );
+
+  /// "Clear All" affordance shown at the top of a filter dialog body. Disabled
+  /// (greyed, non-tappable) when there is nothing to clear.
+  Widget _filterClearAllRow({
+    required bool hasActiveFilters,
+    required VoidCallback onClear,
+  }) =>
+      Align(
+        alignment: Alignment.centerRight,
+        child: TextButton.icon(
+          onPressed: hasActiveFilters ? onClear : null,
+          icon: Icon(
+            Icons.refresh_rounded,
+          ),
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          label: Text(
+            'Clear All',
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color:
+                  hasActiveFilters ? AppColors.danger : AppColors.textSecondary,
+            ),
+          ),
+        ),
+      );
+
   Future<void> _showRetailFilterDialog() async {
     final productStore = locator<ProductStore>();
 
@@ -4270,168 +4466,138 @@ class _AddProductScreenState extends State<AddProductScreen>
     await showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Filter Products', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-              TextButton(
-                onPressed: () {
-                  setDialogState(() {
+        builder: (context, setDialogState) {
+          final hasActiveFilters = tempCategories.isNotEmpty ||
+              tempBrands.isNotEmpty ||
+              tempProductType != 'all' ||
+              tempSortBy != 'name_asc';
+
+          return AppDialogShell(
+            title: 'Filter Products',
+            subtitle: 'Narrow down the list',
+            accent: AppColors.primary,
+            icon: Icons.filter_list_rounded,
+            body: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _filterClearAllRow(
+                  hasActiveFilters: hasActiveFilters,
+                  onClear: () => setDialogState(() {
                     tempCategories.clear();
                     tempBrands.clear();
                     tempProductType = 'all';
                     tempSortBy = 'name_asc';
-                  });
-                },
-                child: const Text('Clear All', style: TextStyle(color: AppColors.danger)),
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Product Type Filter
-                  const Text('Product Type', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      ChoiceChip(
-                        label: const Text('All'),
-                        selected: tempProductType == 'all',
-                        onSelected: (_) => setDialogState(() => tempProductType = 'all'),
-                        selectedColor: AppColors.primary,
-                        labelStyle: TextStyle(color: tempProductType == 'all' ? Colors.white : Colors.black),
-                      ),
-                      ChoiceChip(
-                        label: const Text('Simple'),
-                        selected: tempProductType == 'simple',
-                        onSelected: (_) => setDialogState(() => tempProductType = 'simple'),
-                        selectedColor: AppColors.primary,
-                        labelStyle: TextStyle(color: tempProductType == 'simple' ? Colors.white : Colors.black),
-                      ),
-                      ChoiceChip(
-                        label: const Text('Variable'),
-                        selected: tempProductType == 'variable',
-                        onSelected: (_) => setDialogState(() => tempProductType = 'variable'),
-                        selectedColor: AppColors.primary,
-                        labelStyle: TextStyle(color: tempProductType == 'variable' ? Colors.white : Colors.black),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
+                  }),
+                ),
+                const SizedBox(height: 4),
 
-                  // Category Filter
-                  if (categories.isNotEmpty) ...[
-                    const Text('Categories', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: categories.map((category) => FilterChip(
-                        label: Text(category.name),
-                        selected: tempCategories.contains(category.id),
-                        onSelected: (selected) {
-                          setDialogState(() {
-                            if (selected) {
-                              tempCategories.add(category.id);
-                            } else {
-                              tempCategories.remove(category.id);
-                            }
-                          });
-                        },
-                        selectedColor: AppColors.primary,
-                        labelStyle: TextStyle(color: tempCategories.contains(category.id) ? Colors.white : Colors.black),
-                      )).toList(),
-                    ),
-                    const SizedBox(height: 16),
+                // Product Type
+                _filterSectionLabel('Product Type'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final type in const [
+                      ('all', 'All'),
+                      ('simple', 'Simple'),
+                      ('variable', 'Variable'),
+                    ])
+                      _filterChoiceChip(
+                        label: type.$2,
+                        selected: tempProductType == type.$1,
+                        onSelected: () =>
+                            setDialogState(() => tempProductType = type.$1),
+                      ),
                   ],
+                ),
+                const SizedBox(height: 18),
 
-                  // Brand Filter
-                  if (brands.isNotEmpty) ...[
-                    const Text('Brands', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: brands.map((brand) => FilterChip(
-                        label: Text(brand),
-                        selected: tempBrands.contains(brand),
-                        onSelected: (selected) {
-                          setDialogState(() {
-                            if (selected) {
-                              tempBrands.add(brand);
-                            } else {
-                              tempBrands.remove(brand);
-                            }
-                          });
-                        },
-                        selectedColor: AppColors.primary,
-                        labelStyle: TextStyle(color: tempBrands.contains(brand) ? Colors.white : Colors.black),
-                      )).toList(),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // Sort By
-                  const Text('Sort By', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                  const SizedBox(height: 8),
+                // Categories
+                if (categories.isNotEmpty) ...[
+                  _filterSectionLabel('Categories'),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: [
-                      ChoiceChip(
-                        label: const Text('Name (A-Z)'),
-                        selected: tempSortBy == 'name_asc',
-                        onSelected: (_) => setDialogState(() => tempSortBy = 'name_asc'),
-                        selectedColor: AppColors.primary,
-                        labelStyle: TextStyle(color: tempSortBy == 'name_asc' ? Colors.white : Colors.black),
-                      ),
-                      ChoiceChip(
-                        label: const Text('Name (Z-A)'),
-                        selected: tempSortBy == 'name_desc',
-                        onSelected: (_) => setDialogState(() => tempSortBy = 'name_desc'),
-                        selectedColor: AppColors.primary,
-                        labelStyle: TextStyle(color: tempSortBy == 'name_desc' ? Colors.white : Colors.black),
-                      ),
-                      ChoiceChip(
-                        label: const Text('Recently Added'),
-                        selected: tempSortBy == 'recent',
-                        onSelected: (_) => setDialogState(() => tempSortBy = 'recent'),
-                        selectedColor: AppColors.primary,
-                        labelStyle: TextStyle(color: tempSortBy == 'recent' ? Colors.white : Colors.black),
-                      ),
-                    ],
+                    children: categories
+                        .map((category) => _filterMultiChip(
+                              label: category.name,
+                              selected: tempCategories.contains(category.id),
+                              onSelected: (selected) => setDialogState(() {
+                                if (selected) {
+                                  tempCategories.add(category.id);
+                                } else {
+                                  tempCategories.remove(category.id);
+                                }
+                              }),
+                            ))
+                        .toList(),
                   ),
+                  const SizedBox(height: 18),
                 ],
+
+                // Brands
+                if (brands.isNotEmpty) ...[
+                  _filterSectionLabel('Brands'),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: brands
+                        .map((brand) => _filterMultiChip(
+                              label: brand,
+                              selected: tempBrands.contains(brand),
+                              onSelected: (selected) => setDialogState(() {
+                                if (selected) {
+                                  tempBrands.add(brand);
+                                } else {
+                                  tempBrands.remove(brand);
+                                }
+                              }),
+                            ))
+                        .toList(),
+                  ),
+                  const SizedBox(height: 18),
+                ],
+
+                // Sort By
+                _filterSectionLabel('Sort By'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final sort in const [
+                      ('name_asc', 'Name (A-Z)'),
+                      ('name_desc', 'Name (Z-A)'),
+                      ('recent', 'Recently Added'),
+                    ])
+                      _filterChoiceChip(
+                        label: sort.$2,
+                        selected: tempSortBy == sort.$1,
+                        onSelected: () =>
+                            setDialogState(() => tempSortBy = sort.$1),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+            actions: [
+              appDialogCancelButton(context),
+              const SizedBox(width: 12),
+              appDialogPrimaryButton(
+                label: 'Apply Filters',
+                onPressed: () {
+                  setState(() {
+                    _selectedCategories = tempCategories;
+                    _selectedBrands = tempBrands;
+                    _selectedProductType = tempProductType;
+                    _retailSortBy = tempSortBy;
+                  });
+                  Navigator.pop(context);
+                },
               ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _selectedCategories = tempCategories;
-                  _selectedBrands = tempBrands;
-                  _selectedProductType = tempProductType;
-                  _retailSortBy = tempSortBy;
-                });
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-              child: const Text('Apply Filters', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -4453,180 +4619,139 @@ class _AddProductScreenState extends State<AddProductScreen>
     await showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Filter Items', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-              TextButton(
-                onPressed: () {
-                  setDialogState(() {
+        builder: (context, setDialogState) {
+          final hasActiveFilters = tempCategories.isNotEmpty ||
+              tempVegFilter != 'all' ||
+              tempStatusFilter != 'all' ||
+              tempSortBy != 'name_asc';
+
+          return AppDialogShell(
+            title: 'Filter Items',
+            subtitle: 'Narrow down the list',
+            accent: AppColors.primary,
+            icon: Icons.filter_list_rounded,
+            body: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _filterClearAllRow(
+                  hasActiveFilters: hasActiveFilters,
+                  onClear: () => setDialogState(() {
                     tempCategories.clear();
                     tempVegFilter = 'all';
                     tempStatusFilter = 'all';
                     tempSortBy = 'name_asc';
-                  });
-                },
-                child: const Text('Clear All', style: TextStyle(color: AppColors.danger)),
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Veg/Non-Veg Filter
-                  const Text('Food Type', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      ChoiceChip(
-                        label: const Text('All'),
-                        selected: tempVegFilter == 'all',
-                        onSelected: (_) => setDialogState(() => tempVegFilter = 'all'),
-                        selectedColor: AppColors.primary,
-                        labelStyle: TextStyle(color: tempVegFilter == 'all' ? Colors.white : Colors.black),
-                      ),
-                      ChoiceChip(
-                        label: const Text('Veg'),
-                        selected: tempVegFilter == 'veg',
-                        onSelected: (_) => setDialogState(() => tempVegFilter = 'veg'),
-                        selectedColor: AppColors.success,
-                        labelStyle: TextStyle(color: tempVegFilter == 'veg' ? Colors.white : Colors.black),
-                      ),
-                      ChoiceChip(
-                        label: const Text('Non-Veg'),
-                        selected: tempVegFilter == 'non-veg',
-                        onSelected: (_) => setDialogState(() => tempVegFilter = 'non-veg'),
-                        selectedColor: AppColors.danger,
-                        labelStyle: TextStyle(color: tempVegFilter == 'non-veg' ? Colors.white : Colors.black),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
+                  }),
+                ),
+                const SizedBox(height: 4),
 
-                  // Status Filter
-                  const Text('Status', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      ChoiceChip(
-                        label: const Text('All'),
-                        selected: tempStatusFilter == 'all',
-                        onSelected: (_) => setDialogState(() => tempStatusFilter = 'all'),
-                        selectedColor: AppColors.primary,
-                        labelStyle: TextStyle(color: tempStatusFilter == 'all' ? Colors.white : Colors.black),
+                // Food Type — semantic colours retained (veg green / non-veg red)
+                _filterSectionLabel('Food Type'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final food in [
+                      ('all', 'All', AppColors.primary),
+                      ('veg', 'Veg', AppColors.success),
+                      ('non-veg', 'Non-Veg', AppColors.danger),
+                    ])
+                      _filterChoiceChip(
+                        label: food.$2,
+                        accent: food.$3,
+                        selected: tempVegFilter == food.$1,
+                        onSelected: () =>
+                            setDialogState(() => tempVegFilter = food.$1),
                       ),
-                      ChoiceChip(
-                        label: const Text('Active'),
-                        selected: tempStatusFilter == 'active',
-                        onSelected: (_) => setDialogState(() => tempStatusFilter = 'active'),
-                        selectedColor: AppColors.success,
-                        labelStyle: TextStyle(color: tempStatusFilter == 'active' ? Colors.white : Colors.black),
-                      ),
-                      ChoiceChip(
-                        label: const Text('Disabled'),
-                        selected: tempStatusFilter == 'disabled',
-                        onSelected: (_) => setDialogState(() => tempStatusFilter = 'disabled'),
-                        selectedColor: Colors.orange,
-                        labelStyle: TextStyle(color: tempStatusFilter == 'disabled' ? Colors.white : Colors.black),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Category Filter
-                  if (categories.isNotEmpty) ...[
-                    const Text('Categories', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: categories.map((category) => FilterChip(
-                        label: Text(category),
-                        selected: tempCategories.contains(category),
-                        onSelected: (selected) {
-                          setDialogState(() {
-                            if (selected) {
-                              tempCategories.add(category);
-                            } else {
-                              tempCategories.remove(category);
-                            }
-                          });
-                        },
-                        selectedColor: AppColors.primary,
-                        labelStyle: TextStyle(color: tempCategories.contains(category) ? Colors.white : Colors.black),
-                      )).toList(),
-                    ),
-                    const SizedBox(height: 16),
                   ],
+                ),
+                const SizedBox(height: 18),
 
-                  // Sort By
-                  const Text('Sort By', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                  const SizedBox(height: 8),
+                // Status — semantic colours retained (active green / disabled orange)
+                _filterSectionLabel('Status'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final status in [
+                      ('all', 'All', AppColors.primary),
+                      ('active', 'Active', AppColors.success),
+                      ('disabled', 'Disabled', Colors.orange),
+                    ])
+                      _filterChoiceChip(
+                        label: status.$2,
+                        accent: status.$3,
+                        selected: tempStatusFilter == status.$1,
+                        onSelected: () =>
+                            setDialogState(() => tempStatusFilter = status.$1),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+
+                // Categories
+                if (categories.isNotEmpty) ...[
+                  _filterSectionLabel('Categories'),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: [
-                      ChoiceChip(
-                        label: const Text('Name (A-Z)'),
-                        selected: tempSortBy == 'name_asc',
-                        onSelected: (_) => setDialogState(() => tempSortBy = 'name_asc'),
-                        selectedColor: AppColors.primary,
-                        labelStyle: TextStyle(color: tempSortBy == 'name_asc' ? Colors.white : Colors.black),
-                      ),
-                      ChoiceChip(
-                        label: const Text('Name (Z-A)'),
-                        selected: tempSortBy == 'name_desc',
-                        onSelected: (_) => setDialogState(() => tempSortBy = 'name_desc'),
-                        selectedColor: AppColors.primary,
-                        labelStyle: TextStyle(color: tempSortBy == 'name_desc' ? Colors.white : Colors.black),
-                      ),
-                      ChoiceChip(
-                        label: const Text('Price (Low-High)'),
-                        selected: tempSortBy == 'price_asc',
-                        onSelected: (_) => setDialogState(() => tempSortBy = 'price_asc'),
-                        selectedColor: AppColors.primary,
-                        labelStyle: TextStyle(color: tempSortBy == 'price_asc' ? Colors.white : Colors.black),
-                      ),
-                      ChoiceChip(
-                        label: const Text('Price (High-Low)'),
-                        selected: tempSortBy == 'price_desc',
-                        onSelected: (_) => setDialogState(() => tempSortBy = 'price_desc'),
-                        selectedColor: AppColors.primary,
-                        labelStyle: TextStyle(color: tempSortBy == 'price_desc' ? Colors.white : Colors.black),
-                      ),
-                    ],
+                    children: categories
+                        .map((category) => _filterMultiChip(
+                              label: category,
+                              selected: tempCategories.contains(category),
+                              onSelected: (selected) => setDialogState(() {
+                                if (selected) {
+                                  tempCategories.add(category);
+                                } else {
+                                  tempCategories.remove(category);
+                                }
+                              }),
+                            ))
+                        .toList(),
                   ),
+                  const SizedBox(height: 18),
                 ],
+
+                // Sort By
+                _filterSectionLabel('Sort By'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final sort in const [
+                      ('name_asc', 'Name (A-Z)'),
+                      ('name_desc', 'Name (Z-A)'),
+                      ('price_asc', 'Price (Low-High)'),
+                      ('price_desc', 'Price (High-Low)'),
+                    ])
+                      _filterChoiceChip(
+                        label: sort.$2,
+                        selected: tempSortBy == sort.$1,
+                        onSelected: () =>
+                            setDialogState(() => tempSortBy = sort.$1),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+            actions: [
+              appDialogCancelButton(context),
+              const SizedBox(width: 12),
+              appDialogPrimaryButton(
+                label: 'Apply Filters',
+                onPressed: () {
+                  setState(() {
+                    _selectedCategories = tempCategories;
+                    _selectedVegFilter = tempVegFilter;
+                    _selectedStatusFilter = tempStatusFilter;
+                    _restaurantSortBy = tempSortBy;
+                  });
+                  Navigator.pop(context);
+                },
               ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _selectedCategories = tempCategories;
-                  _selectedVegFilter = tempVegFilter;
-                  _selectedStatusFilter = tempStatusFilter;
-                  _restaurantSortBy = tempSortBy;
-                });
-                Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-              child: const Text('Apply Filters', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
     );
   }

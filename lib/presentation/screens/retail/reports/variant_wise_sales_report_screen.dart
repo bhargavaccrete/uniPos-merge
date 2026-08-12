@@ -45,8 +45,8 @@ class _VariantWiseSalesReportScreenState extends State<VariantWiseSalesReportScr
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(item['productName'], style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                if (item['size'] != null || item['color'] != null)
-                  Text('${item['size'] ?? ''} ${item['color'] ?? ''}'.trim(), style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B))),
+                if ((item['variantLabel'] as String?)?.isNotEmpty ?? false)
+                  Text(item['variantLabel'] as String, style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B))),
                 const SizedBox(height: 12),
                 Row(
                   children: [

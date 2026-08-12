@@ -1,12 +1,60 @@
 
 
 import '../../../data/models/restaurant/db/cartmodel_308.dart';
-import '../../../presentation/screens/restaurant/start order/cart/customerdetails.dart';
 import '../../../util/restaurant/staticswitch.dart';
 import '../../../core/config/tax_feature.dart';
 
+/// How a discount value is interpreted: a flat currency amount, or a percentage
+/// of the item total. Lives here (not in a screen) so any caller — restaurant or
+/// retail — can reach it without depending on the presentation layer.
+enum DiscountType { amount, percentage }
+
+/// One billable line, decoupled from any particular cart model. Restaurant maps
+/// its [CartItem] to this; retail maps its own cart model. The engine only ever
+/// needed these three values.
+///
+/// [taxRate] is a FRACTION (0.18 for 18%), matching [CartItem.taxRate]. Callers
+/// holding a percentage must divide by 100 before constructing.
+class CalcLine {
+  final double price;
+  final int quantity;
+  final double? taxRate;
+
+  const CalcLine({
+    required this.price,
+    required this.quantity,
+    this.taxRate,
+  });
+}
+
+/// Per-line breakdown, so callers can persist a correct per-item discount share
+/// and taxable amount instead of re-deriving them (and getting them wrong).
+class CalcLineResult {
+  /// price * quantity, before any discount.
+  final double originalAmount;
+
+  /// This line's share of the order discount.
+  final double discountAmount;
+
+  /// Base this line is taxed on, after discount and loyalty redemption.
+  final double taxableAmount;
+
+  final double gstAmount;
+
+  /// The fraction actually applied (0 when the tax feature is off).
+  final double taxRate;
+
+  const CalcLineResult({
+    required this.originalAmount,
+    required this.discountAmount,
+    required this.taxableAmount,
+    required this.gstAmount,
+    required this.taxRate,
+  });
+}
+
 class CartCalculationService {
-  final List<CartItem> items;
+  final List<CalcLine> lines;
   final DiscountType discountType;
   final double discountValue;
   // ✅ 1. FIX: Corrected typo from 'serivceChargePercentage'
@@ -41,8 +89,42 @@ class CartCalculationService {
   late final double roundOffAmount; // Amount added/subtracted for rounding
   late final double loyaltyRedemptionAmount; // actual redemption applied (clamped)
 
+  /// Per-line breakdown, in the same order as [lines].
+  late final List<CalcLineResult> lineResults;
+
+  /// Restaurant entry point — takes [CartItem]s and maps them to [CalcLine].
+  /// Kept so every existing restaurant call site compiles unchanged.
   CartCalculationService({
-    required this.items,
+    required List<CartItem> items,
+    required DiscountType discountType,
+    required double discountValue,
+    double serviceChargePercentage = 0.0,
+    double deliveryCharge = 0.0,
+    bool isDeliveryOrder = false,
+    bool? isTaxInclusive,
+    bool? discountOnItems,
+    double loyaltyRedemption = 0.0,
+  }) : this.fromLines(
+          lines: items
+              .map((i) => CalcLine(
+                    price: i.price,
+                    quantity: i.quantity,
+                    taxRate: i.taxRate,
+                  ))
+              .toList(),
+          discountType: discountType,
+          discountValue: discountValue,
+          serviceChargePercentage: serviceChargePercentage,
+          deliveryCharge: deliveryCharge,
+          isDeliveryOrder: isDeliveryOrder,
+          isTaxInclusive: isTaxInclusive,
+          discountOnItems: discountOnItems,
+          loyaltyRedemption: loyaltyRedemption,
+        );
+
+  /// Model-agnostic entry point. Retail uses this via `RetailBillingService`.
+  CartCalculationService.fromLines({
+    required this.lines,
     required this.discountType,
     required this.discountValue,
     this.serviceChargePercentage = 0.0,
@@ -57,7 +139,7 @@ class CartCalculationService {
   }
 
   void _calculate() {
-    if (items.isEmpty) {
+    if (lines.isEmpty) {
       itemTotal = 0;
       taxableAmount = 0;
       discountAmount = 0;
@@ -66,21 +148,23 @@ class CartCalculationService {
       roundOffAmount = 0;
       grandTotal = 0;
       loyaltyRedemptionAmount = 0;
+      lineResults = const [];
       return;
     }
 
     // STEP 1: Calculate original total
-    final double totalOriginalAmount = items.fold(0.0, (sum, item) => sum + (item.price * item.quantity));
+    final double totalOriginalAmount = lines.fold(0.0, (sum, item) => sum + (item.price * item.quantity));
     itemTotal = totalOriginalAmount;
 
     // STEP 2: Accumulators
     double accumulatedTaxableAmount = 0;
     double accumulatedGST = 0;
     double accumulatedDiscount = 0;
+    final List<CalcLineResult> results = [];
 
     // STEP 3: Loop through items
     final bool taxFeatureEnabled = TaxFeature.enabled;
-    for (final item in items) {
+    for (final item in lines) {
       final double itemOriginalAmount = item.price * item.quantity;
       final double itemTaxRate = taxFeatureEnabled ? (item.taxRate ?? 0) : 0;
 
@@ -128,6 +212,12 @@ class CartCalculationService {
           billDiscount = discountValue;
         }
 
+        // Cap the discount at the bill total. Without this a flat amount larger
+        // than the bill (or a percentage over 100) drives afterDiscountTotal
+        // negative, which cascades into a negative taxable base, negative GST
+        // and a negative grand total — nothing downstream rejects it.
+        billDiscount = billDiscount.clamp(0, totalOriginalAmount);
+
         // Calculate this item's share after bill discount
         final double afterDiscountTotal = totalOriginalAmount - billDiscount;
         final double itemShare = totalOriginalAmount > 0
@@ -155,6 +245,14 @@ class CartCalculationService {
       accumulatedTaxableAmount += itemBase;
       accumulatedGST += itemGST;
       accumulatedDiscount += itemDiscount;
+
+      results.add(CalcLineResult(
+        originalAmount: itemOriginalAmount,
+        discountAmount: itemDiscount,
+        taxableAmount: itemBase,
+        gstAmount: itemGST,
+        taxRate: itemTaxRate,
+      ));
     }
 
     // STEP 4: Loyalty points redemption — reduce the taxable base BEFORE GST
@@ -172,6 +270,19 @@ class CartCalculationService {
         final double f = (reducible - redemptionApplied) / reducible;
         accumulatedTaxableAmount *= f;
         accumulatedGST *= f;
+        // Scale the per-line figures by the same factor, otherwise the lines
+        // no longer sum to the totals and a caller persisting them writes
+        // item amounts that don't reconcile with the bill.
+        for (int i = 0; i < results.length; i++) {
+          final r = results[i];
+          results[i] = CalcLineResult(
+            originalAmount: r.originalAmount,
+            discountAmount: r.discountAmount,
+            taxableAmount: r.taxableAmount * f,
+            gstAmount: r.gstAmount * f,
+            taxRate: r.taxRate,
+          );
+        }
       }
     }
 
@@ -180,6 +291,7 @@ class CartCalculationService {
     totalGST = accumulatedGST;
     discountAmount = accumulatedDiscount;
     loyaltyRedemptionAmount = redemptionApplied;
+    lineResults = List.unmodifiable(results);
 
     // STEP 5: Service Charge
     if (isDeliveryOrder) {

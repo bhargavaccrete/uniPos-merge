@@ -344,6 +344,11 @@ abstract class _BulkImportStore with Store {
         progress = processedGroups / totalGroups;
       }
 
+      // This store writes through its own repositories, so ProductStore's
+      // in-memory lists are stale until refreshed.
+      await productStore.loadProducts();
+      await productStore.loadVariants();
+
       if (errorCount == 0) {
         successMessage = "Import completed! Successfully imported $successCount products.";
       } else {

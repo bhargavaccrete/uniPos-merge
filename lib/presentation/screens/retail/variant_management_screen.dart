@@ -4,8 +4,11 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/config/tax_feature.dart';
 import '../../../data/models/common/taxmodel_314.dart';
+import '../../../data/models/retail/hive_model/attribute_model_219.dart';
 import '../../../data/models/retail/hive_model/product_model_200.dart';
 import '../../../data/models/retail/hive_model/variante_model_201.dart';
+import '../../../domain/services/retail/simple_product_fields_service.dart';
+import '../../../domain/services/retail/variant_attribute_mapper.dart';
 
 
 class VariantManagementScreen extends StatefulWidget {
@@ -24,10 +27,31 @@ class _VariantManagementScreenState extends State<VariantManagementScreen> {
   List<VarianteModel> variants = [];
   bool isLoading = true;
 
+  /// Configured descriptor fields (Settings → Simple Product Fields). The first
+  /// one becomes the grouping axis for the list.
+  List<AttributeModel> _fields = [];
+
+  /// Group key for variants with no value for the grouping field.
+  static const String _ungroupedKey = '__ungrouped__';
+
+  /// Only show the colour swatch when the grouping field is actually a colour —
+  /// grouping by Flavour or Capacity should not render colour dots.
+  bool get _isColourLike {
+    final name = _groupingField?.name.toLowerCase() ?? '';
+    return name.contains('color') || name.contains('colour');
+  }
+
   @override
   void initState() {
     super.initState();
     _loadVariants();
+    _loadFields();
+  }
+
+  Future<void> _loadFields() async {
+    final fields = await SimpleProductFieldsService().resolveFields();
+    if (!mounted) return;
+    setState(() => _fields = fields);
   }
 
   Future<void> _loadVariants() async {
@@ -174,7 +198,7 @@ class _VariantManagementScreenState extends State<VariantManagementScreen> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Add variants with different sizes, colors, etc.',
+            'Add variants for each option you stock.',
             style: TextStyle(
               fontSize: 14,
               color: Color(0xFFB0B0B0),
@@ -196,15 +220,27 @@ class _VariantManagementScreenState extends State<VariantManagementScreen> {
     );
   }
 
+  /// The field variants are grouped by - the first configured descriptor
+  /// field, not hardcoded colour. Null when nothing is configured.
+  AttributeModel? get _groupingField => _fields.isEmpty ? null : _fields.first;
+
+  /// This variant's value for the grouping field.
+  String _groupValueFor(VarianteModel variant) {
+    final field = _groupingField;
+    if (field == null) return '';
+    return attributeStore.attributesOf(variant)[field.name] ?? '';
+  }
+
   Widget _buildVariantList() {
-    // Group variants by color
+    // Group by the first configured field (was hardcoded to colour)
     final Map<String?, List<VarianteModel>> groupedVariants = {};
     for (var variant in variants) {
-      final color = variant.color ?? 'No Color';
-      if (!groupedVariants.containsKey(color)) {
-        groupedVariants[color] = [];
+      final value = _groupValueFor(variant);
+      final key = value.isEmpty ? _ungroupedKey : value;
+      if (!groupedVariants.containsKey(key)) {
+        groupedVariants[key] = [];
       }
-      groupedVariants[color]!.add(variant);
+      groupedVariants[key]!.add(variant);
     }
 
     return Column(
@@ -299,7 +335,7 @@ class _VariantManagementScreenState extends State<VariantManagementScreen> {
             ),
             child: Row(
               children: [
-                if (color != null && color != 'No Color')
+                if (_isColourLike && color != null && color != _ungroupedKey)
                   Container(
                     width: 24,
                     height: 24,
@@ -314,7 +350,9 @@ class _VariantManagementScreenState extends State<VariantManagementScreen> {
                   ),
                 const SizedBox(width: 8),
                 Text(
-                  color ?? 'No Color',
+                  color == _ungroupedKey || color == null
+                      ? 'Not set'
+                      : color,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -359,21 +397,18 @@ class _VariantManagementScreenState extends State<VariantManagementScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (variant.size != null)
+                  // Whatever attributes this variant actually has — the
+                  // labels come from the attribute names, not hardcoded ones.
+                  if (attributeStore
+                      .describeAttributes(attributeStore.attributesOf(variant))
+                      .isNotEmpty)
                     Text(
-                      'Size: ${variant.size}',
+                      attributeStore
+                          .describeAttributes(attributeStore.attributesOf(variant)),
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                         color: Color(0xFF1A1A1A),
-                      ),
-                    ),
-                  if (variant.weight != null)
-                    Text(
-                      'Weight: ${variant.weight}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF9E9E9E),
                       ),
                     ),
                   // Custom Attributes
@@ -530,7 +565,7 @@ class _VariantManagementScreenState extends State<VariantManagementScreen> {
                             ),
                             SizedBox(height: 4),
                             Text(
-                              'One color, one size, one barcode',
+                              'A single variant with its own barcode',
                               style: TextStyle(
                                 fontSize: 13,
                                 color: Color(0xFF6B6B6B),
@@ -597,7 +632,7 @@ class _VariantManagementScreenState extends State<VariantManagementScreen> {
                             ),
                             SizedBox(height: 4),
                             Text(
-                              'One color, multiple sizes (S, M, L)',
+                              'Many variants at once, one per value',
                               style: TextStyle(
                                 fontSize: 13,
                                 color: Color(0xFF1565C0),
@@ -626,7 +661,7 @@ class _VariantManagementScreenState extends State<VariantManagementScreen> {
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Tip: Use Bulk Add to quickly create multiple sizes for one color',
+                        'Tip: Use Bulk Add to create several variants in one go',
                         style: TextStyle(fontSize: 12, color: Color(0xFFE65100)),
                       ),
                     ),
@@ -669,9 +704,12 @@ class _AddVariantDialog extends StatefulWidget {
 
 class _AddVariantDialogState extends State<_AddVariantDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _sizeController = TextEditingController();
-  final _colorController = TextEditingController();
-  final _weightController = TextEditingController();
+
+  /// Descriptor fields from Settings → Simple Product Fields, replacing the
+  /// previously hardcoded Size / Color / Weight inputs.
+  List<AttributeModel> _fields = [];
+  final Map<String, TextEditingController> _fieldControllers = {};
+
   final _skuController = TextEditingController();
   final _barcodeController = TextEditingController();
   final _priceController = TextEditingController();
@@ -687,13 +725,23 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
   void initState() {
     super.initState();
     taxStore.loadTaxes();
+    _loadFields();
   }
+
+  Future<void> _loadFields() async {
+    final fields = await SimpleProductFieldsService().resolveFields();
+    if (!mounted) return;
+    setState(() => _fields = fields);
+  }
+
+  TextEditingController _fieldController(String attributeId) =>
+      _fieldControllers.putIfAbsent(attributeId, () => TextEditingController());
 
   @override
   void dispose() {
-    _sizeController.dispose();
-    _colorController.dispose();
-    _weightController.dispose();
+    for (final controller in _fieldControllers.values) {
+      controller.dispose();
+    }
     _skuController.dispose();
     _barcodeController.dispose();
     _priceController.dispose();
@@ -719,6 +767,13 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
     });
   }
 
+  /// Hint from the attribute's own defined values, so a grocery shop sees
+  /// "e.g. 500ml" rather than a hardcoded apparel example.
+  String _hintForAttribute(AttributeModel attribute) {
+    final values = attributeStore.getValues(attribute.attributeId);
+    return values.isEmpty ? '' : 'e.g. ${values.first.value}';
+  }
+
   Map<String, String>? _getCustomAttributesMap() {
     final map = <String, String>{};
     for (var attr in _customAttributes) {
@@ -740,12 +795,21 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
         : _skuController.text.trim();
 
     final variantId = '${widget.productId}_${DateTime.now().millisecondsSinceEpoch}';
+    // Configured fields + any one-off rows, projected onto the legacy columns
+    // by the one shared rule so receipts and reports keep working.
+    final entered = <String, String>{
+      for (final attribute in _fields)
+        if ((_fieldControllers[attribute.attributeId]?.text.trim() ?? '')
+            .isNotEmpty)
+          attribute.name: _fieldControllers[attribute.attributeId]!.text.trim(),
+    };
+    final attributes = mergeVariantAttributes(
+      entered,
+      extraCustomAttributes: _getCustomAttributesMap(),
+    );
     final variant = VarianteModel.create(
       varianteId: variantId,
       productId: widget.productId,
-      size: _sizeController.text.trim().isEmpty ? null : _sizeController.text.trim(),
-      color: _colorController.text.trim().isEmpty ? null : _colorController.text.trim(),
-      weight: _weightController.text.trim().isEmpty ? null : _weightController.text.trim(),
       sku: sku,
       barcode: _barcodeController.text.trim().isEmpty ? null : _barcodeController.text.trim(),
       costPrice: double.tryParse(_priceController.text.trim()) ?? 0.0,
@@ -759,7 +823,7 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
                   orElse: () => Tax(id: '', taxname: '', taxperecentage: null))
               .taxperecentage,
       taxId: _selectedTaxId,
-      customAttributes: _getCustomAttributesMap(),
+      customAttributes: attributes,
     );
 
     await productStore.addVariant(variant);
@@ -789,12 +853,14 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildTextField(_colorController, 'Color', 'e.g., Red, Blue'),
-                const SizedBox(height: 12),
-                _buildTextField(_sizeController, 'Size', 'e.g., S, M, L'),
-                const SizedBox(height: 12),
-                _buildTextField(_weightController, 'Weight (Optional)', 'e.g., 500g'),
-                const SizedBox(height: 12),
+                for (final attribute in _fields) ...[
+                  _buildTextField(
+                    _fieldController(attribute.attributeId),
+                    attribute.name,
+                    _hintForAttribute(attribute),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 _buildTextField(_priceController, 'Cost Price', '0.00',
                   keyboardType: TextInputType.number, required: true),
                 const SizedBox(height: 12),
@@ -1050,9 +1116,9 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
     final updatedVariant = VarianteModel(
       varianteId: widget.variant.varianteId,
       productId: widget.variant.productId,
-      size: widget.variant.size,
-      color: widget.variant.color,
-      weight: widget.variant.weight,
+      // size: widget.variant.size,
+      // color: widget.variant.color,
+      // weight: widget.variant.weight,
       sku: widget.variant.sku,
       barcode: widget.variant.barcode,
       mrp: widget.variant.mrp,
@@ -1255,7 +1321,6 @@ class _BulkAddVariantDialog extends StatefulWidget {
 
 class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _colorController = TextEditingController();
   final _priceController = TextEditingController();
   final _mrpController = TextEditingController();
   final _stockController = TextEditingController();
@@ -1263,48 +1328,94 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
   final _baseBarcodeController = TextEditingController();
   String? _selectedTaxId;
 
-  // Size selection
-  final List<String> _availableSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
-  final Set<String> _selectedSizes = {};
+  /// Configured descriptor fields (Settings → Simple Product Fields).
+  List<AttributeModel> _fields = [];
 
-  // Custom sizes
-  final List<String> _customSizes = [];
-  final _customSizeController = TextEditingController();
+  /// The attribute that VARIES across the generated variants — one variant per
+  /// selected value. Replaces the old hardcoded "sizes" axis.
+  AttributeModel? _varyingAttribute;
+
+  /// Selected values of [_varyingAttribute], from its defined values plus any
+  /// typed in here.
+  final Set<String> _selectedValues = {};
+  final List<String> _customValues = [];
+  final _customValueController = TextEditingController();
+
+  /// Fixed values applied to EVERY generated variant (the other fields).
+  final Map<String, TextEditingController> _fixedControllers = {};
 
   @override
   void initState() {
     super.initState();
     taxStore.loadTaxes();
+    _loadFields();
+  }
+
+  Future<void> _loadFields() async {
+    final fields = await SimpleProductFieldsService().resolveFields();
+    if (!mounted) return;
+    setState(() {
+      _fields = fields;
+      // Default the varying axis to the first configured field.
+      _varyingAttribute = fields.isEmpty ? null : fields.first;
+    });
+  }
+
+  TextEditingController _fixedController(String attributeId) =>
+      _fixedControllers.putIfAbsent(attributeId, () => TextEditingController());
+
+  /// Values offered for the varying attribute: its defined values + custom ones.
+  List<String> get _availableValues {
+    final attribute = _varyingAttribute;
+    if (attribute == null) return const [];
+    return attributeStore
+        .getValues(attribute.attributeId)
+        .map((v) => v.value)
+        .toList();
   }
 
   @override
   void dispose() {
-    _colorController.dispose();
+    _customValueController.dispose();
+    for (final controller in _fixedControllers.values) {
+      controller.dispose();
+    }
     _priceController.dispose();
     _mrpController.dispose();
     _stockController.dispose();
     _minStockController.dispose();
     _baseBarcodeController.dispose();
-    _customSizeController.dispose();
     super.dispose();
   }
 
   Future<void> _saveVariants() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final allSizes = [..._selectedSizes, ..._customSizes];
+    final allValues = [..._selectedValues, ..._customValues];
+    final varying = _varyingAttribute;
 
-    if (allSizes.isEmpty) {
+    if (varying == null || allValues.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select at least one size'),
+        SnackBar(
+          content: Text(varying == null
+              ? 'Add a field in Settings → Simple Product Fields first'
+              : 'Please select at least one ${varying.name.toLowerCase()}'),
           backgroundColor: Colors.red,
         ),
       );
       return;
     }
 
-    final color = _colorController.text.trim().isEmpty ? null : _colorController.text.trim();
+    // Values typed once and applied to every generated variant.
+    final fixedValues = <String, String>{
+      for (final attribute in _fields)
+        if (attribute.attributeId != varying.attributeId &&
+            (_fixedControllers[attribute.attributeId]?.text.trim() ?? '')
+                .isNotEmpty)
+          attribute.name:
+              _fixedControllers[attribute.attributeId]!.text.trim(),
+    };
+
     final price = double.tryParse(_priceController.text.trim()) ?? 0.0;
     final mrp = _mrpController.text.trim().isEmpty ? null : double.tryParse(_mrpController.text.trim());
     final stock = int.tryParse(_stockController.text.trim()) ?? 0;
@@ -1317,9 +1428,9 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
                 orElse: () => Tax(id: '', taxname: '', taxperecentage: null))
             .taxperecentage;
 
-    // Create variants for each size
+    // One variant per selected value of the varying attribute
     int barcodeCounter = 1;
-    for (final size in allSizes) {
+    for (final value in allValues) {
       final variantId = '${widget.productId}_${DateTime.now().millisecondsSinceEpoch}_$barcodeCounter';
 
       // Generate barcode: if base is provided, append counter
@@ -1332,12 +1443,15 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
       // auto-generated SKU (each call advances the shared global sequence).
       final sku = await skuGeneratorService.generate(widget.categoryName);
 
+      final attributes = mergeVariantAttributes({
+        ...fixedValues,
+        varying.name: value,
+      });
+
       final variant = VarianteModel.create(
         varianteId: variantId,
         productId: widget.productId,
-        size: size,
-        color: color,
-        weight: null,
+        customAttributes: attributes,
         sku: sku,
         barcode: barcode,
         costPrice: price,
@@ -1360,19 +1474,21 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
       widget.onVariantsAdded();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${allSizes.length} variants added successfully'),
+          content: Text('${allValues.length} variants added successfully'),
           backgroundColor: const Color(0xFF4CAF50),
         ),
       );
     }
   }
 
-  void _addCustomSize() {
-    final customSize = _customSizeController.text.trim();
-    if (customSize.isNotEmpty && !_customSizes.contains(customSize) && !_availableSizes.contains(customSize)) {
+  void _addCustomValue() {
+    final value = _customValueController.text.trim();
+    if (value.isNotEmpty &&
+        !_customValues.contains(value) &&
+        !_availableValues.contains(value)) {
       setState(() {
-        _customSizes.add(customSize);
-        _customSizeController.clear();
+        _customValues.add(value);
+        _customValueController.clear();
       });
     }
   }
@@ -1390,42 +1506,83 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Color
-                TextFormField(
-                  controller: _colorController,
-                  decoration: const InputDecoration(
-                    labelText: 'Color',
-                    hintText: 'e.g., Green, Red',
-                    border: OutlineInputBorder(),
-                    isDense: true,
+                // Which field varies across the generated variants
+                if (_fields.length > 1) ...[
+                  DropdownButtonFormField<String>(
+                    initialValue: _varyingAttribute?.attributeId,
+                    decoration: const InputDecoration(
+                      labelText: 'Create one variant per',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: _fields
+                        .map((a) => DropdownMenuItem(
+                              value: a.attributeId,
+                              child: Text(a.name),
+                            ))
+                        .toList(),
+                    onChanged: (id) {
+                      if (id == null) return;
+                      setState(() {
+                        _varyingAttribute =
+                            _fields.firstWhere((a) => a.attributeId == id);
+                        _selectedValues.clear();
+                        _customValues.clear();
+                      });
+                    },
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
+                ],
 
-                // Size Selection
-                const Text(
-                  'Select Sizes',
-                  style: TextStyle(
+                // Fixed values - typed once, applied to every variant
+                for (final attribute in _fields)
+                  if (attribute.attributeId != _varyingAttribute?.attributeId) ...[
+                    TextFormField(
+                      controller: _fixedController(attribute.attributeId),
+                      decoration: InputDecoration(
+                        labelText: attribute.name,
+                        hintText: 'Same for all variants',
+                        border: const OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                // Values of the varying field
+                Text(
+                  _varyingAttribute == null
+                      ? 'No fields configured'
+                      : 'Select ${_varyingAttribute!.name}',
+                  style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF1A1A1A),
                   ),
                 ),
                 const SizedBox(height: 8),
+                if (_availableValues.isEmpty && _customValues.isEmpty)
+                  Text(
+                    _varyingAttribute == null
+                        ? 'Add a field in Settings, Simple Product Fields.'
+                        : 'No preset values - type them below.',
+                    style: const TextStyle(
+                        fontSize: 12, color: Color(0xFF9E9E9E)),
+                  ),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: _availableSizes.map((size) {
-                    final isSelected = _selectedSizes.contains(size);
+                  children: _availableValues.map((value) {
+                    final isSelected = _selectedValues.contains(value);
                     return FilterChip(
-                      label: Text(size),
+                      label: Text(value),
                       selected: isSelected,
                       onSelected: (selected) {
                         setState(() {
                           if (selected) {
-                            _selectedSizes.add(size);
+                            _selectedValues.add(value);
                           } else {
-                            _selectedSizes.remove(size);
+                            _selectedValues.remove(value);
                           }
                         });
                       },
@@ -1439,23 +1596,22 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
                   }).toList(),
                 ),
 
-                // Custom sizes
-                if (_customSizes.isNotEmpty) ...[
+                // Values typed in here
+                if (_customValues.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: _customSizes.map((size) {
+                    children: _customValues.map((value) {
                       return Chip(
-                        label: Text(size),
+                        label: Text(value),
                         deleteIcon: const Icon(Icons.close, size: 16),
                         onDeleted: () {
-                          setState(() {
-                            _customSizes.remove(size);
-                          });
+                          setState(() => _customValues.remove(value));
                         },
                         backgroundColor: const Color(0xFF2196F3),
-                        labelStyle: const TextStyle(color: Colors.white, fontSize: 12),
+                        labelStyle:
+                            const TextStyle(color: Colors.white, fontSize: 12),
                       );
                     }).toList(),
                   ),
@@ -1466,20 +1622,24 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
                   children: [
                     Expanded(
                       child: TextField(
-                        controller: _customSizeController,
-                        decoration: const InputDecoration(
-                          labelText: 'Custom Size',
-                          hintText: 'e.g., 32, 34',
-                          border: OutlineInputBorder(),
+                        controller: _customValueController,
+                        enabled: _varyingAttribute != null,
+                        decoration: InputDecoration(
+                          labelText: _varyingAttribute == null
+                              ? 'Value'
+                              : 'Add ${_varyingAttribute!.name}',
+                          hintText: 'Type a value and press +',
+                          border: const OutlineInputBorder(),
                           isDense: true,
                         ),
-                        onSubmitted: (_) => _addCustomSize(),
+                        onSubmitted: (_) => _addCustomValue(),
                       ),
                     ),
                     const SizedBox(width: 8),
                     IconButton(
                       icon: const Icon(Icons.add_circle, color: Color(0xFF4CAF50)),
-                      onPressed: _addCustomSize,
+                      onPressed:
+                          _varyingAttribute == null ? null : _addCustomValue,
                     ),
                   ],
                 ),
@@ -1574,7 +1734,8 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
             backgroundColor: const Color(0xFF2196F3),
             foregroundColor: Colors.white,
           ),
-          child: Text('Add ${_selectedSizes.length + _customSizes.length} Variants'),
+          child: Text(
+              'Add ${_selectedValues.length + _customValues.length} Variants'),
         ),
       ],
     );

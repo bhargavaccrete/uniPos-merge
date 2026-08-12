@@ -193,6 +193,10 @@ class ReportService {
           'productName': item.productName,
           'size': item.size,
           'color': item.color,
+          // Descriptor resolved from the sale's own record, so reports match
+          // the receipt even if the variant was edited afterwards.
+          'variantLabel': attributeStore.describeAttributes(item.attributes,
+              size: item.size, color: item.color),
           'totalQuantity': 0,
           'totalRevenue': 0.0,
           'totalDiscount': 0.0,
@@ -344,9 +348,8 @@ class ReportService {
             'productId': product.productId,
             'productName': product.productName,
             'variantId': variant.varianteId,
-            'size': variant.size,
-            'color': variant.color,
-            'weight': variant.weight,
+            'variantLabel':
+                attributeStore.describeAttributes(attributeStore.attributesOf(variant)),
             'currentStock': variant.stockQty,
             'costPrice': variant.costPrice,
             'mrp': variant.mrp,
@@ -456,6 +459,10 @@ class ReportService {
           'productName': item.productName,
           'size': item.size,
           'color': item.color,
+          // Descriptor resolved from the sale's own record, so reports match
+          // the receipt even if the variant was edited afterwards.
+          'variantLabel': attributeStore.describeAttributes(item.attributes,
+              size: item.size, color: item.color),
           'barcode': item.barcode,
           'totalQuantitySold': 0,
           'totalRevenue': 0.0,

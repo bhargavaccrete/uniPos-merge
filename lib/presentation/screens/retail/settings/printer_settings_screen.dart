@@ -386,7 +386,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
             const SizedBox(height: 8),
             SwitchListTile(
               title: const Text('Variant Details'),
-              subtitle: const Text('Size, Color, Weight'),
+              subtitle: const Text('Print each item\'s variant details'),
               value: _settings.showVariantDetails,
               onChanged: (value) {
                 _printerService.setShowVariantDetails(value);

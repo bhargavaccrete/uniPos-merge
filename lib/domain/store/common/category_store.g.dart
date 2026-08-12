@@ -30,6 +30,13 @@ mixin _$CategoryStore on _CategoryStore, Store {
       (_$hasCategoriesComputed ??= Computed<bool>(() => super.hasCategories,
               name: '_CategoryStore.hasCategories'))
           .value;
+  Computed<Map<String, String>>? _$categoryNameByIdComputed;
+
+  @override
+  Map<String, String> get categoryNameById => (_$categoryNameByIdComputed ??=
+          Computed<Map<String, String>>(() => super.categoryNameById,
+              name: '_CategoryStore.categoryNameById'))
+      .value;
 
   late final _$categoriesAtom =
       Atom(name: '_CategoryStore.categories', context: context);
@@ -197,7 +204,8 @@ searchQuery: ${searchQuery},
 categoryItemsMap: ${categoryItemsMap},
 filteredCategories: ${filteredCategories},
 categoryCount: ${categoryCount},
-hasCategories: ${hasCategories}
+hasCategories: ${hasCategories},
+categoryNameById: ${categoryNameById}
     ''';
   }
 }

@@ -219,6 +219,15 @@ mixin _$AttributeStore on _AttributeStoreBase, Store {
         .run(() => super.removeAttributesFromProduct(productId));
   }
 
+  late final _$ensureBaseAttributesAsyncAction =
+      AsyncAction('_AttributeStoreBase.ensureBaseAttributes', context: context);
+
+  @override
+  Future<void> ensureBaseAttributes() {
+    return _$ensureBaseAttributesAsyncAction
+        .run(() => super.ensureBaseAttributes());
+  }
+
   late final _$_AttributeStoreBaseActionController =
       ActionController(name: '_AttributeStoreBase', context: context);
 

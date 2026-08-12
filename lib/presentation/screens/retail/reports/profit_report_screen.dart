@@ -399,9 +399,9 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
                       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                     ),
                     const SizedBox(height: 4),
-                    if (item['size'] != null || item['color'] != null)
+                    if ((item['variantLabel'] as String?)?.isNotEmpty ?? false)
                       Text(
-                        '${item['size'] ?? ''} ${item['color'] ?? ''}'.trim(),
+                        item['variantLabel'] as String,
                         style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
                       ),
                   ],

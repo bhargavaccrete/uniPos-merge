@@ -2358,6 +2358,15 @@ class UnifiedBackupService {
     // Admin credential restores via the generic localPrefs restore (see
     // _restoreLocalSettings) — no explicit handling needed here.
 
+    // Boxes were written directly above, so ProductStore's in-memory lists
+    // still hold the pre-restore data (and detached objects after box.clear()).
+    try {
+      await productStore.loadProducts();
+      await productStore.loadVariants();
+    } catch (e) {
+      debugPrint("⚠️ Could not refresh product store after restore: $e");
+    }
+
     debugPrint("✅ Full retail data restored successfully!");
   }
 
