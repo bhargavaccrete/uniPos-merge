@@ -66,11 +66,9 @@ class HiveBoxNames {
   /// Supplier records box
   static const String suppliers = 'suppliers';
 
-  /// Purchase orders box
-  static const String purchases = 'purchases';
-
-  /// Purchase line items box
-  static const String purchaseItems = 'purchaseItems';
+  // RETIRED: 'purchases' and 'purchaseItems' belonged to the standalone
+  // Purchase feature, removed in favour of Purchase Orders + GRN. Don't reuse
+  // these names — an old install may still have those box files on disk.
 
   /// Purchase order model box
   static const String purchaseOrders = 'purchaseOrders';
@@ -242,8 +240,6 @@ class HiveBoxNames {
     saleItems,
     customer,
     suppliers,
-    purchases,
-    purchaseItems,
     purchaseOrders,
     purchaseOrderItems,
     grns,

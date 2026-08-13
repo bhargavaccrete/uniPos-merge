@@ -3,7 +3,6 @@
 
 
 import 'package:billberrylite/core/di/service_locator.dart';
-import 'package:billberrylite/data/models/retail/hive_model/purchase_model_207.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 
 import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
@@ -343,7 +342,11 @@ class ReportService {
     for (var product in allProducts) {
       final variants = await productStore.getVariantsForProduct(product.productId);
       for (var variant in variants) {
-        if (variant.stockQty <= threshold) {
+        // A variant's own minStock wins over the global threshold, matching
+        // productStore.reorderPointFor — otherwise the Stock Alerts card and
+        // the inventory colouring would disagree about the same variant.
+        final reorderPoint = variant.minStock ?? threshold;
+        if (variant.stockQty <= reorderPoint) {
           lowStockItems.add({
             'productId': product.productId,
             'productName': product.productName,
@@ -351,6 +354,7 @@ class ReportService {
             'variantLabel':
                 attributeStore.describeAttributes(attributeStore.attributesOf(variant)),
             'currentStock': variant.stockQty,
+            'reorderPoint': reorderPoint,
             'costPrice': variant.costPrice,
             'mrp': variant.mrp,
             'barcode': variant.barcode,

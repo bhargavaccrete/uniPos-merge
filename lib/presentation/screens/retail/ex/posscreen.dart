@@ -353,7 +353,10 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
   }
 
   Future<void> _onProductSelected(ProductModel product) async {
-    final variants = await productStore.getVariantsForProduct(product.productId);
+    // Inactive variants stay in the catalogue but never reach a till.
+    final variants = (await productStore.getVariantsForProduct(product.productId))
+        .where(productStore.isSellable)
+        .toList();
 
     if (variants.isEmpty) {
       if (mounted) {
@@ -393,6 +396,14 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     _lastScanTime = now;
 
     final variant = await productStore.findVariantByBarcode(barcode);
+
+    if (variant != null && !productStore.isSellable(variant)) {
+      if (mounted) {
+        NotificationService.instance
+            .showWarning('This variant is inactive and cannot be sold');
+      }
+      return;
+    }
 
     if (variant != null) {
       final product = await productStore.findByBarcode(barcode);

@@ -637,12 +637,17 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
   }
 
   Future<void> _updateCustomer(Customer customer, String name, String phone, String email, String address, String notes) async {
+    // Emptying an optional field must actually clear it — the clear* flags
+    // exist because `x ?? this.x` alone would silently keep the old value.
     final updatedCustomer = customer.copyWith(
       name: name,
       phone: phone,
       email: email.isNotEmpty ? email : null,
+      clearEmail: email.isEmpty,
       address: address.isNotEmpty ? address : null,
+      clearAddress: address.isEmpty,
       notes: notes.isNotEmpty ? notes : null,
+      clearNotes: notes.isEmpty,
       updatedAt: DateTime.now().toIso8601String(),
     );
 

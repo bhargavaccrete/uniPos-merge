@@ -18,6 +18,7 @@ import 'package:billberrylite/domain/services/retail/auth_service.dart';
 import 'package:billberrylite/domain/services/retail/backup_service.dart';
 import 'package:billberrylite/domain/services/retail/gst_service.dart';
 import 'package:billberrylite/domain/services/retail/sku_generator_service.dart';
+import 'package:billberrylite/domain/services/retail/customer_id_generator_service.dart';
 import 'package:billberrylite/domain/services/retail/print_service.dart';
 import 'package:billberrylite/domain/services/retail/report_service.dart';
 import 'package:billberrylite/domain/services/retail/stock_alert_service.dart';
@@ -29,7 +30,6 @@ import 'package:billberrylite/domain/store/common/customer_store.dart';
 import 'package:billberrylite/domain/store/retail/hold_sale_store.dart';
 import 'package:billberrylite/domain/store/retail/product_store.dart';
 import 'package:billberrylite/domain/store/retail/purchase_order_store.dart';
-import 'package:billberrylite/domain/store/retail/purchase_store.dart';
 import 'package:billberrylite/domain/store/retail/sale_store.dart';
 import 'package:billberrylite/domain/store/retail/stock_alert_store.dart';
 import 'package:billberrylite/domain/store/retail/supplier_store.dart';
@@ -158,6 +158,8 @@ Future<void> _registerRetailDependencies() async {
   locator.registerLazySingleton<StockAlertService>(() => StockAlertService());
   locator.registerLazySingleton<GstService>(() => GstService());
   locator.registerLazySingleton<SkuGeneratorService>(() => SkuGeneratorService());
+  locator.registerLazySingleton<CustomerIdGeneratorService>(
+      () => CustomerIdGeneratorService());
 
   // Register Repositories
   locator.registerLazySingleton<retail.VariantRepository>(() => retail.VariantRepository());
@@ -208,7 +210,6 @@ Future<void> _registerRetailDependencies() async {
   );
 
   locator.registerLazySingleton<SupplierStore>(() => SupplierStore());
-  locator.registerLazySingleton<PurchaseStore>(() => PurchaseStore());
   locator.registerLazySingleton<PurchaseOrderStore>(() => PurchaseOrderStore());
 
   // HoldSaleStore depends on HoldSaleRepository
@@ -423,7 +424,6 @@ retail.CartStore get retailCartStore => locator<retail.CartStore>();
 ProductStore get productStore => locator<ProductStore>();
 SaleStore get saleStore => locator<SaleStore>();
 SupplierStore get supplierStore => locator<SupplierStore>();
-PurchaseStore get purchaseStore => locator<PurchaseStore>();
 PurchaseOrderStore get purchaseOrderStore => locator<PurchaseOrderStore>();
 HoldSaleStore get holdSaleStore => locator<HoldSaleStore>();
 StockAlertStore get stockAlertStore => locator<StockAlertStore>();
@@ -437,6 +437,8 @@ PrintService get printService => locator<PrintService>();
 StockAlertService get stockAlertService => locator<StockAlertService>();
 GstService get gstService => locator<GstService>();
 SkuGeneratorService get skuGeneratorService => locator<SkuGeneratorService>();
+CustomerIdGeneratorService get customerIdGeneratorService =>
+    locator<CustomerIdGeneratorService>();
 AuthService get authService => locator<AuthService>();
 VariantGeneratorService get variantGeneratorService => locator<VariantGeneratorService>();
 

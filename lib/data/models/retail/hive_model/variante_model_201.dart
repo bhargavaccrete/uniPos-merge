@@ -257,16 +257,22 @@ class VarianteModel extends HiveObject {
     bool? isDefault,
     String? status,
     String? taxId,
+    // `x ?? this.x` can never put a nullable field back to null, so an edit
+    // form has no way to clear an optional number. These say so explicitly,
+    // instead of forcing callers to hand-build the model (which is how
+    // sellingPrice/hsnCode/status used to get silently wiped).
+    bool clearMrp = false,
+    bool clearMinStock = false,
   }) {
     return VarianteModel(
       varianteId: varianteId ?? this.varianteId,
       productId: productId ?? this.productId,
       sku: sku ?? this.sku,
       barcode: barcode ?? this.barcode,
-      mrp: mrp ?? this.mrp,
+      mrp: clearMrp ? null : (mrp ?? this.mrp),
       costPrice: costPrice ?? this.costPrice,
       stockQty: stockQty ?? this.stockQty,
-      minStock: minStock ?? this.minStock,
+      minStock: clearMinStock ? null : (minStock ?? this.minStock),
       taxRate: taxRate ?? this.taxRate,
       createdAt: createdAt ?? this.createdAt,
       updateAt: updateAt ?? DateTime.now().toIso8601String(),

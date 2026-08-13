@@ -1,5 +1,7 @@
 import 'package:mobx/mobx.dart';
 import 'package:billberrylite/data/models/retail/hive_model/supplier_model_205.dart';
+import 'package:billberrylite/data/repositories/retail/grn_repository.dart';
+import 'package:billberrylite/data/repositories/retail/purchase_order_repository.dart';
 import 'package:billberrylite/data/repositories/retail/supplier_repository.dart';
 
 
@@ -81,6 +83,25 @@ abstract class _SupplierStore with Store {
   }
 
   @action
+  void setSearchQuery(String query) {
+    searchQuery = query;
+  }
+
+  /// Reactive alternative to [searchSuppliers] — filters the in-memory list
+  /// instead of re-querying the box, so results can't arrive out of order and
+  /// an add/edit shows up immediately. Same fields as the repository search.
+  @computed
+  List<SupplierModel> get filteredSuppliers {
+    if (searchQuery.isEmpty) return suppliers;
+    final query = searchQuery.toLowerCase();
+    return suppliers.where((supplier) {
+      return supplier.name.toLowerCase().contains(query) ||
+          (supplier.phone?.contains(query) ?? false) ||
+          (supplier.gstNumber?.toLowerCase().contains(query) ?? false);
+    }).toList();
+  }
+
+  @action
   void selectSupplier(SupplierModel? supplier) {
     selectedSupplier = supplier;
   }
@@ -98,12 +119,30 @@ abstract class _SupplierStore with Store {
     await loadSuppliers();
   }
 
+  /// Purchase orders and GRNs that point at this supplier. Deleting a supplier
+  /// with history would orphan those records — they resolve the supplier name
+  /// by id at render time — so the UI blocks it.
+  Future<int> countReferences(String supplierId) async {
+    final orders = await PurchaseOrderRepository()
+        .getPurchaseOrdersBySupplier(supplierId);
+    final grns = await GRNRepository().getGRNsBySupplier(supplierId);
+    return orders.length + grns.length;
+  }
+
   @computed
   int get supplierCount => suppliers.length;
 
   @computed
   bool get hasSelection => selectedSupplier != null;
 
+  /// Net payable across every supplier — advances (negative balances) offset
+  /// what's owed.
+  ///
+  /// Derived from the [suppliers] observable, NOT from the repository's
+  /// box-wide fold. A computed that reads no observable gives MobX nothing to
+  /// invalidate on, so the old version could serve a cached total after a
+  /// balance changed.
   @computed
-  double get totalOutstanding => _supplierRepository.getTotalOutstanding();
+  double get totalOutstanding =>
+      suppliers.fold(0.0, (sum, s) => sum + s.currentBalance);
 }

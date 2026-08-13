@@ -45,16 +45,27 @@ class StockAlertService {
     return items.length;
   }
 
-  /// Get critical stock items (stock <= 3)
-  Future<List<Map<String, dynamic>>> getCriticalStockItems() async {
-    final items = await getLowStockItems();
-    return items.where((item) => (item['currentStock'] as int) <= 3).toList();
+  /// Whether a low-stock row is in the "critical" band rather than merely low.
+  ///
+  /// Mirrors [ProductStore.statusFor]: a third of that row's reorder point
+  /// (its variant `minStock`, or the global threshold), never below 1. A fixed
+  /// "<= 3" would mark a variant that reorders at 2 as critical forever.
+  static bool _isCritical(Map<String, dynamic> item) {
+    final reorderPoint = (item['reorderPoint'] as int?) ?? _defaultThreshold;
+    final critical = (reorderPoint / 3).ceil().clamp(1, reorderPoint);
+    return (item['currentStock'] as int) <= critical;
   }
 
-  /// Get warning stock items (stock > 3 but <= threshold)
+  /// Get critical stock items
+  Future<List<Map<String, dynamic>>> getCriticalStockItems() async {
+    final items = await getLowStockItems();
+    return items.where(_isCritical).toList();
+  }
+
+  /// Get warning stock items (low, but not yet critical)
   Future<List<Map<String, dynamic>>> getWarningStockItems() async {
     final items = await getLowStockItems();
-    return items.where((item) => (item['currentStock'] as int) > 3).toList();
+    return items.where((item) => !_isCritical(item)).toList();
   }
 
   /// Check if there are any low stock items
@@ -66,7 +77,7 @@ class StockAlertService {
   /// Get stock alert summary
   Future<Map<String, dynamic>> getAlertSummary() async {
     final items = await getLowStockItems();
-    final criticalCount = items.where((item) => (item['currentStock'] as int) <= 3).length;
+    final criticalCount = items.where(_isCritical).length;
     final warningCount = items.length - criticalCount;
     final outOfStockCount = items.where((item) => (item['currentStock'] as int) == 0).length;
 

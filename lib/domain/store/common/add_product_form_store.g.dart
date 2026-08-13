@@ -410,6 +410,22 @@ mixin _$AddProductFormStore on _AddProductFormStore, Store {
     });
   }
 
+  late final _$simpleFieldValuesAtom =
+      Atom(name: '_AddProductFormStore.simpleFieldValues', context: context);
+
+  @override
+  ObservableMap<String, String> get simpleFieldValues {
+    _$simpleFieldValuesAtom.reportRead();
+    return super.simpleFieldValues;
+  }
+
+  @override
+  set simpleFieldValues(ObservableMap<String, String> value) {
+    _$simpleFieldValuesAtom.reportWrite(value, super.simpleFieldValues, () {
+      super.simpleFieldValues = value;
+    });
+  }
+
   late final _$isVegAtom =
       Atom(name: '_AddProductFormStore.isVeg', context: context);
 
@@ -846,6 +862,17 @@ mixin _$AddProductFormStore on _AddProductFormStore, Store {
   }
 
   @override
+  void setSimpleFieldValue(String attributeName, String value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setSimpleFieldValue');
+    try {
+      return super.setSimpleFieldValue(attributeName, value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
   void toggleAttribute(String attributeId) {
     final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
         name: '_AddProductFormStore.toggleAttribute');
@@ -1090,6 +1117,7 @@ productType: ${productType},
 selectedAttributeIds: ${selectedAttributeIds},
 selectedAttributeValues: ${selectedAttributeValues},
 retailVariants: ${retailVariants},
+simpleFieldValues: ${simpleFieldValues},
 isVeg: ${isVeg},
 unit: ${unit},
 trackInventory: ${trackInventory},

@@ -100,6 +100,12 @@ abstract class _AddProductFormStore with Store {
   @observable
   ObservableList<VariantFormData> retailVariants = ObservableList<VariantFormData>();
 
+  /// Descriptor values for a SIMPLE product, keyed by attribute NAME
+  /// (Settings → Simple Product Fields). Variable products carry their
+  /// descriptors on each generated variant instead.
+  @observable
+  ObservableMap<String, String> simpleFieldValues = ObservableMap<String, String>();
+
   // ==================== RESTAURANT-SPECIFIC FIELDS ====================
 
   @observable
@@ -276,6 +282,19 @@ abstract class _AddProductFormStore with Store {
       retailVariants.clear();
       selectedAttributeIds.clear();
       selectedAttributeValues.clear();
+    } else {
+      // Variable products describe themselves per generated variant.
+      simpleFieldValues.clear();
+    }
+  }
+
+  @action
+  void setSimpleFieldValue(String attributeName, String value) {
+    final v = value.trim();
+    if (v.isEmpty) {
+      simpleFieldValues.remove(attributeName);
+    } else {
+      simpleFieldValues[attributeName] = v;
     }
   }
 
@@ -591,6 +610,7 @@ abstract class _AddProductFormStore with Store {
         minStock: minStock,
         isDefault: true,
         taxRate: taxRate > 0 ? taxRate : null,
+        customAttributes: mergeVariantAttributes(Map.of(simpleFieldValues)),
       );
       await productStore.addVariant(variant);
     }

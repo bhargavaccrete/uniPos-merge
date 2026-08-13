@@ -7,7 +7,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 import 'package:billberrylite/domain/store/common/customer_store.dart';
 import 'package:billberrylite/domain/store/retail/product_store.dart';
-import 'package:billberrylite/domain/store/retail/purchase_store.dart';
 import 'package:billberrylite/domain/store/retail/sale_store.dart';
 import 'package:billberrylite/domain/store/retail/supplier_store.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -351,13 +350,6 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
         final supplierStore = locator<SupplierStore>();
         await supplierStore.loadSuppliers();
         debugPrint("📦 SupplierStore reloaded: ${supplierStore.suppliers.length} suppliers");
-      }
-
-      // Force reload PurchaseStore
-      if (locator.isRegistered<PurchaseStore>()) {
-        final purchaseStore = locator<PurchaseStore>();
-        await purchaseStore.loadPurchases();
-        debugPrint("📦 PurchaseStore reloaded: ${purchaseStore.purchases.length} purchases");
       }
 
       debugPrint("✅ All retail stores reloaded successfully");

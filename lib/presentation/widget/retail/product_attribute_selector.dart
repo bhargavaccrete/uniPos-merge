@@ -8,6 +8,12 @@ import 'package:billberrylite/domain/store/retail/attribute_store.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../screens/retail/attributes_screen.dart';
+import '../componets/common/app_dialog.dart';
+import '../componets/common/app_empty_state.dart';
+import '../componets/common/app_text_field.dart';
+import 'package:billberrylite/domain/services/common/notification_service.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 
 /// WooCommerce-style attribute selector widget for product form
@@ -132,44 +138,32 @@ class ProductAttributeSelectorState extends State<ProductAttributeSelector> {
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Create New Attribute'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Attribute Name',
-                hintText: 'e.g., Color, Size, Material',
-                border: OutlineInputBorder(),
-              ),
-              autofocus: true,
-              textCapitalization: TextCapitalization.words,
-            ),
-          ],
+      builder: (dialogContext) => AppDialogShell(
+        title: 'Create New Attribute',
+        subtitle: 'A field you can reuse across products',
+        accent: AppColors.primary,
+        icon: Icons.new_label_outlined,
+        body: AppTextField(
+          controller: nameController,
+          label: 'Attribute Name',
+          hint: 'e.g. Colour, Storage, Flavour',
+          icon: Icons.label_outline_rounded,
+          required: true,
+          autofocus: true,
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final name = nameController.text.trim();
-              if (name.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please enter an attribute name'),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
+          appDialogCancelButton(dialogContext),
+          const SizedBox(width: 12),
+          appDialogPrimaryButton(
+            label: 'Create',
+            onPressed: () {
+              if (nameController.text.trim().isEmpty) {
+                NotificationService.instance
+                    .showWarning('Please enter an attribute name');
                 return;
               }
-
-              Navigator.pop(context, true);
+              Navigator.pop(dialogContext, true);
             },
-            child: const Text('Create'),
           ),
         ],
       ),
@@ -180,12 +174,7 @@ class ProductAttributeSelectorState extends State<ProductAttributeSelector> {
       await _attributeStore.addAttribute(name);
       await _loadAttributes();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Attribute "$name" created successfully'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      NotificationService.instance.showSuccess('Attribute "$name" created');
 
       // Auto-select the newly created attribute
       final newAttr = _attributeStore.attributes.firstWhere(
@@ -204,56 +193,48 @@ class ProductAttributeSelectorState extends State<ProductAttributeSelector> {
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Add Value to ${attrWithValues.attribute.name}'),
-        content: Column(
+      builder: (dialogContext) => AppDialogShell(
+        title: 'Add Value',
+        subtitle: 'for ${attrWithValues.attribute.name}',
+        accent: AppColors.primary,
+        icon: Icons.playlist_add_rounded,
+        body: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
+            AppTextField(
               controller: valueController,
-              decoration: const InputDecoration(
-                labelText: 'Value',
-                hintText: 'e.g., Red, Large, Cotton',
-                border: OutlineInputBorder(),
-              ),
+              label: 'Value',
+              hint: 'e.g. Red, Large, 1TB',
+              icon: Icons.sell_outlined,
+              required: true,
               autofocus: true,
-              textCapitalization: TextCapitalization.words,
             ),
             if (isColor) ...[
               const SizedBox(height: 12),
-              TextField(
+              AppTextField(
                 controller: colorController,
-                decoration: const InputDecoration(
-                  labelText: 'Color Code (Optional)',
-                  hintText: '#FF0000',
-                  border: OutlineInputBorder(),
-                  prefixText: '#',
-                ),
+                label: 'Colour Code (Optional)',
+                hint: 'FF0000',
+                icon: Icons.palette_outlined,
               ),
             ],
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
+          appDialogCancelButton(dialogContext),
+          const SizedBox(width: 12),
+          appDialogPrimaryButton(
+            label: 'Add',
             onPressed: () {
               final value = valueController.text.trim();
               if (value.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please enter a value'),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
+                NotificationService.instance
+                    .showWarning('Please enter a value');
                 return;
               }
 
-              Navigator.pop(context, true);
+              Navigator.pop(dialogContext, true);
             },
-            child: const Text('Add'),
           ),
         ],
       ),
@@ -288,12 +269,7 @@ class ProductAttributeSelectorState extends State<ProductAttributeSelector> {
         });
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Value "$value" added successfully'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      NotificationService.instance.showSuccess('Value "$value" added successfully');
     }
   }
 
@@ -377,12 +353,7 @@ class ProductAttributeSelectorState extends State<ProductAttributeSelector> {
 
   void generateVariants() {
     if (_previewCombinations.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select at least one value for each attribute'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      NotificationService.instance.showWarning('Please select at least one value for each attribute');
       return;
     }
 
@@ -392,12 +363,7 @@ class ProductAttributeSelectorState extends State<ProductAttributeSelector> {
         .toList();
 
     if (selectedCombos.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select at least one variant to generate'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      NotificationService.instance.showWarning('Please select at least one variant to generate');
       return;
     }
 
@@ -412,12 +378,7 @@ class ProductAttributeSelectorState extends State<ProductAttributeSelector> {
 
     widget.onVariantsGenerated(variants);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Generated ${variants.length} variant(s)'),
-        backgroundColor: Colors.green,
-      ),
-    );
+    NotificationService.instance.showSuccess('Generated ${variants.length} variant(s)');
   }
 
   /// Get variant count that would be generated
@@ -437,19 +398,11 @@ class ProductAttributeSelectorState extends State<ProductAttributeSelector> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with Add Attribute Button
-            Row(
-              children: [
-                const Text(
-                  'Product Attributes',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Spacer(),
-                _buildAddAttributeButton(),
-              ],
+            // The screen above already renders the "Product Attributes"
+            // section header, so only the action lives here.
+            Align(
+              alignment: Alignment.centerRight,
+              child: _buildAddAttributeButton(),
             ),
             const SizedBox(height: 8),
 
@@ -480,12 +433,18 @@ class ProductAttributeSelectorState extends State<ProductAttributeSelector> {
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: generateVariants,
-                    icon: const Icon(Icons.auto_awesome),
-                    label: Text('Generate $_selectedCount Variant(s)'),
+                    icon: const Icon(Icons.auto_awesome, size: 20),
+                    label: Text('Generate $_selectedCount Variant(s)',
+                        style:
+                            GoogleFonts.poppins(fontWeight: FontWeight.w600)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4CAF50),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                   ),
                 ),
@@ -497,151 +456,186 @@ class ProductAttributeSelectorState extends State<ProductAttributeSelector> {
     );
   }
 
+  /// "Add Attribute" trigger.
+  ///
+  /// One button plus a bottom sheet, replacing two near-identical
+  /// PopupMenuButtons — the platform menu picked up Material 3's surface tint
+  /// and mixed pickable attributes with actions in the same list.
   Widget _buildAddAttributeButton() {
-    final availableAttributes = _attributeStore.attributes
-        .where((a) => !_selectedAttributes.any((s) => s.attribute.attributeId == a.attributeId))
-        .toList();
-
-    if (availableAttributes.isEmpty) {
-      return PopupMenuButton<String>(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.add, size: 18, color: Colors.blue),
-              SizedBox(width: 4),
-              Text('Add Attribute', style: TextStyle(color: Colors.blue)),
-            ],
-          ),
-        ),
-        itemBuilder: (context) => [
-          PopupMenuItem(
-            value: 'create_new',
-            child: Row(
-              children: [
-                Icon(Icons.add_circle_outline, size: 18, color: Colors.green[700]),
-                const SizedBox(width: 8),
-                Text('Create New Attribute', style: TextStyle(color: Colors.green[700])),
-              ],
-            ),
-          ),
-          const PopupMenuDivider(),
-          PopupMenuItem(
-            value: 'manage',
-            child: Row(
-              children: [
-                Icon(Icons.settings, size: 18, color: Colors.grey[600]),
-                const SizedBox(width: 8),
-                Text('Manage Attributes', style: TextStyle(color: Colors.grey[600])),
-              ],
-            ),
-          ),
-        ],
-        onSelected: (value) {
-          if (value == 'create_new') {
-            _showCreateAttributeDialog();
-          } else if (value == 'manage') {
-            _showManageAttributesInfo();
-          }
-        },
-      );
-    }
-
-    return PopupMenuButton<dynamic>(
+    return InkWell(
+      onTap: _showAddAttributeSheet,
+      borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.blue.withOpacity(0.1),
+          color: AppColors.primary.withOpacity(0.08),
           borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.primary.withOpacity(0.25)),
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.add, size: 18, color: Colors.blue),
-            SizedBox(width: 4),
-            Text('Add Attribute', style: TextStyle(color: Colors.blue)),
+            const Icon(Icons.add_rounded, size: 18, color: AppColors.primary),
+            const SizedBox(width: 6),
+            Text('Add Attribute',
+                style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary)),
           ],
         ),
       ),
-      itemBuilder: (context) => [
-        ...availableAttributes.map((attr) => PopupMenuItem(
-          value: attr,
-          child: Text(attr.name),
-        )),
-        const PopupMenuDivider(),
-        PopupMenuItem(
-          value: 'create_new',
-          child: Row(
+    );
+  }
+
+  /// Attributes still available for this product, plus the create/manage
+  /// actions kept below a divider so they can't be mistaken for choices.
+  Future<void> _showAddAttributeSheet() async {
+    final available = _attributeStore.attributes
+        .where((a) =>
+            !_selectedAttributes.any((s) => s.attribute.attributeId == a.attributeId))
+        .toList();
+
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(sheetContext).size.height * 0.6,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.add_circle_outline, size: 18, color: Colors.green[700]),
-              const SizedBox(width: 8),
-              Text('Create New Attribute', style: TextStyle(color: Colors.green[700])),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+                child: Row(
+                  children: [
+                    Text('Add Attribute',
+                        style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary)),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded,
+                          color: AppColors.textSecondary),
+                      onPressed: () => Navigator.pop(sheetContext),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: AppColors.divider),
+              Flexible(
+                child: available.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          'All your attributes are already added to this product.',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.poppins(
+                              fontSize: 13, color: AppColors.textSecondary),
+                        ),
+                      )
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: available.length,
+                        itemBuilder: (_, i) {
+                          final attr = available[i];
+                          final values =
+                              _attributeStore.getValues(attr.attributeId);
+                          return ListTile(
+                            leading: const Icon(Icons.label_outline_rounded,
+                                color: AppColors.primary, size: 20),
+                            title: Text(attr.name,
+                                style: GoogleFonts.poppins(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.textPrimary)),
+                            subtitle: Text(
+                              values.isEmpty
+                                  ? 'No values yet'
+                                  : values.map((v) => v.value).take(4).join(', '),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary),
+                            ),
+                            onTap: () {
+                              Navigator.pop(sheetContext);
+                              _addAttribute(attr);
+                            },
+                          );
+                        },
+                      ),
+              ),
+              const Divider(height: 1, color: AppColors.divider),
+              ListTile(
+                leading: const Icon(Icons.add_circle_outline,
+                    color: AppColors.primary, size: 20),
+                title: Text('Create New Attribute',
+                    style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary)),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _showCreateAttributeDialog();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.tune_rounded,
+                    color: AppColors.textSecondary, size: 20),
+                title: Text('Manage Attributes',
+                    style: GoogleFonts.poppins(
+                        fontSize: 14, color: AppColors.textSecondary)),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _showManageAttributesInfo();
+                },
+              ),
             ],
           ),
         ),
-        const PopupMenuDivider(),
-        PopupMenuItem(
-          value: 'manage',
-          child: Row(
-            children: [
-              Icon(Icons.settings, size: 18, color: Colors.grey[600]),
-              const SizedBox(width: 8),
-              Text('Manage Attributes', style: TextStyle(color: Colors.grey[600])),
-            ],
-          ),
-        ),
-      ],
-      onSelected: (value) {
-        if (value is AttributeModel) {
-          _addAttribute(value);
-        } else if (value == 'create_new') {
-          _showCreateAttributeDialog();
-        } else if (value == 'manage') {
-          _showManageAttributesInfo();
-        }
-      },
+      ),
     );
   }
 
   Widget _buildEmptyState() {
     return Container(
-      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(color: AppColors.divider),
       ),
-      child: Column(
-        children: [
-          Icon(Icons.category_outlined, size: 48, color: Colors.grey[400]),
-          const SizedBox(height: 12),
-          Text(
-            'No attributes selected',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Add attributes like Color, Size to auto-generate variants',
-            style: TextStyle(color: Colors.grey[500], fontSize: 13),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          if (_attributeStore.attributes.isEmpty)
-            OutlinedButton.icon(
-              onPressed: _showManageAttributesInfo,
-              icon: const Icon(Icons.add),
-              label: const Text('Create Attributes First'),
-            ),
-        ],
+      child: AppEmptyState(
+        dense: true,
+        icon: Icons.category_outlined,
+        title: 'No attributes selected',
+        message: 'Add attributes like Colour or Size to auto-generate variants',
+        action: _attributeStore.attributes.isEmpty
+            ? OutlinedButton.icon(
+                onPressed: _showManageAttributesInfo,
+                icon: const Icon(Icons.add, size: 18),
+                label: Text('Create Attributes First',
+                    style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.primary),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              )
+            : null,
       ),
     );
   }
@@ -657,9 +651,9 @@ class ProductAttributeSelectorState extends State<ProductAttributeSelector> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.green.withOpacity(0.1),
+        color: AppColors.primary.withOpacity(0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.green.withOpacity(0.3)),
+        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -667,14 +661,14 @@ class ProductAttributeSelectorState extends State<ProductAttributeSelector> {
           // Header with Select All / Unselect All
           Row(
             children: [
-              const Icon(Icons.preview, color: Colors.green, size: 20),
+              const Icon(Icons.preview, color: AppColors.primary, size: 20),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   '$_selectedCount / ${_previewCombinations.length} variants selected',
-                  style: const TextStyle(
+                  style: GoogleFonts.poppins(
                     fontWeight: FontWeight.w500,
-                    color: Colors.green,
+                    color: AppColors.primary,
                   ),
                 ),
               ),
@@ -688,13 +682,14 @@ class ProductAttributeSelectorState extends State<ProductAttributeSelector> {
                 ),
                 child: Text(
                   'Select All',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: 12,
-                    color: allSelected ? Colors.grey : Colors.green,
+                    color: allSelected ? AppColors.textSecondary : AppColors.primary,
                   ),
                 ),
               ),
-              const Text(' | ', style: TextStyle(color: Colors.grey)),
+              Text(' | ',
+                  style: GoogleFonts.poppins(color: AppColors.textSecondary)),
               TextButton(
                 onPressed: noneSelected ? null : _unselectAllCombinations,
                 style: TextButton.styleFrom(
@@ -704,9 +699,10 @@ class ProductAttributeSelectorState extends State<ProductAttributeSelector> {
                 ),
                 child: Text(
                   'Unselect All',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: 12,
-                    color: noneSelected ? Colors.grey : Colors.red,
+                    color:
+                        noneSelected ? AppColors.textSecondary : AppColors.danger,
                   ),
                 ),
               ),
@@ -734,17 +730,18 @@ class ProductAttributeSelectorState extends State<ProductAttributeSelector> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: AppColors.warning.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                border: Border.all(color: AppColors.warning.withOpacity(0.3)),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.warning_amber, size: 16, color: Colors.orange),
-                  SizedBox(width: 8),
+                  const Icon(Icons.warning_amber,
+                      size: 16, color: AppColors.warning),
+                  const SizedBox(width: 8),
                   Text(
                     'Select at least one variant to generate',
-                    style: TextStyle(fontSize: 12, color: Colors.orange),
+                    style: GoogleFonts.poppins(fontSize: 12, color: AppColors.warning),
                   ),
                 ],
               ),
@@ -797,7 +794,7 @@ class _AttributeSection extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -807,7 +804,7 @@ class _AttributeSection extends StatelessWidget {
             children: [
               Text(
                 attr.name,
-                style: const TextStyle(
+                style: GoogleFonts.poppins(
                   fontWeight: FontWeight.w600,
                   fontSize: 15,
                 ),
@@ -815,7 +812,7 @@ class _AttributeSection extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 '(${selected.length}/${available.length})',
-                style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                style: GoogleFonts.poppins(color: AppColors.textSecondary, fontSize: 13),
               ),
               const Spacer(),
               TextButton(
@@ -827,7 +824,7 @@ class _AttributeSection extends StatelessWidget {
                 ),
                 child: Text(
                   selected.length == available.length ? 'Clear All' : 'Select All',
-                  style: const TextStyle(fontSize: 12),
+                  style: GoogleFonts.poppins(fontSize: 12),
                 ),
               ),
               IconButton(
@@ -835,7 +832,7 @@ class _AttributeSection extends StatelessWidget {
                 onPressed: onRemove,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                color: Colors.grey[600],
+                color: AppColors.textSecondary,
               ),
             ],
           ),
@@ -848,7 +845,7 @@ class _AttributeSection extends StatelessWidget {
               children: [
                 Text(
                   'No values defined for this attribute.',
-                  style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                  style: GoogleFonts.poppins(color: AppColors.textSecondary, fontSize: 13),
                 ),
                 if (onAddValue != null) ...[
                   const SizedBox(height: 8),
@@ -890,19 +887,20 @@ class _AttributeSection extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.1),
+                            color: AppColors.primary.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.green.withOpacity(0.5)),
+                            border: Border.all(color: AppColors.primary.withOpacity(0.5)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.add, size: 14, color: Colors.green[700]),
+                              const Icon(Icons.add,
+                                  size: 14, color: AppColors.primary),
                               const SizedBox(width: 4),
                               Text(
                                 'Add Value',
-                                style: TextStyle(
-                                  color: Colors.green[700],
+                                style: GoogleFonts.poppins(
+                                  color: AppColors.primary,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -946,9 +944,13 @@ class _ValueChip extends StatelessWidget {
 
     return Material(
       color: isSelected
-          ? Colors.blue
-          : (chipColor?.withOpacity(0.2) ?? Colors.grey[200]),
-      borderRadius: BorderRadius.circular(20),
+          ? AppColors.primary
+          : (chipColor?.withOpacity(0.2) ?? AppColors.surfaceLight),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+            color: isSelected ? AppColors.primary : AppColors.divider),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: onTap,
@@ -964,21 +966,22 @@ class _ValueChip extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: chipColor,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.grey[400]!),
+                    border: Border.all(color: AppColors.divider),
                   ),
                 ),
                 const SizedBox(width: 6),
               ],
               Text(
                 value.value,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.black87,
+                style: GoogleFonts.poppins(
+                  color: isSelected ? AppColors.white : AppColors.textPrimary,
                   fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
                 ),
               ),
               if (isSelected) ...[
                 const SizedBox(width: 4),
-                const Icon(Icons.check, size: 14, color: Colors.white),
+                const Icon(Icons.check, size: 14, color: AppColors.white),
               ],
             ],
           ),
@@ -1008,10 +1011,10 @@ class _VariantCheckbox extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.grey[100],
+          color: isSelected ? AppColors.white : AppColors.surfaceLight,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? Colors.green : Colors.grey[300]!,
+            color: isSelected ? AppColors.primary : AppColors.divider,
             width: isSelected ? 1.5 : 1,
           ),
         ),
@@ -1021,14 +1024,14 @@ class _VariantCheckbox extends StatelessWidget {
             Icon(
               isSelected ? Icons.check_box : Icons.check_box_outline_blank,
               size: 18,
-              color: isSelected ? Colors.green : Colors.grey[400],
+              color: isSelected ? AppColors.primary : AppColors.textSecondary,
             ),
             const SizedBox(width: 6),
             Text(
               label,
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: 12,
-                color: isSelected ? Colors.black87 : Colors.grey[600],
+                color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
                 decoration: isSelected ? null : TextDecoration.lineThrough,
               ),
             ),

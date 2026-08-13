@@ -11,8 +11,6 @@ import 'package:uuid/uuid.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/common/customer_model_125.dart';
 import '../../../data/models/retail/hive_model/product_model_200.dart';
-import '../../../data/models/retail/hive_model/purchase_Item_model_206.dart';
-import '../../../data/models/retail/hive_model/purchase_model_207.dart';
 import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
 import '../../../data/models/retail/hive_model/sale_model_203.dart';
 import '../../../data/models/retail/hive_model/supplier_model_205.dart';
@@ -81,22 +79,10 @@ class BackupService {
       'updatedAt': s.updatedAt,
     }).toList();
 
-    final purchases = purchaseStore.purchases.map((p) => {
-      'purchaseId': p.purchaseId,
-      'supplierId': p.supplierId,
-      'invoiceNumber': p.invoiceNumber,
-      'totalItems': p.totalItems,
-      'totalAmount': p.totalAmount,
-      'purchaseDate': p.purchaseDate,
-      'createdAt': p.createdAt,
-      'updatedAt': p.updatedAt,
-    }).toList();
-
+    // Purchases/purchaseItems removed with the standalone Purchase feature —
+    // stock now arrives through Purchase Orders + GRN.
+    final purchases = <Map<String, dynamic>>[];
     final purchaseItems = <Map<String, dynamic>>[];
-    for (var purchase in purchaseStore.purchases) {
-      await purchaseStore.loadPurchaseItems(purchase.purchaseId);
-      purchaseItems.addAll(purchaseStore.currentPurchaseItems.map((pi) => pi.toMap()).toList());
-    }
 
     // Get categories
     final categories = categoryStore.categories.map((c) => c.toMap()).toList();
@@ -726,67 +712,9 @@ class BackupService {
         }
       }
 
-      // Restore Purchases and Purchase Items together
-      if (backupData.containsKey('purchases') && backupData.containsKey('purchaseItems')) {
-        try {
-          final purchases = backupData['purchases'] as List;
-          final allPurchaseItems = backupData['purchaseItems'] as List;
-
-          // Group purchase items by purchaseId
-          final purchaseItemsMap = <String, List<PurchaseItemModel>>{};
-          for (var itemData in allPurchaseItems) {
-            try {
-              final itemMap = itemData as Map<String, dynamic>;
-              final purchaseItem = PurchaseItemModel(
-                purchaseItemId: itemMap['purchaseItemId'] ?? const Uuid().v4(),
-                purchaseId: itemMap['purchaseId'] ?? '',
-                variantId: itemMap['variantId'] ?? '',
-                productId: itemMap['productId'] ?? '',
-                quantity: (itemMap['quantity'] as num?)?.toInt() ?? 0,
-                costPrice: (itemMap['costPrice'] as num?)?.toDouble() ?? 0.0,
-                mrp: (itemMap['mrp'] as num?)?.toDouble() ?? 0.0,
-                total: (itemMap['total'] as num?)?.toDouble() ?? 0.0,
-                createdAt: itemMap['createdAt'] ?? DateTime.now().toIso8601String(),
-              );
-
-              if (!purchaseItemsMap.containsKey(purchaseItem.purchaseId)) {
-                purchaseItemsMap[purchaseItem.purchaseId] = [];
-              }
-              purchaseItemsMap[purchaseItem.purchaseId]!.add(purchaseItem);
-            } catch (e) {
-              // Skip individual purchase item errors
-            }
-          }
-
-          // Now restore purchases with their items
-          for (var purchaseData in purchases) {
-            try {
-              final purchaseMap = purchaseData as Map<String, dynamic>;
-              final purchaseId = purchaseMap['purchaseId'] ?? const Uuid().v4();
-
-              final purchase = PurchaseModel(
-                purchaseId: purchaseId,
-                supplierId: purchaseMap['supplierId'] ?? '',
-                invoiceNumber: purchaseMap['invoiceNumber'],
-                totalItems: (purchaseMap['totalItems'] as num?)?.toInt() ?? 0,
-                totalAmount: (purchaseMap['totalAmount'] as num?)?.toDouble() ?? 0.0,
-                purchaseDate: purchaseMap['purchaseDate'] ?? DateTime.now().toIso8601String(),
-                createdAt: purchaseMap['createdAt'] ?? DateTime.now().toIso8601String(),
-                updatedAt: purchaseMap['updatedAt'],
-              );
-
-              final items = purchaseItemsMap[purchaseId] ?? [];
-              await purchaseStore.addPurchase(purchase, items);
-              restoredCount++;
-              restoredCount += items.length;
-            } catch (e) {
-              // Skip individual purchase errors
-            }
-          }
-        } catch (e) {
-          errors.add('Purchases restore error: $e');
-        }
-      }
+      // Purchases are no longer restored — the standalone Purchase feature was
+      // removed. Older backups still carry 'purchases'/'purchaseItems'; they're
+      // skipped on purpose.
 
       return {
         'success': true,

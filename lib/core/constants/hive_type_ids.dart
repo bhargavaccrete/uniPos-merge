@@ -80,8 +80,9 @@ class HiveTypeIds {
   static const int retailSale = 153;
   static const int retailSaleItem = 154;
   static const int retailSupplier = 155;
-  static const int retailPurchaseItem = 156;
-  static const int retailPurchase = 157;
+  // RETIRED: 156 (retailPurchaseItem) and 157 (retailPurchase) belonged to the
+  // standalone Purchase feature, removed in favour of Purchase Orders + GRN.
+  // NEVER reassign these ids — old box files on disk still reference them.
   // 158 was retailCustomer — retired, customer now shares RestaurantCustomer's
   // typeId (125), see Customer in data/models/common/. Don't reuse 158.
   static const int retailHoldSale = 159;
@@ -129,8 +130,6 @@ class HiveTypeIds {
     retailSale,
     retailSaleItem,
     retailSupplier,
-    retailPurchaseItem,
-    retailPurchase,
     retailHoldSale,
     retailHoldSaleItem,
     retailPurchaseOrder,

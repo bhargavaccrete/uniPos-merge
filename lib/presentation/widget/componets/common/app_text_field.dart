@@ -25,6 +25,11 @@ class AppTextField extends StatefulWidget {
   final TextEditingController? controller;
   final FocusNode? focusNode;
 
+  /// Starting text for controller-less (keyed) fields. Mutually exclusive with
+  /// [controller]. The visual keyboard needs a controller, so fields using this
+  /// always fall back to the system keyboard.
+  final String? initialValue;
+
   /// Label shown above (floating) the field.
   final String? label;
 
@@ -65,6 +70,10 @@ class AppTextField extends StatefulWidget {
   final bool enableSuggestions;
   final bool autocorrect;
 
+  /// Auto-capitalisation for the soft keyboard (e.g. [TextCapitalization.words]
+  /// on name fields).
+  final TextCapitalization textCapitalization;
+
   /// When to auto-validate. Defaults to [AutovalidateMode.onUserInteraction] so
   /// a shown "… is required" error clears as soon as the user fills the field
   /// (and re-appears if they clear it) — instead of lingering until the next
@@ -75,6 +84,7 @@ class AppTextField extends StatefulWidget {
     super.key,
     this.controller,
     this.focusNode,
+    this.initialValue,
     this.label,
     this.hint,
     this.icon,
@@ -97,6 +107,7 @@ class AppTextField extends StatefulWidget {
     this.prefixWidget,
     this.enableSuggestions = true,
     this.autocorrect = true,
+    this.textCapitalization = TextCapitalization.none,
     this.autovalidateMode = AutovalidateMode.onUserInteraction,
   });
 
@@ -152,6 +163,7 @@ class _AppTextFieldState extends State<AppTextField> {
 
     return TextFormField(
       controller: widget.controller,
+      initialValue: widget.controller == null ? widget.initialValue : null,
       focusNode: widget.focusNode,
       keyboardType: widget.keyboardType,
       maxLines: widget.obscureText ? 1 : widget.maxLines,
@@ -163,6 +175,7 @@ class _AppTextFieldState extends State<AppTextField> {
       autofocus: widget.autofocus,
       enableSuggestions: widget.enableSuggestions,
       autocorrect: widget.autocorrect,
+      textCapitalization: widget.textCapitalization,
       validator: widget.validator,
       autovalidateMode: widget.autovalidateMode,
       onChanged: useVK ? null : widget.onChanged,

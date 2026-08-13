@@ -86,15 +86,18 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
         }
 
         // Update existing customer
+        final foodPreference = _foodPreferenceController.text.trim();
+        final notes = _notesController.text.trim();
+
+        // Emptying an optional field must actually clear it — the clear* flags
+        // exist because `x ?? this.x` alone would silently keep the old value.
         final updatedCustomer = widget.customer!.copyWith(
           name: _nameController.text.trim(),
           phone: _phoneController.text.trim(),
-          foodPrefrence: _foodPreferenceController.text.trim().isEmpty
-              ? null
-              : _foodPreferenceController.text.trim(),
-          notes: _notesController.text.trim().isEmpty
-              ? null
-              : _notesController.text.trim(),
+          foodPrefrence: foodPreference.isEmpty ? null : foodPreference,
+          clearFoodPrefrence: foodPreference.isEmpty,
+          notes: notes.isEmpty ? null : notes,
+          clearNotes: notes.isEmpty,
           updatedAt: DateTime.now().toIso8601String(),
         );
 

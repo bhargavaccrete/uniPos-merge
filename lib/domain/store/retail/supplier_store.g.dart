@@ -9,6 +9,13 @@ part of 'supplier_store.dart';
 // ignore_for_file: non_constant_identifier_names, unnecessary_brace_in_string_interps, unnecessary_lambdas, prefer_expression_function_bodies, lines_longer_than_80_chars, avoid_as, avoid_annotating_with_dynamic, no_leading_underscores_for_local_identifiers
 
 mixin _$SupplierStore on _SupplierStore, Store {
+  Computed<List<SupplierModel>>? _$filteredSuppliersComputed;
+
+  @override
+  List<SupplierModel> get filteredSuppliers => (_$filteredSuppliersComputed ??=
+          Computed<List<SupplierModel>>(() => super.filteredSuppliers,
+              name: '_SupplierStore.filteredSuppliers'))
+      .value;
   Computed<int>? _$supplierCountComputed;
 
   @override
@@ -150,6 +157,17 @@ mixin _$SupplierStore on _SupplierStore, Store {
       ActionController(name: '_SupplierStore', context: context);
 
   @override
+  void setSearchQuery(String query) {
+    final _$actionInfo = _$_SupplierStoreActionController.startAction(
+        name: '_SupplierStore.setSearchQuery');
+    try {
+      return super.setSearchQuery(query);
+    } finally {
+      _$_SupplierStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
   void selectSupplier(SupplierModel? supplier) {
     final _$actionInfo = _$_SupplierStoreActionController.startAction(
         name: '_SupplierStore.selectSupplier');
@@ -178,6 +196,7 @@ suppliers: ${suppliers},
 searchResults: ${searchResults},
 searchQuery: ${searchQuery},
 selectedSupplier: ${selectedSupplier},
+filteredSuppliers: ${filteredSuppliers},
 supplierCount: ${supplierCount},
 hasSelection: ${hasSelection},
 totalOutstanding: ${totalOutstanding}

@@ -5,6 +5,7 @@ import 'package:billberrylite/core/routes/routes_name.dart';
 import 'package:billberrylite/presentation/screens/retail/ex/posscreen.dart';
 import 'package:billberrylite/presentation/screens/retail/home_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/inventory_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/product_management_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/add_product_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/category_management_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/stock_alerts_screen.dart';
@@ -13,9 +14,7 @@ import 'package:billberrylite/presentation/screens/retail/parked_sales_screen.da
 import 'package:billberrylite/presentation/screens/retail/customer_list_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/credit_reports_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/supplier_list_screen.dart';
-import 'package:billberrylite/presentation/screens/retail/purchase_history_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/purchase_order_list_screen.dart';
-import 'package:billberrylite/presentation/screens/retail/add_purchase_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/reports_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/sales_history_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/eod_report_screen.dart';
@@ -35,6 +34,7 @@ class RetailRoutes {
     RouteNames.checkout: (_) => const CheckoutScreen(),
     RouteNames.parkedSales: (_) => const ParkedSalesScreen(),
 
+    RouteNames.productManagement: (_) => const ProductManagementScreen(),
     RouteNames.inventory: (_) => const InventoryScreen(),
     RouteNames.addProduct: (_) => const AddProductScreen(),
     RouteNames.categories: (_) => const CategoryManagementScreen(),
@@ -45,8 +45,6 @@ class RetailRoutes {
 
     RouteNames.suppliers: (_) => const SupplierListScreen(),
     RouteNames.purchaseOrders: (_) => const PurchaseOrderListScreen(),
-    RouteNames.addPurchase: (_) => const AddPurchaseScreen(),
-    RouteNames.purchaseHistory: (_) => const PurchaseHistoryScreen(),
 
     RouteNames.reports: (_) => const ReportsScreen(),
     RouteNames.salesHistory: (_) => const SalesHistoryScreen(),

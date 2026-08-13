@@ -1,3 +1,5 @@
+import "dart:typed_data";
+
 import "package:hive/hive.dart";
 import "package:billberrylite/core/constants/hive_type_ids.dart";
 
@@ -66,6 +68,12 @@ class ProductModel extends HiveObject {
   @HiveField(16)
   final String? taxId;
 
+  /// Product photo, stored as bytes rather than a file path so it survives on
+  /// web as well as mobile — the same choice the restaurant `Items` model makes
+  /// with its `imageBytes`. [imagePath] predates this and is unused.
+  @HiveField(17)
+  final Uint8List? imageBytes;
+
   ProductModel({
     required this.productId,
     required this.productName,
@@ -84,6 +92,7 @@ class ProductModel extends HiveObject {
     this.defaultMrp,
     this.defaultCostPrice,
     this.taxId,
+    this.imageBytes,
   });
 
   /// Check if this is a variable product
@@ -109,6 +118,7 @@ class ProductModel extends HiveObject {
     double? defaultMrp,
     double? defaultCostPrice,
     String? taxId,
+    Uint8List? imageBytes,
   }) {
     final now = DateTime.now().toIso8601String();
     return ProductModel(
@@ -129,6 +139,7 @@ class ProductModel extends HiveObject {
       defaultMrp: defaultMrp,
       defaultCostPrice: defaultCostPrice,
       taxId: taxId,
+      imageBytes: imageBytes,
     );
   }
 
@@ -152,6 +163,8 @@ class ProductModel extends HiveObject {
       'defaultMrp': defaultMrp,
       'defaultCostPrice': defaultCostPrice,
       'taxId': taxId,
+      // List<int> so the backup JSON stays serialisable, matching Items.toMap.
+      'imageBytes': imageBytes?.toList(),
     };
   }
 
@@ -175,7 +188,17 @@ class ProductModel extends HiveObject {
       defaultMrp: (map['defaultMrp'] as num?)?.toDouble(),
       defaultCostPrice: (map['defaultCostPrice'] as num?)?.toDouble(),
       taxId: map['taxId'] as String?,
+      imageBytes: _bytesFrom(map['imageBytes']),
     );
+  }
+
+  /// Backups round-trip bytes through JSON as a List<int>; a restore from an
+  /// in-memory map may still hand back a Uint8List.
+  static Uint8List? _bytesFrom(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is Uint8List) return raw;
+    if (raw is List) return Uint8List.fromList(raw.cast<int>());
+    return null;
   }
 
   ProductModel copyWith({
@@ -196,25 +219,35 @@ class ProductModel extends HiveObject {
     double? defaultMrp,
     double? defaultCostPrice,
     String? taxId,
+    Uint8List? imageBytes,
+    // `x ?? this.x` can never put a nullable field back to null, so an edit
+    // form has no way to clear an optional value. These say so explicitly,
+    // instead of forcing callers to hand-build the model.
+    bool clearBrandName = false,
+    bool clearDescription = false,
+    bool clearHsnCode = false,
+    bool clearTax = false,
+    bool clearImage = false,
   }) {
     return ProductModel(
       productId: productId ?? this.productId,
       productName: productName ?? this.productName,
-      brandName: brandName ?? this.brandName,
+      brandName: clearBrandName ? null : (brandName ?? this.brandName),
       category: category ?? this.category,
       subCategory: subCategory ?? this.subCategory,
       imagePath: imagePath ?? this.imagePath,
-      description: description ?? this.description,
+      description: clearDescription ? null : (description ?? this.description),
       hasVariants: hasVariants ?? this.hasVariants,
       createdAt: createdAt ?? this.createdAt,
       updateAt: updateAt ?? DateTime.now().toIso8601String(),
-      gstRate: gstRate ?? this.gstRate,
-      hsnCode: hsnCode ?? this.hsnCode,
+      gstRate: clearTax ? null : (gstRate ?? this.gstRate),
+      hsnCode: clearHsnCode ? null : (hsnCode ?? this.hsnCode),
       productType: productType ?? this.productType,
       defaultPrice: defaultPrice ?? this.defaultPrice,
       defaultMrp: defaultMrp ?? this.defaultMrp,
       defaultCostPrice: defaultCostPrice ?? this.defaultCostPrice,
-      taxId: taxId ?? this.taxId,
+      taxId: clearTax ? null : (taxId ?? this.taxId),
+      imageBytes: clearImage ? null : (imageBytes ?? this.imageBytes),
     );
   }
 }

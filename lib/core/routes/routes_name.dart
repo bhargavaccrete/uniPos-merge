@@ -128,6 +128,8 @@ class RouteNames {
   static const parkedSales = '/parked-sales';
 
   // Retail – Inventory
+  /// Catalog hub: Products + Categories + Attributes tabs.
+  static const productManagement = '/product-management';
   static const inventory = '/inventory';
   static const addProduct = '/add-product';
   static const categories = '/categories';
@@ -140,8 +142,6 @@ class RouteNames {
   // Retail – Purchasing
   static const suppliers = '/suppliers';
   static const purchaseOrders = '/purchase-orders';
-  static const addPurchase = '/add-purchase';
-  static const purchaseHistory = '/purchase-history';
 
   // Retail – Reports
   static const reports = '/reports';

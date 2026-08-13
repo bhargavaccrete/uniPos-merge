@@ -1,11 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:uuid/uuid.dart';
-
-import '../../../core/di/service_locator.dart';
-import '../../../data/models/common/customer_model_125.dart';
-import '../../../domain/services/restaurant/notification_service.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/core/config/phone_rule.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/models/common/customer_model_125.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'customer_detail_screen.dart';
+
 class CustomerListScreen extends StatefulWidget {
   const CustomerListScreen({super.key});
 
@@ -17,16 +27,30 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // The shared CustomerStore has no self-hydrating constructor (restaurant's
+    // screens load it themselves), so retail must load it here — without this
+    // the list renders empty even when the box is full.
+    customerStore.setSearchQuery('');
+    customerStore.loadCustomers();
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
+    customerStore.setSearchQuery(''); // Leave a clean filter for the next visit
     super.dispose();
   }
 
   void _onSearchChanged(String query) {
-    customerStore.searchCustomers(query);
+    // Filter through the store's computed list rather than the repository's
+    // async search — no out-of-order results, and adds/edits show up live.
+    customerStore.setSearchQuery(query);
+    setState(() {});
   }
 
-  void _showAddCustomerDialog() {
+  Future<void> _showAddCustomerDialog() async {
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
     final emailController = TextEditingController();
@@ -36,223 +60,216 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     final creditLimitController = TextEditingController();
     final openingBalanceController = TextEditingController();
 
-    showDialog(
+    await showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add New Customer'),
-        content: SizedBox(
-          width: 400,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+      builder: (dialogContext) => DialogDisposeScope(
+        disposables: [
+          nameController,
+          phoneController,
+          emailController,
+          addressController,
+          notesController,
+          gstController,
+          creditLimitController,
+          openingBalanceController,
+        ],
+        child: MoneyScope(
+          child: AppDialogShell(
+            title: 'Add Customer',
+            accent: AppColors.primary,
+            icon: Icons.person_add_alt_1_rounded,
+            body: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // Basic Information Section
-                const Text(
-                  'Basic Information',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF6B6B6B),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
+                _dialogSectionLabel('Basic Information'),
+                AppTextField(
                   controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Name *',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
+                  label: 'Name',
+                  required: true,
+                  icon: Icons.person_outline_rounded,
                   textCapitalization: TextCapitalization.words,
+                  textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 12),
-                TextField(
+                AppTextField(
                   controller: phoneController,
-                  decoration: const InputDecoration(
-                    labelText: 'Phone *',
-                    border: OutlineInputBorder(),
-                    prefixText: '+91 ',
-                    isDense: true,
-                  ),
+                  label: 'Phone',
+                  hint: PhoneRule.hint,
+                  required: true,
+                  icon: Icons.phone_outlined,
                   keyboardType: TextInputType.phone,
-                  maxLength: 10,
+                  maxLength: PhoneRule.maxLength,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: PhoneRule.validate,
+                  textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 12),
-                TextField(
+                AppTextField(
                   controller: emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
+                  label: 'Email',
+                  icon: Icons.mail_outline_rounded,
                   keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 12),
-                TextField(
+                AppTextField(
                   controller: addressController,
-                  decoration: const InputDecoration(
-                    labelText: 'Address',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
+                  label: 'Address',
+                  icon: Icons.location_on_outlined,
                   maxLines: 2,
                 ),
 
-                const SizedBox(height: 16),
-                const Divider(),
-                const SizedBox(height: 8),
-
-                // Business Information Section
-                const Text(
-                  'Business Information',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF6B6B6B),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
+                _dialogSectionLabel('Business Information'),
+                AppTextField(
                   controller: gstController,
-                  decoration: const InputDecoration(
-                    labelText: 'GST Number',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                    hintText: 'e.g., 22AAAAA0000A1Z5',
-                  ),
+                  label: 'GST Number',
+                  hint: 'e.g. 22AAAAA0000A1Z5',
+                  icon: Icons.badge_outlined,
                   textCapitalization: TextCapitalization.characters,
                 ),
 
-                const SizedBox(height: 16),
-                const Divider(),
-                const SizedBox(height: 8),
-
-                // Credit Settings Section
-                const Text(
-                  'Credit Settings',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF6B6B6B),
-                  ),
+                _dialogSectionLabel('Credit Settings'),
+                AppTextField(
+                  controller: creditLimitController,
+                  label: 'Credit Limit',
+                  hint: '0 = Unlimited',
+                  icon: Icons.credit_card_outlined,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                  ],
+                  textInputAction: TextInputAction.next,
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: creditLimitController,
-                        decoration: const InputDecoration(
-                          labelText: 'Credit Limit',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                          prefixText: '\u20B9 ',
-                          hintText: '0 = Unlimited',
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: openingBalanceController,
-                        decoration: const InputDecoration(
-                          labelText: 'Opening Balance',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                          prefixText: '\u20B9 ',
-                          hintText: 'Due amount',
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      ),
-                    ),
+                const SizedBox(height: 12),
+                AppTextField(
+                  controller: openingBalanceController,
+                  label: 'Opening Balance',
+                  hint: 'Due carried forward from previous records',
+                  icon: Icons.account_balance_wallet_outlined,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
                   ],
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Opening balance is the due amount carried forward from previous records.',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF9E9E9E),
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
 
-                const SizedBox(height: 16),
-                const Divider(),
-                const SizedBox(height: 8),
-
-                // Notes Section
-                const Text(
-                  'Additional Notes',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF6B6B6B),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
+                _dialogSectionLabel('Additional Notes'),
+                AppTextField(
                   controller: notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Notes',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                    hintText: 'Any additional information...',
-                  ),
+                  label: 'Notes',
+                  hint: 'Any additional information…',
+                  icon: Icons.sticky_note_2_outlined,
                   maxLines: 2,
                 ),
               ],
             ),
+            actions: [
+              appDialogCancelButton(dialogContext),
+              const SizedBox(width: 12),
+              appDialogPrimaryButton(
+                label: 'Add Customer',
+                onPressed: () => _saveNewCustomer(
+                  dialogContext,
+                  name: nameController.text,
+                  phone: phoneController.text,
+                  email: emailController.text,
+                  address: addressController.text,
+                  notes: notesController.text,
+                  gst: gstController.text,
+                  creditLimit: creditLimitController.text,
+                  openingBalance: openingBalanceController.text,
+                ),
+              ),
+            ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameController.text.isEmpty || phoneController.text.isEmpty) {
-                NotificationService.instance.showError('Name and Phone are required');
-                return;
-              }
+      ),
+    );
+  }
 
-              // Parse credit values
-              final creditLimit = double.tryParse(creditLimitController.text.trim()) ?? 0.0;
-              final openingBalance = double.tryParse(openingBalanceController.text.trim()) ?? 0.0;
+  Future<void> _saveNewCustomer(
+    BuildContext dialogContext, {
+    required String name,
+    required String phone,
+    required String email,
+    required String address,
+    required String notes,
+    required String gst,
+    required String creditLimit,
+    required String openingBalance,
+  }) async {
+    final trimmedName = name.trim();
+    final trimmedPhone = phone.trim();
 
-              final newCustomer = Customer.create(
-                customerId: const Uuid().v4(),
-                name: nameController.text.trim(),
-                phone: phoneController.text.trim(),
-                email: emailController.text.trim().isEmpty ? null : emailController.text.trim(),
-                address: addressController.text.trim().isEmpty ? null : addressController.text.trim(),
-                notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
-                gstNumber: gstController.text.trim().isEmpty ? null : gstController.text.trim().toUpperCase(),
-                creditLimit: creditLimit,
-                openingBalance: openingBalance,
-              );
+    if (trimmedName.isEmpty) {
+      NotificationService.instance.showError('Name is required');
+      return;
+    }
 
-              await customerStore.addCustomer(newCustomer);
+    // These dialogs have no Form, so the field's inline validator only *shows*
+    // the error — the save path has to enforce it too.
+    final phoneError = PhoneRule.validate(trimmedPhone);
+    if (phoneError != null) {
+      NotificationService.instance.showError(phoneError);
+      return;
+    }
 
-              if (mounted) {
-                Navigator.pop(context);
-                NotificationService.instance.showSuccess(
-                  openingBalance > 0
-                      ? 'Customer added with \u20B9${openingBalance.toStringAsFixed(2)} opening balance'
-                      : 'Customer added successfully',
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4CAF50),
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Add Customer'),
-          ),
-        ],
+    // Same guard restaurant already applies — a duplicate phone makes
+    // getCustomerByPhone (used by POS lookup) return an arbitrary record.
+    final existing = await customerStore.getCustomerByPhone(trimmedPhone);
+    if (existing != null) {
+      NotificationService.instance
+          .showError('A customer with this phone number already exists');
+      return;
+    }
+
+    final openingDue = double.tryParse(openingBalance.trim()) ?? 0.0;
+
+    final added = await customerStore.addCustomer(
+      Customer.create(
+        customerId: await customerIdGeneratorService.generate(),
+        name: trimmedName,
+        phone: trimmedPhone,
+        email: email.trim().isEmpty ? null : email.trim(),
+        address: address.trim().isEmpty ? null : address.trim(),
+        notes: notes.trim().isEmpty ? null : notes.trim(),
+        gstNumber: gst.trim().isEmpty ? null : gst.trim().toUpperCase(),
+        creditLimit: double.tryParse(creditLimit.trim()) ?? 0.0,
+        openingBalance: openingDue,
+      ),
+    );
+
+    if (!dialogContext.mounted) return;
+
+    // addCustomer reports failure through its return value — don't claim
+    // success when the plan gate or Hive rejected the write.
+    if (!added) {
+      NotificationService.instance
+          .showError(customerStore.errorMessage ?? 'Failed to add customer');
+      return;
+    }
+
+    Navigator.pop(dialogContext);
+    NotificationService.instance.showSuccess(
+      openingDue > 0
+          ? 'Customer added with ${formatMoney(openingDue)} opening balance'
+          : 'Customer added successfully',
+    );
+  }
+
+  Widget _dialogSectionLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 20, bottom: 10),
+      child: Text(
+        text.toUpperCase(),
+        style: GoogleFonts.poppins(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.8,
+          color: AppColors.textSecondary,
+        ),
       ),
     );
   }
@@ -263,316 +280,266 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       MaterialPageRoute(
         builder: (context) => CustomerDetailScreen(customer: customer),
       ),
-    ).then((_) {
-      // Refresh customer list when returning from detail screen
-      customerStore.loadCustomers();
-    });
+    ).then((_) => customerStore.loadCustomers());
   }
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = !AppResponsive.isMobile(context);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text('Customers', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.white,
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: 'Customers',
+        actions: [
+          // Once the book has customers, adding lives here. While it's still
+          // empty the centred empty-state button is the only prompt, so this
+          // stays hidden rather than offering the same action twice.
+          Observer(
+            builder: (context) => customerStore.customers.isEmpty
+                ? const SizedBox.shrink()
+                : IconButton(
+                    icon: const Icon(Icons.person_add_alt_1_rounded),
+                    tooltip: 'Add customer',
+                    onPressed: _showAddCustomerDialog,
+                  ),
+          ),
+          const SizedBox(width: 4),
+        ],
       ),
-      body: Column(
-        children: [
-          _buildSearchBar(),
-          Expanded(
-            child: Observer(
-              builder: (context) {
-                // Show all customers when search is empty
-                if (_searchController.text.isEmpty) {
-                  if (customerStore.customerCount == 0) {
-                    return _buildEmptyState();
+      body: MoneyScope(
+        child: Column(
+          children: [
+            Container(
+              color: AppColors.white,
+              padding: EdgeInsets.all(isTablet ? 20 : 16),
+              child: AppTextField(
+                controller: _searchController,
+                hint: 'Search by name or phone...',
+                icon: Icons.search_rounded,
+                onChanged: _onSearchChanged,
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 20),
+                        onPressed: () {
+                          _searchController.clear();
+                          _onSearchChanged('');
+                        },
+                      )
+                    : null,
+              ),
+            ),
+
+            _buildStatsRow(isTablet),
+
+            Expanded(
+              child: Observer(
+                builder: (context) {
+                  if (customerStore.isLoading) {
+                    return const Center(
+                      child: CircularProgressIndicator(
+                          color: AppColors.primary),
+                    );
                   }
-                  return _buildAllCustomersList();
-                }
 
-                // Show no results when searching but no matches
-                if (customerStore.searchResults.isEmpty) {
-                  return _buildNoResultsState();
-                }
+                  final customers = customerStore.filteredCustomers;
 
-                // Show search results
-                return _buildSearchResults();
-              },
+                  if (customers.isEmpty) {
+                    return _searchController.text.isEmpty
+                        ? AppEmptyState(
+                            icon: Icons.people_outline_rounded,
+                            title: 'No customers yet',
+                            message:
+                                'Add your first customer to start tracking purchases, points and dues.',
+                            action: appEmptyStateAction(
+                              label: 'Add Customer',
+                              onPressed: _showAddCustomerDialog,
+                            ),
+                          )
+                        : AppEmptyState(
+                            icon: Icons.search_off_rounded,
+                            title: 'No customers found',
+                            message:
+                                'No results for "${_searchController.text}".',
+                          );
+                  }
+
+                  return ListView.builder(
+                    padding: EdgeInsets.all(isTablet ? 20 : 16),
+                    itemCount: customers.length,
+                    itemBuilder: (context, index) =>
+                        _buildCustomerCard(customers[index], isTablet),
+                  );
+                },
+              ),
             ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAddCustomerDialog,
-        backgroundColor: const Color(0xFF4CAF50),
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.all(20),
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          hintText: 'Search by name or phone...',
-          hintStyle: const TextStyle(fontSize: 14, color: Color(0xFFB0B0B0)),
-          prefixIcon: const Icon(Icons.search, color: Color(0xFF6B6B6B)),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear, color: Color(0xFF6B6B6B)),
-                  onPressed: () {
-                    _searchController.clear();
-                    _onSearchChanged('');
-                    setState(() {});
-                  },
-                )
-              : null,
-          filled: true,
-          fillColor: const Color(0xFFF5F5F5),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFFE8E8E8), width: 0.5),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFFE8E8E8), width: 0.5),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFF4CAF50), width: 1.5),
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ],
         ),
-        onChanged: (value) {
-          _onSearchChanged(value);
-          setState(() {});
-        },
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.people_outline,
-            size: 80,
-            color: Colors.grey[300],
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'No customers yet',
-            style: TextStyle(
-              fontSize: 16,
-              color: Color(0xFF6B6B6B),
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Add your first customer using the + button',
-            style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFFB0B0B0),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNoResultsState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.search_off,
-            size: 80,
-            color: Colors.grey[300],
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'No customers found',
-            style: TextStyle(
-              fontSize: 16,
-              color: Color(0xFF6B6B6B),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'No results for "${_searchController.text}"',
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFFB0B0B0),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAllCustomersList() {
+  /// Headline numbers across the whole customer base (unfiltered — these
+  /// describe the book, not the current search).
+  Widget _buildStatsRow(bool isTablet) {
     return Observer(
       builder: (context) {
         final customers = customerStore.customers;
+        if (customers.isEmpty) return const SizedBox.shrink();
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: customers.length,
-          itemBuilder: (context, index) {
-            final customer = customers[index];
-            return _buildCustomerCard(customer);
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildSearchResults() {
-    return Observer(
-      builder: (context) {
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: customerStore.searchResults.length,
-          itemBuilder: (context, index) {
-            final customer = customerStore.searchResults[index];
-            return _buildCustomerCard(customer);
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildCustomerCard(Customer customer) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          backgroundColor: const Color(0xFF4CAF50).withOpacity(0.1),
-          child: Text(
-            (customer.name?.isNotEmpty ?? false) ? customer.name![0].toUpperCase() : '?',
-            style: const TextStyle(
-              color: Color(0xFF4CAF50),
-              fontWeight: FontWeight.w600,
-            ),
+        return Padding(
+          padding: EdgeInsets.symmetric(
+              horizontal: isTablet ? 20 : 16, vertical: 8),
+          child: Row(
+            children: [
+              _buildStatChip('${customers.length} customers',
+                  Icons.people_rounded, AppColors.primary),
+              const SizedBox(width: 8),
+              _buildStatChip(
+                '${formatMoney(customerStore.totalOutstandingCredit)} due',
+                Icons.account_balance_wallet_rounded,
+                AppColors.danger,
+              ),
+              const SizedBox(width: 8),
+              _buildStatChip(
+                '${customers.fold(0, (sum, c) => sum + c.loyaltyPoints)} pts',
+                Icons.stars_rounded,
+                AppColors.warning,
+              ),
+            ],
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatChip(String label, IconData icon, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(8),
         ),
-        title: Row(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Expanded(
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 6),
+            Flexible(
               child: Text(
-                customer.name ?? '',
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF1A1A1A),
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: color,
                 ),
               ),
             ),
-            if (customer.creditBalance > 0)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(4),
-                ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomerCard(Customer customer, bool isTablet) {
+    final hasDue = customer.creditBalance > 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: hasDue
+              ? AppColors.danger.withValues(alpha: 0.3)
+              : AppColors.divider,
+        ),
+      ),
+      child: InkWell(
+        onTap: () => _openCustomerDetails(customer),
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: isTablet ? 20 : 18,
+                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                 child: Text(
-                  'Due: \u20B9${customer.creditBalance.toStringAsFixed(0)}',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: Colors.red,
-                    fontWeight: FontWeight.w500,
+                  (customer.name?.isNotEmpty ?? false)
+                      ? customer.name![0].toUpperCase()
+                      : '?',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
                   ),
                 ),
               ),
-          ],
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Text(
-                  '+91 ${customer.phone}',
-                  style: const TextStyle(fontSize: 13, color: Color(0xFF6B6B6B)),
-                ),
-                if (customer.totalVisites > 0) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF6B6B6B).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      '${customer.totalVisites} visits',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: Color(0xFF6B6B6B),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      customer.name ?? 'Unknown',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
                       ),
                     ),
+                    const SizedBox(height: 2),
+                    Text(
+                      [
+                        if (customer.phone?.isNotEmpty ?? false) customer.phone!,
+                        if (customer.totalVisites > 0)
+                          '${customer.totalVisites} visits',
+                        if (customer.totalPurchaseAmount > 0)
+                          formatMoney(customer.totalPurchaseAmount),
+                        if (customer.loyaltyPoints > 0)
+                          '${customer.loyaltyPoints} pts',
+                      ].join('  •  '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (hasDue) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.danger.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                ],
+                  child: Text(
+                    'Due ${formatMoney(customer.creditBalance)}',
+                    style: GoogleFonts.poppins(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.danger,
+                    ),
+                  ),
+                ),
               ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                if (customer.totalPurchaseAmount > 0) ...[
-                  const Icon(Icons.shopping_bag_outlined, size: 14, color: Color(0xFF4CAF50)),
-                  const SizedBox(width: 4),
-                  Text(
-                    '\u20B9${customer.totalPurchaseAmount.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF4CAF50),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-                if (customer.loyaltyPoints > 0) ...[
-                  const SizedBox(width: 12),
-                  const Icon(Icons.star_outline, size: 14, color: Color(0xFFFFA726)),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${customer.loyaltyPoints} pts',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFFFFA726),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-                if (customer.totalPurchaseAmount == 0 && customer.loyaltyPoints == 0)
-                  const Text(
-                    'No purchases yet',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFFB0B0B0),
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-              ],
-            ),
-          ],
+              const SizedBox(width: 4),
+              Icon(Icons.chevron_right_rounded,
+                  size: 20, color: AppColors.textSecondary),
+            ],
+          ),
         ),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Color(0xFFB0B0B0)),
-        onTap: () => _openCustomerDetails(customer),
       ),
     );
   }

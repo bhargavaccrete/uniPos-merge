@@ -14,6 +14,15 @@ part 'product_store.g.dart';
 /// so Inventory and the Stock Alerts screen never disagree.
 enum RetailStockStatus { outOfStock, critical, low, inStock }
 
+/// Variant status a till may sell. Anything else stays in the catalogue with
+/// its stock and history intact, but is hidden from the POS.
+///
+/// Top level rather than a static: `ProductStore` is a mixin application
+/// (`= _ProductStore with _$ProductStore`), so statics on the private class
+/// are not reachable through it.
+const String kActiveVariantStatus = 'active';
+const String kInactiveVariantStatus = 'inactive';
+
 class ProductStore = _ProductStore with _$ProductStore;
 
 abstract class _ProductStore with Store {
@@ -227,15 +236,46 @@ abstract class _ProductStore with Store {
   /// screen uses. Observable, so changing it re-renders every dependent view.
   int get lowStockThreshold => stockAlertStore.threshold;
 
-  RetailStockStatus stockStatusForQty(int qty) {
+  RetailStockStatus stockStatusForQty(int qty) =>
+      statusFor(qty, lowStockThreshold);
+
+  /// The one stock rule, so the inventory colouring, the Stock Alerts card and
+  /// the low-stock report can never disagree.
+  ///
+  /// [reorderPoint] is the level at or below which stock counts as low — a
+  /// variant's own `minStock` when it has one, otherwise the global threshold.
+  /// The "critical" band is a third of that (min 1), rather than a fixed 3, so
+  /// a variant that reorders at 2 is not permanently red.
+  RetailStockStatus statusFor(int qty, int reorderPoint) {
     if (qty <= 0) return RetailStockStatus.outOfStock;
-    if (qty <= 3) return RetailStockStatus.critical;
-    if (qty <= lowStockThreshold) return RetailStockStatus.low;
+    final critical = (reorderPoint / 3).ceil().clamp(1, reorderPoint);
+    if (qty <= critical) return RetailStockStatus.critical;
+    if (qty <= reorderPoint) return RetailStockStatus.low;
     return RetailStockStatus.inStock;
   }
 
+  /// A variant's own `minStock` wins over the global threshold — that is the
+  /// whole point of collecting it on the variant forms.
+  int reorderPointFor(VarianteModel variant) =>
+      variant.minStock ?? lowStockThreshold;
+
+  bool isSellable(VarianteModel variant) =>
+      variant.status == kActiveVariantStatus;
+
+  /// True when [barcode] already belongs to some other variant.
+  ///
+  /// Barcode lookup is `firstWhere`, so a duplicate does not fail loudly — it
+  /// silently makes the second variant unscannable and sells the first. Forms
+  /// must check this before saving. Pass [exceptVariantId] when editing.
+  bool isBarcodeTaken(String barcode, {String? exceptVariantId}) {
+    final code = barcode.trim();
+    if (code.isEmpty) return false;
+    return variants.any(
+        (v) => v.barcode == code && v.varianteId != exceptVariantId);
+  }
+
   RetailStockStatus stockStatusForVariant(VarianteModel variant) =>
-      stockStatusForQty(variant.stockQty);
+      statusFor(variant.stockQty, reorderPointFor(variant));
 
   RetailStockStatus stockStatusForProduct(String productId) =>
       stockStatusForQty(totalStockFor(productId));

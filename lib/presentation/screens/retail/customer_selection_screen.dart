@@ -1,17 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-
-import 'package:uuid/uuid.dart';
-
-import '../../../core/di/service_locator.dart';
-import '../../../data/models/common/customer_model_125.dart';
-import '../../../domain/services/restaurant/notification_service.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/core/config/phone_rule.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/models/common/customer_model_125.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 
 class CustomerSelectionScreen extends StatefulWidget {
   const CustomerSelectionScreen({super.key});
 
   @override
-  State<CustomerSelectionScreen> createState() => _CustomerSelectionScreenState();
+  State<CustomerSelectionScreen> createState() =>
+      _CustomerSelectionScreenState();
 }
 
 class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
@@ -21,19 +29,23 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
   @override
   void initState() {
     super.initState();
-    // Clear any previous selection and search
+    // Clear any previous selection, then hydrate the store — the shared
+    // CustomerStore doesn't self-load, so the filtered list would be empty.
     customerStore.clearSelection();
+    customerStore.loadCustomers();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     _searchFocusNode.dispose();
+    customerStore.setSearchQuery('');
     super.dispose();
   }
 
   void _onSearchChanged(String query) {
-    customerStore.searchCustomers(query);
+    customerStore.setSearchQuery(query);
+    setState(() {});
   }
 
   void _selectCustomer(Customer customer) {
@@ -41,383 +53,385 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
     Navigator.pop(context, customer);
   }
 
-  void _showAddCustomerDialog() {
+  Future<void> _showAddCustomerDialog() async {
     final nameController = TextEditingController();
-    final phoneController = TextEditingController(text: _searchController.text);
+    // Pre-fill the phone only when the typed query looks like a number.
+    final typed = _searchController.text.trim();
+    final phoneController = TextEditingController(
+      text: RegExp(r'^\d+$').hasMatch(typed) ? typed : '',
+    );
+    final nameSeed = RegExp(r'^\d+$').hasMatch(typed) ? '' : typed;
+    nameController.text = nameSeed;
     final emailController = TextEditingController();
     final addressController = TextEditingController();
 
-    showDialog(
+    await showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add New Customer'),
-        content: SingleChildScrollView(
-          child: Column(
+      builder: (dialogContext) => DialogDisposeScope(
+        disposables: [
+          nameController,
+          phoneController,
+          emailController,
+          addressController,
+        ],
+        child: AppDialogShell(
+          title: 'Add Customer',
+          accent: AppColors.primary,
+          icon: Icons.person_add_alt_1_rounded,
+          body: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextField(
+              AppTextField(
                 controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Name *',
-                  border: OutlineInputBorder(),
-                ),
+                label: 'Name',
+                required: true,
+                icon: Icons.person_outline_rounded,
                 textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 12),
-              TextField(
+              AppTextField(
                 controller: phoneController,
-                decoration: const InputDecoration(
-                  labelText: 'Phone *',
-                  border: OutlineInputBorder(),
-                  prefixText: '+91 ',
-                ),
+                label: 'Phone',
+                hint: PhoneRule.hint,
+                required: true,
+                icon: Icons.phone_outlined,
                 keyboardType: TextInputType.phone,
-                maxLength: 10,
+                maxLength: PhoneRule.maxLength,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                validator: PhoneRule.validate,
+                textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 12),
-              TextField(
+              AppTextField(
                 controller: emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  border: OutlineInputBorder(),
-                ),
+                label: 'Email',
+                icon: Icons.mail_outline_rounded,
                 keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 12),
-              TextField(
+              AppTextField(
                 controller: addressController,
-                decoration: const InputDecoration(
-                  labelText: 'Address',
-                  border: OutlineInputBorder(),
-                ),
+                label: 'Address',
+                icon: Icons.location_on_outlined,
                 maxLines: 2,
               ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameController.text.isEmpty || phoneController.text.isEmpty) {
-                NotificationService.instance.showError('Name and Phone are required');
-                return;
-              }
-
-              final newCustomer = Customer.create(
-                customerId: const Uuid().v4(),
-                name: nameController.text.trim(),
-                phone: phoneController.text.trim(),
-                email: emailController.text.trim().isEmpty ? null : emailController.text.trim(),
-                address: addressController.text.trim().isEmpty ? null : addressController.text.trim(),
-              );
-
-              await customerStore.addCustomer(newCustomer);
-
-              if (mounted) {
-                Navigator.pop(context);
-                _selectCustomer(newCustomer);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4CAF50),
-              foregroundColor: Colors.white,
+          actions: [
+            appDialogCancelButton(dialogContext),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: 'Add & Select',
+              onPressed: () => _saveAndSelect(
+                dialogContext,
+                name: nameController.text,
+                phone: phoneController.text,
+                email: emailController.text,
+                address: addressController.text,
+              ),
             ),
-            child: const Text('Add Customer'),
-          ),
-        ],
+          ],
+        ),
       ),
     );
+  }
+
+  Future<void> _saveAndSelect(
+    BuildContext dialogContext, {
+    required String name,
+    required String phone,
+    required String email,
+    required String address,
+  }) async {
+    final trimmedName = name.trim();
+    final trimmedPhone = phone.trim();
+
+    if (trimmedName.isEmpty) {
+      NotificationService.instance.showError('Name is required');
+      return;
+    }
+
+    // No Form wrapper here, so the field's inline validator only *shows* the
+    // error — the save path has to enforce it too.
+    final phoneError = PhoneRule.validate(trimmedPhone);
+    if (phoneError != null) {
+      NotificationService.instance.showError(phoneError);
+      return;
+    }
+
+    // An existing number means the cashier should pick that customer, not
+    // create a second record that splits their credit and points.
+    final existing = await customerStore.getCustomerByPhone(trimmedPhone);
+    if (existing != null) {
+      if (!mounted || !dialogContext.mounted) return;
+      Navigator.pop(dialogContext);
+      NotificationService.instance
+          .showError('That phone already belongs to ${existing.name ?? 'a customer'} — selected instead');
+      _selectCustomer(existing);
+      return;
+    }
+
+    final newCustomer = Customer.create(
+      customerId: await customerIdGeneratorService.generate(),
+      name: trimmedName,
+      phone: trimmedPhone,
+      email: email.trim().isEmpty ? null : email.trim(),
+      address: address.trim().isEmpty ? null : address.trim(),
+    );
+
+    final added = await customerStore.addCustomer(newCustomer);
+    if (!mounted || !dialogContext.mounted) return;
+
+    // Never attach an unsaved customer to the bill — the sale would reference
+    // a customerId that isn't in the box.
+    if (!added) {
+      NotificationService.instance
+          .showError(customerStore.errorMessage ?? 'Failed to add customer');
+      return;
+    }
+
+    Navigator.pop(dialogContext);
+    _selectCustomer(newCustomer);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text('Select Customer', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.white,
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: 'Select Customer',
         actions: [
           TextButton(
-            onPressed: () {
-              // Skip customer selection
-              Navigator.pop(context, null);
-            },
-            child: const Text(
+            onPressed: () => Navigator.pop(context, null),
+            child: Text(
               'Skip',
-              style: TextStyle(color: Color(0xFF6B6B6B)),
-            ),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          _buildSearchBar(),
-          Expanded(
-            child: Observer(
-              builder: (context) {
-                if (_searchController.text.isEmpty) {
-                  return _buildEmptyState();
-                }
-
-                if (customerStore.searchResults.isEmpty) {
-                  return _buildNoResultsState();
-                }
-
-                return _buildSearchResults();
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Search by name or phone',
-            style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFF6B6B6B),
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _searchController,
-            focusNode: _searchFocusNode,
-            autofocus: true,
-            decoration: InputDecoration(
-              hintText: 'Type name or mobile number...',
-              hintStyle: const TextStyle(fontSize: 14, color: Color(0xFFB0B0B0)),
-              prefixIcon: const Icon(Icons.search, color: Color(0xFF6B6B6B)),
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear, color: Color(0xFF6B6B6B)),
-                      onPressed: () {
-                        _searchController.clear();
-                        _onSearchChanged('');
-                        setState(() {});
-                      },
-                    )
-                  : null,
-              filled: true,
-              fillColor: const Color(0xFFF5F5F5),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFE8E8E8), width: 0.5),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFE8E8E8), width: 0.5),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFF4CAF50), width: 1.5),
-              ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            ),
-            onChanged: (value) {
-              _onSearchChanged(value);
-              setState(() {});
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.person_search,
-            size: 80,
-            color: Colors.grey[300],
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Search for a customer',
-            style: TextStyle(
-              fontSize: 16,
-              color: Color(0xFF6B6B6B),
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Type a name or mobile number to find customers',
-            style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFFB0B0B0),
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNoResultsState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.person_add_outlined,
-            size: 80,
-            color: Colors.grey[300],
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'No customer found',
-            style: TextStyle(
-              fontSize: 16,
-              color: Color(0xFF6B6B6B),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'No results for "${_searchController.text}"',
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFFB0B0B0),
-            ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: _showAddCustomerDialog,
-            icon: const Icon(Icons.add),
-            label: const Text('Add New Customer'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4CAF50),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+              style: GoogleFonts.poppins(
+                color: AppColors.white,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
+          const SizedBox(width: 4),
         ],
       ),
-    );
-  }
+      body: MoneyScope(
+        child: Column(
+          children: [
+            Container(
+              color: AppColors.white,
+              padding: const EdgeInsets.all(16),
+              child: AppTextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                autofocus: true,
+                hint: 'Type name or mobile number...',
+                icon: Icons.search_rounded,
+                onChanged: _onSearchChanged,
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 20),
+                        onPressed: () {
+                          _searchController.clear();
+                          _onSearchChanged('');
+                        },
+                      )
+                    : null,
+              ),
+            ),
+            Expanded(
+              child: Observer(
+                builder: (context) {
+                  if (_searchController.text.isEmpty) {
+                    return const AppEmptyState(
+                      icon: Icons.person_search_rounded,
+                      title: 'Search for a customer',
+                      message:
+                          'Type a name or mobile number to find customers.',
+                    );
+                  }
 
-  Widget _buildSearchResults() {
-    return Observer(
-      builder: (context) {
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: customerStore.searchResults.length + 1,
-          itemBuilder: (context, index) {
-            if (index == 0) {
-              return _buildAddNewCustomerTile();
-            }
+                  final results = customerStore.filteredCustomers;
 
-            final customer = customerStore.searchResults[index - 1];
-            return _buildCustomerTile(customer);
-          },
-        );
-      },
+                  if (results.isEmpty) {
+                    return AppEmptyState(
+                      icon: Icons.person_add_alt_1_outlined,
+                      title: 'No customer found',
+                      message: 'No results for "${_searchController.text}".',
+                      action: appEmptyStateAction(
+                        label: 'Add New Customer',
+                        onPressed: _showAddCustomerDialog,
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: results.length + 1,
+                    itemBuilder: (context, index) {
+                      if (index == 0) return _buildAddNewCustomerTile();
+                      return _buildCustomerTile(results[index - 1]);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _buildAddNewCustomerTile() {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF4CAF50).withOpacity(0.05),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF4CAF50), width: 1),
+        color: AppColors.primary.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.primary),
       ),
-      child: ListTile(
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: const Color(0xFF4CAF50),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(Icons.add, color: Colors.white),
-        ),
-        title: const Text(
-          'Add New Customer',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF4CAF50),
-          ),
-        ),
-        subtitle: Text(
-          'Create customer with "${_searchController.text}"',
-          style: const TextStyle(fontSize: 13, color: Color(0xFF6B6B6B)),
-        ),
+      child: InkWell(
         onTap: _showAddCustomerDialog,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.add, color: AppColors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Add New Customer',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    Text(
+                      'Create customer with "${_searchController.text}"',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildCustomerTile(Customer customer) {
+    final hasDue = customer.creditBalance > 0;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.divider),
       ),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: const Color(0xFF4CAF50).withOpacity(0.1),
-          child: Text(
-            (customer.name?.isNotEmpty ?? false) ? customer.name![0].toUpperCase() : '?',
-            style: const TextStyle(
-              color: Color(0xFF4CAF50),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        title: Text(
-          customer.name ?? '',
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF1A1A1A),
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text(
-              customer.phone ?? '',
-              style: const TextStyle(fontSize: 13, color: Color(0xFF6B6B6B)),
-            ),
-            if (customer.totalPurchaseAmount > 0) ...[
-              const SizedBox(height: 4),
-              Text(
-                'Total Purchase: ₹${customer.totalPurchaseAmount.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF4CAF50),
-                  fontWeight: FontWeight.w500,
+      child: InkWell(
+        onTap: () => _selectCustomer(customer),
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                child: Text(
+                  (customer.name?.isNotEmpty ?? false)
+                      ? customer.name![0].toUpperCase()
+                      : '?',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
                 ),
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      customer.name ?? 'Unknown',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      [
+                        if (customer.phone?.isNotEmpty ?? false) customer.phone!,
+                        if (customer.totalPurchaseAmount > 0)
+                          formatMoney(customer.totalPurchaseAmount),
+                        if (customer.loyaltyPoints > 0)
+                          '${customer.loyaltyPoints} pts',
+                      ].join('  •  '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Dues matter at the till — the cashier needs to see them before
+              // putting another credit sale on this account.
+              if (hasDue) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.danger.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'Due ${formatMoney(customer.creditBalance)}',
+                    style: GoogleFonts.poppins(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.danger,
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(width: 4),
+              Icon(Icons.chevron_right_rounded,
+                  size: 20, color: AppColors.textSecondary),
             ],
-          ],
+          ),
         ),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Color(0xFFB0B0B0)),
-        onTap: () => _selectCustomer(customer),
       ),
     );
   }

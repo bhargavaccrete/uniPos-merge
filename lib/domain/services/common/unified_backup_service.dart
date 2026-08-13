@@ -64,8 +64,6 @@ import 'package:billberrylite/data/models/retail/hive_model/cart_model_202.dart'
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:billberrylite/data/models/retail/hive_model/supplier_model_205.dart';
-import 'package:billberrylite/data/models/retail/hive_model/purchase_model_207.dart';
-import 'package:billberrylite/data/models/retail/hive_model/purchase_Item_model_206.dart';
 import 'package:billberrylite/data/models/retail/hive_model/hold_sale_model_209.dart';
 import 'package:billberrylite/data/models/retail/hive_model/hold_sale_item_model_210.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model_211.dart';
@@ -939,21 +937,9 @@ class UnifiedBackupService {
         exportMap["suppliers"] = [];
       }
 
-      // Purchases
-      try {
-        exportMap["purchases"] = Hive.box<PurchaseModel>(HiveBoxNames.purchases).values.map((e) => e.toMap()).toList();
-      } catch (e) {
-        debugPrint("⚠️ Purchases box error: $e");
-        exportMap["purchases"] = [];
-      }
-
-      // Purchase Items
-      try {
-        exportMap["purchaseItems"] = Hive.box<PurchaseItemModel>(HiveBoxNames.purchaseItems).values.map((e) => e.toMap()).toList();
-      } catch (e) {
-        debugPrint("⚠️ Purchase Items box error: $e");
-        exportMap["purchaseItems"] = [];
-      }
+      // Purchases/purchaseItems intentionally absent — the standalone Purchase
+      // feature was removed; goods now arrive through Purchase Orders + GRN.
+      // Older backups may still carry those keys; they're simply ignored.
 
       // Categories (String list)
       try {
@@ -2191,21 +2177,9 @@ class UnifiedBackupService {
           (s) => s.supplierId,  // Use supplierId as key
     );
 
-    // ✅ Restore Purchases (as PurchaseModel objects with ID keys)
-    await restoreBoxTypedWithId(
-      "purchases",
-      Hive.box<PurchaseModel>(HiveBoxNames.purchases),
-          (m) => PurchaseModel.fromMap(m),
-          (p) => p.purchaseId,  // Use purchaseId as key
-    );
-
-    // ✅ Restore Purchase Items (as PurchaseItemModel objects with ID keys)
-    await restoreBoxTypedWithId(
-      "purchaseItems",
-      Hive.box<PurchaseItemModel>(HiveBoxNames.purchaseItems),
-          (m) => PurchaseItemModel.fromMap(m),
-          (pi) => pi.purchaseItemId,  // Use purchaseItemId as key
-    );
+    // Purchases/purchaseItems are no longer restored — the standalone Purchase
+    // feature was removed. A backup taken before that still carries those keys;
+    // skipping them is intentional, not an oversight.
 
     // ✅ Restore EOD Reports - hardcoded for retail mode (we're inside _restoreRetailData)
     try {

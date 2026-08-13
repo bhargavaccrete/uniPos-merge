@@ -1,9 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 
-import '../../../core/di/service_locator.dart';
-import '../../../data/models/retail/hive_model/supplier_model_205.dart';
-
+import 'package:billberrylite/core/config/phone_rule.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/models/retail/hive_model/supplier_model_205.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 
 class SupplierListScreen extends StatefulWidget {
   const SupplierListScreen({super.key});
@@ -16,268 +28,295 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    supplierStore.setSearchQuery('');
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
+    supplierStore.setSearchQuery(''); // Leave a clean filter for the next visit
     super.dispose();
   }
 
   void _onSearchChanged(String query) {
-    supplierStore.searchSuppliers(query);
+    supplierStore.setSearchQuery(query);
+    setState(() {});
   }
 
-  void _showAddSupplierDialog() {
-    final nameController = TextEditingController();
-    final phoneController = TextEditingController();
-    final addressController = TextEditingController();
-    final gstController = TextEditingController();
-    final openingBalanceController = TextEditingController(text: '0');
+  String _formatDate(String isoDate) {
+    final date = DateTime.tryParse(isoDate);
+    if (date == null) return isoDate;
+    return DateFormat('dd MMM yyyy, hh:mm a').format(date);
+  }
 
-    showDialog(
+  /// Avatar initial. Guarded because a name could be blank in older data —
+  /// the add form used to accept whitespace-only names.
+  String _initial(String name) {
+    final trimmed = name.trim();
+    return trimmed.isEmpty ? '?' : trimmed[0].toUpperCase();
+  }
+
+  // ==================== ADD / EDIT ====================
+
+  /// One form for both modes — pass [existing] to edit.
+  Future<void> _showSupplierForm({SupplierModel? existing}) async {
+    final isEdit = existing != null;
+
+    final nameController = TextEditingController(text: existing?.name ?? '');
+    final phoneController = TextEditingController(text: existing?.phone ?? '');
+    final addressController =
+        TextEditingController(text: existing?.address ?? '');
+    final gstController = TextEditingController(text: existing?.gstNumber ?? '');
+    // Opening balance is the starting point of the ledger — editing it after
+    // purchases have moved the current balance would silently rewrite history,
+    // so it's add-only.
+    final openingBalanceController = TextEditingController();
+
+    await showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add New Supplier'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Name *',
-                  border: OutlineInputBorder(),
+      builder: (dialogContext) => DialogDisposeScope(
+        disposables: [
+          nameController,
+          phoneController,
+          addressController,
+          gstController,
+          openingBalanceController,
+        ],
+        child: MoneyScope(
+          child: AppDialogShell(
+            title: isEdit ? 'Edit Supplier' : 'Add Supplier',
+            accent: AppColors.primary,
+            icon: isEdit ? Icons.edit_outlined : Icons.storefront_rounded,
+            body: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppTextField(
+                  controller: nameController,
+                  label: 'Name',
+                  required: true,
+                  icon: Icons.storefront_outlined,
+                  textCapitalization: TextCapitalization.words,
+                  textInputAction: TextInputAction.next,
                 ),
-                textCapitalization: TextCapitalization.words,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: phoneController,
-                decoration: const InputDecoration(
-                  labelText: 'Phone',
-                  border: OutlineInputBorder(),
-                  prefixText: '+91 ',
+                const SizedBox(height: 12),
+                AppTextField(
+                  controller: phoneController,
+                  label: 'Phone',
+                  hint: PhoneRule.hint,
+                  icon: Icons.phone_outlined,
+                  keyboardType: TextInputType.phone,
+                  maxLength: PhoneRule.maxLength,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  // Optional for suppliers — only validated once typed into.
+                  validator: (v) => PhoneRule.validate(v, required: false),
+                  textInputAction: TextInputAction.next,
                 ),
-                keyboardType: TextInputType.phone,
-                maxLength: 10,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: addressController,
-                decoration: const InputDecoration(
-                  labelText: 'Address',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 12),
+                AppTextField(
+                  controller: addressController,
+                  label: 'Address',
+                  icon: Icons.location_on_outlined,
+                  maxLines: 2,
                 ),
-                maxLines: 2,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: gstController,
-                decoration: const InputDecoration(
-                  labelText: 'GST Number',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 12),
+                AppTextField(
+                  controller: gstController,
+                  label: 'GST Number',
+                  hint: 'e.g. 22AAAAA0000A1Z5',
+                  icon: Icons.badge_outlined,
+                  textCapitalization: TextCapitalization.characters,
                 ),
-                textCapitalization: TextCapitalization.characters,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: openingBalanceController,
-                decoration: const InputDecoration(
-                  labelText: 'Opening Balance',
-                  border: OutlineInputBorder(),
-                  prefixText: '₹ ',
+                if (!isEdit) ...[
+                  const SizedBox(height: 12),
+                  AppTextField(
+                    controller: openingBalanceController,
+                    label: 'Opening Balance',
+                    hint: 'Amount already owed to this supplier',
+                    icon: Icons.account_balance_wallet_outlined,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                          RegExp(r'^\d*\.?\d{0,2}')),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              appDialogCancelButton(dialogContext),
+              const SizedBox(width: 12),
+              appDialogPrimaryButton(
+                label: isEdit ? 'Save' : 'Add Supplier',
+                onPressed: () => _saveSupplier(
+                  dialogContext,
+                  existing: existing,
+                  name: nameController.text,
+                  phone: phoneController.text,
+                  address: addressController.text,
+                  gst: gstController.text,
+                  openingBalance: openingBalanceController.text,
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
               ),
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Name is required'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-
-              final openingBalance = double.tryParse(openingBalanceController.text) ?? 0;
-
-              final newSupplier = SupplierModel.create(
-                name: nameController.text.trim(),
-                phone: phoneController.text.trim().isEmpty ? null : phoneController.text.trim(),
-                address: addressController.text.trim().isEmpty ? null : addressController.text.trim(),
-                gstNumber: gstController.text.trim().isEmpty ? null : gstController.text.trim(),
-                openingBalance: openingBalance,
-                currentBalance: openingBalance,
-              );
-
-              await supplierStore.addSupplier(newSupplier);
-
-              if (mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Supplier added successfully'),
-                    backgroundColor: Color(0xFF4CAF50),
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4CAF50),
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Add Supplier'),
-          ),
-        ],
       ),
     );
   }
 
-  void _showSupplierDetails(SupplierModel supplier) {
-    showDialog(
+  Future<void> _saveSupplier(
+    BuildContext dialogContext, {
+    SupplierModel? existing,
+    required String name,
+    required String phone,
+    required String address,
+    required String gst,
+    required String openingBalance,
+  }) async {
+    // Validate the TRIMMED name — checking the raw text let "   " through and
+    // saved a blank-named supplier that then crashed the list.
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty) {
+      NotificationService.instance.showError('Name is required');
+      return;
+    }
+
+    final trimmedPhone = phone.trim();
+    final phoneError = PhoneRule.validate(trimmedPhone, required: false);
+    if (phoneError != null) {
+      NotificationService.instance.showError(phoneError);
+      return;
+    }
+
+    final trimmedAddress = address.trim();
+    final trimmedGst = gst.trim();
+
+    try {
+      if (existing != null) {
+        // Emptying an optional field must actually clear it.
+        await supplierStore.updateSupplier(
+          existing.copyWith(
+            name: trimmedName,
+            phone: trimmedPhone.isEmpty ? null : trimmedPhone,
+            clearPhone: trimmedPhone.isEmpty,
+            address: trimmedAddress.isEmpty ? null : trimmedAddress,
+            clearAddress: trimmedAddress.isEmpty,
+            gstNumber: trimmedGst.isEmpty ? null : trimmedGst.toUpperCase(),
+            clearGstNumber: trimmedGst.isEmpty,
+          ),
+        );
+      } else {
+        final opening = double.tryParse(openingBalance.trim()) ?? 0.0;
+        await supplierStore.addSupplier(
+          SupplierModel.create(
+            name: trimmedName,
+            phone: trimmedPhone.isEmpty ? null : trimmedPhone,
+            address: trimmedAddress.isEmpty ? null : trimmedAddress,
+            gstNumber: trimmedGst.isEmpty ? null : trimmedGst.toUpperCase(),
+            openingBalance: opening,
+            currentBalance: opening,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      NotificationService.instance.showError('Failed to save supplier: $e');
+      return;
+    }
+
+    if (!dialogContext.mounted) return;
+    Navigator.pop(dialogContext);
+    NotificationService.instance.showSuccess(
+      existing != null
+          ? 'Supplier updated successfully'
+          : 'Supplier added successfully',
+    );
+  }
+
+  // ==================== DELETE ====================
+
+  Future<void> _deleteSupplier(SupplierModel supplier) async {
+    // Purchases/POs/GRNs resolve the supplier name by id at render time, so
+    // removing a supplier with history would leave those screens blank.
+    final references = await supplierStore.countReferences(supplier.supplierId);
+    if (!mounted) return;
+
+    if (references > 0) {
+      await showAppErrorDialog(
+        context: context,
+        title: 'Can\'t delete "${supplier.name}"',
+        message:
+            '$references purchase record${references == 1 ? '' : 's'} still reference this supplier. '
+            'Deleting them would leave that history without a supplier name.',
+      );
+      return;
+    }
+
+    final confirmed = await showAppConfirmDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(supplier.name),
-        content: SingleChildScrollView(
-          child: Column(
+      title: 'Delete "${supplier.name}"?',
+      message: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      accent: AppColors.danger,
+      icon: Icons.delete_outline_rounded,
+    );
+    if (!confirmed || !mounted) return;
+
+    try {
+      await supplierStore.deleteSupplier(supplier.supplierId);
+      NotificationService.instance.showSuccess('Supplier deleted');
+    } catch (e) {
+      NotificationService.instance.showError('Failed to delete supplier: $e');
+    }
+  }
+
+  // ==================== DETAILS ====================
+
+  void _showSupplierDetails(SupplierModel supplier) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => MoneyScope(
+        child: AppDialogShell(
+          title: supplier.name,
+          subtitle: supplier.phone,
+          accent: AppColors.primary,
+          icon: Icons.storefront_rounded,
+          body: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (supplier.phone != null) _buildDetailRow('Phone', supplier.phone!),
-              if (supplier.address != null) _buildDetailRow('Address', supplier.address!),
-              if (supplier.gstNumber != null) _buildDetailRow('GST Number', supplier.gstNumber!),
-              const Divider(height: 24),
-              _buildDetailRow('Opening Balance', '₹${supplier.openingBalance.toStringAsFixed(2)}'),
-              _buildDetailRow('Current Balance', '₹${supplier.currentBalance.toStringAsFixed(2)}'),
-              const SizedBox(height: 8),
+              if (supplier.address?.isNotEmpty ?? false)
+                _buildDetailRow('Address', supplier.address!),
+              if (supplier.gstNumber?.isNotEmpty ?? false)
+                _buildDetailRow('GST Number', supplier.gstNumber!),
+              _buildDetailRow(
+                  'Opening Balance', formatMoney(supplier.openingBalance)),
+              _buildDetailRow(
+                'Current Balance',
+                formatMoney(supplier.currentBalance.abs()) +
+                    (supplier.currentBalance < 0 ? ' advance' : ''),
+                valueColor: supplier.currentBalance > 0
+                    ? AppColors.danger
+                    : AppColors.success,
+              ),
+              const Divider(height: 20, color: AppColors.divider),
               _buildDetailRow('Created', _formatDate(supplier.createdAt)),
               _buildDetailRow('Last Updated', _formatDate(supplier.updatedAt)),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _showUpdateBalanceDialog(supplier);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2196F3),
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Update Balance'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showUpdateBalanceDialog(SupplierModel supplier) {
-    final amountController = TextEditingController();
-    bool isDebit = true;
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Update Balance'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Current Balance: ₹${supplier.currentBalance.toStringAsFixed(2)}',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: RadioListTile<bool>(
-                      title: const Text('Purchase (Debit)'),
-                      value: true,
-                      groupValue: isDebit,
-                      onChanged: (value) {
-                        setState(() {
-                          isDebit = value!;
-                        });
-                      },
-                    ),
-                  ),
-                  Expanded(
-                    child: RadioListTile<bool>(
-                      title: const Text('Payment (Credit)'),
-                      value: false,
-                      groupValue: isDebit,
-                      onChanged: (value) {
-                        setState(() {
-                          isDebit = value!;
-                        });
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: amountController,
-                decoration: const InputDecoration(
-                  labelText: 'Amount',
-                  border: OutlineInputBorder(),
-                  prefixText: '₹ ',
-                ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                autofocus: true,
-              ),
-            ],
-          ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final amount = double.tryParse(amountController.text);
-                if (amount == null || amount <= 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please enter a valid amount'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                  return;
-                }
-
-                final finalAmount = isDebit ? amount : -amount;
-                await supplierStore.updateSupplierBalance(supplier.supplierId, finalAmount);
-
-                if (mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Balance updated successfully'),
-                      backgroundColor: Color(0xFF4CAF50),
-                    ),
-                  );
-                }
+            appDialogCancelButton(dialogContext, label: 'Close'),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: 'Update Balance',
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _showUpdateBalanceDialog(supplier);
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4CAF50),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Update'),
             ),
           ],
         ),
@@ -285,12 +324,7 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
     );
   }
 
-  String _formatDate(String isoDate) {
-    final date = DateTime.parse(isoDate);
-    return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
-  }
-
-  Widget _buildDetailRow(String label, String value) {
+  Widget _buildDetailRow(String label, String value, {Color? valueColor}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -300,19 +334,19 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
             width: 120,
             child: Text(
               label,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF6B6B6B),
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                color: AppColors.textSecondary,
               ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF1A1A1A),
+              style: GoogleFonts.poppins(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w500,
+                color: valueColor ?? AppColors.textPrimary,
               ),
             ),
           ),
@@ -320,115 +354,263 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
       ),
     );
   }
+
+  // ==================== BALANCE ====================
+
+  Future<void> _showUpdateBalanceDialog(SupplierModel supplier) async {
+    final amountController = TextEditingController();
+    bool isDebit = true;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => DialogDisposeScope(
+        disposables: [amountController],
+        child: MoneyScope(
+          child: StatefulBuilder(
+            builder: (context, setLocalState) => AppDialogShell(
+              title: 'Update Balance',
+              subtitle:
+                  'Current: ${formatMoney(supplier.currentBalance)}',
+              accent: AppColors.primary,
+              icon: Icons.account_balance_wallet_outlined,
+              body: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildBalanceModeTile(
+                    label: 'Purchase (Debit)',
+                    caption: 'Increases what you owe',
+                    selected: isDebit,
+                    onTap: () => setLocalState(() => isDebit = true),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildBalanceModeTile(
+                    label: 'Payment (Credit)',
+                    caption: 'Reduces what you owe',
+                    selected: !isDebit,
+                    onTap: () => setLocalState(() => isDebit = false),
+                  ),
+                  const SizedBox(height: 16),
+                  AppTextField(
+                    controller: amountController,
+                    label: 'Amount',
+                    icon: Icons.currency_rupee_rounded,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                          RegExp(r'^\d*\.?\d{0,2}')),
+                    ],
+                    autofocus: true,
+                  ),
+                ],
+              ),
+              actions: [
+                appDialogCancelButton(dialogContext),
+                const SizedBox(width: 12),
+                appDialogPrimaryButton(
+                  label: 'Update',
+                  onPressed: () async {
+                    final amount =
+                        double.tryParse(amountController.text.trim());
+                    if (amount == null || amount <= 0) {
+                      NotificationService.instance
+                          .showError('Please enter a valid amount');
+                      return;
+                    }
+
+                    try {
+                      await supplierStore.updateSupplierBalance(
+                          supplier.supplierId, isDebit ? amount : -amount);
+                    } catch (e) {
+                      if (!mounted) return;
+                      NotificationService.instance
+                          .showError('Failed to update balance: $e');
+                      return;
+                    }
+
+                    if (!dialogContext.mounted) return;
+                    Navigator.pop(dialogContext);
+                    NotificationService.instance
+                        .showSuccess('Balance updated successfully');
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBalanceModeTile({
+    required String label,
+    required String caption,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.06)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.divider,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              selected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              size: 20,
+              color: selected ? AppColors.primary : AppColors.textSecondary,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.poppins(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: selected
+                          ? AppColors.primary
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    caption,
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ==================== BUILD ====================
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = !AppResponsive.isMobile(context);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text('Suppliers', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.white,
-      ),
-      body: Column(
-        children: [
-          _buildSearchBar(),
-          _buildSummaryCard(),
-          Expanded(
-            child: Observer(
-              builder: (context) {
-                if (_searchController.text.isEmpty) {
-                  if (supplierStore.supplierCount == 0) {
-                    return _buildEmptyState();
-                  }
-                  return _buildAllSuppliersList();
-                }
-
-                if (supplierStore.searchResults.isEmpty) {
-                  return _buildNoResultsState();
-                }
-
-                return _buildSearchResults();
-              },
-            ),
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: 'Suppliers',
+        actions: [
+          // Populated → add lives here; empty → the centred empty-state button
+          // is the only prompt.
+          Observer(
+            builder: (context) => supplierStore.suppliers.isEmpty
+                ? const SizedBox.shrink()
+                : IconButton(
+                    icon: const Icon(Icons.add_business_rounded),
+                    tooltip: 'Add supplier',
+                    onPressed: () => _showSupplierForm(),
+                  ),
           ),
+          const SizedBox(width: 4),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAddSupplierDialog,
-        backgroundColor: const Color(0xFF4CAF50),
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
-    );
-  }
+      body: MoneyScope(
+        child: Column(
+          children: [
+            Container(
+              color: AppColors.white,
+              padding: EdgeInsets.all(isTablet ? 20 : 16),
+              child: AppTextField(
+                controller: _searchController,
+                hint: 'Search by name, phone, or GST...',
+                icon: Icons.search_rounded,
+                onChanged: _onSearchChanged,
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 20),
+                        onPressed: () {
+                          _searchController.clear();
+                          _onSearchChanged('');
+                        },
+                      )
+                    : null,
+              ),
+            ),
+            _buildSummaryRow(isTablet),
+            Expanded(
+              child: Observer(
+                builder: (context) {
+                  final suppliers = supplierStore.filteredSuppliers;
 
-  Widget _buildSearchBar() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          hintText: 'Search by name, phone, or GST...',
-          hintStyle: const TextStyle(fontSize: 14, color: Color(0xFFB0B0B0)),
-          prefixIcon: const Icon(Icons.search, color: Color(0xFF6B6B6B)),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear, color: Color(0xFF6B6B6B)),
-                  onPressed: () {
-                    _searchController.clear();
-                    _onSearchChanged('');
-                    setState(() {});
-                  },
-                )
-              : null,
-          filled: true,
-          fillColor: const Color(0xFFF5F5F5),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFFE8E8E8), width: 0.5),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFFE8E8E8), width: 0.5),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFF4CAF50), width: 1.5),
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  if (suppliers.isEmpty) {
+                    return _searchController.text.isEmpty
+                        ? AppEmptyState(
+                            icon: Icons.storefront_outlined,
+                            title: 'No suppliers yet',
+                            message:
+                                'Add your first supplier to track purchases and balances.',
+                            action: appEmptyStateAction(
+                              label: 'Add Supplier',
+                              onPressed: () => _showSupplierForm(),
+                            ),
+                          )
+                        : AppEmptyState(
+                            icon: Icons.search_off_rounded,
+                            title: 'No suppliers found',
+                            message:
+                                'No results for "${_searchController.text}".',
+                          );
+                  }
+
+                  return ListView.builder(
+                    padding: EdgeInsets.all(isTablet ? 20 : 16),
+                    itemCount: suppliers.length,
+                    itemBuilder: (context, index) =>
+                        _buildSupplierCard(suppliers[index], isTablet),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
-        onChanged: (value) {
-          _onSearchChanged(value);
-          setState(() {});
-        },
       ),
     );
   }
 
-  Widget _buildSummaryCard() {
+  Widget _buildSummaryRow(bool isTablet) {
     return Observer(
       builder: (context) {
-        return Container(
-          color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+        if (supplierStore.suppliers.isEmpty) return const SizedBox.shrink();
+
+        final net = supplierStore.totalOutstanding;
+        return Padding(
+          padding:
+              EdgeInsets.symmetric(horizontal: isTablet ? 20 : 16, vertical: 8),
           child: Row(
             children: [
-              Expanded(
-                child: _buildStatItem(
-                  'Total Suppliers',
-                  supplierStore.supplierCount.toString(),
-                  Icons.people_outline,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildStatItem(
-                  'Total Outstanding',
-                  '₹${supplierStore.totalOutstanding.toStringAsFixed(2)}',
-                  Icons.account_balance_wallet_outlined,
-                ),
+              _buildStatChip('${supplierStore.supplierCount} suppliers',
+                  Icons.storefront_rounded, AppColors.primary),
+              const SizedBox(width: 8),
+              // Net of advances — a supplier you've overpaid offsets the rest.
+              _buildStatChip(
+                '${formatMoney(net.abs())} ${net < 0 ? 'advance' : 'payable'}',
+                Icons.account_balance_wallet_rounded,
+                net > 0 ? AppColors.danger : AppColors.success,
               ),
             ],
           ),
@@ -437,199 +619,170 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
     );
   }
 
-  Widget _buildStatItem(String label, String value, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: const Color(0xFF6B6B6B)),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Color(0xFF6B6B6B),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1A1A1A),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.storefront_outlined,
-            size: 80,
-            color: Colors.grey[300],
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'No suppliers yet',
-            style: TextStyle(
-              fontSize: 16,
-              color: Color(0xFF6B6B6B),
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Add your first supplier using the + button',
-            style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFFB0B0B0),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNoResultsState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.search_off,
-            size: 80,
-            color: Colors.grey[300],
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'No suppliers found',
-            style: TextStyle(
-              fontSize: 16,
-              color: Color(0xFF6B6B6B),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'No results for "${_searchController.text}"',
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFFB0B0B0),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAllSuppliersList() {
-    return Observer(
-      builder: (context) {
-        final suppliers = supplierStore.suppliers;
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: suppliers.length,
-          itemBuilder: (context, index) {
-            final supplier = suppliers[index];
-            return _buildSupplierCard(supplier);
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildSearchResults() {
-    return Observer(
-      builder: (context) {
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: supplierStore.searchResults.length,
-          itemBuilder: (context, index) {
-            final supplier = supplierStore.searchResults[index];
-            return _buildSupplierCard(supplier);
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildSupplierCard(SupplierModel supplier) {
-    final hasBalance = supplier.currentBalance != 0;
-    final isNegative = supplier.currentBalance < 0;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          backgroundColor: const Color(0xFF2196F3).withOpacity(0.1),
-          child: Text(
-            supplier.name[0].toUpperCase(),
-            style: const TextStyle(
-              color: Color(0xFF2196F3),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+  Widget _buildStatChip(String label, IconData icon, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(8),
         ),
-        title: Text(
-          supplier.name,
-          style: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF1A1A1A),
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const SizedBox(height: 4),
-            if (supplier.phone != null)
-              Text(
-                supplier.phone!,
-                style: const TextStyle(fontSize: 13, color: Color(0xFF6B6B6B)),
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: color,
+                ),
               ),
-            if (hasBalance) ...[
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Icon(
-                    isNegative ? Icons.check_circle_outline : Icons.error_outline,
-                    size: 14,
-                    color: isNegative ? const Color(0xFF4CAF50) : const Color(0xFFFF5722),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSupplierCard(SupplierModel supplier, bool isTablet) {
+    final balance = supplier.currentBalance;
+    final hasBalance = balance != 0;
+    final isAdvance = balance < 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: balance > 0
+              ? AppColors.danger.withValues(alpha: 0.3)
+              : AppColors.divider,
+        ),
+      ),
+      child: InkWell(
+        onTap: () => _showSupplierDetails(supplier),
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: isTablet ? 20 : 18,
+                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                child: Text(
+                  _initial(supplier.name),
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '₹${supplier.currentBalance.abs().toStringAsFixed(2)} ${isNegative ? "Advance" : "Outstanding"}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isNegative ? const Color(0xFF4CAF50) : const Color(0xFFFF5722),
-                      fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      supplier.name.trim().isEmpty
+                          ? 'Unnamed supplier'
+                          : supplier.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      [
+                        if (supplier.phone?.isNotEmpty ?? false) supplier.phone!,
+                        if (supplier.gstNumber?.isNotEmpty ?? false)
+                          supplier.gstNumber!,
+                      ].join('  •  '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (hasBalance) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: (isAdvance ? AppColors.success : AppColors.danger)
+                        .withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '${formatMoney(balance.abs())} ${isAdvance ? 'advance' : 'due'}',
+                    style: GoogleFonts.poppins(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: isAdvance ? AppColors.success : AppColors.danger,
+                    ),
+                  ),
+                ),
+              ],
+              PopupMenuButton<String>(
+                icon: Icon(Icons.more_vert_rounded,
+                    color: AppColors.textSecondary, size: 20),
+                color: AppColors.white,
+                surfaceTintColor: AppColors.white,
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                onSelected: (value) {
+                  if (value == 'edit') _showSupplierForm(existing: supplier);
+                  if (value == 'delete') _deleteSupplier(supplier);
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.edit_outlined,
+                            size: 18, color: AppColors.primary),
+                        const SizedBox(width: 10),
+                        Text('Edit',
+                            style: GoogleFonts.poppins(
+                                fontSize: 13, color: AppColors.textPrimary)),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.delete_outline,
+                            size: 18, color: AppColors.danger),
+                        const SizedBox(width: 10),
+                        Text('Delete',
+                            style: GoogleFonts.poppins(
+                                fontSize: 13, color: AppColors.danger)),
+                      ],
                     ),
                   ),
                 ],
               ),
             ],
-          ],
+          ),
         ),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Color(0xFFB0B0B0)),
-        onTap: () => _showSupplierDetails(supplier),
       ),
     );
   }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/domain/services/retail/simple_product_fields_service.dart';
+import 'package:billberrylite/domain/services/retail/variant_attribute_mapper.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -23,6 +25,7 @@ import '../../../util/responsive.dart';
 import '../../../util/common/app_responsive.dart';
 import '../../../presentation/widget/componets/common/app_text_field.dart';
 import '../../../presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/screens/retail/simple_product_fields_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/import_product/bulk_import_screen.dart';
 import 'package:billberrylite/presentation/screens/restaurant/import/restaurant_bulk_import_service.dart';
 import 'package:billberrylite/presentation/screens/restaurant/import/bulk_import_screen.dart';
@@ -143,6 +146,7 @@ class _AddProductScreenState extends State<AddProductScreen>
   @override
   void initState() {
     super.initState();
+    _loadSimpleFields();
     _tabController = TabController(length: 2, vsync: this);
     _formStore = AddProductFormStore();
 
@@ -171,6 +175,9 @@ class _AddProductScreenState extends State<AddProductScreen>
 
   @override
   void dispose() {
+    for (final c in _simpleFieldControllers.values) {
+      c.dispose();
+    }
     _tabController.dispose();
     _scrollController.dispose();
     _nameController.dispose();
@@ -382,6 +389,8 @@ class _AddProductScreenState extends State<AddProductScreen>
           );
 
           final updatedVariant = defaultVariant.copyWith(
+            customAttributes:
+                mergeVariantAttributes(Map.of(_formStore.simpleFieldValues)),
             sku: await _skuOrGenerated(_formStore.sku),
             barcode: _formStore.barcode,
             mrp: _formStore.mrp,
@@ -1266,6 +1275,13 @@ class _AddProductScreenState extends State<AddProductScreen>
               ),
             ],
           ),
+        ),
+
+        // Simple Product descriptor fields (configured in Settings)
+        Observer(
+          builder: (_) => _formStore.productType == 'simple'
+              ? _buildSimpleFieldsSection(isMobile)
+              : const SizedBox.shrink(),
         ),
 
         // Variable Product Options
@@ -2931,6 +2947,138 @@ class _AddProductScreenState extends State<AddProductScreen>
 
   // ==================== EDIT FUNCTIONS ====================
 
+  /// Descriptor fields for a SIMPLE product (Settings → Simple Product Fields).
+  /// Mirrors the retail Add Product screen so both entry points behave alike.
+  List<AttributeModel> _simpleFields = [];
+  final Map<String, TextEditingController> _simpleFieldControllers = {};
+
+  Future<void> _loadSimpleFields() async {
+    final fields = await SimpleProductFieldsService().resolveFields();
+    if (!mounted) return;
+    setState(() => _simpleFields = fields);
+  }
+
+  TextEditingController _simpleFieldController(AttributeModel attribute) =>
+      _simpleFieldControllers.putIfAbsent(attribute.attributeId, () {
+        final c = TextEditingController(
+            text: _formStore.simpleFieldValues[attribute.name] ?? '');
+        return c;
+      });
+
+  /// Inputs for the configured descriptor fields, shown for simple products.
+  /// Values land in the default variant's `customAttributes` on save.
+  ///
+  /// Always rendered — even with no fields configured — so the customise action
+  /// stays reachable. During setup the user hasn't seen Settings yet, so this
+  /// is the only place they can change what Size / Color / Weight should be.
+  Widget _buildSimpleFieldsSection(bool isMobile) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            const Text(
+              'Product Details',
+              style: TextStyle(
+                fontSize: 16,
+                color: AppColors.darkNeutral,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
+            IconButton(
+              icon: const Icon(Icons.tune, size: 20, color: AppColors.primary),
+              tooltip: 'Choose which fields appear',
+              visualDensity: VisualDensity.compact,
+              onPressed: _openSimpleFieldSettings,
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (_simpleFields.isEmpty)
+          Text(
+            'No detail fields. Tap the tune icon to add Size, Colour, Flavour '
+            'or your own — price, stock, barcode and SKU always show.',
+            style: GoogleFonts.poppins(
+                fontSize: 12, height: 1.4, color: AppColors.textSecondary),
+          )
+        else
+          for (final attribute in _simpleFields) ...[
+            _buildSimpleFieldInput(attribute),
+            const SizedBox(height: 12),
+          ],
+      ],
+    );
+  }
+
+  /// One descriptor input. Offers the attribute's preset values as a menu while
+  /// still accepting free text — same behaviour as the retail Add Product form.
+  Widget _buildSimpleFieldInput(AttributeModel attribute) {
+    final controller = _simpleFieldController(attribute);
+    final values = attributeStore.getValues(attribute.attributeId);
+
+    return AppTextField(
+      controller: controller,
+      label: attribute.name,
+      hint: _simpleFieldHint(attribute),
+      onChanged: (v) => _formStore.setSimpleFieldValue(attribute.name, v),
+      suffixIcon: values.isEmpty
+          ? null
+          : PopupMenuButton<String>(
+              icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                  size: 22, color: AppColors.textSecondary),
+              tooltip: 'Choose ${attribute.name}',
+              // M3 tints menu surfaces by default; keep them plain white.
+              color: AppColors.white,
+              shape:
+                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              onSelected: (value) {
+                controller.text = value;
+                _formStore.setSimpleFieldValue(attribute.name, value);
+              },
+              itemBuilder: (_) => values
+                  .map((v) => PopupMenuItem<String>(
+                        value: v.value,
+                        child: Text(v.value,
+                            style: GoogleFonts.poppins(fontSize: 14)),
+                      ))
+                  .toList(),
+            ),
+    );
+  }
+
+  /// Opens the shared Simple Product Fields configurator, then re-resolves the
+  /// list. Values and controllers for fields the user just removed are dropped
+  /// so a deleted field can't still be written onto the default variant.
+  Future<void> _openSimpleFieldSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SimpleProductFieldsScreen()),
+    );
+    if (!mounted) return;
+
+    final fields = await SimpleProductFieldsService().resolveFields();
+    if (!mounted) return;
+
+    final keptNames = fields.map((a) => a.name).toSet();
+    for (final name in _formStore.simpleFieldValues.keys.toList()) {
+      if (!keptNames.contains(name)) _formStore.setSimpleFieldValue(name, '');
+    }
+
+    final keptIds = fields.map((a) => a.attributeId).toSet();
+    for (final id in _simpleFieldControllers.keys.toList()) {
+      if (!keptIds.contains(id)) _simpleFieldControllers.remove(id)?.dispose();
+    }
+
+    setState(() => _simpleFields = fields);
+  }
+
+  String? _simpleFieldHint(AttributeModel attribute) {
+    final values = attributeStore.getValues(attribute.attributeId);
+    return values.isEmpty ? null : 'e.g. ${values.first.value}';
+  }
+
   Future<void> _editRetailProduct(ProductModel product) async {
     // Set edit mode
     setState(() {
@@ -2959,6 +3107,23 @@ class _AddProductScreenState extends State<AddProductScreen>
     _formStore.setSelectedCategoryId(product.category);
     _formStore.setTaxRate(product.gstRate ?? 0);
     _formStore.setProductType(product.hasVariants ? 'variable' : 'simple');
+    // Round-trip the descriptor fields from the product's default variant.
+    if (!product.hasVariants) {
+      // A local `productStore` is declared further down this method, so
+      // resolve the singleton explicitly here.
+      final existing =
+          locator<ProductStore>().variantsFor(product.productId);
+      final defaultVariant = existing.isEmpty
+          ? null
+          : existing.firstWhere((v) => v.isDefault, orElse: () => existing.first);
+      defaultVariant?.customAttributes?.forEach((key, value) {
+        _formStore.setSimpleFieldValue(key, value);
+        final attribute = attributeStore.getAttributeByName(key);
+        if (attribute != null) {
+          _simpleFieldController(attribute).text = value;
+        }
+      });
+    }
     // Existing products already have stock data — keep it visible on edit
     // instead of hiding it behind the Track Inventory toggle.
     _formStore.setTrackInventory(true);

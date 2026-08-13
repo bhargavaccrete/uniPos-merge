@@ -5,7 +5,6 @@ import 'package:billberrylite/data/models/retail/hive_model/attribute_model_219.
 import 'package:billberrylite/domain/services/common/notification_service.dart';
 import 'package:billberrylite/domain/services/retail/simple_product_fields_service.dart';
 import 'package:billberrylite/domain/store/retail/attribute_store.dart';
-import 'package:billberrylite/presentation/screens/retail/attributes_screen.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -235,7 +234,7 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
     if (attribute == null) return;
     setState(() => _fields.add(attribute));
     NotificationService.instance.showSuccess(
-        'Field created. Add its values from Product Attributes.');
+        'Field created. Add its values in Settings → Product Attributes.');
   }
 
   @override
@@ -250,14 +249,6 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
             icon: const Icon(Icons.restart_alt_rounded),
             tooltip: 'Reset to defaults',
             onPressed: _isLoading || _isSaving ? null : _resetToDefaults,
-          ),
-          IconButton(
-            icon: const Icon(Icons.tune),
-            tooltip: 'Manage attribute values',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AttributesScreen()),
-            ),
           ),
         ],
       ),

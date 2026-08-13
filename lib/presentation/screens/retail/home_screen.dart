@@ -11,17 +11,15 @@ import 'package:billberrylite/presentation/widget/componets/common/app_dialog.da
 import 'package:billberrylite/presentation/widget/componets/common/dashboard_menu_card.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 
-import 'package:billberrylite/presentation/screens/retail/inventory_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/product_management_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/customer_list_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/reports_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/stock_alerts_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/supplier_list_screen.dart';
-import 'package:billberrylite/presentation/screens/retail/purchase_history_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/purchase_order_list_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/sales_history_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/cash_drawer_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/settings_screen.dart';
-import 'package:billberrylite/presentation/screens/retail/category_management_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/login_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/change_password_screen.dart';
 
@@ -509,17 +507,13 @@ class _HomeScreenState extends State<HomeScreen> {
         color: Colors.blue,
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RetailPosScreen())),
       ),
+      // One card for the whole catalog — products, their categories and the
+      // attributes that build variants all live behind the Products hub.
       DashboardMenuCard(
         icon: Icons.inventory_2_rounded,
-        title: 'Inventory',
+        title: 'Products',
         color: Colors.amber,
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const InventoryScreen())),
-      ),
-      DashboardMenuCard(
-        icon: Icons.category_rounded,
-        title: 'Categories',
-        color: Colors.purple,
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CategoryManagementScreen())),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ProductManagementScreen())),
       ),
       DashboardMenuCard(
         icon: Icons.people_rounded,
@@ -538,12 +532,6 @@ class _HomeScreenState extends State<HomeScreen> {
         title: 'Purchase Orders',
         color: Colors.cyan,
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PurchaseOrderListScreen())),
-      ),
-      DashboardMenuCard(
-        icon: Icons.shopping_cart_rounded,
-        title: 'Purchases',
-        color: Colors.deepPurple,
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PurchaseHistoryScreen())),
       ),
       DashboardMenuCard(
         icon: Icons.receipt_long_rounded,
