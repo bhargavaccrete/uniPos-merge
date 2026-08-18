@@ -149,6 +149,7 @@ abstract class _PrinterStore with Store {
     int port = 9100,
     int paperSize = 80,
     String role = 'both',
+    String? assignRole,
   }) async {
     final printer = SavedPrinterModel(
       id: const Uuid().v4(),
@@ -160,6 +161,22 @@ abstract class _PrinterStore with Store {
       isDefault: savedPrinters.isEmpty,
     );
     await savePrinter(printer);
+    await _assignIfRequested(printer, assignRole);
+  }
+
+  /// Point a slot at a freshly saved printer.
+  ///
+  /// Restaurant leaves this null — its Printer Management slots do the
+  /// assigning. Retail has exactly one slot (Billing) and no slot screen, so it
+  /// passes `'receipt'`: saving a printer there IS choosing it. Without this the
+  /// printer lands in Hive but no `default_*_printer_id` pointer ever gets set,
+  /// so `hasDefaultReceiptPrinter` stays false and nothing ever prints.
+  Future<void> _assignIfRequested(
+      SavedPrinterModel printer, String? assignRole) async {
+    if (assignRole == null) return;
+    // 'both' keeps the record valid for whichever slot(s) point at it.
+    await savePrinter(printer.copyWith(role: 'both'));
+    await setDefaultForRole(printer.id, assignRole);
   }
 
   @action
@@ -239,6 +256,7 @@ abstract class _PrinterStore with Store {
     required String name,
     int paperSize = 80,
     String role = 'both',
+    String? assignRole,
   }) async {
     final printer = SavedPrinterModel(
       id: const Uuid().v4(),
@@ -252,6 +270,7 @@ abstract class _PrinterStore with Store {
       role: role,
     );
     await savePrinter(printer);
+    await _assignIfRequested(printer, assignRole);
   }
 
   @action
@@ -260,6 +279,7 @@ abstract class _PrinterStore with Store {
     required String name,
     int paperSize = 80,
     String role = 'both',
+    String? assignRole,
   }) async {
     final printer = SavedPrinterModel(
       id: const Uuid().v4(),
@@ -271,6 +291,7 @@ abstract class _PrinterStore with Store {
       isDefault: savedPrinters.isEmpty,
     );
     await savePrinter(printer);
+    await _assignIfRequested(printer, assignRole);
   }
 
   // ══════════════════════════════════════════════════════════════════════════

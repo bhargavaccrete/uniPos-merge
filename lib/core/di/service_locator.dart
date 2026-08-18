@@ -125,11 +125,28 @@ Future<void> setupServiceLocator() async {
   // Register PrintService as a common dependency for both Retail and Restaurant
   locator.registerLazySingleton<PrintService>(() => PrintService());
 
+  // Printer connection stack — common to both modes. None of these touch a
+  // restaurant type; both verticals pair printers through the same shared UI
+  // (`screens/common/printer/`) and both reach the transport via `printerStore`.
+  // Registering them per-mode meant any retail read of `printerStore` threw
+  // "not registered inside GetIt".
+  locator.registerLazySingleton<PrinterRepository>(() => PrinterRepository());
+  locator.registerLazySingleton<ThermalPrinterService>(() => ThermalPrinterService());
+  locator.registerLazySingleton<PrinterStore>(
+    () => PrinterStore(locator<PrinterRepository>(), locator<ThermalPrinterService>()),
+  );
+
   // LicenseStore is common — needed in setup wizard before business mode is selected
   locator.registerLazySingleton<LicenseApiService>(() => LicenseApiService());
   locator.registerLazySingleton<LicenseStore>(
     () => LicenseStore(locator<LicenseApiService>()),
   );
+
+  // Load saved printers at startup so defaultKotPrinter / defaultReceiptPrinter
+  // are available immediately when the first order is placed.
+  // Without this, printKOT() would find null defaults and fall through to PDF.
+  // Async side-effect, so it runs after every common registration above.
+  await locator<PrinterStore>().loadSavedPrinters();
 
   // Register business-specific dependencies based on mode
   // If mode is not set yet (during setup), we'll register them later
@@ -292,10 +309,10 @@ Future<void> _registerRestaurantDependencies() async {
   locator.registerLazySingleton<EodRepository>(() => EodRepository());
   locator.registerLazySingleton<ItemCancellationRepository>(
       () => ItemCancellationRepository());
-  locator.registerLazySingleton<PrinterRepository>(() => PrinterRepository());
   locator.registerLazySingleton<AttendanceRepository>(() => AttendanceRepository());
   locator.registerLazySingleton<NotificationRepository>(() => NotificationRepository());
-  locator.registerLazySingleton<ThermalPrinterService>(() => ThermalPrinterService());
+  // PrinterRepository / ThermalPrinterService / PrinterStore are COMMON —
+  // registered in setupServiceLocator(), see the printer block there.
 
   // ==================== RESTAURANT STORES ====================
   locator.registerLazySingleton<CategoryStore>(
@@ -359,17 +376,8 @@ Future<void> _registerRestaurantDependencies() async {
     () => EodStore(locator<EodRepository>()),
   );
   locator.registerLazySingleton<AppStore>(() => AppStore());
-  locator.registerLazySingleton<PrinterStore>(
-    () => PrinterStore(locator<PrinterRepository>(), locator<ThermalPrinterService>()),
-  );
   locator.registerLazySingleton<AttendanceStore>(() => AttendanceStore(locator<AttendanceRepository>()));
   locator.registerLazySingleton<NotificationStore>(() => NotificationStore(locator<NotificationRepository>()));
-
-  // Load saved printers at startup so defaultKotPrinter / defaultReceiptPrinter
-  // are available immediately when the first order is placed.
-  // Without this, printKOT() would find null defaults and fall through to PDF.
-  await locator<PrinterStore>().loadSavedPrinters();
-
 }
 
 /// Register business dependencies dynamically (called during setup wizard)

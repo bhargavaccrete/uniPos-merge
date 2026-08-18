@@ -16,6 +16,7 @@ import 'package:billberrylite/presentation/screens/retail/attributes_screen.dart
 import 'package:billberrylite/presentation/screens/retail/simple_product_fields_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/store_info_settings_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/settings/printer_settings_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/settings/printer_connection_screen.dart';
 import 'package:billberrylite/presentation/widget/restaurant/opening_balance_dialog.dart';
 import 'package:billberrylite/presentation/screens/retail/eod_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/payment_methods_screen.dart';
@@ -215,8 +216,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Printing Section
+          // Printing Section — device connection first, then what goes on the
+          // paper. Both use the same shared printer stack the restaurant side
+          // uses (PrinterStore / ThermalPrinterService).
           _sectionHeader(context, 'PRINTING'),
+          _buildSettingsCard(
+            context,
+            icon: Icons.print_outlined,
+            title: 'Connect Printer',
+            subtitle: 'Pair a thermal printer — Bluetooth · WiFi · USB',
+            iconColor: AppColors.info,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) =>
+                        const RetailPrinterConnectionScreen()),
+              );
+            },
+          ),
           _buildSettingsCard(
             context,
             icon: Icons.print,

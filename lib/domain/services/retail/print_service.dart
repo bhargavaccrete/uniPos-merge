@@ -13,8 +13,6 @@ import 'package:file_selector/file_selector.dart';
 import 'package:billberrylite/domain/services/retail/receipt_pdf_service.dart';
 import 'package:billberrylite/domain/services/restaurant/esc_pos_image.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
-import 'package:billberrylite/domain/services/retail/retail_printer_settings_service.dart';
-import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/config/tax_feature.dart';
@@ -631,8 +629,7 @@ class PrintService {
             // Direct Thermal Printer — only shown when a receipt printer is saved.
             // This is the fastest path: one tap → ESC/POS bytes → printer.
             // No PDF rendering, no system dialog.
-            if (AppConfig.isRestaurant &&
-                printerStore.hasDefaultReceiptPrinter)
+            if (printerStore.hasDefaultReceiptPrinter)
               _buildOptionTile(
                 icon: Icons.print,
                 title: 'Print to ${printerStore.defaultReceiptPrinter!.name}',
@@ -662,10 +659,19 @@ class PrintService {
                     roundOff: roundOff,
                   );
                   final printer = printerStore.defaultReceiptPrinter!;
-                  final bytes = EscPosReceiptBuilder.buildReceiptTicket(
-                    receiptData: receiptData,
-                    paperWidth: printer.paperSize,
-                  );
+                  // Raster the thermal PDF first: the PDF renderer is the only
+                  // path that reads RETAIL's own toggles (via _getRetailSettings)
+                  // — EscPosReceiptBuilder reads restaurant's PrintSettings map,
+                  // so a text ticket would ignore every retail setting. Text
+                  // stays as the fallback when rasterizing fails.
+                  final bytes = await rasterizeThermalReceipt(
+                        receiptData,
+                        paperWidth: printer.paperSize,
+                      ) ??
+                      EscPosReceiptBuilder.buildReceiptTicket(
+                        receiptData: receiptData,
+                        paperWidth: printer.paperSize,
+                      );
                   final success = await printerStore.sendBytes(bytes, printer);
                   // NotificationService, not ScaffoldMessenger — the sheet that
                   // owned the context is already gone by the time the printer

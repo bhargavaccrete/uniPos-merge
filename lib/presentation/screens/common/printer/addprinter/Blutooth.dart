@@ -1,28 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/domain/services/restaurant/thermal_printer_service.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'save_printer_dialog.dart';
+import 'slot_row_actions.dart';
 
-/// USB Printer discovery and setup screen.
+/// Bluetooth Printer discovery and setup screen.
 ///
-/// Similar flow to Bluetooth — scan for connected USB devices, tap Save.
-/// No permissions needed (unlike Bluetooth which requires Location).
-/// USB printers are typically used on:
-/// - Windows: wired counter receipt printer
-/// - Android: USB OTG cable to thermal printer
-class Usb extends StatefulWidget {
-  const Usb({super.key});
+/// Three sections:
+/// 1. Scanning status banner — shows while BLE scan is active
+/// 2. Discovered devices list — devices found during current scan
+/// 3. Saved Bluetooth printers — previously saved printers from Hive
+///
+/// Unlike WiFi (manual IP), Bluetooth requires active scanning.
+/// The FAB triggers a BLE scan, discovered devices appear in real-time,
+/// and staff taps "Save" on the device they want to use.
+class Bluthooth extends StatefulWidget {
+  /// Slot to point at a newly saved printer — see [AddPrinter.assignToRole].
+  final String? assignToRole;
+
+  const Bluthooth({super.key, this.assignToRole});
 
   @override
-  State<Usb> createState() => _UsbState();
+  State<Bluthooth> createState() => _BluthoothhState();
 }
 
-class _UsbState extends State<Usb> {
+class _BluthoothhState extends State<Bluthooth> {
   @override
   void initState() {
     super.initState();
@@ -31,6 +39,7 @@ class _UsbState extends State<Usb> {
 
   @override
   void dispose() {
+    // Stop scanning when leaving the screen to save battery
     printerStore.stopScan();
     super.dispose();
   }
@@ -44,21 +53,26 @@ class _UsbState extends State<Usb> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── SECTION 1: Scanning Status Banner ──
             _buildScanningBanner(),
+
+            // ── SECTION 2: Discovered Devices ──
             _buildDiscoveredDevices(),
             const SizedBox(height: 24),
-            _buildSavedUsbPrinters(),
+
+            // ── SECTION 3: Saved Bluetooth Printers ──
+            _buildSavedPrintersList(),
           ],
         ),
       ),
-      // FAB triggers USB scan
+      // FAB triggers Bluetooth scan
+      // Positioned at bottom-right, same style as original stub
       floatingActionButton: Observer(
         builder: (_) => FloatingActionButton(
           backgroundColor: AppColors.primary,
-          onPressed:
-              printerStore.isScanning ? _stopScan : _startScan,
+          onPressed: printerStore.isScanning ? _stopScan : _startScan,
           child: Icon(
-            printerStore.isScanning ? Icons.stop : Icons.usb,
+            printerStore.isScanning ? Icons.stop : Icons.bluetooth_searching,
             color: Colors.white,
           ),
         ),
@@ -67,7 +81,9 @@ class _UsbState extends State<Usb> {
   }
 
   // ════════════════════════════════════════════════════════════════════════
-  // Scanning Banner — shows while USB scan is active
+  // SECTION 1: Scanning Banner
+  // Shows a blue banner with progress indicator while scan is active.
+  // Disappears when scan stops.
   // ════════════════════════════════════════════════════════════════════════
 
   Widget _buildScanningBanner() {
@@ -93,7 +109,7 @@ class _UsbState extends State<Usb> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Scanning for USB printers...',
+                  'Scanning for Bluetooth printers...',
                   style: GoogleFonts.poppins(
                     fontSize: 13,
                     color: AppColors.primary,
@@ -101,6 +117,7 @@ class _UsbState extends State<Usb> {
                   ),
                 ),
               ),
+              // Tap "Stop" text to end scan early
               TextButton(
                 onPressed: _stopScan,
                 child: Text('Stop',
@@ -115,29 +132,34 @@ class _UsbState extends State<Usb> {
   }
 
   // ════════════════════════════════════════════════════════════════════════
-  // Discovered USB Devices — live list from scan
+  // SECTION 2: Discovered Devices
+  // Live list of BLE devices found during scan. Each device shows
+  // name + MAC address + Save/Test buttons.
+  // Wrapped in Observer — updates in real-time as devices are found.
   // ════════════════════════════════════════════════════════════════════════
 
   Widget _buildDiscoveredDevices() {
     return Observer(
       builder: (_) {
-        // discoveredDevices is shared with the Bluetooth scan; show USB only so
-        // BLE results don't leak into this tab.
+        // discoveredDevices is shared with the USB scan; show BLE only so USB
+        // results don't leak into this tab.
         final devices = printerStore.discoveredDevices
             .cast<DiscoveredPrinter>()
-            .where((d) => d.connectionType == 'USB')
+            .where((d) => d.connectionType == 'BLE')
             .toList();
 
+        // Show prompt when no scan has happened yet
         if (devices.isEmpty && !printerStore.isScanning) {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 32),
             child: Center(
               child: Column(
                 children: [
-                  Icon(Icons.usb_off, size: 48, color: AppColors.divider),
+                  Icon(Icons.bluetooth_searching,
+                      size: 48, color: AppColors.divider),
                   const SizedBox(height: 12),
                   Text(
-                    'Connect a USB printer and\ntap the scan button',
+                    'Tap the scan button to find\nnearby Bluetooth printers',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.poppins(
                         color: AppColors.textSecondary, fontSize: 14),
@@ -152,70 +174,62 @@ class _UsbState extends State<Usb> {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: Center(
-              child: Text('Looking for USB devices...',
-                  style: GoogleFonts.poppins(
-                      color: AppColors.textSecondary, fontSize: 13)),
+              child: Text(
+                'Looking for devices...',
+                style: GoogleFonts.poppins(
+                    color: AppColors.textSecondary, fontSize: 13),
+              ),
             ),
           );
         }
 
-        // A USB-C converter/hub shows up as several USB devices (its HDMI, LAN,
-        // etc.). We can't read the USB class here, so flag the obvious non-printers
-        // by name and sort likely printers to the top — but keep ALL savable so a
-        // printer with an odd name is never hidden.
-        final sorted = devices.cast<DiscoveredPrinter>().toList()
-          ..sort((a, b) =>
-              (_isLikelyNonPrinter(a.name) ? 1 : 0) -
-              (_isLikelyNonPrinter(b.name) ? 1 : 0));
-
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Discovered USB Devices (${devices.length})',
-                style: GoogleFonts.poppins(
-                    fontSize: 16, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 4),
-            Text('Pick the one marked as your printer. Unsure? Save it and Test '
-                'Print — the one that prints paper is your printer.',
-                style: GoogleFonts.poppins(
-                    fontSize: 11, color: AppColors.textSecondary)),
+            Text(
+              'Discovered Devices (${devices.length})',
+              style: GoogleFonts.poppins(
+                  fontSize: 16, fontWeight: FontWeight.w600),
+            ),
             const SizedBox(height: 8),
-            ...sorted.map((device) {
-              final nonPrinter = _isLikelyNonPrinter(device.name);
-              final accent =
-                  nonPrinter ? AppColors.warning : AppColors.success;
+            // Cast each device explicitly — ObservableList iteration
+            // can lose type info in some MobX versions
+            ...devices.map((device) {
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
                   color: AppColors.white,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: accent.withOpacity(0.5)),
+                  border: Border.all(color: AppColors.divider),
                 ),
                 child: ListTile(
-                  leading: Icon(
-                    nonPrinter ? Icons.warning_amber_rounded : Icons.print,
-                    color: accent,
-                  ),
+                  leading: Icon(Icons.bluetooth,
+                      color: AppColors.info),
+                  // Device name from BLE advertisement
+                  // Some printers broadcast a name, others show as "Unknown"
                   title: Text(
-                    device.name ?? 'USB Printer',
-                    style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                    device.name ?? 'Unknown Device',
+                    style:
+                        GoogleFonts.poppins(fontWeight: FontWeight.w600),
                   ),
+                  // MAC address — unique identifier for this device
                   subtitle: Text(
-                    nonPrinter
-                        ? 'Likely NOT a printer — part of your USB hub/converter'
-                        : 'Likely your printer  ·  VID ${device.vendorId ?? device.address ?? "?"}',
+                    device.address ?? 'No address',
                     style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        color: nonPrinter
-                            ? AppColors.warning
-                            : AppColors.textSecondary),
+                        fontSize: 12, color: AppColors.textSecondary),
                   ),
-                  trailing: TextButton(
-                    onPressed: () => _showSaveDialog(device),
-                    child: Text('Save',
-                        style: GoogleFonts.poppins(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w600)),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Save button — opens dialog to configure name/size/role
+                      TextButton(
+                        onPressed: () => _showSaveDialog(device),
+                        child: Text('Save',
+                            style: GoogleFonts.poppins(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w600)),
+                      ),
+                    ],
                   ),
                 ),
               );
@@ -227,25 +241,27 @@ class _UsbState extends State<Usb> {
   }
 
   // ════════════════════════════════════════════════════════════════════════
-  // Saved USB Printers — from Hive
+  // SECTION 3: Saved Bluetooth Printers
+  // Same pattern as WiFi's saved list — Observer-wrapped, with test/delete
   // ════════════════════════════════════════════════════════════════════════
 
-  Widget _buildSavedUsbPrinters() {
+  Widget _buildSavedPrintersList() {
     return Observer(
       builder: (_) {
-        final usbPrinters =
-            printerStore.savedPrinters.where((p) => p.isUsb).toList();
+        final btPrinters = printerStore.bluetoothPrinters;
 
-        if (usbPrinters.isEmpty) return const SizedBox.shrink();
+        if (btPrinters.isEmpty) return const SizedBox.shrink();
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Saved USB Printers',
-                style: GoogleFonts.poppins(
-                    fontSize: 16, fontWeight: FontWeight.w600)),
+            Text(
+              'Saved Bluetooth Printers',
+              style: GoogleFonts.poppins(
+                  fontSize: 16, fontWeight: FontWeight.w600),
+            ),
             const SizedBox(height: 8),
-            ...usbPrinters.map((printer) => Container(
+            ...btPrinters.map((printer) => Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   decoration: BoxDecoration(
                     color: AppColors.white,
@@ -253,10 +269,16 @@ class _UsbState extends State<Usb> {
                     border: Border.all(color: AppColors.divider),
                   ),
                   child: ListTile(
-                    leading: Icon(Icons.usb, color: AppColors.info),
-                    title: Text(printer.name,
-                        style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w600)),
+                    // In assign mode, tapping a row makes it the active printer.
+                    onTap: () =>
+                        setActiveForSlot(printer, widget.assignToRole),
+                    leading:
+                        Icon(Icons.bluetooth_connected, color: AppColors.info),
+                    title: Text(
+                      printer.name,
+                      style:
+                          GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                    ),
                     subtitle: Text(
                       '${printer.address} | ${printer.paperSize}mm',
                       style: GoogleFonts.poppins(
@@ -265,6 +287,9 @@ class _UsbState extends State<Usb> {
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        ...[activeSlotBadge(printer, widget.assignToRole)]
+                            .whereType<Widget>(),
+                        // Test print — sends test ticket via Bluetooth
                         IconButton(
                           icon: const Icon(Icons.print_outlined, size: 20),
                           tooltip: 'Test Print',
@@ -301,38 +326,60 @@ class _UsbState extends State<Usb> {
   }
 
   // ════════════════════════════════════════════════════════════════════════
-  // Actions
+  // ACTIONS — Scan, Save, Delete
   // ════════════════════════════════════════════════════════════════════════
 
-  /// USB scan — no permissions needed (unlike Bluetooth)
+  /// Start BLE scan — first requests permissions, then triggers discovery.
+  ///
+  /// Android requires both Bluetooth and Location permissions for BLE scanning.
+  /// permission_handler (already in pubspec) handles the runtime request.
+  /// We ask for permissions HERE (not at app startup) because only staff
+  /// who use Bluetooth printers should be prompted.
   Future<void> _startScan() async {
-    printerStore.startUsbScan();
+    // Request Bluetooth permissions (Android 12+ needs SCAN + CONNECT)
+    final btStatus = await Permission.bluetoothScan.request();
+    await Permission.bluetoothConnect.request();
+
+    // Android also requires Location for BLE discovery
+    final locStatus = await Permission.locationWhenInUse.request();
+
+    if (btStatus.isDenied || locStatus.isDenied) {
+      if (mounted) {
+        NotificationService.instance.showError(
+            'Bluetooth and Location permissions are required to scan');
+      }
+      return;
+    }
+
+    printerStore.startBluetoothScan();
   }
 
   void _stopScan() {
     printerStore.stopScan();
   }
 
-  /// Save dialog — same structure as Bluetooth save dialog. The dialog owns its
-  /// own controller (see [SavePrinterDialog]) and returns the entered values.
+  /// Show save dialog — the dialog owns its own controller (see
+  /// [SavePrinterDialog]) and returns the entered name + paper size.
   Future<void> _showSaveDialog(DiscoveredPrinter device) async {
     final result = await showDialog<SavePrinterResult>(
       context: context,
       builder: (ctx) => SavePrinterDialog(
-        title: 'Save USB Printer',
-        icon: Icons.usb,
-        subtitle: 'VID: ${device.vendorId ?? device.address ?? "Unknown"}',
-        initialName: device.name ?? 'USB Printer',
+        title: 'Save Printer',
+        icon: Icons.bluetooth,
+        subtitle: device.address ?? 'Unknown address',
+        initialName: device.name ?? 'BT Printer',
       ),
     );
     if (result == null) return; // cancelled / dismissed
 
-    // Role is assigned later by the slot on the Printer Management screen.
-    await printerStore.saveUsbPrinter(
+    // Restaurant assigns the role later via its Printer Management slots;
+    // retail passes assignToRole so saving claims the Billing slot outright.
+    await printerStore.saveBluetoothPrinter(
       device: device,
       name: result.name,
       paperSize: result.paperSize,
       role: 'receipt',
+      assignRole: widget.assignToRole,
     );
     if (mounted) {
       NotificationService.instance
@@ -340,6 +387,7 @@ class _UsbState extends State<Usb> {
     }
   }
 
+  /// Delete with confirmation
   Future<void> _confirmDelete(String id, String name) async {
     final confirmed = await showAppConfirmDialog(
       context: context,
@@ -357,17 +405,4 @@ class _UsbState extends State<Usb> {
       }
     }
   }
-}
-
-/// Heuristic: does this USB device name look like something OTHER than a printer
-/// (an HDMI/AV adapter, LAN chip, hub, keyboard…)? Used only to flag/sort the
-/// scan list — never to hide a device, since a real printer can be oddly named.
-bool _isLikelyNonPrinter(String? name) {
-  final n = (name ?? '').toLowerCase();
-  if (n.isEmpty) return false;
-  const nonPrinterHints = [
-    'adapter', 'av ', 'hdmi', 'lan', 'ethernet', 'hub', 'keyboard',
-    'mouse', 'audio', 'camera', 'webcam', 'storage', 'disk', 'display', 'dock',
-  ];
-  return nonPrinterHints.any(n.contains);
 }

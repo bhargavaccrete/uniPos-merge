@@ -2,11 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
-import 'package:billberrylite/presentation/screens/restaurant/printerSetting/addprinter/Blutooth.dart';
-import 'package:billberrylite/presentation/screens/restaurant/printerSetting/addprinter/usb.dart';
-import 'package:billberrylite/presentation/screens/restaurant/printerSetting/addprinter/wifi.dart';
+import 'package:billberrylite/presentation/screens/common/printer/addprinter/Blutooth.dart';
+import 'package:billberrylite/presentation/screens/common/printer/addprinter/usb.dart';
+import 'package:billberrylite/presentation/screens/common/printer/addprinter/wifi.dart';
 class AddPrinter extends StatefulWidget {
-  const AddPrinter({super.key});
+  /// When set, a printer saved here is immediately pointed at that slot
+  /// (`'receipt'` or `'kot'`).
+  ///
+  /// Retail passes `'receipt'`: it has one slot and no Printer Management
+  /// screen, so saving a printer IS choosing it. Restaurant leaves this null —
+  /// its slot cards do the assigning, and auto-claiming a slot there would
+  /// silently reroute the Billing or Kitchen printer.
+  final String? assignToRole;
+
+  const AddPrinter({super.key, this.assignToRole});
 
   @override
   State<AddPrinter> createState() => _AddPrinterState();
@@ -53,9 +62,9 @@ class _AddPrinterState extends State<AddPrinter> with SingleTickerProviderStateM
       body: TabBarView(
           controller: tabController,
           children: [
-            WifiLan(),
-            Bluthooth(),
-            Usb()
+            WifiLan(assignToRole: widget.assignToRole),
+            Bluthooth(assignToRole: widget.assignToRole),
+            Usb(assignToRole: widget.assignToRole)
           ]),
     );
   }

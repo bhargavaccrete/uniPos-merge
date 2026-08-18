@@ -6,6 +6,7 @@ import 'package:billberrylite/domain/services/restaurant/notification_service.da
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'slot_row_actions.dart';
 
 /// WiFi/LAN Printer setup screen.
 ///
@@ -16,7 +17,10 @@ import 'package:billberrylite/presentation/widget/componets/common/app_dialog.da
 /// WiFi printers don't need discovery (unlike Bluetooth). Staff types the IP
 /// address found on the printer's config page, tests the connection, and saves.
 class WifiLan extends StatefulWidget {
-  const WifiLan({super.key});
+  /// Slot to point at a newly saved printer — see [AddPrinter.assignToRole].
+  final String? assignToRole;
+
+  const WifiLan({super.key, this.assignToRole});
 
   @override
   State<WifiLan> createState() => _WifiLanState();
@@ -278,6 +282,9 @@ class _WifiLanState extends State<WifiLan> {
                     border: Border.all(color: AppColors.divider),
                   ),
                   child: ListTile(
+                    // In assign mode, tapping a row makes it the active printer.
+                    onTap: () =>
+                        setActiveForSlot(printer, widget.assignToRole),
                     leading: Icon(Icons.wifi, color: AppColors.info),
                     // Printer name + connection details
                     title: Text(
@@ -289,10 +296,12 @@ class _WifiLanState extends State<WifiLan> {
                       style: GoogleFonts.poppins(
                           fontSize: 12, color: AppColors.textSecondary),
                     ),
-                    // Action buttons: Test print + Delete
+                    // Action buttons: Active badge + Test print + Delete
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        ...[activeSlotBadge(printer, widget.assignToRole)]
+                            .whereType<Widget>(),
                         // Test print — sends a test ticket to verify it works
                         IconButton(
                           icon: const Icon(Icons.print_outlined, size: 20),
@@ -411,6 +420,7 @@ class _WifiLanState extends State<WifiLan> {
       port: port,
       paperSize: _paperSize,
       role: _role,
+      assignRole: widget.assignToRole,
     );
 
     if (mounted) {

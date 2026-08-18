@@ -226,9 +226,15 @@ mixin _$PrinterStore on _PrinterStore, Store {
       required String ip,
       int port = 9100,
       int paperSize = 80,
-      String role = 'both'}) {
+      String role = 'both',
+      String? assignRole}) {
     return _$addWifiPrinterAsyncAction.run(() => super.addWifiPrinter(
-        name: name, ip: ip, port: port, paperSize: paperSize, role: role));
+        name: name,
+        ip: ip,
+        port: port,
+        paperSize: paperSize,
+        role: role,
+        assignRole: assignRole));
   }
 
   late final _$testWifiConnectionAsyncAction =
@@ -265,9 +271,14 @@ mixin _$PrinterStore on _PrinterStore, Store {
       {required DiscoveredPrinter device,
       required String name,
       int paperSize = 80,
-      String role = 'both'}) {
+      String role = 'both',
+      String? assignRole}) {
     return _$saveUsbPrinterAsyncAction.run(() => super.saveUsbPrinter(
-        device: device, name: name, paperSize: paperSize, role: role));
+        device: device,
+        name: name,
+        paperSize: paperSize,
+        role: role,
+        assignRole: assignRole));
   }
 
   late final _$saveBluetoothPrinterAsyncAction =
@@ -278,10 +289,15 @@ mixin _$PrinterStore on _PrinterStore, Store {
       {required DiscoveredPrinter device,
       required String name,
       int paperSize = 80,
-      String role = 'both'}) {
+      String role = 'both',
+      String? assignRole}) {
     return _$saveBluetoothPrinterAsyncAction.run(() => super
         .saveBluetoothPrinter(
-            device: device, name: name, paperSize: paperSize, role: role));
+            device: device,
+            name: name,
+            paperSize: paperSize,
+            role: role,
+            assignRole: assignRole));
   }
 
   late final _$sendBytesAsyncAction =

@@ -108,7 +108,7 @@ import '../../presentation/screens/restaurant/Reports/expenseReport/expenserepor
 import '../../presentation/screens/restaurant/Reports/paymentMode/payment_mode_report.dart';
 import '../../presentation/screens/restaurant/Reports/void Order Report/voidOrderReport.dart';
 import '../../presentation/screens/restaurant/Reports/item Cancellation Report/itemCancellationReport.dart';
-import '../../presentation/screens/restaurant/printerSetting/addprinter/addprinter.dart';
+import '../../presentation/screens/common/printer/addprinter/addprinter.dart';
 import '../../presentation/screens/restaurant/shift/shift_report_screen.dart';
 import '../../presentation/screens/restaurant/shift/staff_performance_screen.dart';
 import '../../presentation/screens/restaurant/cash_drawer/cash_drawer_screen.dart';

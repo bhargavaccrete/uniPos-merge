@@ -106,6 +106,13 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.paymentMethod)) {
       Hive.registerAdapter(pm.PaymentMethodAdapter());
     }
+    // SavedPrinterModel - typeId: 130. Lives in the restaurant typeId range for
+    // historical reasons, but printer pairing is COMMON to both modes — retail
+    // pairs through the same shared UI, so the adapter must be registered
+    // regardless of business mode.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.savedPrinter)) {
+      Hive.registerAdapter(SavedPrinterModelAdapter());
+    }
   }
 
   /// Open common boxes (needed regardless of business mode)
@@ -121,6 +128,10 @@ class HiveInit {
     // Generic named-sequence counters (bill/order/KOT numbers, SKU sequence,
     // etc.) — shared across both business modes.
     await Hive.openBox(HiveBoxNames.appCounters);
+    // Saved thermal printers (Bluetooth/WiFi/USB) — one physical box for both
+    // modes. PrinterRepository's constructor does a synchronous Hive.box()
+    // lookup, so this must be open before the service locator builds it.
+    await Hive.openBox<SavedPrinterModel>(HiveBoxNames.restaurantPrinters);
 
     // Open and initialize payment methods box with defaults
     final paymentBox = await Hive.openBox<pm.PaymentMethod>(HiveBoxNames.paymentMethods);
@@ -580,10 +591,8 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantCashHandover)) {
       Hive.registerAdapter(CashHandoverModelAdapter());
     }
-    // SavedPrinterModel - 130: BT/WiFi thermal printer configuration
-    if (!Hive.isAdapterRegistered(HiveTypeIds.savedPrinter)) {
-      Hive.registerAdapter(SavedPrinterModelAdapter());
-    }
+    // SavedPrinterModel (130) moved to _registerCommonAdapters — printer
+    // pairing is shared with retail.
     // RestaurantSessionModel - 131: Session-based day management
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantSession)) {
       Hive.registerAdapter(RestaurantSessionModelAdapter());
@@ -654,8 +663,7 @@ class HiveInit {
     await Hive.openBox<StockMovementModel>(HiveBoxNames.restaurantStockMovements);
     await Hive.openBox<CashHandoverModel>(HiveBoxNames.restaurantCashHandovers);
 
-    // Saved thermal printers (Bluetooth/WiFi configuration)
-    await Hive.openBox<SavedPrinterModel>(HiveBoxNames.restaurantPrinters);
+    // Saved thermal printers box moved to openCommonBoxes — shared with retail.
 
     // Restaurant POS Sessions
     await Hive.openBox<RestaurantSessionModel>(HiveBoxNames.restaurantSessions);
