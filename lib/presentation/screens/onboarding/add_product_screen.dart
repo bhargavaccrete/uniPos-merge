@@ -4346,8 +4346,11 @@ class _AddProductScreenState extends State<AddProductScreen>
                       attributes: Map.fromEntries(
                         combo.entries.map((e) => MapEntry(e.key, e.value.value)),
                       ),
+                      // Keyed by attributeId, not name — see the same note in
+                      // AddProductFormStore._generateRetailVariants.
                       attributeValueIds: Map.fromEntries(
-                        combo.entries.map((e) => MapEntry(e.key, e.value.valueId)),
+                        combo.entries.map(
+                            (e) => MapEntry(e.value.attributeId, e.value.valueId)),
                       ),
                       price: 0, // Will be set using bulk edit
                       costPrice: 0, // Will be set using bulk edit

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/common/short_ref.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
@@ -10,6 +11,10 @@ import 'package:billberrylite/domain/services/retail/retail_billing_service.dart
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 import 'package:billberrylite/presentation/screens/retail/customer_selection_screen.dart';
 import 'package:billberrylite/presentation/widget/componets/common/split_payment_widget.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/common/loyalty_points.dart';
@@ -174,33 +179,57 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final formattedTotal = _grandTotal.toStringAsFixed(precision);
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Pay Later'),
-        content: Column(
+      builder: (dialogContext) => AppDialogShell(
+        title: 'Confirm Pay Later',
+        subtitle: 'Settle this bill against the customer\'s account',
+        icon: Icons.schedule_rounded,
+        accent: AppColors.warning,
+        body: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Customer: ${customerStore.selectedCustomer!.name}'),
-            const SizedBox(height: 8),
-            Text('Amount: $symbol$formattedTotal'),
-            const SizedBox(height: 8),
-            const Text(
-              'This will create a credit sale. The amount will be added to the customer\'s outstanding balance.',
-              style: TextStyle(fontSize: 13, color: Color(0xFF6B6B6B)),
+            _payLaterRow(dialogContext, 'Customer',
+                customerStore.selectedCustomer!.name ?? 'Unnamed'),
+            _payLaterRow(dialogContext, 'Amount', '$symbol$formattedTotal',
+                emphasise: true),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: AppColors.warning.withValues(alpha: 0.25)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline_rounded,
+                      size: 18, color: AppColors.warning),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'This creates a credit sale. The amount is added to the '
+                      'customer\'s outstanding balance.',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.captionFontSize(dialogContext),
+                        color: AppColors.textSecondary,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF9800),
-            ),
-            child: const Text('Confirm Pay Later'),
+          appDialogCancelButton(dialogContext),
+          const SizedBox(width: 12),
+          appDialogPrimaryButton(
+            label: 'Pay Later',
+            color: AppColors.warning,
+            onPressed: () => Navigator.pop(dialogContext, true),
           ),
         ],
       ),
@@ -245,7 +274,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
 
       // Save sale and items through the store, then adjust stock
-      await saleStore.addSaleWithItems(sale, _buildSaleItems(saleId, bill));
+      await saleStore.addSaleWithItems(
+          sale, await _buildSaleItems(saleId, bill));
       await _deductStock();
 
       // Store customer before clearing
@@ -263,6 +293,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           customer: customer!,
         );
       }
+
+      // Closing the dialog only closed the DIALOG — the cart was cleared
+      // above, so the user was left staring at an empty Checkout and had to
+      // press back again to reach billing. Hand control back to the POS, which
+      // already awaits `true` to toast the success.
+      if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) {
         NotificationService.instance.showError('Error processing credit sale: $e');
@@ -277,13 +313,63 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
+  /// One label/value line of the Pay Later confirmation — same shape the
+  /// Settings day-info dialog uses, so confirmations read alike.
+  Widget _payLaterRow(BuildContext context, String label, String value,
+      {bool emphasise = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.poppins(
+                fontSize: emphasise
+                    ? AppResponsive.subheadingFontSize(context)
+                    : AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: emphasise ? AppColors.warning : AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Persist the sale lines exactly as the engine computed them.
   ///
   /// The per-item taxable amount and discount share must come from [bill],
   /// not from the cart row: a cart row's taxable amount is computed at add-time
   /// and knows nothing about an order-level discount applied later. Reading it
   /// back here is what used to store an inflated tax base on every invoice.
-  List<SaleItemModel> _buildSaleItems(String saleId, RetailBill bill) {
+  ///
+  /// The variant's cost is read here and frozen onto the line. Profit reports
+  /// used to look up the variant's live `costPrice` instead, so a supplier
+  /// price change re-wrote the profit on sales that had already been settled.
+  Future<List<SaleItemModel>> _buildSaleItems(
+      String saleId, RetailBill bill) async {
+    // One lookup per distinct variant in the basket, not per report row.
+    final costByVariantId = <String, double?>{};
+    for (final line in bill.lines) {
+      final variantId = line.item.variantId;
+      if (costByVariantId.containsKey(variantId)) continue;
+      final variant = await productStore.getVariantById(variantId);
+      costByVariantId[variantId] = variant?.costPrice;
+    }
+
     return bill.lines.map((line) {
       final cartItem = line.item;
       return SaleItemModel.fromCalculated(
@@ -301,6 +387,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         total: line.total,
         barcode: cartItem.barcode,
         hsnCode: cartItem.hsnCode,
+        costPrice: costByVariantId[cartItem.variantId],
       );
     }).toList();
   }
@@ -380,7 +467,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
 
       // Persist the header and its lines through the store, in one action.
-      final saleItems = _buildSaleItems(saleId, bill);
+      final saleItems = await _buildSaleItems(saleId, bill);
       await saleStore.addSaleWithItems(sale, saleItems);
 
       await _deductStock();
@@ -399,6 +486,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           customer: customer,
         );
       }
+
+      // See the credit path above — the dialog's buttons pop the dialog, not
+      // this screen, so printing and pressing back landed on a blank Checkout.
+      if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) {
         NotificationService.instance.showError('Error processing checkout: $e');
@@ -1251,7 +1342,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
               // Sale ID
               Text(
-                'Receipt #${sale.saleId.substring(0, 8).toUpperCase()}',
+                'Receipt #${shortRef(sale.saleId)}',
                 style: const TextStyle(
                   color: Color(0xFF6B6B6B),
                   fontSize: 14,
@@ -1470,7 +1561,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
               // Invoice ID
               Text(
-                'Invoice #${sale.saleId.substring(0, 8).toUpperCase()}',
+                'Invoice #${shortRef(sale.saleId)}',
                 style: const TextStyle(
                   color: Color(0xFF6B6B6B),
                   fontSize: 14,

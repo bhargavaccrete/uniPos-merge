@@ -38,13 +38,14 @@ class SaleItemModelAdapter extends TypeAdapter<SaleItemModel> {
       sgstAmount: fields[18] as double?,
       weight: fields[19] as String?,
       attributes: (fields[20] as Map?)?.cast<String, String>(),
+      costPrice: fields[21] as double?,
     );
   }
 
   @override
   void write(BinaryWriter writer, SaleItemModel obj) {
     writer
-      ..writeByte(21)
+      ..writeByte(22)
       ..writeByte(0)
       ..write(obj.saleItemId)
       ..writeByte(1)
@@ -86,7 +87,9 @@ class SaleItemModelAdapter extends TypeAdapter<SaleItemModel> {
       ..writeByte(19)
       ..write(obj.weight)
       ..writeByte(20)
-      ..write(obj.attributes);
+      ..write(obj.attributes)
+      ..writeByte(21)
+      ..write(obj.costPrice);
   }
 
   @override

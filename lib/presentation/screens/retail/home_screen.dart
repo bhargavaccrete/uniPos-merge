@@ -17,6 +17,7 @@ import 'package:billberrylite/presentation/screens/retail/reports_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/stock_alerts_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/supplier_list_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/purchase_order_list_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/damaged_goods_hub_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/sales_history_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/cash_drawer_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/settings_screen.dart';
@@ -532,6 +533,13 @@ class _HomeScreenState extends State<HomeScreen> {
         title: 'Purchase Orders',
         color: Colors.cyan,
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PurchaseOrderListScreen())),
+      ),
+      // Returns, claims and write-offs raised from damaged goods on a GRN.
+      DashboardMenuCard(
+        icon: Icons.assignment_return_rounded,
+        title: 'Returns & Claims',
+        color: Colors.deepPurple,
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const DamagedGoodsHubScreen())),
       ),
       DashboardMenuCard(
         icon: Icons.receipt_long_rounded,

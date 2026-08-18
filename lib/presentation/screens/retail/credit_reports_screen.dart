@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/common/short_ref.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+
 import 'package:intl/intl.dart';
 import '../../../core/di/service_locator.dart';
 import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model_218.dart';
@@ -14,6 +19,20 @@ class CreditReportsScreen extends StatefulWidget {
 
   @override
   State<CreditReportsScreen> createState() => _CreditReportsScreenState();
+}
+
+/// Query bounds for the user-facing range: midnight to midnight with an
+/// **exclusive** end.
+///
+/// The picker hands back midnight of the final day, and every retail query is
+/// exclusive at the end — so passing it straight through dropped that whole
+/// last day. [DateTimeRange] itself stays inclusive because it is what the
+/// filter chip displays.
+(DateTime, DateTime) _queryBounds(DateTimeRange range) {
+  final start = DateTime(range.start.year, range.start.month, range.start.day);
+  final end = DateTime(range.end.year, range.end.month, range.end.day)
+      .add(const Duration(days: 1));
+  return (start, end);
 }
 
 class _CreditReportsScreenState extends State<CreditReportsScreen>
@@ -57,30 +76,32 @@ class _CreditReportsScreenState extends State<CreditReportsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text('Credit Reports'),
-        backgroundColor: Colors.white,
-        elevation: 0,
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: 'Credit Reports',
         actions: [
           IconButton(
+            // White on the primary fill; the amber marks an active filter,
+            // which used to be green-on-white and is now invisible otherwise.
             icon: Icon(
               Icons.filter_alt_outlined,
-              color: _dateFilter != null ? const Color(0xFF4CAF50) : null,
+              color: _dateFilter != null ? AppColors.warning : Colors.white,
             ),
+            tooltip: 'Filter by date',
             onPressed: _selectDateRange,
           ),
           if (_dateFilter != null)
             IconButton(
-              icon: const Icon(Icons.clear),
+              icon: const Icon(Icons.clear, color: Colors.white),
+              tooltip: 'Clear filter',
               onPressed: () => setState(() => _dateFilter = null),
             ),
         ],
         bottom: TabBar(
           controller: _tabController,
-          labelColor: const Color(0xFF4CAF50),
-          unselectedLabelColor: const Color(0xFF6B6B6B),
-          indicatorColor: const Color(0xFF4CAF50),
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          indicatorColor: Colors.white,
           tabs: const [
             Tab(text: 'Credit Sales'),
             Tab(text: 'Collections'),
@@ -98,11 +119,13 @@ class _CreditReportsScreenState extends State<CreditReportsScreen>
               color: const Color(0xFFE3F2FD),
               child: Row(
                 children: [
-                  const Icon(Icons.calendar_today, size: 16, color: Color(0xFF1976D2)),
+                  Icon(Icons.calendar_today, size: 16, color: Color(0xFF1976D2)),
                   const SizedBox(width: 8),
                   Text(
                     '${DateFormat('dd/MM/yy').format(_dateFilter!.start)} - ${DateFormat('dd/MM/yy').format(_dateFilter!.end)}',
-                    style: const TextStyle(color: Color(0xFF1976D2), fontSize: 13),
+                    style: TextStyle(
+                        color: const Color(0xFF1976D2),
+                        fontSize: AppResponsive.smallFontSize(context)),
                   ),
                 ],
               ),
@@ -159,10 +182,8 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
     try {
       List<SaleModel> sales;
       if (widget.dateFilter != null) {
-        sales = await saleStore.getCreditSalesByDateRange(
-          widget.dateFilter!.start,
-          widget.dateFilter!.end,
-        );
+        final (start, end) = _queryBounds(widget.dateFilter!);
+        sales = await saleStore.getCreditSalesByDateRange(start, end);
       } else {
         sales = await saleStore.getCreditSales();
       }
@@ -238,14 +259,14 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
         Text(
           value,
           style: TextStyle(
-            fontSize: 18,
+            fontSize: AppResponsive.subheadingFontSize(context),
             fontWeight: FontWeight.w700,
             color: color,
           ),
         ),
         Text(
           label,
-          style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
+          style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: Color(0xFF6B6B6B)),
         ),
       ],
     );
@@ -270,9 +291,9 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'INV-${sale.saleId.substring(0, 8).toUpperCase()}',
-                style: const TextStyle(
-                  fontSize: 14,
+                'INV-${shortRef(sale.saleId)}',
+                style: TextStyle(
+                  fontSize: AppResponsive.bodyFontSize(context),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -285,7 +306,7 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
                 child: Text(
                   sale.statusDisplayText,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: AppResponsive.captionFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: _getStatusColor(sale.status),
                   ),
@@ -296,7 +317,7 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
           const SizedBox(height: 8),
           Text(
             dateStr,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF9E9E9E)),
+            style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: Color(0xFF9E9E9E)),
           ),
           const SizedBox(height: 8),
           Row(
@@ -305,14 +326,14 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Total',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF9E9E9E)),
+                    style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: Color(0xFF9E9E9E)),
                   ),
                   Text(
                     '₹${sale.totalAmount.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 16,
+                    style: TextStyle(
+                      fontSize: AppResponsive.subheadingFontSize(context),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -321,14 +342,14 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  const Text(
+                  Text(
                     'Due',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF9E9E9E)),
+                    style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: Color(0xFF9E9E9E)),
                   ),
                   Text(
                     '₹${sale.dueAmount.toStringAsFixed(2)}',
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: AppResponsive.subheadingFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: sale.dueAmount > 0 ? Colors.red : Colors.green,
                     ),
@@ -392,14 +413,11 @@ class _CollectionsTabState extends State<_CollectionsTab> {
       Map<String, double> collections;
 
       if (widget.dateFilter != null) {
-        payments = await creditPaymentRepository.getPaymentsByDateRange(
-          widget.dateFilter!.start,
-          widget.dateFilter!.end,
-        );
+        final (start, end) = _queryBounds(widget.dateFilter!);
+        payments =
+            await creditPaymentRepository.getPaymentsByDateRange(start, end);
         collections = await creditPaymentRepository.getCollectionByModeInRange(
-          widget.dateFilter!.start,
-          widget.dateFilter!.end,
-        );
+            start, end);
       } else {
         payments = await creditPaymentRepository.getAllPayments();
         collections = {'cash': 0, 'card': 0, 'upi': 0, 'total': 0};
@@ -454,14 +472,14 @@ class _CollectionsTabState extends State<_CollectionsTab> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Total Collections',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                      style: TextStyle(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w500),
                     ),
                     Text(
                       '₹${(_collectionByMode['total'] ?? 0).toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 18,
+                      style: TextStyle(
+                        fontSize: AppResponsive.subheadingFontSize(context),
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF4CAF50),
                       ),
@@ -505,13 +523,13 @@ class _CollectionsTabState extends State<_CollectionsTab> {
         children: [
           Text(
             label,
-            style: TextStyle(fontSize: 12, color: color),
+            style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: color),
           ),
           const SizedBox(height: 4),
           Text(
             '₹${amount.toStringAsFixed(0)}',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.w700,
               color: color,
             ),
@@ -557,15 +575,15 @@ class _CollectionsTabState extends State<_CollectionsTab> {
               children: [
                 Text(
                   payment.isDebtWriteOff ? 'Write-Off' : payment.paymentModeDisplayText,
-                  style: const TextStyle(
-                    fontSize: 14,
+                  style: TextStyle(
+                    fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   dateStr,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF9E9E9E)),
+                  style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: Color(0xFF9E9E9E)),
                 ),
               ],
             ),
@@ -573,7 +591,7 @@ class _CollectionsTabState extends State<_CollectionsTab> {
           Text(
             '₹${payment.amount.toStringAsFixed(2)}',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: AppResponsive.subheadingFontSize(context),
               fontWeight: FontWeight.w600,
               color: payment.isDebtWriteOff ? Colors.grey : const Color(0xFF4CAF50),
             ),
@@ -641,15 +659,15 @@ class _OutstandingTabState extends State<_OutstandingTab> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Total Outstanding',
-                    style: TextStyle(fontSize: 14, color: Color(0xFF6B6B6B)),
+                    style: TextStyle(fontSize: AppResponsive.bodyFontSize(context), color: Color(0xFF6B6B6B)),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '₹${_totalOutstanding.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 28,
+                    style: TextStyle(
+                      fontSize: AppResponsive.headingFontSize(context),
                       fontWeight: FontWeight.w700,
                       color: Colors.red,
                     ),
@@ -666,15 +684,15 @@ class _OutstandingTabState extends State<_OutstandingTab> {
                   children: [
                     Text(
                       '${_customersWithDue.length}',
-                      style: const TextStyle(
-                        fontSize: 24,
+                      style: TextStyle(
+                        fontSize: AppResponsive.headingFontSize(context),
                         fontWeight: FontWeight.w700,
                         color: Colors.red,
                       ),
                     ),
-                    const Text(
+                    Text(
                       'Customers',
-                      style: TextStyle(fontSize: 12, color: Colors.red),
+                      style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: Colors.red),
                     ),
                   ],
                 ),
@@ -686,15 +704,16 @@ class _OutstandingTabState extends State<_OutstandingTab> {
         // List
         Expanded(
           child: _customersWithDue.isEmpty
-              ? const Center(
+              ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.check_circle, size: 64, color: Color(0xFF4CAF50)),
+                      const Icon(Icons.check_circle,
+                          size: 64, color: Color(0xFF4CAF50)),
                       SizedBox(height: 16),
                       Text(
                         'No outstanding balance!',
-                        style: TextStyle(fontSize: 16, color: Color(0xFF6B6B6B)),
+                        style: TextStyle(fontSize: AppResponsive.subheadingFontSize(context), color: Color(0xFF6B6B6B)),
                       ),
                     ],
                   ),
@@ -762,15 +781,15 @@ class _OutstandingTabState extends State<_OutstandingTab> {
                       children: [
                         Text(
                           customer.name ?? '',
-                          style: const TextStyle(
-                            fontSize: 14,
+                          style: TextStyle(
+                            fontSize: AppResponsive.bodyFontSize(context),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         Text(
                           customer.phone ?? '',
-                          style: const TextStyle(
-                            fontSize: 12,
+                          style: TextStyle(
+                            fontSize: AppResponsive.captionFontSize(context),
                             color: Color(0xFF9E9E9E),
                           ),
                         ),
@@ -782,16 +801,16 @@ class _OutstandingTabState extends State<_OutstandingTab> {
                     children: [
                       Text(
                         '₹${customer.creditBalance.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 16,
+                        style: TextStyle(
+                          fontSize: AppResponsive.subheadingFontSize(context),
                           fontWeight: FontWeight.w700,
                           color: Colors.red,
                         ),
                       ),
                       Text(
                         '${percentage.toStringAsFixed(1)}%',
-                        style: const TextStyle(
-                          fontSize: 11,
+                        style: TextStyle(
+                          fontSize: AppResponsive.captionFontSize(context),
                           color: Color(0xFF9E9E9E),
                         ),
                       ),

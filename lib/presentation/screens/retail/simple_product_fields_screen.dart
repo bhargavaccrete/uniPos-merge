@@ -10,6 +10,7 @@ import 'package:billberrylite/presentation/widget/componets/common/app_empty_sta
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 /// Configures which descriptor fields appear on a **Simple** product's variant
 /// card — replacing the hardcoded Color / Size / Weight boxes.
@@ -122,7 +123,7 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
                   Text(
                     'Add Field',
                     style: GoogleFonts.poppins(
-                      fontSize: 16,
+                      fontSize: AppResponsive.subheadingFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
                     ),
@@ -136,7 +137,7 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
                     icon: const Icon(Icons.add_circle_outline, size: 18),
                     label: Text('Create New',
                         style: GoogleFonts.poppins(
-                            fontSize: 13, fontWeight: FontWeight.w600)),
+                            fontSize: AppResponsive.smallFontSize(context), fontWeight: FontWeight.w600)),
                   ),
                 ],
               ),
@@ -148,7 +149,7 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
                 child: Text(
                   'All existing attributes are already added.',
                   style: GoogleFonts.poppins(
-                      fontSize: 13, color: AppColors.textSecondary),
+                      fontSize: AppResponsive.smallFontSize(context), color: AppColors.textSecondary),
                 ),
               )
             else
@@ -164,7 +165,7 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
                           color: AppColors.primary),
                       title: Text(attribute.name,
                           style: GoogleFonts.poppins(
-                              fontSize: 14, fontWeight: FontWeight.w500)),
+                              fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w500)),
                       subtitle: Text(
                         values.isEmpty
                             ? 'No preset values'
@@ -172,7 +173,7 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.poppins(
-                            fontSize: 11, color: AppColors.textSecondary),
+                            fontSize: AppResponsive.captionFontSize(context), color: AppColors.textSecondary),
                       ),
                       onTap: () {
                         Navigator.pop(sheetContext);
@@ -272,9 +273,9 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.06),
+        color: AppColors.primary.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -288,7 +289,7 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
               'don\'t sell by and add your own — price, stock, barcode and SKU '
               'are always shown.',
               style: GoogleFonts.poppins(
-                fontSize: 12,
+                fontSize: AppResponsive.captionFontSize(context),
                 height: 1.4,
                 color: AppColors.textSecondary,
               ),
@@ -308,7 +309,7 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
         action: OutlinedButton.icon(
           onPressed: _showAddFieldSheet,
           icon: const Icon(Icons.add),
-          label: const Text('Add Field'),
+          label: Text('Add Field'),
         ),
       );
     }
@@ -323,7 +324,7 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
           icon: const Icon(Icons.add),
           label: Text('Add Field',
               style: GoogleFonts.poppins(
-                  fontSize: 14, fontWeight: FontWeight.w600)),
+                  fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600)),
           style: OutlinedButton.styleFrom(
             foregroundColor: AppColors.primary,
             side: const BorderSide(color: AppColors.primary),
@@ -356,7 +357,7 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
                 Text(
                   attribute.name,
                   style: GoogleFonts.poppins(
-                    fontSize: 14,
+                    fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
@@ -369,7 +370,7 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
-                      fontSize: 11, color: AppColors.textSecondary),
+                      fontSize: AppResponsive.captionFontSize(context), color: AppColors.textSecondary),
                 ),
               ],
             ),
@@ -414,7 +415,7 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
               : Text(
                   'Save Fields',
                   style: GoogleFonts.poppins(
-                    fontSize: 15,
+                    fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: AppColors.white,
                   ),

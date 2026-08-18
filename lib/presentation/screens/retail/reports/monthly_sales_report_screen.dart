@@ -1,19 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:billberrylite/domain/services/retail/report_service.dart';
 
+import 'package:billberrylite/domain/services/retail/report_service.dart';
+import 'package:billberrylite/presentation/screens/retail/reports/sales_totals_report_view.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_date_step_bar.dart';
+import 'package:billberrylite/util/restaurant/report_history_window.dart';
+import 'package:billberrylite/util/color.dart';
+
+/// Sales totals for a single month.
+///
+/// Point-in-time like the daily report, so it keeps its own month picker and
+/// shares [SalesTotalsReportView] for the body.
 class MonthlySalesReportScreen extends StatefulWidget {
   const MonthlySalesReportScreen({super.key});
 
   @override
-  State<MonthlySalesReportScreen> createState() => _MonthlySalesReportScreenState();
+  State<MonthlySalesReportScreen> createState() =>
+      _MonthlySalesReportScreenState();
 }
 
 class _MonthlySalesReportScreenState extends State<MonthlySalesReportScreen> {
   final ReportService _reportService = ReportService();
+
   DateTime _selectedMonth = DateTime.now();
   Map<String, dynamic>? _reportData;
-  bool _isLoading = false;
+  List<Map<String, dynamic>> _items = const [];
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -23,138 +36,92 @@ class _MonthlySalesReportScreenState extends State<MonthlySalesReportScreen> {
 
   Future<void> _loadReport() async {
     setState(() => _isLoading = true);
-    try {
-      final data = await _reportService.getMonthlySalesReport(_selectedMonth.year, _selectedMonth.month);
-      setState(() {
-        _reportData = data;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-    }
+
+    // Same window the totals cover. `DateTime(y, m + 1)` rolls the year over
+    // correctly for December.
+    final start = DateTime(_selectedMonth.year, _selectedMonth.month);
+    final end = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
+
+    final totalsFuture = _reportService.getMonthlySalesReport(
+        _selectedMonth.year, _selectedMonth.month);
+    final itemsFuture =
+        _reportService.getVariantWiseSalesReport(startDate: start, endDate: end);
+
+    final data = await totalsFuture;
+    final items = await itemsFuture;
+    if (!mounted) return;
+    setState(() {
+      _reportData = data;
+      _items = items;
+      _isLoading = false;
+    });
   }
 
-  Future<void> _selectMonth() async {
+  Future<void> _pickMonth() async {
+    // Flutter has no month picker; the day is discarded on selection.
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedMonth,
-      firstDate: DateTime(2020),
+      // Clamped to the plan's history window, like every other report picker.
+      firstDate: ReportDateStepBar.pickerFirstDate(),
       lastDate: DateTime.now(),
+      helpText: 'Select any day in the month',
     );
+    if (picked == null || !mounted) return;
+    setState(() => _selectedMonth = DateTime(picked.year, picked.month));
+    await _loadReport();
+  }
 
-    if (picked != null) {
-      setState(() => _selectedMonth = DateTime(picked.year, picked.month));
-      _loadReport();
-    }
+  /// `DateTime(y, m + n)` normalises out-of-range months, so stepping past
+  /// December or before January rolls the year without special-casing.
+  Future<void> _step(int months) async {
+    setState(() => _selectedMonth =
+        DateTime(_selectedMonth.year, _selectedMonth.month + months));
+    await _loadReport();
+  }
+
+  /// The current month is the newest worth showing.
+  bool get _canStepForward {
+    final now = DateTime.now();
+    return _selectedMonth.isBefore(DateTime(now.year, now.month));
+  }
+
+  bool get _canStepBack {
+    final cutoff = ReportHistoryWindow.cutoff;
+    if (cutoff == null) return true;
+    // The previous month is reachable if any part of it is inside the window.
+    final previousMonthEnd =
+        DateTime(_selectedMonth.year, _selectedMonth.month);
+    return previousMonthEnd.isAfter(cutoff);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text('Monthly Sales Report'),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.white,
-        actions: [
-          IconButton(icon: const Icon(Icons.calendar_today), onPressed: _selectMonth),
-        ],
+      backgroundColor: AppColors.surfaceLight,
+      appBar: reportAppBar(
+        title: 'Monthly Sales',
+        subtitle: DateFormat('MMMM yyyy').format(_selectedMonth),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _reportData == null
-              ? const Center(child: Text('No data'))
-              : ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF9C27B0), Color(0xFF7B1FA2)],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        children: [
-                          const Text('Selected Month', style: TextStyle(color: Colors.white70, fontSize: 14)),
-                          const SizedBox(height: 8),
-                          Text(
-                            DateFormat('MMMM yyyy').format(_selectedMonth),
-                            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(child: _buildCard('Sales', '${_reportData!['totalSales']}', Icons.receipt, Colors.green)),
-                        const SizedBox(width: 12),
-                        Expanded(child: _buildCard('Revenue', '₹${(_reportData!['totalRevenue'] as double).toStringAsFixed(0)}', Icons.currency_rupee, Colors.blue)),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _buildStatsCard(),
-                  ],
-                ),
-    );
-  }
-
-  Widget _buildCard(String label, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
-      ),
-      child: Column(
+      body: Column(
         children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B))),
-          const SizedBox(height: 4),
-          Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatsCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Statistics', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 16),
-          _buildRow('Items Sold', '${_reportData!['totalItems']}'),
-          _buildRow('Discount', '₹${(_reportData!['totalDiscount'] as double).toStringAsFixed(2)}'),
-          _buildRow('Tax', '₹${(_reportData!['totalTax'] as double).toStringAsFixed(2)}'),
-          _buildRow('Returns', '${_reportData!['totalReturns']}'),
-          const Divider(height: 24),
-          _buildRow('Net Revenue', '₹${(_reportData!['netRevenue'] as double).toStringAsFixed(2)}', true),
-          _buildRow('Avg Sale', '₹${(_reportData!['averageSaleValue'] as double).toStringAsFixed(2)}'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRow(String label, String value, [bool highlight = false]) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(color: highlight ? Colors.black : const Color(0xFF6B6B6B))),
-          Text(value, style: TextStyle(fontWeight: FontWeight.w600, color: highlight ? Colors.green : Colors.black)),
+          ReportDateStepBar(
+            value: _selectedMonth,
+            label: DateFormat('MMMM yyyy').format(_selectedMonth),
+            onPrevious: _canStepBack ? () => _step(-1) : null,
+            onNext: _canStepForward ? () => _step(1) : null,
+            onPick: _pickMonth,
+          ),
+          Expanded(
+            child: SalesTotalsReportView(
+              isLoading: _isLoading,
+              data: _reportData,
+              items: _items,
+              periodLabel: DateFormat('MMMM yyyy').format(_selectedMonth),
+              reportTitle: 'Monthly Sales',
+              exportFileName: 'monthly_sales',
+            ),
+          ),
         ],
       ),
     );

@@ -1501,10 +1501,14 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
           ),
           child: Row(
             children: [
-              // Tabs
-              Expanded(
+              // Tabs. Flexible + shrinkWrap so the strip is only as wide as the
+              // tabs themselves — Expanded reserved the whole row, stranding the
+              // New button at the far right with a gap in between. It still
+              // scrolls once the tabs outgrow the available width.
+              Flexible(
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
+                  shrinkWrap: true,
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                   itemCount: cartStore.tabs.length,
                   itemBuilder: (context, index) {
@@ -1522,8 +1526,12 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                           },
                           borderRadius: BorderRadius.circular(10),
                           child: Container(
-                            constraints: const BoxConstraints(minWidth: 100, maxWidth: 180),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            // "Tab 1" + count + close needs nowhere near 100px;
+                            // the old floor padded every tab out and pushed the
+                            // strip wide. A customer name still gets room to 160.
+                            constraints:
+                                const BoxConstraints(minWidth: 0, maxWidth: 160),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
                               color: isActive
                                   ? AppColors.primary
@@ -1535,7 +1543,8 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                               children: [
                                 Flexible(
                                   child: Text(
-                                    tab.displayName,
+                                    // Position-derived — see CartStore.tabLabel.
+                                    cartStore.tabLabel(index),
                                     style: GoogleFonts.poppins(
                                       fontSize: AppResponsive.smallFontSize(context),
                                       fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/common/short_ref.dart';
 import 'package:flutter/services.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../domain/services/restaurant/notification_service.dart';
@@ -360,7 +361,7 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
               child: const Icon(Icons.receipt_long, color: Color(0xFFFF9800), size: 20),
             ),
             title: Text(
-              'INV-${invoice.saleId.substring(0, 8).toUpperCase()}',
+              'INV-${shortRef(invoice.saleId)}',
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
             ),
             subtitle: Text(

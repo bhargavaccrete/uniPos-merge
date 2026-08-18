@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/common/short_ref.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/color.dart';
 
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
@@ -52,9 +58,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading sale: $e'), backgroundColor: Colors.red),
-        );
+        NotificationService.instance.showError('Error loading sale: $e');
       }
     }
   }
@@ -62,31 +66,22 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
   Future<void> _processReturn() async {
     if (_sale == null) return;
 
-    // Confirm return
-    final confirmed = await showDialog<bool>(
+    final isFull = _returnType == 'full';
+    final refundAmount =
+        isFull ? _sale!.totalAmount : _calculatePartialReturnAmount();
+
+    final confirmed = await showAppConfirmDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Return'),
-        content: Text(
-          _returnType == 'full'
-              ? 'Process full return of ₹${_sale!.totalAmount.toStringAsFixed(2)}?'
-              : 'Process partial return of ₹${_calculatePartialReturnAmount().toStringAsFixed(2)}?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Confirm Return'),
-          ),
-        ],
-      ),
+      title: isFull ? 'Return whole sale?' : 'Return selected items?',
+      message: 'Refund ${formatMoney(refundAmount)} via '
+          '${_refundMethod.toUpperCase()}. Stock goes back in and the sale is '
+          'marked returned. This cannot be undone.',
+      confirmLabel: 'Confirm Return',
+      accent: AppColors.danger,
+      icon: Icons.assignment_return_rounded,
     );
 
-    if (confirmed != true) return;
+    if (!confirmed || !mounted) return;
 
     setState(() => _isProcessing = true);
 
@@ -112,23 +107,16 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
 
       if (mounted) {
         Navigator.pop(context, true); // Return to previous screen
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Return processed successfully!\nReturn ID: ${returnSaleId.substring(0, 13)}'),
-            backgroundColor: const Color(0xFF4CAF50),
-            duration: const Duration(seconds: 4),
-          ),
-        );
+        NotificationService.instance
+            .showSuccess('Return processed • ${shortRef(returnSaleId, length: 13)}');
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isProcessing = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error processing return: $e'), backgroundColor: Colors.red),
-        );
-      }
+      NotificationService.instance.showError('Error processing return: $e');
     }
   }
+
 
   double _calculatePartialReturnAmount() {
     double total = 0;
@@ -149,13 +137,10 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text('Process Return', style: TextStyle(fontSize: 18)),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.red,
-        foregroundColor: Colors.white,
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: 'Process Return',
+        titleFontSize: 18,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -199,7 +184,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -209,9 +194,9 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 12),
-          _buildInfoRow('Sale ID', _sale!.saleId.substring(0, 13).toUpperCase()),
+          _buildInfoRow('Sale ID', shortRef(_sale!.saleId, length: 13)),
           _buildInfoRow('Total Items', '${_sale!.totalItems}'),
-          _buildInfoRow('Total Amount', '₹${_sale!.totalAmount.toStringAsFixed(2)}'),
+          _buildInfoRow('Total Amount', formatMoney(_sale!.totalAmount)),
           _buildInfoRow('Payment Type', _sale!.paymentType.toUpperCase()),
         ],
       ),
@@ -224,7 +209,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Color(0xFF6B6B6B))),
+          Text(label, style: const TextStyle(color: AppColors.textSecondary)),
           Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
         ],
       ),
@@ -238,7 +223,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -248,34 +233,95 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 12),
+          // Selectable tiles rather than RadioListTile — Flutter deprecated
+          // Radio's groupValue/onChanged in favour of a RadioGroup ancestor,
+          // and these match the tiles used in Material Receiving.
           Row(
             children: [
               Expanded(
-                child: RadioListTile<String>(
-                  title: const Text('Full Return'),
-                  subtitle: const Text('Return all items'),
+                child: _returnTypeTile(
                   value: 'full',
-                  groupValue: _returnType,
-                  onChanged: (value) => setState(() {
-                    _returnType = value!;
-                    _selectedItems.clear();
-                  }),
-                  contentPadding: EdgeInsets.zero,
+                  label: 'Full Return',
+                  caption: 'Return all items',
                 ),
               ),
+              const SizedBox(width: 8),
               Expanded(
-                child: RadioListTile<String>(
-                  title: const Text('Partial Return'),
-                  subtitle: const Text('Select items'),
+                child: _returnTypeTile(
                   value: 'partial',
-                  groupValue: _returnType,
-                  onChanged: (value) => setState(() => _returnType = value!),
-                  contentPadding: EdgeInsets.zero,
+                  label: 'Partial Return',
+                  caption: 'Select items',
                 ),
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _returnTypeTile({
+    required String value,
+    required String label,
+    required String caption,
+  }) {
+    final selected = _returnType == value;
+
+    return InkWell(
+      onTap: () => setState(() {
+        _returnType = value;
+        // Switching back to a full return clears any partial picks, so the
+        // refund total can't be computed from a stale selection.
+        if (value == 'full') _selectedItems.clear();
+      }),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.07)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.divider,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              selected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              size: 18,
+              color: selected ? AppColors.primary : AppColors.textSecondary,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color:
+                          selected ? AppColors.primary : AppColors.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    caption,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -287,7 +333,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -329,7 +375,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -353,10 +399,10 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFFFFF3E0) : const Color(0xFFF5F5F5),
+        color: isSelected ? AppColors.warning.withValues(alpha: 0.1) : AppColors.surfaceMedium,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: isSelected ? Colors.orange : const Color(0xFFE8E8E8),
+          color: isSelected ? Colors.orange : AppColors.divider,
           width: isSelected ? 2 : 1,
         ),
       ),
@@ -392,13 +438,13 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                       Text(
                         attributeStore.describeAttributes(item.attributes,
                             size: item.size, color: item.color, labelled: false),
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
+                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                       ),
                   ],
                 ),
               ),
               Text(
-                '₹${item.total.toStringAsFixed(2)}',
+                formatMoney(item.total),
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
             ],
@@ -446,7 +492,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Colors.red, Color(0xFFD32F2F)],
+          colors: [Colors.red, AppColors.danger],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -460,7 +506,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            '₹${returnAmount.toStringAsFixed(2)}',
+            formatMoney(returnAmount),
             style: const TextStyle(
               color: Colors.white,
               fontSize: 32,
@@ -486,7 +532,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, -2),
           ),

@@ -9,6 +9,13 @@ class StockAlertService {
   static const String _enabledKey = 'stock_alerts_enabled';
   static const int _defaultThreshold = 10;
 
+  /// The threshold values offered in the UI.
+  ///
+  /// One list, because there are two places to change this setting — Settings
+  /// and the Stock Alerts screen — and they used to offer different options
+  /// (`[5,10,15,20,25,50]` vs `[5,10,15,20]`) for the same stored value.
+  static const List<int> thresholdOptions = [5, 10, 15, 20, 25, 50];
+
   /// Get the current stock alert threshold from preferences
   Future<int> getThreshold() async {
     final prefs = await SharedPreferences.getInstance();

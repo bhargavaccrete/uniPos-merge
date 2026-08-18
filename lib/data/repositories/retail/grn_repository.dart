@@ -1,8 +1,10 @@
 import 'package:hive/hive.dart';
+import '../../../domain/services/retail/document_number_service.dart';
 import '../../models/retail/hive_model/grn_model_213.dart';
 
 class GRNRepository {
   late Box<GRNModel> _grnBox;
+  final _numbers = DocumentNumberService();
 
   GRNRepository() {
     _grnBox = Hive.box<GRNModel>('grns');
@@ -93,16 +95,11 @@ class GRNRepository {
   }
 
   // Generate next GRN number (format: GRN-YYYYMMDD-XXX)
-  String generateGRNNumber() {
-    final now = DateTime.now();
-    final datePrefix = 'GRN-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-
-    final todayGRNs = _grnBox.values.where((grn) {
-      return grn.grnNumber.startsWith(datePrefix);
-    }).toList();
-
-    final nextNumber = todayGRNs.length + 1;
-    return '$datePrefix-${nextNumber.toString().padLeft(3, '0')}';
+  Future<String> generateGRNNumber() {
+    return _numbers.next(
+      'GRN',
+      isTaken: (number) => _grnBox.values.any((grn) => grn.grnNumber == number),
+    );
   }
 
   // Update GRN Status

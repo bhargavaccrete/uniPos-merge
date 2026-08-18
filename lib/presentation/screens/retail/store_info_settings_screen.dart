@@ -1,11 +1,16 @@
 import 'dart:typed_data';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/domain/services/common/notification_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 import 'package:billberrylite/util/color.dart';
 
 class StoreInfoSettingsScreen extends StatefulWidget {
-  const StoreInfoSettingsScreen({Key? key}) : super(key: key);
+  const StoreInfoSettingsScreen({super.key});
 
   @override
   State<StoreInfoSettingsScreen> createState() => _StoreInfoSettingsScreenState();
@@ -72,12 +77,8 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
         // Validate image size (max 2MB)
         if (bytes.length > 2 * 1024 * 1024) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Image is too large. Please select an image under 2MB.'),
-                backgroundColor: Colors.red,
-              ),
-            );
+            NotificationService.instance.showError(
+                'Image is too large. Please select an image under 2MB.');
           }
           return;
         }
@@ -89,9 +90,7 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking image: $e')),
-        );
+        NotificationService.instance.showError('Error picking image: $e');
       }
     }
   }
@@ -135,12 +134,12 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
 
     if (mounted) {
       final bool allSuccess = success && logoSuccess;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(allSuccess ? 'Store information saved successfully' : 'Failed to save some settings'),
-          backgroundColor: allSuccess ? AppColors.success : AppColors.danger,
-        ),
-      );
+      if (allSuccess) {
+        NotificationService.instance
+            .showSuccess('Store information saved successfully');
+      } else {
+        NotificationService.instance.showError('Failed to save some settings');
+      }
 
       if (allSuccess) {
         Navigator.pop(context);
@@ -165,17 +164,12 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        title: const Text('Store Information'),
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.darkNeutral,
-        elevation: 0,
-      ),
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(title: 'Store Information'),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+              padding: AppResponsive.padding(context),
               child: Form(
                 key: _formKey,
                 child: Column(
@@ -185,10 +179,10 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: AppColors.info.withOpacity(0.1),
+                        color: AppColors.info.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: AppColors.info.withOpacity(0.3),
+                          color: AppColors.info.withValues(alpha: 0.3),
                         ),
                       ),
                       child: Row(
@@ -199,8 +193,8 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                             child: Text(
                               'This information will appear on all receipts and invoices',
                               style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[700],
+                                fontSize: AppResponsive.bodyFontSize(context),
+                                color: AppColors.textSecondary,
                               ),
                             ),
                           ),
@@ -215,7 +209,7 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                     Text(
                       'Your logo will appear on receipts and invoices',
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         color: Colors.grey[600],
                       ),
                     ),
@@ -340,10 +334,10 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                 ),
                               )
-                            : const Text(
+                            : Text(
                                 'Save Information',
                                 style: TextStyle(
-                                  fontSize: 16,
+                                  fontSize: AppResponsive.subheadingFontSize(context),
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -359,14 +353,18 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
   Widget _buildSectionHeader(String title) {
     return Text(
       title,
-      style: TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: AppColors.darkNeutral,
+      style: GoogleFonts.poppins(
+        fontSize: AppResponsive.subheadingFontSize(context),
+        fontWeight: FontWeight.w600,
+        color: AppColors.textPrimary,
       ),
     );
   }
 
+  /// Delegates to [AppTextField] — this screen had eleven raw `TextFormField`s,
+  /// each rebuilding the same decoration by hand. The shared field owns the
+  /// house border, fill, label and error treatment, so a change to input styling
+  /// lands here for free instead of needing eleven edits.
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -378,20 +376,12 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
     TextCapitalization textCapitalization = TextCapitalization.words,
     String? Function(String?)? validator,
   }) {
-    return TextFormField(
+    return AppTextField(
       controller: controller,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        prefixIcon: Icon(icon, color: AppColors.primary),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-        filled: true,
-        fillColor: Colors.white,
-        counterText: maxLength != null ? '' : null,
-      ),
-      keyboardType: keyboardType,
+      label: label,
+      hint: hint,
+      icon: icon,
+      keyboardType: keyboardType ?? TextInputType.text,
       maxLines: maxLines,
       maxLength: maxLength,
       textCapitalization: textCapitalization,
@@ -455,7 +445,7 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                 OutlinedButton.icon(
                   onPressed: _deleteLogo,
                   icon: const Icon(Icons.delete_outline, size: 18),
-                  label: const Text('Remove'),
+                  label: Text('Remove'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.danger,
                     side: BorderSide(color: AppColors.danger),

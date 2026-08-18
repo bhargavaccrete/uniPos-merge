@@ -7,6 +7,7 @@ import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -316,7 +317,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
                     Text(
                       'Add New Customer',
                       style: GoogleFonts.poppins(
-                        fontSize: 14,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: AppColors.primary,
                       ),
@@ -326,7 +327,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.poppins(
-                        fontSize: 11,
+                        fontSize: AppResponsive.captionFontSize(context),
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -365,7 +366,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
                       ? customer.name![0].toUpperCase()
                       : '?',
                   style: GoogleFonts.poppins(
-                    fontSize: 16,
+                    fontSize: AppResponsive.subheadingFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: AppColors.primary,
                   ),
@@ -381,7 +382,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.poppins(
-                        fontSize: 14,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
@@ -398,7 +399,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.poppins(
-                        fontSize: 11,
+                        fontSize: AppResponsive.captionFontSize(context),
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -419,7 +420,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
                   child: Text(
                     'Due ${formatMoney(customer.creditBalance)}',
                     style: GoogleFonts.poppins(
-                      fontSize: 10,
+                      fontSize: AppResponsive.captionFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: AppColors.danger,
                     ),

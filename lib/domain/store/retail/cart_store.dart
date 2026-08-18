@@ -570,6 +570,22 @@ abstract class _CartStore with Store {
     return tabs[activeTabIndex];
   }
 
+  /// Label for the tab at [index] — a customer name once one is attached,
+  /// otherwise its 1-based position.
+  ///
+  /// Derived from POSITION rather than the stored `name`, because that name is
+  /// stamped once at creation and never revisited. Closing a middle tab left
+  /// "Tab 1, Tab 3" on screen, and since [createNewTab] numbers by
+  /// `tabs.length + 1` the next New button then minted a SECOND "Tab 3".
+  /// Numbering is a function of order, so it is computed, not stored.
+  String tabLabel(int index) {
+    if (index >= 0 && index < tabs.length) {
+      final customer = tabs[index].customerName;
+      if (customer != null && customer.isNotEmpty) return customer;
+    }
+    return 'Tab ${index + 1}';
+  }
+
   /// Create a new tab
   @action
   Future<void> createNewTab() async {

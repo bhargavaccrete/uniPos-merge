@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:billberrylite/domain/services/common/notification_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:file_selector/file_selector.dart';
@@ -271,52 +273,70 @@ class PrintService {
     double? roundOff, // Rounding adjustment applied to reach grand total
     int paperWidth = 80, // Target paper width
   }) async {
-    // Load logo for all bills
-    final logoBytes = await _loadStoreLogo();
-    final upi = await _loadUpiConfig();
+    // Grab the navigator BEFORE any await.
+    //
+    // Rendering the PDF (logo raster + UPI QR) takes long enough that the
+    // widget which opened this can be gone by the time it finishes — the print
+    // options sheet is popped on tap, and re-checking `context.mounted`
+    // afterwards then returned silently. That is why a receipt "sometimes"
+    // never appeared: a race between the sheet's dismiss animation and the
+    // render. A captured NavigatorState survives it.
+    final navigator = Navigator.of(context, rootNavigator: true);
 
-    final receiptData = ReceiptData(
-      sale: sale,
-      items: items,
-      customer: customer,
-      storeName: storeName,
-      storeAddress: storeAddress,
-      storePhone: storePhone,
-      storeEmail: storeEmail,
-      gstNumber: gstNumber,
-      taxEnabled: TaxFeature.enabled,
-      orderType: orderType,
-      tableNo: tableNo,
-      kotNumber: kotNumber,
-      kotStatus: kotStatus,
-      cancelReference: cancelReference,
-      kotNumbers: kotNumbers,
-      orderTimestamp: orderTimestamp,
-      orderNo: orderNo,
-      isAddonKot: isAddonKot,
-      kotRemark: kotRemark,
-      billNumber: billNumber,
-      logoBytes: logoBytes,
-      itemTotal: itemTotal,
-      loyaltyPointsDiscount: loyaltyPointsDiscount,
-      serviceCharge: serviceCharge,
-      isDeliveryOrder: isDeliveryOrder,
-      roundOff: roundOff,
-      paymentBreakdown: paymentBreakdown,
-      isTaxInclusive: isTaxInclusive,
-      upiId: upi.id,
-      upiPayeeName: upi.payee,
-      upiQrImageBytes: upi.qr,
-    );
+    final pw.Document pdf;
+    try {
+      // Load logo for all bills
+      final logoBytes = await _loadStoreLogo();
+      final upi = await _loadUpiConfig();
 
-    final pdf = format == ReceiptFormat.thermal
-        ? await _receiptPdfService.generateThermalReceipt(receiptData, paperWidth: paperWidth)
-        : await _receiptPdfService.generateInvoice(receiptData);
+      final receiptData = ReceiptData(
+        sale: sale,
+        items: items,
+        customer: customer,
+        storeName: storeName,
+        storeAddress: storeAddress,
+        storePhone: storePhone,
+        storeEmail: storeEmail,
+        gstNumber: gstNumber,
+        taxEnabled: TaxFeature.enabled,
+        orderType: orderType,
+        tableNo: tableNo,
+        kotNumber: kotNumber,
+        kotStatus: kotStatus,
+        cancelReference: cancelReference,
+        kotNumbers: kotNumbers,
+        orderTimestamp: orderTimestamp,
+        orderNo: orderNo,
+        isAddonKot: isAddonKot,
+        kotRemark: kotRemark,
+        billNumber: billNumber,
+        logoBytes: logoBytes,
+        itemTotal: itemTotal,
+        loyaltyPointsDiscount: loyaltyPointsDiscount,
+        serviceCharge: serviceCharge,
+        isDeliveryOrder: isDeliveryOrder,
+        roundOff: roundOff,
+        paymentBreakdown: paymentBreakdown,
+        isTaxInclusive: isTaxInclusive,
+        upiId: upi.id,
+        upiPayeeName: upi.payee,
+        upiQrImageBytes: upi.qr,
+      );
 
-    if (!context.mounted) return;
+      pdf = format == ReceiptFormat.thermal
+          ? await _receiptPdfService.generateThermalReceipt(receiptData,
+              paperWidth: paperWidth)
+          : await _receiptPdfService.generateInvoice(receiptData);
+    } catch (e, s) {
+      // A throw here used to unwind past the caller with nothing on screen.
+      debugPrint('Error building receipt preview: $e\n$s');
+      NotificationService.instance.showError('Could not build the receipt');
+      return;
+    }
 
-    await Navigator.push(
-      context,
+    if (!navigator.mounted) return;
+
+    await navigator.push(
       MaterialPageRoute(
         builder: (context) => Scaffold(
           backgroundColor: const Color(0xFFF7F8FA),
@@ -575,7 +595,7 @@ class PrintService {
     await showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
+      builder: (sheetContext) => Container(
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -618,7 +638,7 @@ class PrintService {
                 title: 'Print to ${printerStore.defaultReceiptPrinter!.name}',
                 subtitle: 'Direct thermal print (${printerStore.defaultReceiptPrinter!.type.toUpperCase()})',
                 onTap: () async {
-                  Navigator.pop(context);
+                  Navigator.pop(sheetContext);
                   // Build the ReceiptData needed by the ESC/POS builder
                   final receiptData = ReceiptData(
                     sale: sale,
@@ -647,17 +667,15 @@ class PrintService {
                     paperWidth: printer.paperSize,
                   );
                   final success = await printerStore.sendBytes(bytes, printer);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(success
-                            ? 'Receipt sent to ${printer.name}'
-                            : 'Print failed: ${printerStore.errorMessage ?? "Unknown error"}'),
-                        backgroundColor: success
-                            ? const Color(0xFF4CAF50)
-                            : const Color(0xFFC62828),
-                      ),
-                    );
+                  // NotificationService, not ScaffoldMessenger — the sheet that
+                  // owned the context is already gone by the time the printer
+                  // answers, which silently swallowed the result.
+                  if (success) {
+                    NotificationService.instance
+                        .showSuccess('Receipt sent to ${printer.name}');
+                  } else {
+                    NotificationService.instance.showError(
+                        'Print failed: ${printerStore.errorMessage ?? "Unknown error"}');
                   }
                 },
               ),
@@ -668,7 +686,7 @@ class PrintService {
               title: 'Print Invoice (A4)',
               subtitle: 'Full-size invoice for accounting',
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 showPrintPreview(
                   context: context,
                   sale: sale,
@@ -700,7 +718,7 @@ class PrintService {
               title: 'Print Receipt (Thermal)',
               subtitle: 'For 80mm thermal printers',
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 showPrintPreview(
                   context: context,
                   sale: sale,
@@ -732,7 +750,7 @@ class PrintService {
               title: 'Share Invoice',
               subtitle: 'Send via WhatsApp, Email, etc.',
               onTap: () async {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 await sharePdf(
                   sale: sale,
                   items: items,
@@ -761,7 +779,7 @@ class PrintService {
               title: 'Save to Device',
               subtitle: 'Save PDF to documents folder',
               onTap: () async {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 final path = await savePdfToDownloads(
                   sale: sale,
                   items: items,
@@ -781,13 +799,8 @@ class PrintService {
                   isTaxInclusive: isTaxInclusive,
                   roundOff: roundOff,
                 );
-                if (context.mounted && path != null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Saved to: $path'),
-                      backgroundColor: const Color(0xFF4CAF50),
-                    ),
-                  );
+                if (path != null) {
+                  NotificationService.instance.showSuccess('Saved to: $path');
                 }
               },
             ),

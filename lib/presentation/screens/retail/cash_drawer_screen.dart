@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/retail/cash_drawer_ledger.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
 import 'package:billberrylite/util/color.dart';
@@ -18,7 +21,7 @@ import 'package:billberrylite/presentation/widget/componets/common/primary_app_b
 /// cash-movement engine (CashMovementStore) and Cash In/Out dialog, but sources
 /// sales from the retail [saleStore] and drops restaurant-only concepts
 /// (shifts, cash handover). The estimated drawer balance is:
-///   Opening + Cash Sales + Cash In − Cash Out − Cash Expenses
+///   Opening + Cash Sales + Cash In − Cash Out − Cash Expenses − Cash Refunds
 /// — the exact formula retail EOD uses, so the two always agree.
 
 class _LogEntry {
@@ -36,7 +39,7 @@ class _LogEntry {
   });
 }
 
-enum _LogType { opening, sale, expense, movement }
+enum _LogType { opening, sale, refund, expense, movement }
 
 class CashDrawerScreen extends StatefulWidget {
   const CashDrawerScreen({super.key});
@@ -51,6 +54,13 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
   double _openingBalance = 0.0;
   double _cashSales = 0.0;
   double _cashExpenses = 0.0;
+  double _cashRefunds = 0.0;
+
+  /// Net collected per payment method (sales minus returns), for the Sales
+  /// Summary card. Informational only — the drawer balance stays cash-only,
+  /// because card/UPI never enter the till.
+  final Map<String, double> _netByMethod = {};
+
   DateTime? _dayStart;
   List<_LogEntry> _log = [];
 
@@ -91,10 +101,37 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
 
       // Retail cash sales for the day
       final sales = await saleStore.getSalesByDateRange(dayStart, now);
+      _netByMethod.clear();
       final saleEntries = <_LogEntry>[];
+      final refundEntries = <_LogEntry>[];
       double cashSales = 0.0;
+      double cashRefunds = 0.0;
       for (final s in sales) {
-        if (s.isReturn == true) continue;
+        // A cash refund physically empties the till, so it belongs here.
+        // Derived from the return sale rather than from the audit movement
+        // ReturnService writes — that movement carries a distinct 'refund'
+        // type and is skipped below, which is what prevents double counting.
+        // Deriving also corrects refunds taken before the audit trail existed.
+        if (s.isReturn == true) {
+          // Returns carry a negative totalAmount, so adding them nets the
+          // method down automatically — including card/UPI refunds, which
+          // belong in the summary even though they never touch the drawer.
+          _addToMethod(s.paymentType, s.totalAmount);
+          if (s.paymentType.toLowerCase().trim() != 'cash') continue;
+          final refunded = s.totalAmount.abs();
+          if (refunded <= 0) continue;
+          cashRefunds += refunded;
+          refundEntries.add(
+            _LogEntry(
+              time: DateTime.tryParse(s.date) ?? dayStart,
+              description: 'Cash Refund',
+              signedAmount: -refunded,
+              type: _LogType.refund,
+            ),
+          );
+          continue;
+        }
+        _accumulateMethods(s);
         final cash = _cashComponentOf(s);
         if (cash <= 0) continue;
         cashSales += cash;
@@ -110,6 +147,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
         );
       }
       _cashSales = cashSales;
+      _cashRefunds = cashRefunds;
 
       // Cash expenses for the day
       await expenseStore.loadExpenses();
@@ -134,7 +172,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
           )
           .toList();
 
-      _buildLog(dayStart, saleEntries, expenseEntries);
+      _buildLog(dayStart, saleEntries, refundEntries, expenseEntries);
     } catch (e) {
       // Never leave the screen stuck on the spinner — show whatever loaded.
       debugPrint('Cash Drawer load failed: $e');
@@ -146,23 +184,54 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
   /// Net cash component of a sale. For split payments, only the cash slice
   /// counts; for single payment, the whole total if it was cash. Mirrors the
   /// EOD service so the drawer and EOD never disagree.
-  double _cashComponentOf(SaleModel s) {
+  /// Shared with the Cash Drawer History report — see [CashDrawerLedger].
+  double _cashComponentOf(SaleModel s) =>
+      CashDrawerLedger.cashComponentOf(s);
+
+  void _addToMethod(String? method, double amount) {
+    final key = (method ?? '').toLowerCase().trim();
+    if (key.isEmpty) return;
+    _netByMethod[key] = (_netByMethod[key] ?? 0) + amount;
+  }
+
+  /// Splits a sale across its payment methods. Uses `paymentListJson` when the
+  /// sale was split, exactly like [_cashComponentOf], so the summary and the
+  /// drawer balance can never disagree about the cash slice.
+  void _accumulateMethods(SaleModel s) {
     if (s.isSplitPayment == true &&
         s.paymentListJson != null &&
         s.paymentListJson!.isNotEmpty) {
-      return s.paymentList
-          .where((p) => (p['method'] as String? ?? '').toLowerCase() == 'cash')
-          .fold(0.0, (a, p) => a + ((p['amount'] as num?)?.toDouble() ?? 0.0));
+      for (final p in s.paymentList) {
+        _addToMethod(
+          p['method'] as String?,
+          (p['amount'] as num?)?.toDouble() ?? 0.0,
+        );
+      }
+      return;
     }
-    if (s.paymentType.toLowerCase().trim() == 'cash') {
-      return s.totalAmount;
-    }
-    return 0.0;
+    _addToMethod(s.paymentType, s.totalAmount);
   }
+
+  double _method(String key) => _netByMethod[key] ?? 0.0;
+
+  /// Anything that isn't one of the named methods, so a new payment type still
+  /// appears rather than silently vanishing from the summary.
+  double get _otherCollected {
+    const named = {'cash', 'card', 'upi', 'credit'};
+    return _netByMethod.entries
+        .where((e) => !named.contains(e.key))
+        .fold(0.0, (sum, e) => sum + e.value);
+  }
+
+  /// Money actually taken this session. Credit is excluded — it's billed, not
+  /// collected, so folding it in would overstate what came in.
+  double get _collectedRevenue =>
+      _method('cash') + _method('card') + _method('upi') + _otherCollected;
 
   void _buildLog(
     DateTime dayStart,
     List<_LogEntry> sales,
+    List<_LogEntry> refunds,
     List<_LogEntry> expenses,
   ) {
     final entries = <_LogEntry>[
@@ -173,12 +242,18 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
         type: _LogType.opening,
       ),
       ...sales,
+      ...refunds,
       ...expenses,
     ];
 
     // Manual movements (skip 'opening' — already shown by synthetic entry above)
     for (final m in cashMovementStore.movements) {
-      if (m.type == 'opening' || m.type == 'adjustment') continue;
+      // 'refund' rows are audit-only; the derived Cash Refund entries above
+      // already account for them.
+      // Same rule the history report applies.
+      if (!CashDrawerLedger.isLedgerMovement(m)) {
+        continue;
+      }
       entries.add(
         _LogEntry(
           time: m.timestamp,
@@ -199,13 +274,15 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     _log = entries;
   }
 
-  /// Live balance: Opening + Cash Sales + Cash In − Cash Out − Cash Expenses
+  /// Live balance:
+  /// Opening + Cash Sales + Cash In − Cash Out − Cash Expenses − Cash Refunds
   double get _balance =>
       _openingBalance +
       _cashSales +
       cashMovementStore.totalCashIn -
       cashMovementStore.totalCashOut -
-      _cashExpenses;
+      _cashExpenses -
+      _cashRefunds;
 
   // ── Cash In / Cash Out dialog ────────────────────────────────────────────
 
@@ -373,56 +450,29 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                           final amount =
                               double.tryParse(amountCtrl.text.trim()) ?? 0;
                           if (amount <= 0) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              const SnackBar(
-                                content: Text('Enter a valid amount'),
-                              ),
-                            );
+                            NotificationService.instance
+                                .showError('Enter a valid amount');
                             return;
                           }
                           // Warn if Cash Out would drive the drawer negative.
                           if (type == 'out' && amount > _balance) {
-                            final proceed = await showDialog<bool>(
+                            final proceed = await showAppConfirmDialog(
                               context: ctx,
-                              builder: (warnCtx) => AlertDialog(
-                                title: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.warning_amber_rounded,
-                                      color: Colors.orange.shade700,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    const Text('Balance Warning'),
-                                  ],
-                                ),
-                                content: Text(
+                              title: 'Balance Warning',
+                              message:
                                   'This withdrawal (${CurrencyHelper.currentSymbol}${amount.toStringAsFixed(DecimalSettings.precision)}) '
                                   'exceeds the estimated drawer balance '
                                   '(${CurrencyHelper.currentSymbol}${_balance.toStringAsFixed(DecimalSettings.precision)}). '
                                   'Proceed only if you have physically verified the cash.',
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.pop(warnCtx, false),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.orange.shade700,
-                                    ),
-                                    onPressed: () =>
-                                        Navigator.pop(warnCtx, true),
-                                    child: const Text(
-                                      'Proceed Anyway',
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                              confirmLabel: 'Proceed Anyway',
+                              accent: AppColors.warning,
+                              icon: Icons.warning_amber_rounded,
                             );
-                            if (proceed != true) return;
+                            if (!proceed) return;
                           }
+                          // The warning dialog above is an await, so the sheet
+                          // may already be gone by the time we pop it.
+                          if (!ctx.mounted) return;
                           Navigator.pop(ctx);
                           final ok = await cashMovementStore.addMovement(
                             type: type,
@@ -486,6 +536,8 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
         SizedBox(height: AppResponsive.largeSpacing(context)),
         _buildBreakdownRow(context, currency),
         SizedBox(height: AppResponsive.largeSpacing(context)),
+        _buildSalesSummaryCard(context, currency),
+        SizedBox(height: AppResponsive.largeSpacing(context)),
         _buildActivityLog(context, currency),
       ],
     );
@@ -531,7 +583,8 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
             '+ Sales ${_cashSales.toStringAsFixed(0)}  '
             '+ In ${cashMovementStore.totalCashIn.toStringAsFixed(0)}  '
             '− Out ${cashMovementStore.totalCashOut.toStringAsFixed(0)}  '
-            '− Exp ${_cashExpenses.toStringAsFixed(0)}',
+            '− Exp ${_cashExpenses.toStringAsFixed(0)}'
+            '${_cashRefunds > 0 ? '  − Refunds ${_cashRefunds.toStringAsFixed(0)}' : ''}',
             style: GoogleFonts.poppins(
               fontSize: AppResponsive.captionFontSize(context),
               color: Colors.white.withValues(alpha: 0.7),
@@ -650,6 +703,15 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
             Colors.red,
             false,
           ),
+          if (_cashRefunds > 0)
+            _breakdownLine(
+              context,
+              'Cash Refunds',
+              _cashRefunds,
+              currency,
+              AppColors.danger,
+              false,
+            ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
             child: Divider(height: 1),
@@ -726,6 +788,100 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     );
   }
 
+  // ── Sales summary (all payment methods) ──────────────────────────────────
+
+  /// Collections by payment method, in the same visual language as the drawer
+  /// breakdown above — coloured rule, label, amount, then a divider before the
+  /// total.
+  ///
+  /// Sits OUTSIDE the drawer balance on purpose: a cash drawer holds cash, so
+  /// card and UPI must never move that number. The restaurant drawer makes the
+  /// same split (balance card + "Shift Sales Summary"); this is its retail
+  /// counterpart. Net of refunds — a card refund reduces the Card line without
+  /// touching the till.
+  Widget _buildSalesSummaryCard(BuildContext context, String currency) {
+    final credit = _method('credit');
+    final other = _otherCollected;
+
+    return Container(
+      padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.account_balance_wallet_rounded,
+                  size: AppResponsive.smallIconSize(context),
+                  color: AppColors.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Sales Summary',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+
+          _breakdownLine(context, 'Cash', _method('cash'), currency,
+              Colors.green, true),
+          _breakdownLine(
+              context, 'Card', _method('card'), currency, Colors.blue, true),
+          _breakdownLine(
+              context, 'UPI', _method('upi'), currency, Colors.purple, true),
+          if (other != 0)
+            _breakdownLine(
+                context, 'Other', other, currency, Colors.teal, true),
+
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Divider(height: 1),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Collected Today',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              Text(
+                '$currency ${_collectedRevenue.toStringAsFixed(DecimalSettings.precision)}',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+
+          // Credit is billed, not collected. Kept under the total so it can
+          // never be read as money in hand — retail has pay-later, which the
+          // restaurant drawer never has to account for.
+          if (credit != 0) ...[
+            SizedBox(height: AppResponsive.smallSpacing(context)),
+            _breakdownLine(context, 'Credit (unpaid)', credit, currency,
+                AppColors.warning, true),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildActivityLog(BuildContext context, String currency) {
     if (_log.isEmpty) {
       return Center(
@@ -782,6 +938,10 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
       case _LogType.sale:
         dotColor = Colors.green;
         dotIcon = Icons.shopping_bag_outlined;
+        break;
+      case _LogType.refund:
+        dotColor = AppColors.danger;
+        dotIcon = Icons.assignment_return_outlined;
         break;
       case _LogType.expense:
         dotColor = Colors.red;

@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/common/short_ref.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 
@@ -22,6 +27,10 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
   DateTime? _startDate;
   DateTime? _endDate;
 
+  /// Incremented per load so a slow in-flight request can be discarded when a
+  /// newer one has already been issued.
+  int _loadToken = 0;
+
   @override
   void initState() {
     super.initState();
@@ -35,26 +44,46 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
     super.dispose();
   }
 
+  /// Bounds in the form `ReportService` expects: inclusive start, **exclusive**
+  /// end.
+  ///
+  /// `showDateRangePicker` hands back midnight of the final day, and
+  /// `_inWindow` rejects anything not before the end — so passing it straight
+  /// through silently dropped every sale on the last day of the range. Same
+  /// `+1 day` as `ReportPageScaffold._bounds`.
+  (DateTime?, DateTime?) get _bounds {
+    if (_startDate == null || _endDate == null) return (null, null);
+    final start = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
+    final end = DateTime(_endDate!.year, _endDate!.month, _endDate!.day)
+        .add(const Duration(days: 1));
+    return (start, end);
+  }
+
   Future<void> _loadAllReports() async {
+    // Change the range twice quickly and the slower first load could land after
+    // the second and overwrite it with stale numbers. Only the newest token
+    // gets to publish.
+    final token = ++_loadToken;
     setState(() => _isLoading = true);
+    final (start, end) = _bounds;
 
-    final overallData = await _reportService.getProfitReport(
-      startDate: _startDate,
-      endDate: _endDate,
-    );
-    final perDayData = await _reportService.getProfitPerDayReport(
-      startDate: _startDate,
-      endDate: _endDate,
-    );
-    final perItemData = await _reportService.getProfitPerItemReport(
-      startDate: _startDate,
-      endDate: _endDate,
-    );
-    final perSaleData = await _reportService.getProfitPerSaleReport(
-      startDate: _startDate,
-      endDate: _endDate,
-    );
+    // Started together rather than awaited one after another — four sequential
+    // round-trips through the sales box was the whole load time.
+    final overallFuture =
+        _reportService.getProfitReport(startDate: start, endDate: end);
+    final perDayFuture =
+        _reportService.getProfitPerDayReport(startDate: start, endDate: end);
+    final perItemFuture =
+        _reportService.getProfitPerItemReport(startDate: start, endDate: end);
+    final perSaleFuture =
+        _reportService.getProfitPerSaleReport(startDate: start, endDate: end);
 
+    final overallData = await overallFuture;
+    final perDayData = await perDayFuture;
+    final perItemData = await perItemFuture;
+    final perSaleData = await perSaleFuture;
+
+    if (!mounted || token != _loadToken) return;
     setState(() {
       _overallReport = overallData;
       _profitPerDay = perDayData;
@@ -94,25 +123,24 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text('Profit Analysis'),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 0,
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: 'Profit Analysis',
         actions: [
           IconButton(
             icon: Icon(_startDate != null ? Icons.clear : Icons.date_range),
+            color: Colors.white,
             onPressed: _startDate != null ? _clearDateRange : _selectDateRange,
             tooltip: _startDate != null ? 'Clear Date Filter' : 'Select Date Range',
           ),
         ],
+        // Tabs read on the primary fill, matching every other AppBar in the app.
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
-          labelColor: const Color(0xFF1A1A1A),
-          unselectedLabelColor: const Color(0xFF6B6B6B),
-          indicatorColor: const Color(0xFF1A1A1A),
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          indicatorColor: Colors.white,
           tabs: const [
             Tab(text: 'Overview'),
             Tab(text: 'Daily Trend'),
@@ -171,16 +199,16 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
           ),
           child: Column(
             children: [
-              const Text('Gross Profit', style: TextStyle(color: Colors.white70, fontSize: 14)),
+              Text('Gross Profit', style: TextStyle(color: Colors.white70, fontSize: AppResponsive.bodyFontSize(context))),
               const SizedBox(height: 8),
               Text(
                 '₹${(_overallReport!['grossProfit'] as double).toStringAsFixed(2)}',
-                style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w700),
+                style: TextStyle(color: Colors.white, fontSize: AppResponsive.headingFontSize(context), fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 8),
               Text(
                 '${(_overallReport!['profitMargin'] as double).toStringAsFixed(1)}% margin',
-                style: const TextStyle(color: Colors.white70, fontSize: 14),
+                style: TextStyle(color: Colors.white70, fontSize: AppResponsive.bodyFontSize(context)),
               ),
             ],
           ),
@@ -212,9 +240,9 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Profit Trend',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                style: TextStyle(fontSize: AppResponsive.subheadingFontSize(context), fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 16),
               Expanded(child: _buildProfitChart()),
@@ -222,9 +250,9 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
           ),
         ),
         const SizedBox(height: 16),
-        const Text(
+        Text(
           'Daily Breakdown',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          style: TextStyle(fontSize: AppResponsive.subheadingFontSize(context), fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         ..._profitPerDay.map((day) => _buildDailyProfitCard(day)),
@@ -250,7 +278,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
               getTitlesWidget: (value, meta) {
                 return Text(
                   '₹${(value / 1000).toStringAsFixed(0)}k',
-                  style: const TextStyle(fontSize: 10, color: Color(0xFF6B6B6B)),
+                  style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: Color(0xFF6B6B6B)),
                 );
               },
             ),
@@ -265,11 +293,11 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
                       DateFormat('MM/dd').format(date),
-                      style: const TextStyle(fontSize: 10, color: Color(0xFF6B6B6B)),
+                      style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: Color(0xFF6B6B6B)),
                     ),
                   );
                 }
-                return const Text('');
+                return Text('');
               },
             ),
           ),
@@ -316,7 +344,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
             children: [
               Text(
                 DateFormat('EEEE, MMM dd, yyyy').format(date),
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: AppResponsive.bodyFontSize(context)),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -328,7 +356,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
                   '${margin.toStringAsFixed(1)}%',
                   style: TextStyle(
                     color: profit >= 0 ? Colors.green.shade700 : Colors.red.shade700,
-                    fontSize: 12,
+                    fontSize: AppResponsive.captionFontSize(context),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -362,9 +390,9 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text(
+        Text(
           'Profit by Product Variant',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          style: TextStyle(fontSize: AppResponsive.subheadingFontSize(context), fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         ..._profitPerItem.map((item) => _buildItemProfitCard(item)),
@@ -396,13 +424,13 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
                   children: [
                     Text(
                       item['productName'] ?? 'Unknown',
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: AppResponsive.bodyFontSize(context)),
                     ),
                     const SizedBox(height: 4),
                     if ((item['variantLabel'] as String?)?.isNotEmpty ?? false)
                       Text(
                         item['variantLabel'] as String,
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
+                        style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: Color(0xFF6B6B6B)),
                       ),
                   ],
                 ),
@@ -417,7 +445,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
                   '${margin.toStringAsFixed(1)}%',
                   style: TextStyle(
                     color: profit >= 0 ? Colors.green.shade700 : Colors.red.shade700,
-                    fontSize: 12,
+                    fontSize: AppResponsive.captionFontSize(context),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -451,15 +479,16 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text(
+        Text(
           'Profit by Individual Sale',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          style: TextStyle(fontSize: AppResponsive.subheadingFontSize(context), fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         ..._profitPerSale.take(50).map((sale) => _buildSaleProfitCard(sale)),
       ],
     );
   }
+
 
   Widget _buildSaleProfitCard(Map<String, dynamic> sale) {
     final profit = sale['profit'] as double;
@@ -484,13 +513,13 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Sale #${sale['saleId'].toString().substring(0, 8)}...',
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                    'Sale #${shortRef(sale['saleId']?.toString(), ellipsis: true)}',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: AppResponsive.bodyFontSize(context)),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     DateFormat('MMM dd, yyyy hh:mm a').format(date),
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
+                    style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: Color(0xFF6B6B6B)),
                   ),
                 ],
               ),
@@ -504,7 +533,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
                   '${margin.toStringAsFixed(1)}%',
                   style: TextStyle(
                     color: profit >= 0 ? Colors.green.shade700 : Colors.red.shade700,
-                    fontSize: 12,
+                    fontSize: AppResponsive.captionFontSize(context),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -536,12 +565,12 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 11, color: Color(0xFF6B6B6B)),
+          style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: Color(0xFF6B6B6B)),
         ),
         const SizedBox(height: 4),
         Text(
           value,
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color),
+          style: TextStyle(fontSize: AppResponsive.smallFontSize(context), fontWeight: FontWeight.w600, color: color),
         ),
       ],
     );
@@ -563,9 +592,9 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(fontSize: 13, color: Color(0xFF6B6B6B))),
+              Text(label, style: TextStyle(fontSize: AppResponsive.smallFontSize(context), color: Color(0xFF6B6B6B))),
               const SizedBox(height: 4),
-              Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              Text(value, style: TextStyle(fontSize: AppResponsive.subheadingFontSize(context), fontWeight: FontWeight.w700)),
             ],
           ),
         ],

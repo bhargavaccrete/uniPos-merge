@@ -1,8 +1,10 @@
 import 'package:hive/hive.dart';
+import '../../../domain/services/retail/document_number_service.dart';
 import '../../models/retail/hive_model/purchase_order_model_211.dart';
 
 class PurchaseOrderRepository {
   late Box<PurchaseOrderModel> _poBox;
+  final _numbers = DocumentNumberService();
 
   PurchaseOrderRepository() {
     _poBox = Hive.box<PurchaseOrderModel>('purchaseOrders');
@@ -102,17 +104,11 @@ class PurchaseOrderRepository {
   }
 
   // Generate next PO number (format: PO-YYYYMMDD-XXX)
-  String generatePONumber() {
-    final now = DateTime.now();
-    final datePrefix = 'PO-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-
-    // Get all POs from today
-    final todayPOs = _poBox.values.where((po) {
-      return po.poNumber.startsWith(datePrefix);
-    }).toList();
-
-    final nextNumber = todayPOs.length + 1;
-    return '$datePrefix-${nextNumber.toString().padLeft(3, '0')}';
+  Future<String> generatePONumber() {
+    return _numbers.next(
+      'PO',
+      isTaken: (number) => _poBox.values.any((po) => po.poNumber == number),
+    );
   }
 
   // Get Purchase Order Count

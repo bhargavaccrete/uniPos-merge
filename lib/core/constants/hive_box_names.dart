@@ -73,6 +73,13 @@ class HiveBoxNames {
   /// Purchase order model box
   static const String purchaseOrders = 'purchaseOrders';
 
+  /// Damaged-goods workflow raised from a GRN
+  static const String purchaseReturns = 'purchaseReturns';
+  static const String purchaseReturnItems = 'purchaseReturnItems';
+  static const String supplierClaims = 'supplierClaims';
+  static const String supplierClaimItems = 'supplierClaimItems';
+  static const String inventoryLosses = 'inventoryLosses';
+
   /// Purchase order items box
   static const String purchaseOrderItems = 'purchaseOrderItems';
 
@@ -241,6 +248,11 @@ class HiveBoxNames {
     customer,
     suppliers,
     purchaseOrders,
+    purchaseReturns,
+    purchaseReturnItems,
+    supplierClaims,
+    supplierClaimItems,
+    inventoryLosses,
     purchaseOrderItems,
     grns,
     grnItems,

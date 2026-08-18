@@ -179,10 +179,18 @@ class _AddProductScreenState extends State<AddProductScreen> {
   /// copyWith cannot express on its own.
   bool _imageCleared = false;
 
-  // Whether the optional attribute generator is expanded. Purely a UI toggle —
-  // there is no "variable product" mode any more, so revealing it never
-  // discards manually entered variants.
+  // Whether the bulk generator is expanded. Purely a UI toggle — there is no
+  // "variable product" mode any more, so revealing it never discards manually
+  // entered variants. The selector below stays mounted while collapsed so the
+  // attributes and values already picked survive a fold.
   bool _showAttributeGenerator = false;
+
+  /// Stable id for this draft, used only for the SKUs the generator mints.
+  ///
+  /// It used to be `DateTime.now()...` evaluated inside build, so every rebuild
+  /// handed the selector a different product and regenerating produced a fresh
+  /// SKU prefix each time. The real productId is stamped on at save.
+  final String _draftProductId = _uuid.v4();
 
   // Generated variants from attributes
   List<VarianteModel> _generatedVariants = [];
@@ -702,60 +710,29 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 }),
 
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _addVariant,
-                        icon: const Icon(Icons.add,
-                            size: 18, color: AppColors.primary),
-                        label: Text('Add variant',
-                            style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w600)),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primary,
-                          side: const BorderSide(color: AppColors.primary),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _addVariant,
+                    icon: const Icon(Icons.add,
+                        size: 18, color: AppColors.primary),
+                    label: Text('Add variant',
+                        style:
+                            GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => setState(
-                            () => _showAttributeGenerator = !_showAttributeGenerator),
-                        icon: Icon(
-                            _showAttributeGenerator
-                                ? Icons.expand_less_rounded
-                                : Icons.auto_awesome,
-                            size: 18,
-                            color: AppColors.info),
-                        label: Text('Generate',
-                            style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w600)),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.info,
-                          side: const BorderSide(color: AppColors.info),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
 
-                // ── Optional: build many variants from attributes ────────
-                if (_showAttributeGenerator) ...[
-                  const SizedBox(height: 16),
-                  _buildSectionHeader('Generate from Attributes'),
-                  const SizedBox(height: 12),
-                  _buildAttributeSelector(),
-                ],
+                // ── Bulk add: many variants at once, from attributes ─────
+                const SizedBox(height: 16),
+                _buildBulkAddPanel(),
 
                 if (_generatedVariants.isNotEmpty) ...[
                   const SizedBox(height: 24),
@@ -795,6 +772,107 @@ class _AddProductScreenState extends State<AddProductScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// Bulk add: pick attributes (Size, Colour…) and get one variant per
+  /// combination, the same accelerator the setup wizard offers.
+  ///
+  /// This used to hide behind a button labelled only "Generate", sitting beside
+  /// "Add variant" as if it were an alternative to it — so the whole bulk path
+  /// went unnoticed. The header now says what it does and stays on screen; only
+  /// the picker folds away.
+  Widget _buildBulkAddPanel() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _showAttributeGenerator
+              ? AppColors.info.withValues(alpha: 0.5)
+              : AppColors.divider,
+        ),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => setState(
+                () => _showAttributeGenerator = !_showAttributeGenerator),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.info.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.auto_awesome,
+                        size: 20, color: AppColors.info),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Bulk add variants',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _generatedVariants.isEmpty
+                              ? 'Pick Size, Colour… and get one variant per combination'
+                              : '${_generatedVariants.length} generated — tap to change',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.captionFontSize(context),
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    _showAttributeGenerator
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                    color: AppColors.textSecondary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // maintainState keeps the picked attributes and values alive while
+          // folded — collapsing the panel used to dispose the selector and
+          // throw the whole selection away.
+          Visibility(
+            visible: _showAttributeGenerator,
+            maintainState: true,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Divider(height: 1, color: AppColors.divider),
+                  const SizedBox(height: 12),
+                  _buildAttributeSelector(),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1320,33 +1398,23 @@ class _AddProductScreenState extends State<AddProductScreen> {
   /// combination. Available to any product — it is a bulk-create tool, not a
   /// product mode.
   Widget _buildAttributeSelector() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.divider),
-        // Same soft lift the POS and report cards use.
-        boxShadow: const [
-          BoxShadow(
-              color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2)),
-        ],
-      ),
-      child: ProductAttributeSelector(
-        key: _attributeSelectorKey,
-        productId: DateTime.now().millisecondsSinceEpoch.toString(),
-        defaultPrice: double.tryParse(_defaultPriceController.text),
-        defaultCostPrice: double.tryParse(_defaultCostController.text),
-        existingVariants: _generatedVariants.isNotEmpty ? _generatedVariants : null,
-        // Attribute picks are owned by the selector; the parent only needs a
-        // rebuild so the sections below stay in sync.
-        onAttributesChanged: (_) => setState(() {}),
-        onVariantsGenerated: (variants) {
-          setState(() {
-            _generatedVariants = variants;
-          });
-        },
-      ),
+    // Chrome lives on _buildBulkAddPanel now — a second bordered card here
+    // just nested one box inside another.
+    return ProductAttributeSelector(
+      key: _attributeSelectorKey,
+      productId: _draftProductId,
+      defaultPrice: double.tryParse(_defaultPriceController.text),
+      defaultCostPrice: double.tryParse(_defaultCostController.text),
+      existingVariants:
+          _generatedVariants.isNotEmpty ? _generatedVariants : null,
+      // Attribute picks are owned by the selector; the parent only needs a
+      // rebuild so the sections below stay in sync.
+      onAttributesChanged: (_) => setState(() {}),
+      onVariantsGenerated: (variants) {
+        setState(() {
+          _generatedVariants = variants;
+        });
+      },
     );
   }
 

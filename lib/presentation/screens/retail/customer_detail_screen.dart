@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/common/short_ref.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -72,10 +73,12 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
 
   /// Net of the customer's bills — a return is money going back out, so it
   /// subtracts. (The cards already render returns as negative.)
-  double get _netBilledAmount => _customerSales.fold<double>(
-        0,
-        (sum, s) => (s.isReturn ?? false) ? sum - s.totalAmount : sum + s.totalAmount,
-      );
+  /// A plain sum is already the net: `ReturnService` stores a return's
+  /// subtotal/discount/tax/totalAmount as NEGATIVE values, so returns subtract
+  /// themselves. Do not add a conditional minus here — it double-negates and
+  /// makes a return increase the total.
+  double get _netBilledAmount =>
+      _customerSales.fold<double>(0, (sum, s) => sum + s.totalAmount);
 
   String _formatDate(String dateStr) {
     try {
@@ -93,14 +96,6 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
     }
   }
 
-  /// Short human-readable reference. Sale ids are still UUID v4 — 36 chars of
-  /// noise on screen — so they're cut to 8. Anything already short is shown
-  /// whole, which covers the new "CUST-000042" customer ids; only customers
-  /// created before that scheme still carry a UUID and get truncated.
-  String _shortRef(String id) {
-    if (id.length <= 16) return id.toUpperCase();
-    return '${id.substring(0, 8).toUpperCase()}…';
-  }
 
   // ==================== EDIT ====================
 
@@ -499,7 +494,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                 if (_customer.updatedAt != null)
                   _buildInfoRow(
                       'Last Updated', _formatShortDate(_customer.updatedAt!)),
-                _buildInfoRow('Customer ID', _shortRef(_customer.customerId),
+                _buildInfoRow('Customer ID', shortRef(_customer.customerId, minLength: 16, ellipsis: true),
                     valueStyle: GoogleFonts.robotoMono(
                       fontSize: 12,
                       color: AppColors.textSecondary,
@@ -1022,7 +1017,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Bill #${_shortRef(sale.saleId)}',
+                        'Bill #${shortRef(sale.saleId)}',
                         style: GoogleFonts.poppins(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -1043,7 +1038,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        '${isReturn ? '-' : ''}${formatMoney(sale.totalAmount)}',
+                        // abs() because the stored amount is already negative
+                        // for returns — the sign is added once, here.
+                        '${isReturn ? '-' : ''}${formatMoney(sale.totalAmount.abs())}',
                         style: GoogleFonts.poppins(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,

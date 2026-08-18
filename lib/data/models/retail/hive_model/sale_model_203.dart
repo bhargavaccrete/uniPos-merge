@@ -441,6 +441,12 @@ class SaleModel extends HiveObject {
     double? paidAmount,
     double? dueAmount,
     String? status,
+    String? discountType,
+    double? discountValue,
+    String? discountReason,
+    int? loyaltyPointsUsed,
+    double? roundOff,
+    bool? isTaxInclusive,
   }) {
     return SaleModel(
       saleId: saleId ?? this.saleId,
@@ -468,6 +474,17 @@ class SaleModel extends HiveObject {
       paidAmount: paidAmount ?? this.paidAmount,
       dueAmount: dueAmount ?? this.dueAmount,
       status: status ?? this.status,
+      // Bill composition must survive every copy. A credit instalment goes
+      // through here, and dropping these silently rewrote settled invoices:
+      // roundOff and isTaxInclusive are persisted precisely so a reprint can't
+      // drift (see their field docs), and discountReason is the only record of
+      // why a discount was given.
+      discountType: discountType ?? this.discountType,
+      discountValue: discountValue ?? this.discountValue,
+      discountReason: discountReason ?? this.discountReason,
+      loyaltyPointsUsed: loyaltyPointsUsed ?? this.loyaltyPointsUsed,
+      roundOff: roundOff ?? this.roundOff,
+      isTaxInclusive: isTaxInclusive ?? this.isTaxInclusive,
     );
   }
 
@@ -516,18 +533,29 @@ class SaleModel extends HiveObject {
 
   // Create from Map (for backup restore)
   factory SaleModel.fromMap(Map<String, dynamic> map) {
+    // `date` and `createdAt` must never diverge — reports, EOD and the
+    // dashboard all key off them. Each falls back to its sibling before any
+    // default, so a backup carrying only one of them restores with both set to
+    // the SAME instant rather than reclassifying the sale into the restore date.
+    //
+    // Defaulted rather than hard-cast because this runs on the restore path:
+    // one missing key used to throw and abort the entire restore.
+    final restoredCreatedAt = (map['createdAt'] ?? map['date']) as String? ??
+        DateTime.now().toIso8601String();
+    final restoredDate = (map['date'] as String?) ?? restoredCreatedAt;
+
     return SaleModel(
       saleId: map['saleId'] as String,
       customerId: map['customerId'] as String?,
-      totalItems: (map['totalItems'] as num).toInt(),
-      subtotal: (map['subtotal'] as num).toDouble(),
-      discountAmount: (map['discountAmount'] as num).toDouble(),
-      taxAmount: (map['taxAmount'] as num).toDouble(),
-      totalAmount: (map['totalAmount'] as num).toDouble(),
-      paymentType: map['paymentType'] as String,
-      date: map['date'] as String,
-      createdAt: map['createdAt'] as String,
-      updatedAt: map['updatedAt'] as String,
+      totalItems: (map['totalItems'] as num?)?.toInt() ?? 0,
+      subtotal: (map['subtotal'] as num?)?.toDouble() ?? 0.0,
+      discountAmount: (map['discountAmount'] as num?)?.toDouble() ?? 0.0,
+      taxAmount: (map['taxAmount'] as num?)?.toDouble() ?? 0.0,
+      totalAmount: (map['totalAmount'] as num?)?.toDouble() ?? 0.0,
+      paymentType: (map['paymentType'] as String?) ?? 'cash',
+      date: restoredDate,
+      createdAt: restoredCreatedAt,
+      updatedAt: (map['updatedAt'] as String?) ?? restoredCreatedAt,
       isReturn: (map['isReturn'] as bool?) ?? false,
       originalSaleId: map['originalSaleId'] as String?,
       totalTaxableAmount: (map['totalTaxableAmount'] as num?)?.toDouble(),

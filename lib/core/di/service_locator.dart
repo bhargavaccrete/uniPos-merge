@@ -15,10 +15,10 @@ import 'package:billberrylite/data/repositories/retail/cart_repository.dart' as 
 import 'package:billberrylite/data/repositories/retail/variant_repository.dart' as retail;
 import 'package:billberrylite/data/repositories/retail/sale_item_repository.dart';
 import 'package:billberrylite/domain/services/retail/auth_service.dart';
-import 'package:billberrylite/domain/services/retail/backup_service.dart';
 import 'package:billberrylite/domain/services/retail/gst_service.dart';
 import 'package:billberrylite/domain/services/retail/sku_generator_service.dart';
 import 'package:billberrylite/domain/services/retail/customer_id_generator_service.dart';
+import 'package:billberrylite/domain/store/retail/damaged_goods_store.dart';
 import 'package:billberrylite/domain/services/retail/print_service.dart';
 import 'package:billberrylite/domain/services/retail/report_service.dart';
 import 'package:billberrylite/domain/services/retail/stock_alert_service.dart';
@@ -153,13 +153,13 @@ Future<void> _registerRetailDependencies() async {
   locator.registerLazySingleton<HoldSaleRepository>(() => HoldSaleRepository());
 
   // Register Services (Singletons - lazy loaded)
-  locator.registerLazySingleton<BackupService>(() => BackupService());
   locator.registerLazySingleton<ReportService>(() => ReportService());
   locator.registerLazySingleton<StockAlertService>(() => StockAlertService());
   locator.registerLazySingleton<GstService>(() => GstService());
   locator.registerLazySingleton<SkuGeneratorService>(() => SkuGeneratorService());
   locator.registerLazySingleton<CustomerIdGeneratorService>(
       () => CustomerIdGeneratorService());
+  locator.registerLazySingleton<DamagedGoodsStore>(() => DamagedGoodsStore());
 
   // Register Repositories
   locator.registerLazySingleton<retail.VariantRepository>(() => retail.VariantRepository());
@@ -424,6 +424,7 @@ retail.CartStore get retailCartStore => locator<retail.CartStore>();
 ProductStore get productStore => locator<ProductStore>();
 SaleStore get saleStore => locator<SaleStore>();
 SupplierStore get supplierStore => locator<SupplierStore>();
+DamagedGoodsStore get damagedGoodsStore => locator<DamagedGoodsStore>();
 PurchaseOrderStore get purchaseOrderStore => locator<PurchaseOrderStore>();
 HoldSaleStore get holdSaleStore => locator<HoldSaleStore>();
 StockAlertStore get stockAlertStore => locator<StockAlertStore>();
@@ -431,7 +432,6 @@ CreditStore get creditStore => locator<CreditStore>();
 AttributeStore get attributeStore => locator<AttributeStore>();
 
 /// Retail Services
-BackupService get backupService => locator<BackupService>();
 ReportService get reportService => locator<ReportService>();
 PrintService get printService => locator<PrintService>();
 StockAlertService get stockAlertService => locator<StockAlertService>();

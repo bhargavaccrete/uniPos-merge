@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
@@ -74,6 +75,10 @@ class ReturnService {
         gstRate: item.gstRate,
         barcode: item.barcode,
         hsnCode: item.hsnCode,
+        // Carry the ORIGINAL line's cost, never today's. A return has to cancel
+        // out against the sale it reverses, and it can only do that if both
+        // sides are costed identically.
+        costPrice: item.costPrice,
       );
       returnItems.add(returnItem);
     }
@@ -100,6 +105,12 @@ class ReturnService {
         -pointsToDeduct, // Negative points
       );
     }
+
+    await _recordCashRefundMovement(
+      refundMethod: refundMethod,
+      amount: originalSale.totalAmount,
+      returnSaleId: returnSaleId,
+    );
 
     return returnSaleId;
   }
@@ -189,6 +200,9 @@ class ReturnService {
         gstRate: originalItem.gstRate,
         barcode: originalItem.barcode,
         hsnCode: originalItem.hsnCode,
+        // See the full-return path: a partial return must be costed exactly as
+        // the line it reverses.
+        costPrice: originalItem.costPrice,
       );
 
       returnItems.add(returnItem);
@@ -230,6 +244,7 @@ class ReturnService {
         gstRate: item.gstRate,
         barcode: item.barcode,
         hsnCode: item.hsnCode,
+        costPrice: item.costPrice,
       );
     }).toList();
 
@@ -254,7 +269,50 @@ class ReturnService {
       );
     }
 
+    await _recordCashRefundMovement(
+      refundMethod: refundMethod,
+      amount: returnTotal,
+      returnSaleId: returnSaleId,
+    );
+
     return returnSaleId;
+  }
+
+
+  /// Cash refund method that physically empties the drawer. Everything else
+  /// (card, UPI, and any method added later) settles outside the till.
+  static const String cashRefundMethod = 'cash';
+
+  /// Movement type used ONLY for refund audit rows.
+  ///
+  /// Deliberately not 'out': every existing consumer filters movements by
+  /// exact type equality (`m.type == 'in' / 'out' / 'opening' / 'adjustment'`),
+  /// so a distinct type is invisible to all of them. The drawer and EOD derive
+  /// their refund figure from the return SALES instead, and skip these rows —
+  /// that is what stops a refund being counted twice.
+  static const String refundMovementType = 'refund';
+
+  /// Audit-only trail for a cash refund. Never blocks the return: the money has
+  /// already been handed back and the totals are derived from the return sale,
+  /// so a failure here loses the audit row, not the figure.
+  Future<void> _recordCashRefundMovement({
+    required String refundMethod,
+    required double amount,
+    required String returnSaleId,
+  }) async {
+    if (refundMethod.toLowerCase().trim() != cashRefundMethod) return;
+    if (amount <= 0) return;
+
+    try {
+      await cashMovementStore.addMovement(
+        type: refundMovementType,
+        amount: amount,
+        reason: 'Sale Refund',
+        note: 'Return $returnSaleId',
+      );
+    } catch (e) {
+      debugPrint('Cash refund movement not recorded: $e');
+    }
   }
 
   /// Check if a sale can be returned

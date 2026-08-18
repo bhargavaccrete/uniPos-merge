@@ -359,8 +359,13 @@ abstract class _AddProductFormStore with Store {
         attributes: Map.fromEntries(
           combo.entries.map((e) => MapEntry(e.key, e.value.value)),
         ),
+        // Keyed by attributeId, NOT by name — every reader
+        // (AttributeStore.attributesOf, VariantPickerDialog) resolves the key
+        // with getAttributeById. A name key silently resolved to null, which
+        // dropped these variants to the frozen customAttributes fallback so a
+        // renamed attribute value never reached them.
         attributeValueIds: Map.fromEntries(
-          combo.entries.map((e) => MapEntry(e.key, e.value.valueId)),
+          combo.entries.map((e) => MapEntry(e.value.attributeId, e.value.valueId)),
         ),
         price: price,
         costPrice: costPrice,

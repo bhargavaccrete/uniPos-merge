@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/presentation/screens/retail/reports/daily_sales_report_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/reports/monthly_sales_report_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/reports/product_wise_sales_report_screen.dart';
@@ -8,9 +13,17 @@ import 'package:billberrylite/presentation/screens/retail/reports/supplier_wise_
 import 'package:billberrylite/presentation/screens/retail/reports/low_stock_report_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/reports/top_selling_products_report_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/reports/profit_report_screen.dart';
-import 'package:billberrylite/presentation/screens/retail/reports/monthly_sales_report_screen.dart';
-
-import 'reports/daily_sales_report_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/reports/purchase_summary_report_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/reports/purchase_order_status_report_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/reports/grn_report_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/reports/damaged_items_report_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/reports/purchase_return_report_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/reports/cash_drawer_history_report_screen.dart';
+// Financial reports that already existed but were only reachable from Settings,
+// or (in Credit's case) not reachable at all.
+import 'package:billberrylite/presentation/screens/retail/gst_report_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/credit_reports_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/eod_reports_list_screen.dart';
 
 class ReportsScreen extends StatelessWidget {
   const ReportsScreen({super.key});
@@ -18,17 +31,16 @@ class ReportsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text('Reports', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.white,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildSectionHeader('Sales Reports'),
+      backgroundColor: AppColors.surfaceLight,
+      // The restaurant hub uses buildPrimaryAppBar rather than reportAppBar —
+      // it is a menu of reports, not a report.
+      appBar: buildPrimaryAppBar(title: 'Reports'),
+      body: AppResponsive.constrainedContent(
+        context: context,
+        child: ListView(
+          padding: AppResponsive.padding(context),
+          children: [
+          _buildSectionHeader(context, 'Sales Reports'),
           _buildReportCard(
             context,
             title: 'Daily Sales',
@@ -96,11 +108,22 @@ class ReportsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _buildSectionHeader('Purchase Reports'),
+          _buildSectionHeader(context, 'Purchase Reports'),
           _buildReportCard(
             context,
-            title: 'Supplier-wise Purchase',
-            subtitle: 'Purchases grouped by suppliers',
+            title: 'Purchase Summary',
+            subtitle: 'Ordered vs received, and what it cost',
+            icon: Icons.assessment,
+            color: const Color(0xFF3F51B5),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const PurchaseSummaryReportScreen()),
+            ),
+          ),
+          _buildReportCard(
+            context,
+            title: 'Supplier-wise Purchases',
+            subtitle: 'Spend per supplier, based on goods received',
             icon: Icons.local_shipping,
             color: const Color(0xFF673AB7),
             onTap: () => Navigator.push(
@@ -108,8 +131,74 @@ class ReportsScreen extends StatelessWidget {
               MaterialPageRoute(builder: (context) => const SupplierWisePurchaseReportScreen()),
             ),
           ),
+          _buildReportCard(
+            context,
+            title: 'Pending Purchase Orders',
+            subtitle: 'Sent to supplier, awaiting delivery',
+            icon: Icons.hourglass_top,
+            color: const Color(0xFFFF9800),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const PurchaseOrderStatusReportScreen.pending()),
+            ),
+          ),
+          _buildReportCard(
+            context,
+            title: 'Partially Received Orders',
+            subtitle: 'Some goods still outstanding',
+            icon: Icons.incomplete_circle,
+            color: const Color(0xFF00BCD4),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const PurchaseOrderStatusReportScreen.partiallyReceived()),
+            ),
+          ),
+          _buildReportCard(
+            context,
+            title: 'Completed Orders',
+            subtitle: 'Fully received purchase orders',
+            icon: Icons.check_circle,
+            color: const Color(0xFF4CAF50),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const PurchaseOrderStatusReportScreen.completed()),
+            ),
+          ),
+          _buildReportCard(
+            context,
+            title: 'GRN Report',
+            subtitle: 'Confirmed goods receipts',
+            icon: Icons.receipt_long,
+            color: const Color(0xFF009688),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const GRNReportScreen()),
+            ),
+          ),
+          _buildReportCard(
+            context,
+            title: 'Damaged Items',
+            subtitle: 'Received damaged, grouped by outcome',
+            icon: Icons.report_gmailerrorred,
+            color: const Color(0xFFE53935),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const DamagedItemsReportScreen()),
+            ),
+          ),
+          _buildReportCard(
+            context,
+            title: 'Purchase Returns',
+            subtitle: 'Returned to supplier and credit note status',
+            icon: Icons.assignment_return,
+            color: const Color(0xFF795548),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const PurchaseReturnReportScreen()),
+            ),
+          ),
           const SizedBox(height: 16),
-          _buildSectionHeader('Inventory Reports'),
+          _buildSectionHeader(context, 'Inventory Reports'),
           _buildReportCard(
             context,
             title: 'Low Stock Alert',
@@ -122,7 +211,7 @@ class ReportsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _buildSectionHeader('Financial Reports'),
+          _buildSectionHeader(context, 'Financial Reports'),
           _buildReportCard(
             context,
             title: 'Profit Report',
@@ -134,20 +223,69 @@ class ReportsScreen extends StatelessWidget {
               MaterialPageRoute(builder: (context) => const ProfitReportScreen()),
             ),
           ),
-        ],
+          _buildReportCard(
+            context,
+            title: 'GST Report',
+            subtitle: 'Output tax by rate, product and category',
+            icon: Icons.receipt,
+            color: const Color(0xFF00796B),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const GstReportScreen()),
+            ),
+          ),
+          _buildReportCard(
+            context,
+            title: 'Credit Reports',
+            subtitle: 'Credit sales, collections and outstanding',
+            icon: Icons.account_balance_wallet,
+            color: const Color(0xFF5D4037),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const CreditReportsScreen()),
+            ),
+          ),
+          _buildReportCard(
+            context,
+            title: 'Cash Drawer History',
+            subtitle: 'Cash in and out over time',
+            icon: Icons.account_balance_wallet,
+            color: const Color(0xFF00897B),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => const CashDrawerHistoryReportScreen()),
+            ),
+          ),
+          _buildReportCard(
+            context,
+            title: 'End of Day History',
+            subtitle: 'Past day closes and cash reconciliation',
+            icon: Icons.event_available,
+            color: const Color(0xFF455A64),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const EODReportsListScreen()),
+            ),
+          ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(BuildContext context, String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12, top: 8),
+      padding: EdgeInsets.only(
+        bottom: AppResponsive.smallSpacing(context),
+        top: AppResponsive.smallSpacing(context),
+      ),
       child: Text(
         title,
-        style: const TextStyle(
-          fontSize: 16,
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.subheadingFontSize(context),
           fontWeight: FontWeight.w600,
-          color: Color(0xFF1A1A1A),
+          color: AppColors.textPrimary,
         ),
       ),
     );
@@ -161,40 +299,46 @@ class ReportsScreen extends StatelessWidget {
     required Color color,
     required VoidCallback onTap,
   }) {
+    final iconBox = AppResponsive.largeIconSize(context) * 1.5;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
+        color: AppColors.white,
+        borderRadius:
+            BorderRadius.circular(AppResponsive.borderRadius(context)),
+        border: Border.all(color: AppColors.divider, width: 0.5),
       ),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        contentPadding: AppResponsive.listTilePadding(context),
         leading: Container(
-          width: 48,
-          height: 48,
+          width: iconBox,
+          height: iconBox,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            // `color` is this report's own identity, kept as-is.
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, color: color, size: 24),
+          child: Icon(icon, color: color, size: AppResponsive.iconSize(context)),
         ),
         title: Text(
           title,
-          style: const TextStyle(
-            fontSize: 15,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.bodyFontSize(context),
             fontWeight: FontWeight.w600,
-            color: Color(0xFF1A1A1A),
+            color: AppColors.textPrimary,
           ),
         ),
         subtitle: Text(
           subtitle,
-          style: const TextStyle(
-            fontSize: 13,
-            color: Color(0xFF6B6B6B),
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.smallFontSize(context),
+            color: AppColors.textSecondary,
           ),
         ),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Color(0xFFB0B0B0)),
+        trailing: Icon(Icons.arrow_forward_ios,
+            size: AppResponsive.smallIconSize(context),
+            color: AppColors.textSecondary),
         onTap: onTap,
       ),
     );

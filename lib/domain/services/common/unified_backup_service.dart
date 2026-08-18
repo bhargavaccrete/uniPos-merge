@@ -64,6 +64,11 @@ import 'package:billberrylite/data/models/retail/hive_model/cart_model_202.dart'
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:billberrylite/data/models/retail/hive_model/supplier_model_205.dart';
+import 'package:billberrylite/data/models/retail/hive_model/purchase_return_model_174.dart';
+import 'package:billberrylite/data/models/retail/hive_model/purchase_return_item_model_175.dart';
+import 'package:billberrylite/data/models/retail/hive_model/supplier_claim_model_176.dart';
+import 'package:billberrylite/data/models/retail/hive_model/supplier_claim_item_model_177.dart';
+import 'package:billberrylite/data/models/retail/hive_model/inventory_loss_model_178.dart';
 import 'package:billberrylite/data/models/retail/hive_model/hold_sale_model_209.dart';
 import 'package:billberrylite/data/models/retail/hive_model/hold_sale_item_model_210.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model_211.dart';
@@ -940,6 +945,42 @@ class UnifiedBackupService {
       // Purchases/purchaseItems intentionally absent — the standalone Purchase
       // feature was removed; goods now arrive through Purchase Orders + GRN.
       // Older backups may still carry those keys; they're simply ignored.
+
+      // Damaged-goods workflow raised from GRNs.
+      try {
+        exportMap["purchaseReturns"] =
+            Hive.box<PurchaseReturnModel>(HiveBoxNames.purchaseReturns)
+                .values
+                .map((e) => e.toMap())
+                .toList();
+        exportMap["purchaseReturnItems"] =
+            Hive.box<PurchaseReturnItemModel>(HiveBoxNames.purchaseReturnItems)
+                .values
+                .map((e) => e.toMap())
+                .toList();
+        exportMap["supplierClaims"] =
+            Hive.box<SupplierClaimModel>(HiveBoxNames.supplierClaims)
+                .values
+                .map((e) => e.toMap())
+                .toList();
+        exportMap["supplierClaimItems"] =
+            Hive.box<SupplierClaimItemModel>(HiveBoxNames.supplierClaimItems)
+                .values
+                .map((e) => e.toMap())
+                .toList();
+        exportMap["inventoryLosses"] =
+            Hive.box<InventoryLossModel>(HiveBoxNames.inventoryLosses)
+                .values
+                .map((e) => e.toMap())
+                .toList();
+      } catch (e) {
+        debugPrint("⚠️ Damaged-goods boxes error: $e");
+        exportMap["purchaseReturns"] = [];
+        exportMap["purchaseReturnItems"] = [];
+        exportMap["supplierClaims"] = [];
+        exportMap["supplierClaimItems"] = [];
+        exportMap["inventoryLosses"] = [];
+      }
 
       // Categories (String list)
       try {
@@ -2180,6 +2221,38 @@ class UnifiedBackupService {
     // Purchases/purchaseItems are no longer restored — the standalone Purchase
     // feature was removed. A backup taken before that still carries those keys;
     // skipping them is intentional, not an oversight.
+
+    // Damaged-goods workflow raised from GRNs.
+    await restoreBoxTypedWithId(
+      "purchaseReturns",
+      Hive.box<PurchaseReturnModel>(HiveBoxNames.purchaseReturns),
+      (m) => PurchaseReturnModel.fromMap(m),
+      (r) => r.returnId,
+    );
+    await restoreBoxTypedWithId(
+      "purchaseReturnItems",
+      Hive.box<PurchaseReturnItemModel>(HiveBoxNames.purchaseReturnItems),
+      (m) => PurchaseReturnItemModel.fromMap(m),
+      (i) => i.returnItemId,
+    );
+    await restoreBoxTypedWithId(
+      "supplierClaims",
+      Hive.box<SupplierClaimModel>(HiveBoxNames.supplierClaims),
+      (m) => SupplierClaimModel.fromMap(m),
+      (c) => c.claimId,
+    );
+    await restoreBoxTypedWithId(
+      "supplierClaimItems",
+      Hive.box<SupplierClaimItemModel>(HiveBoxNames.supplierClaimItems),
+      (m) => SupplierClaimItemModel.fromMap(m),
+      (i) => i.claimItemId,
+    );
+    await restoreBoxTypedWithId(
+      "inventoryLosses",
+      Hive.box<InventoryLossModel>(HiveBoxNames.inventoryLosses),
+      (m) => InventoryLossModel.fromMap(m),
+      (l) => l.lossId,
+    );
 
     // ✅ Restore EOD Reports - hardcoded for retail mode (we're inside _restoreRetailData)
     try {

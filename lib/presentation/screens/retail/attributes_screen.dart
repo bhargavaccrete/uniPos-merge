@@ -107,9 +107,9 @@ class _AttributesScreenState extends State<AttributesScreen> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.06),
+        color: AppColors.primary.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -310,7 +310,7 @@ class _AttributesScreenState extends State<AttributesScreen> {
                 Text(
                   helper,
                   style: GoogleFonts.poppins(
-                      fontSize: 12, color: AppColors.textSecondary),
+                      fontSize: AppResponsive.captionFontSize(context), color: AppColors.textSecondary),
                 ),
               ],
             ],
@@ -434,7 +434,7 @@ class _AttributeCard extends StatelessWidget {
                           ? 'No values yet'
                           : '${values.length} value${values.length == 1 ? '' : 's'}',
                       style: GoogleFonts.poppins(
-                        fontSize: 11,
+                        fontSize: AppResponsive.captionFontSize(context),
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -455,12 +455,12 @@ class _AttributeCard extends StatelessWidget {
                 itemBuilder: (_) => [
                   PopupMenuItem<String>(
                     value: 'edit',
-                    child: _menuRow(Icons.edit_outlined, 'Rename',
+                    child: _menuRow(context, Icons.edit_outlined, 'Rename',
                         AppColors.textPrimary),
                   ),
                   PopupMenuItem<String>(
                     value: 'delete',
-                    child: _menuRow(Icons.delete_outline, 'Delete',
+                    child: _menuRow(context, Icons.delete_outline, 'Delete',
                         AppColors.danger),
                   ),
                 ],
@@ -478,7 +478,7 @@ class _AttributeCard extends StatelessWidget {
                     'Add values like ${_placeholderFor(attribute.name)} so this '
                     'attribute can be used.',
                     style: GoogleFonts.poppins(
-                        fontSize: 12, color: AppColors.textSecondary),
+                        fontSize: AppResponsive.captionFontSize(context), color: AppColors.textSecondary),
                   )
                 : Wrap(
                     spacing: 8,
@@ -502,7 +502,7 @@ class _AttributeCard extends StatelessWidget {
               icon: const Icon(Icons.add, size: 18),
               label: Text('Add Value',
                   style: GoogleFonts.poppins(
-                      fontSize: 13, fontWeight: FontWeight.w600)),
+                      fontSize: AppResponsive.smallFontSize(context), fontWeight: FontWeight.w600)),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primary,
                 side: const BorderSide(color: AppColors.primary),
@@ -518,12 +518,16 @@ class _AttributeCard extends StatelessWidget {
     );
   }
 
-  Widget _menuRow(IconData icon, String label, Color color) => Row(
+  Widget _menuRow(
+          BuildContext context, IconData icon, String label, Color color) =>
+      Row(
         children: [
-          Icon(icon, size: 18, color: color),
+          Icon(icon, size: AppResponsive.smallIconSize(context), color: color),
           const SizedBox(width: 10),
           Text(label,
-              style: GoogleFonts.poppins(fontSize: 14, color: color)),
+              style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  color: color)),
         ],
       );
 
@@ -585,7 +589,7 @@ class _ValueChip extends StatelessWidget {
             const Icon(Icons.edit_outlined,
                 size: 18, color: AppColors.textPrimary),
             const SizedBox(width: 10),
-            Text('Edit', style: GoogleFonts.poppins(fontSize: 14)),
+            Text('Edit', style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context))),
           ]),
         ),
         PopupMenuItem<String>(
@@ -595,7 +599,7 @@ class _ValueChip extends StatelessWidget {
             const SizedBox(width: 10),
             Text('Delete',
                 style: GoogleFonts.poppins(
-                    fontSize: 14, color: AppColors.danger)),
+                    fontSize: AppResponsive.bodyFontSize(context), color: AppColors.danger)),
           ]),
         ),
       ],
@@ -642,7 +646,7 @@ class _ValueChip extends StatelessWidget {
                 Text(
                   value.value,
                   style: GoogleFonts.poppins(
-                    fontSize: 13,
+                    fontSize: AppResponsive.smallFontSize(context),
                     fontWeight: FontWeight.w500,
                     color: AppColors.textPrimary,
                   ),

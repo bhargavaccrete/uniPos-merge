@@ -105,6 +105,15 @@ class HiveTypeIds {
   // (110), see StaffModel in data/models/common/. Don't reuse 172.
   static const int retailBillingTab = 173;
 
+  // Damaged-goods workflow off the back of a GRN. Damaged units never enter
+  // stock and are never billed, so these are records of intent/outcome, not
+  // stock or ledger movements.
+  static const int retailPurchaseReturn = 174;
+  static const int retailPurchaseReturnItem = 175;
+  static const int retailSupplierClaim = 176;
+  static const int retailSupplierClaimItem = 177;
+  static const int retailInventoryLoss = 178;
+
   // ==================== HELPER METHODS ====================
 
   /// Check if a typeId belongs to retail models
@@ -130,6 +139,11 @@ class HiveTypeIds {
     retailSale,
     retailSaleItem,
     retailSupplier,
+    retailPurchaseReturn,
+    retailPurchaseReturnItem,
+    retailSupplierClaim,
+    retailSupplierClaimItem,
+    retailInventoryLoss,
     retailHoldSale,
     retailHoldSaleItem,
     retailPurchaseOrder,

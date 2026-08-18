@@ -18,6 +18,11 @@ import 'package:billberrylite/data/models/retail/hive_model/cart_model_202.dart'
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:billberrylite/data/models/retail/hive_model/supplier_model_205.dart';
+import 'package:billberrylite/data/models/retail/hive_model/purchase_return_model_174.dart';
+import 'package:billberrylite/data/models/retail/hive_model/purchase_return_item_model_175.dart';
+import 'package:billberrylite/data/models/retail/hive_model/supplier_claim_model_176.dart';
+import 'package:billberrylite/data/models/retail/hive_model/supplier_claim_item_model_177.dart';
+import 'package:billberrylite/data/models/retail/hive_model/inventory_loss_model_178.dart';
 import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/retail/hive_model/hold_sale_model_209.dart';
 import 'package:billberrylite/data/models/retail/hive_model/hold_sale_item_model_210.dart';
@@ -216,6 +221,22 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailSupplier)) {
       Hive.registerAdapter(SupplierModelAdapter());
     }
+    // Damaged-goods workflow raised from a GRN - 174..178
+    if (!Hive.isAdapterRegistered(HiveTypeIds.retailPurchaseReturn)) {
+      Hive.registerAdapter(PurchaseReturnModelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(HiveTypeIds.retailPurchaseReturnItem)) {
+      Hive.registerAdapter(PurchaseReturnItemModelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(HiveTypeIds.retailSupplierClaim)) {
+      Hive.registerAdapter(SupplierClaimModelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(HiveTypeIds.retailSupplierClaimItem)) {
+      Hive.registerAdapter(SupplierClaimItemModelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(HiveTypeIds.retailInventoryLoss)) {
+      Hive.registerAdapter(InventoryLossModelAdapter());
+    }
     // Customer - shared with restaurant (typeId 125, see restaurant section
     // below) — same adapter, retail's own box.
     if (!Hive.isAdapterRegistered(HiveTypeIds.customer)) {
@@ -375,6 +396,11 @@ class HiveInit {
     await Hive.openBox<SaleModel>(HiveBoxNames.sales);
     await Hive.openBox<SaleItemModel>(HiveBoxNames.saleItems);
     await Hive.openBox<SupplierModel>(HiveBoxNames.suppliers);
+    await Hive.openBox<PurchaseReturnModel>(HiveBoxNames.purchaseReturns);
+    await Hive.openBox<PurchaseReturnItemModel>(HiveBoxNames.purchaseReturnItems);
+    await Hive.openBox<SupplierClaimModel>(HiveBoxNames.supplierClaims);
+    await Hive.openBox<SupplierClaimItemModel>(HiveBoxNames.supplierClaimItems);
+    await Hive.openBox<InventoryLossModel>(HiveBoxNames.inventoryLosses);
     await Hive.openBox<Customer>(HiveBoxNames.customer);
     await Hive.openBox<HoldSaleModel>(HiveBoxNames.holdSales);
     await Hive.openBox<HoldSaleItemModel>(HiveBoxNames.holdSaleItems);

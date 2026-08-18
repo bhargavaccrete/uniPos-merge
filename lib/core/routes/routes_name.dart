@@ -142,11 +142,14 @@ class RouteNames {
   // Retail – Purchasing
   static const suppliers = '/suppliers';
   static const purchaseOrders = '/purchase-orders';
+  static const damagedGoods = '/damaged-goods';
+  static const purchaseReturns = '/purchase-returns';
+  static const supplierClaims = '/supplier-claims';
+  static const inventoryLosses = '/inventory-losses';
 
   // Retail – Reports
   static const reports = '/reports';
   static const salesHistory = '/sales-history';
-  static const eodReport = '/eod-report';
   static const gstReport = '/gst-report';
 
   // Retail – Settings

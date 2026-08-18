@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:billberrylite/domain/services/restaurant/eod_service.dart';
 import 'package:billberrylite/presentation/screens/retail/eod_report_detail_screen.dart';
@@ -51,11 +54,13 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('EOD Reports', style: GoogleFonts.poppins()),
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: 'EOD Reports',
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            tooltip: 'Refresh',
             onPressed: _loadReports,
           ),
         ],
@@ -72,7 +77,7 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                       Text(
                         'No EOD Reports Yet',
                         style: GoogleFonts.poppins(
-                          fontSize: 18,
+                          fontSize: AppResponsive.subheadingFontSize(context),
                           fontWeight: FontWeight.w500,
                           color: Colors.grey[600],
                         ),
@@ -81,7 +86,7 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                       Text(
                         'Complete your first End of Day to see reports here',
                         style: GoogleFonts.poppins(
-                          fontSize: 14,
+                          fontSize: AppResponsive.bodyFontSize(context),
                           color: Colors.grey[500],
                         ),
                       ),
@@ -139,7 +144,7 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                       Text(
                         dateFormat.format(report.date),
                         style: GoogleFonts.poppins(
-                          fontSize: 14,
+                          fontSize: AppResponsive.bodyFontSize(context),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -158,7 +163,7 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                     child: Text(
                       report.cashReconciliation.reconciliationStatus,
                       style: GoogleFonts.poppins(
-                        fontSize: 11,
+                        fontSize: AppResponsive.captionFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: isBalanced
                             ? Colors.green[700]
@@ -235,7 +240,7 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                       Text(
                         'Difference: Rs. ${report.cashReconciliation.difference.abs().toStringAsFixed(2)}',
                         style: GoogleFonts.poppins(
-                          fontSize: 12,
+                          fontSize: AppResponsive.captionFontSize(context),
                           fontWeight: FontWeight.w600,
                           color: isOverage ? Colors.blue[700] : Colors.orange[700],
                         ),
@@ -263,7 +268,7 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                     icon: const Icon(Icons.arrow_forward, size: 16),
                     label: Text(
                       'View Details',
-                      style: GoogleFonts.poppins(fontSize: 12),
+                      style: GoogleFonts.poppins(fontSize: AppResponsive.captionFontSize(context)),
                     ),
                   ),
                 ],
@@ -283,7 +288,7 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
           Text(
             label,
             style: GoogleFonts.poppins(
-              fontSize: 11,
+              fontSize: AppResponsive.captionFontSize(context),
               color: Colors.grey[600],
             ),
           ),
@@ -291,7 +296,7 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
           Text(
             value,
             style: GoogleFonts.poppins(
-              fontSize: 14,
+              fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.w600,
               color: color,
             ),

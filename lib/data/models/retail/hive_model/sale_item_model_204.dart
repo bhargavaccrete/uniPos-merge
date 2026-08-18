@@ -81,6 +81,18 @@ class SaleItemModel extends HiveObject {
   @HiveField(20)
   final Map<String, String>? attributes;
 
+  /// Unit cost of the variant at the moment of sale, for the same reason
+  /// [attributes] is captured: profit is a HISTORICAL fact.
+  ///
+  /// Reading the variant's live `costPrice` instead meant a supplier price
+  /// change today silently rewrote last quarter's closed profit report.
+  ///
+  /// Null on sales written before this field existed — reports fall back to the
+  /// live variant cost for those, and must report a line whose cost is genuinely
+  /// unknown as unknown rather than as zero.
+  @HiveField(21)
+  final double? costPrice;
+
   SaleItemModel({
     required this.saleItemId,
     required this.saleId,
@@ -103,6 +115,7 @@ class SaleItemModel extends HiveObject {
     this.sgstAmount,
     this.weight,
     this.attributes,
+    this.costPrice,
   });
 
   factory SaleItemModel.create({
@@ -120,6 +133,7 @@ class SaleItemModel extends HiveObject {
     double? gstRate,
     String? barcode,
     String? hsnCode,
+    double? costPrice,
   }) {
     // ✅ FIX: Check if tax is inclusive (for restaurant mode)
     final bool isTaxInclusive = AppConfig.isRestaurant && AppSettings.isTaxInclusive;
@@ -182,6 +196,7 @@ class SaleItemModel extends HiveObject {
       sgstAmount: sgst,
       barcode: barcode,
       hsnCode: hsnCode,
+      costPrice: costPrice,
     );
   }
 
@@ -204,6 +219,7 @@ class SaleItemModel extends HiveObject {
     required double total,
     String? barcode,
     String? hsnCode,
+    double? costPrice,
   }) {
     final cgst = _roundTo2Decimals(gstAmount / 2);
     final sgst = _roundTo2Decimals(gstAmount / 2);
@@ -230,6 +246,7 @@ class SaleItemModel extends HiveObject {
       sgstAmount: sgst,
       barcode: barcode,
       hsnCode: hsnCode,
+      costPrice: costPrice,
     );
   }
 
@@ -260,6 +277,7 @@ class SaleItemModel extends HiveObject {
       'sgstAmount': sgstAmount,
       'barcode': barcode,
       'hsnCode': hsnCode,
+      'costPrice': costPrice,
     };
   }
 
@@ -267,15 +285,20 @@ class SaleItemModel extends HiveObject {
   factory SaleItemModel.fromMap(Map<String, dynamic> map) {
     return SaleItemModel(
       saleItemId: map['saleItemId'] as String,
+      // Identity fields stay STRICT — a line with no saleId or productId can't
+      // be attached to anything, and silently defaulting them to '' would
+      // restore a corrupt row that looks fine. Better to fail loudly.
       saleId: map['saleId'] as String,
       varianteId: map['varianteId'] as String,
       productId: map['productId'] as String,
       productName: map['productName'] as String?,
       size: map['size'] as String?,
       color: map['color'] as String?,
-      price: (map['price'] as num).toDouble(),
-      qty: (map['qty'] as num).toInt(),
-      total: (map['total'] as num).toDouble(),
+      // Money and quantity default — a missing amount is recoverable data, and
+      // throwing here aborted the whole restore over one line.
+      price: (map['price'] as num?)?.toDouble() ?? 0.0,
+      qty: (map['qty'] as num?)?.toInt() ?? 0,
+      total: (map['total'] as num?)?.toDouble() ?? 0.0,
       discountAmount: (map['discountAmount'] as num?)?.toDouble(),
       taxAmount: (map['taxAmount'] as num?)?.toDouble(),
       barcode: map['barcode'] as String?,
@@ -288,6 +311,7 @@ class SaleItemModel extends HiveObject {
       weight: map['weight'] as String?,
       attributes: (map['attributes'] as Map?)
           ?.map((k, v) => MapEntry(k.toString(), v.toString())),
+      costPrice: (map['costPrice'] as num?)?.toDouble(),
     );
   }
 }

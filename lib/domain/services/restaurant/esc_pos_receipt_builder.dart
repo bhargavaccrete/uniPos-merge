@@ -337,7 +337,9 @@ class EscPosReceiptBuilder {
         name = '${name.substring(0, maxNameLen - 2)}..';
       }
 
-      final amount = _fmt(item.price * item.qty);
+      // Same basis the Sub Total and tax table use, so the Amount column
+      // sums to Sub Total in both modes (restaurant's price is mode-adjusted).
+      final amount = _fmt(receiptLineGross(item));
       bytes.addAll(_text(
           _formatRow(name, '${item.qty}', amount, cols)));
 
@@ -354,14 +356,11 @@ class EscPosReceiptBuilder {
     // ── TOTALS SECTION ──
     // This mirrors the bill summary from customerdetails.dart
 
-    // Per-rate base for the GST table. item.price is mode-adjusted (divided by
-    // 1+rate for exclusive display), so use item.total — which restores the true
-    // base and sums to Sub Total.
     // Derive the tax mode from the order totals (stored flag can be stale).
     // Fall back to the receipt's own line gross so the detector never has to
     // rely on the stale inclusive flag (which mis-classified exclusive bills).
     final double itemsGross =
-        receiptData.items.fold<double>(0, (s, it) => s + it.total);
+        receiptData.items.fold<double>(0, (s, it) => s + receiptLineGross(it));
     final double grossTotal = receiptData.itemTotal ?? itemsGross;
     final isTaxInclusive = (grossTotal > 0)
         ? TaxBreakdown.isInclusiveFromTotals(
@@ -401,7 +400,7 @@ class EscPosReceiptBuilder {
     // (0% bills produce no lines and skip the whole block.)
     final taxLines = TaxBreakdown.compute(
       items: receiptData.items
-          .map((it) => (gross: it.total, ratePercent: it.gstRate ?? 0))
+          .map((it) => (gross: receiptLineGross(it), ratePercent: it.gstRate ?? 0))
           .toList(),
       billDiscount: sale.discountAmount ?? 0,
       isTaxInclusive: isTaxInclusive,

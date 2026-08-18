@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/common/short_ref.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/color.dart';
 import 'package:intl/intl.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../domain/services/restaurant/notification_service.dart';
@@ -77,6 +81,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
     }
   }
 
+
   String _formatDate(String isoDate) {
     try {
       final date = DateTime.parse(isoDate);
@@ -98,6 +103,9 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
       final storeEmail = await storeSettingsService.getStoreEmail();
       final gstNumber = await storeSettingsService.getGSTNumber();
 
+      // Five awaits happened above, so the screen may be gone by now.
+      if (!mounted) return;
+
       // Show print options dialog
       final printService = PrintService();
       await printService.showPrintOptionsDialog(
@@ -110,6 +118,14 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
         storePhone: storePhone,
         storeEmail: storeEmail,
         gstNumber: gstNumber,
+        // Same four the checkout screen passes, read off the STORED sale.
+        // Omitting them printed a reprint that differed from the original: the
+        // "Points Redeemed" and round-off lines vanished, so Sub Total,
+        // Discount and Tax no longer added up to the Grand Total.
+        itemTotal: _sale!.subtotal,
+        loyaltyPointsDiscount: _sale!.loyaltyPointsUsed,
+        roundOff: _sale!.roundOff,
+        isTaxInclusive: _sale!.isTaxInclusive,
       );
     } catch (e) {
       if (mounted) {
@@ -134,28 +150,23 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
   Color _getPaymentColor(String paymentType) {
     switch (paymentType.toLowerCase()) {
       case 'cash':
-        return const Color(0xFF4CAF50);
+        return AppColors.success;
       case 'card':
-        return const Color(0xFF2196F3);
+        return AppColors.info;
       case 'upi':
-        return const Color(0xFF9C27B0);
+        return AppColors.secondary;
       default:
-        return const Color(0xFF6B6B6B);
+        return AppColors.textSecondary;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text(
-          'Sale Details',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-        ),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.white,
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: 'Sale Details',
+        titleFontSize: 18,
         actions: [
           IconButton(
             icon: const Icon(Icons.share_outlined),
@@ -189,7 +200,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, -2),
           ),
@@ -228,12 +239,12 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
           const Icon(
             Icons.error_outline,
             size: 64,
-            color: Color(0xFFD0D0D0),
+            color: AppColors.divider,
           ),
           const SizedBox(height: 16),
           const Text(
             'Sale not found',
-            style: TextStyle(fontSize: 16, color: Color(0xFF6B6B6B)),
+            style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 24),
           ElevatedButton(
@@ -272,7 +283,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
         gradient: LinearGradient(
           colors: [
             _getPaymentColor(_sale!.paymentType),
-            _getPaymentColor(_sale!.paymentType).withOpacity(0.7),
+            _getPaymentColor(_sale!.paymentType).withValues(alpha: 0.7),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -280,7 +291,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: _getPaymentColor(_sale!.paymentType).withOpacity(0.3),
+            color: _getPaymentColor(_sale!.paymentType).withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -318,7 +329,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Text(
@@ -351,7 +362,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _sale!.saleId.substring(0, 13).toUpperCase(),
+                    shortRef(_sale!.saleId, length: 13),
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,
@@ -364,7 +375,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
@@ -445,7 +456,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
+        border: Border.all(color: AppColors.divider, width: 0.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -459,14 +470,14 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF1A1A1A),
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const Spacer(),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF4CAF50).withOpacity(0.1),
+                    color: AppColors.success.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -474,14 +485,14 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF4CAF50),
+                      color: AppColors.success,
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1, thickness: 0.5, color: Color(0xFFE8E8E8)),
+          const Divider(height: 1, thickness: 0.5, color: AppColors.divider),
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -489,7 +500,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
             separatorBuilder: (context, index) => const Divider(
               height: 1,
               thickness: 0.5,
-              color: Color(0xFFE8E8E8),
+              color: AppColors.divider,
               indent: 16,
               endIndent: 16,
             ),
@@ -517,7 +528,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF4CAF50).withOpacity(0.1),
+                  color: AppColors.success.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Center(
@@ -526,7 +537,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF4CAF50),
+                      color: AppColors.success,
                     ),
                   ),
                 ),
@@ -542,7 +553,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF1A1A1A),
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -570,21 +581,21 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFFAFAFA),
+              color: AppColors.surfaceLight,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
               children: [
                 _buildPriceRow(
-                  '${item.qty} × ₹${item.price.toStringAsFixed(2)}',
-                  '₹${(item.qty * item.price).toStringAsFixed(2)}',
+                  '${item.qty} × ${formatMoney(item.price)}',
+                  formatMoney((item.qty * item.price)),
                   isBold: false,
                 ),
                 if (item.discountAmount != null && item.discountAmount! > 0) ...[
                   const SizedBox(height: 6),
                   _buildPriceRow(
                     'Discount',
-                    '- ₹${item.discountAmount!.toStringAsFixed(2)}',
+                    '- ${formatMoney(item.discountAmount!)}',
                     color: Colors.red,
                     isBold: false,
                   ),
@@ -593,15 +604,15 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                   const SizedBox(height: 6),
                   _buildPriceRow(
                     'Tax',
-                    '+ ₹${item.taxAmount!.toStringAsFixed(2)}',
-                    color: const Color(0xFF4CAF50),
+                    '+ ${formatMoney(item.taxAmount!)}',
+                    color: AppColors.success,
                     isBold: false,
                   ),
                 ],
                 const Divider(height: 16, thickness: 0.5),
                 _buildPriceRow(
                   'Item Total',
-                  '₹${item.total.toStringAsFixed(2)}',
+                  formatMoney(item.total),
                   isBold: true,
                 ),
               ],
@@ -616,15 +627,15 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
+        color: AppColors.surfaceMedium,
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
+        border: Border.all(color: AppColors.divider, width: 0.5),
       ),
       child: Text(
         label,
         style: const TextStyle(
           fontSize: 11,
-          color: Color(0xFF6B6B6B),
+          color: AppColors.textSecondary,
         ),
       ),
     );
@@ -637,7 +648,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
+        border: Border.all(color: AppColors.divider, width: 0.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -647,46 +658,46 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF1A1A1A),
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 16),
           _buildPriceRow(
             'Subtotal',
-            '₹${_sale!.subtotal.toStringAsFixed(2)}',
+            formatMoney(_sale!.subtotal),
             isBold: false,
           ),
           const SizedBox(height: 12),
           _buildPriceRow(
             'Discount',
-            '- ₹${_sale!.discountAmount.toStringAsFixed(2)}',
+            '- ${formatMoney(_sale!.discountAmount)}',
             color: Colors.red,
             isBold: false,
           ),
           const SizedBox(height: 12),
           _buildPriceRow(
             'Tax',
-            '+ ₹${_sale!.taxAmount.toStringAsFixed(2)}',
-            color: const Color(0xFF4CAF50),
+            '+ ${formatMoney(_sale!.taxAmount)}',
+            color: AppColors.success,
             isBold: false,
           ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
-            child: Divider(height: 1, thickness: 0.5, color: Color(0xFFE8E8E8)),
+            child: Divider(height: 1, thickness: 0.5, color: AppColors.divider),
           ),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF4CAF50).withOpacity(0.05),
+              color: AppColors.success.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: const Color(0xFF4CAF50).withOpacity(0.2),
+                color: AppColors.success.withValues(alpha: 0.2),
                 width: 1,
               ),
             ),
             child: _buildPriceRow(
               'Grand Total',
-              '₹${_sale!.totalAmount.toStringAsFixed(2)}',
+              formatMoney(_sale!.totalAmount),
               isBold: true,
               fontSize: 20,
             ),
@@ -713,10 +724,10 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF2196F3).withOpacity(0.05),
+            color: AppColors.info.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: const Color(0xFF2196F3).withOpacity(0.2),
+              color: AppColors.info.withValues(alpha: 0.2),
               width: 1,
             ),
           ),
@@ -728,7 +739,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                   Icon(
                     Icons.payment,
                     size: 18,
-                    color: const Color(0xFF2196F3),
+                    color: AppColors.info,
                   ),
                   const SizedBox(width: 8),
                   const Text(
@@ -736,7 +747,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF2196F3),
+                      color: AppColors.info,
                     ),
                   ),
                 ],
@@ -759,7 +770,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                             width: 32,
                             height: 32,
                             decoration: BoxDecoration(
-                              color: _getPaymentMethodColor(method).withOpacity(0.1),
+                              color: _getPaymentMethodColor(method).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Center(
@@ -779,7 +790,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                                   style: const TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
-                                    color: Color(0xFF1A1A1A),
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
                                 if (ref != null && ref.isNotEmpty)
@@ -787,18 +798,18 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                                     'Ref: $ref',
                                     style: const TextStyle(
                                       fontSize: 11,
-                                      color: Color(0xFF6B6B6B),
+                                      color: AppColors.textSecondary,
                                     ),
                                   ),
                               ],
                             ),
                           ),
                           Text(
-                            '₹${amount.toStringAsFixed(2)}',
+                            formatMoney(amount),
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF1A1A1A),
+                              color: AppColors.textPrimary,
                             ),
                           ),
                         ],
@@ -810,7 +821,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                           margin: const EdgeInsets.only(left: 44),
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF5F5F5),
+                            color: AppColors.surfaceMedium,
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Column(
@@ -820,10 +831,10 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                                 children: [
                                   const Text(
                                     'Cash Received',
-                                    style: TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
+                                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                                   ),
                                   Text(
-                                    '₹${received.toStringAsFixed(2)}',
+                                    formatMoney(received),
                                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
                                   ),
                                 ],
@@ -838,7 +849,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                                       style: TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.w600),
                                     ),
                                     Text(
-                                      '₹${change.toStringAsFixed(2)}',
+                                      formatMoney(change),
                                       style: const TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.w600),
                                     ),
                                   ],
@@ -857,7 +868,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                 const Divider(height: 16, thickness: 0.5),
                 _buildPriceRow(
                   'Total Paid',
-                  '₹${_sale!.totalPaid!.toStringAsFixed(2)}',
+                  formatMoney(_sale!.totalPaid!),
                   isBold: true,
                 ),
               ],
@@ -865,7 +876,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                 const SizedBox(height: 8),
                 _buildPriceRow(
                   'Change Returned',
-                  '₹${_sale!.changeReturn!.toStringAsFixed(2)}',
+                  formatMoney(_sale!.changeReturn!),
                   color: Colors.orange,
                   isBold: true,
                 ),
@@ -897,17 +908,17 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
   Color _getPaymentMethodColor(String method) {
     switch (method.toLowerCase()) {
       case 'cash':
-        return const Color(0xFF4CAF50);
+        return AppColors.success;
       case 'card':
-        return const Color(0xFF2196F3);
+        return AppColors.info;
       case 'upi':
-        return const Color(0xFF9C27B0);
+        return AppColors.secondary;
       case 'wallet':
-        return const Color(0xFFFF9800);
+        return AppColors.warning;
       case 'credit':
-        return const Color(0xFFE91E63);
+        return AppColors.accent;
       default:
-        return const Color(0xFF6B6B6B);
+        return AppColors.textSecondary;
     }
   }
 
@@ -926,7 +937,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
           style: TextStyle(
             fontSize: fontSize ?? 14,
             fontWeight: isBold ? FontWeight.w600 : FontWeight.w400,
-            color: color ?? const Color(0xFF6B6B6B),
+            color: color ?? AppColors.textSecondary,
           ),
         ),
         Text(
@@ -934,7 +945,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
           style: TextStyle(
             fontSize: fontSize ?? 14,
             fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
-            color: color ?? const Color(0xFF1A1A1A),
+            color: color ?? AppColors.textPrimary,
           ),
         ),
       ],

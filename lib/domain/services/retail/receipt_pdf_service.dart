@@ -20,6 +20,24 @@ import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/common/loyalty_points.dart';
 import 'retail_printer_settings_service.dart';
 
+/// What one receipt line contributes to Sub Total — the single definition every
+/// renderer must print in its Amount column and feed to the tax table.
+///
+/// The two modes build `SaleItemModel` from opposite ends:
+/// - **Restaurant** divides the gross menu price down to a base before calling
+///   `SaleItemModel.create` (`restaurant_print_helper.dart`), so `total` lands
+///   back on the original gross — which is what `CartCalculationService
+///   .itemTotal` (the Sub Total) sums.
+/// - **Retail** passes an already-base price, so `total` comes out
+///   tax-INCLUSIVE while its Sub Total (`bill.itemTotal`) is the ex-tax gross.
+///
+/// Printing raw `item.total` in both modes is what made a retail bill show a
+/// ₹118 line above a ₹100 Sub Total. Item-level discount is deliberately not
+/// subtracted here: retail's Sub Total is "before any discount" and the bill
+/// shows Discount as its own row.
+double receiptLineGross(SaleItemModel it) =>
+    AppConfig.isRestaurant ? it.total : it.price * it.qty;
+
 /// Data class to hold all receipt information
 class ReceiptData {
   final SaleModel sale;
@@ -278,9 +296,16 @@ class ReceiptPdfService {
     final retailSettings = _getRetailSettings();
 
     final isKot = data.kotNumber != null;
+    // The compact layout was already built here, but the flag came only from
+    // restaurant's PrintSettings — which retail's settings screen never exposed,
+    // so a retail user could not reach it. In retail mode the choice now comes
+    // from RetailPrinterSettings; restaurant keeps its own (and KOT is
+    // restaurant-only, so that branch is unchanged).
     final bool isPaperSaver = isKot
         ? PrintSettings.isKotTemplatePaperSaver
-        : PrintSettings.isBillTemplatePaperSaver;
+        : (isRetail && retailSettings != null
+            ? retailSettings.billTemplate == BillTemplate.paperSaver
+            : PrintSettings.isBillTemplatePaperSaver);
 
     // Font size baseline calculations based on template choice
     final double storeNameSize = isPaperSaver
@@ -635,12 +660,9 @@ class ReceiptPdfService {
             // stale and mismatch how THIS order was priced).
             final bool fallbackInclusive = AppConfig.isRestaurant &&
                 (data.isTaxInclusive ?? AppSettings.isTaxInclusive);
-            // Per-rate base for the GST table. On the restaurant side item.price
-            // is mode-adjusted (divided by 1+rate for exclusive display), so use
-            // item.total — which restores the true base and sums to Sub Total.
-            // Retail keeps price*qty (its price is already the base).
-            double lineGross(SaleItemModel it) =>
-                AppConfig.isRestaurant ? it.total : it.price * it.qty;
+            // Per-rate base for the GST table — the same figure the Amount
+            // column prints, so rows and the tax table can never disagree.
+            double lineGross(SaleItemModel it) => receiptLineGross(it);
             // Prefer the pre-calculated itemTotal, but fall back to the receipt's
             // own line gross so the detector never relies on the stale flag.
             final double itemsGross =
@@ -668,27 +690,6 @@ class ReceiptPdfService {
               isTaxInclusive: inclusive,
               reconcileToGst: data.sale.taxAmount, // lines must sum to the order's GST
             );
-            // TEMP DEBUG — remove after diagnosing tax-summary bug.
-            // ignore: avoid_print
-            print('🟢 TAXDEBUG thermal ───────────────────────────────\n'
-                '  isRestaurant=${AppConfig.isRestaurant} '
-                'itemTotal=${data.itemTotal} itemsGross=$itemsGross '
-                'grossTotal=$grossTotal\n'
-                '  sale.subtotal=${data.sale.subtotal} '
-                'sale.taxAmount=${data.sale.taxAmount} '
-                'sale.totalAmount=${data.sale.totalAmount} '
-                'discount=${data.sale.discountAmount}\n'
-                '  MODE: fallbackInclusive=$fallbackInclusive => inclusive=$inclusive\n'
-                '  ITEMS (price = what the row shows? -> lineGross fed to tax):\n'
-                '${data.items.map((it) => '    "${it.productName}" '
-                    'price=${it.price} qty=${it.qty} total=${it.total} '
-                    'lineGross=${lineGross(it)} gstRate=${it.gstRate} '
-                    'storedTaxable=${it.taxableAmount} storedGst=${it.gstAmount}').join("\n")}\n'
-                '  COMPUTED TAX LINES (printed in summary):\n'
-                '${taxLines.map((l) => '    ${l.ratePercent}% -> '
-                    'taxable=${l.taxable} gst=${l.gst} '
-                    'total=${(l.taxable + l.gst).toStringAsFixed(2)}').join("\n")}\n'
-                '─────────────────────────────────────────────────────');
             final bool hasGst = showTax && taxLines.isNotEmpty;
             // Authoritative total — always matches the order's GST.
             final double totalGst = data.sale.taxAmount;
@@ -1420,12 +1421,9 @@ class ReceiptPdfService {
     // the stored flag can be stale and mismatch how THIS order was priced.
     final bool fallbackInclusive = AppConfig.isRestaurant &&
         (data.isTaxInclusive ?? AppSettings.isTaxInclusive);
-    // Per-rate base for the GST table. On the restaurant side item.price is
-    // mode-adjusted (divided by 1+rate for exclusive display), so use item.total
-    // — which restores the true base and sums to Sub Total. Retail keeps
-    // price*qty (its price is already the base).
-    double lineGross(SaleItemModel it) =>
-        AppConfig.isRestaurant ? it.total : it.price * it.qty;
+    // Per-rate base for the GST table — the same figure the Amount column
+    // prints, so rows and the tax table can never disagree.
+    double lineGross(SaleItemModel it) => receiptLineGross(it);
     // Prefer itemTotal, but fall back to the receipt's own line gross so the
     // detector never has to rely on the stale inclusive flag.
     final double itemsGross =
@@ -1610,8 +1608,11 @@ class ReceiptPdfService {
     );
     final displayName = descriptor.isEmpty ? name : '$name ($descriptor)';
 
-    // Calculate unit price (total / quantity)
-    final unitPrice = item.qty > 0 ? item.total / item.qty : item.total;
+    // Rate and Amount both come off receiptLineGross, so the column sums to
+    // Sub Total. Printing item.total here put a tax-inclusive ₹118 line above
+    // a ₹100 ex-tax Sub Total on every retail bill.
+    final lineAmount = receiptLineGross(item);
+    final unitPrice = item.qty > 0 ? lineAmount / item.qty : lineAmount;
 
     return pw.Padding(
       padding: pw.EdgeInsets.symmetric(vertical: isPaperSaver ? 0.5 : 2.0),
@@ -1642,7 +1643,7 @@ class ReceiptPdfService {
               pw.Expanded(
                 flex: 2,
                 child: pw.Text(
-                  _formatCurrency(item.total),
+                  _formatCurrency(lineAmount),
                   style: pw.TextStyle(fontSize: fontSize),
                   textAlign: pw.TextAlign.right,
                 ),
@@ -1842,7 +1843,12 @@ class ReceiptPdfService {
                     : '-',
                 align: pw.TextAlign.right,
               ),
-              _buildTableCell(_formatCurrency(item.total), align: pw.TextAlign.right, isBold: true),
+              // Gross, matching the "Item Total" row in the totals block —
+              // the Discount column beside it is subtracted once there, not
+              // twice. item.total was tax-inclusive on retail, so this column
+              // never summed to Item Total.
+              _buildTableCell(_formatCurrency(receiptLineGross(item)),
+                  align: pw.TextAlign.right, isBold: true),
             ],
           );
         }),
