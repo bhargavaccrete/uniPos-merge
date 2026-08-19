@@ -24,6 +24,8 @@ import 'package:billberrylite/presentation/screens/retail/reports/cash_drawer_hi
 import 'package:billberrylite/presentation/screens/retail/gst_report_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/credit_reports_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/eod_reports_list_screen.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 
 class ReportsScreen extends StatelessWidget {
   const ReportsScreen({super.key});
@@ -51,6 +53,7 @@ class ReportsScreen extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (context) => const DailySalesReportScreen()),
             ),
+            entitlementKey: RetailEntKeys.reportsDailySales,
           ),
           _buildReportCard(
             context,
@@ -62,6 +65,7 @@ class ReportsScreen extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (context) => const MonthlySalesReportScreen()),
             ),
+            entitlementKey: RetailEntKeys.reportsMonthlySales,
           ),
           _buildReportCard(
             context,
@@ -73,6 +77,7 @@ class ReportsScreen extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (context) => const ProductWiseSalesReportScreen()),
             ),
+            entitlementKey: RetailEntKeys.reportsSaleByProduct,
           ),
           _buildReportCard(
             context,
@@ -84,6 +89,7 @@ class ReportsScreen extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (context) => const VariantWiseSalesReportScreen()),
             ),
+            entitlementKey: RetailEntKeys.reportsSaleByVariant,
           ),
           _buildReportCard(
             context,
@@ -95,6 +101,7 @@ class ReportsScreen extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (context) => const CategoryWiseSalesReportScreen()),
             ),
+            entitlementKey: RetailEntKeys.reportsSaleByCategory,
           ),
           _buildReportCard(
             context,
@@ -106,6 +113,7 @@ class ReportsScreen extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (context) => const TopSellingProductsReportScreen()),
             ),
+            entitlementKey: RetailEntKeys.reportsTopSelling,
           ),
           const SizedBox(height: 16),
           _buildSectionHeader(context, 'Purchase Reports'),
@@ -119,6 +127,7 @@ class ReportsScreen extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (context) => const PurchaseSummaryReportScreen()),
             ),
+            entitlementKey: RetailEntKeys.reportsPurchaseSummary,
           ),
           _buildReportCard(
             context,
@@ -130,6 +139,7 @@ class ReportsScreen extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (context) => const SupplierWisePurchaseReportScreen()),
             ),
+            entitlementKey: RetailEntKeys.reportsSupplierPurchase,
           ),
           _buildReportCard(
             context,
@@ -141,6 +151,7 @@ class ReportsScreen extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (context) => const PurchaseOrderStatusReportScreen.pending()),
             ),
+            entitlementKey: RetailEntKeys.reportsPoStatus,
           ),
           _buildReportCard(
             context,
@@ -152,6 +163,7 @@ class ReportsScreen extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (context) => const PurchaseOrderStatusReportScreen.partiallyReceived()),
             ),
+            entitlementKey: RetailEntKeys.reportsPoStatus,
           ),
           _buildReportCard(
             context,
@@ -163,6 +175,7 @@ class ReportsScreen extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (context) => const PurchaseOrderStatusReportScreen.completed()),
             ),
+            entitlementKey: RetailEntKeys.reportsPoStatus,
           ),
           _buildReportCard(
             context,
@@ -174,6 +187,7 @@ class ReportsScreen extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (context) => const GRNReportScreen()),
             ),
+            entitlementKey: RetailEntKeys.reportsGrn,
           ),
           _buildReportCard(
             context,
@@ -185,6 +199,7 @@ class ReportsScreen extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (context) => const DamagedItemsReportScreen()),
             ),
+            entitlementKey: RetailEntKeys.reportsDamagedItems,
           ),
           _buildReportCard(
             context,
@@ -196,6 +211,7 @@ class ReportsScreen extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (context) => const PurchaseReturnReportScreen()),
             ),
+            entitlementKey: RetailEntKeys.reportsPurchaseReturn,
           ),
           const SizedBox(height: 16),
           _buildSectionHeader(context, 'Inventory Reports'),
@@ -209,6 +225,7 @@ class ReportsScreen extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (context) => const LowStockReportScreen()),
             ),
+            entitlementKey: RetailEntKeys.reportsLowStock,
           ),
           const SizedBox(height: 16),
           _buildSectionHeader(context, 'Financial Reports'),
@@ -222,6 +239,7 @@ class ReportsScreen extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (context) => const ProfitReportScreen()),
             ),
+            entitlementKey: RetailEntKeys.reportsProfit,
           ),
           _buildReportCard(
             context,
@@ -233,6 +251,7 @@ class ReportsScreen extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (context) => const GstReportScreen()),
             ),
+            entitlementKey: RetailEntKeys.reportsGst,
           ),
           _buildReportCard(
             context,
@@ -244,6 +263,7 @@ class ReportsScreen extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (context) => const CreditReportsScreen()),
             ),
+            entitlementKey: RetailEntKeys.billingCredit,
           ),
           _buildReportCard(
             context,
@@ -256,6 +276,7 @@ class ReportsScreen extends StatelessWidget {
               MaterialPageRoute(
                   builder: (context) => const CashDrawerHistoryReportScreen()),
             ),
+            entitlementKey: RetailEntKeys.reportsCashDrawerHistory,
           ),
           _buildReportCard(
             context,
@@ -267,6 +288,7 @@ class ReportsScreen extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (context) => const EODReportsListScreen()),
             ),
+            entitlementKey: RetailEntKeys.reportsEodHistory,
           ),
           ],
         ),
@@ -298,6 +320,7 @@ class ReportsScreen extends StatelessWidget {
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
+    String? entitlementKey,
   }) {
     final iconBox = AppResponsive.largeIconSize(context) * 1.5;
 
@@ -339,7 +362,17 @@ class ReportsScreen extends StatelessWidget {
         trailing: Icon(Icons.arrow_forward_ios,
             size: AppResponsive.smallIconSize(context),
             color: AppColors.textSecondary),
-        onTap: onTap,
+        // Show-and-block: the tile stays visible and the upgrade sheet explains
+        // why, matching the restaurant hub. Tiles with no key are always open.
+        onTap: entitlementKey == null
+            ? onTap
+            : () {
+                if (!PlanGuard.allowedOr(context, entitlementKey,
+                    featureName: title)) {
+                  return;
+                }
+                onTap();
+              },
       ),
     );
   }

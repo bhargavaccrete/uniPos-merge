@@ -126,6 +126,18 @@ class _SplashScreenState extends State<SplashScreen>
     if (AppConfig.isSetupComplete) {
       // Setup is complete - navigate to appropriate screen based on business mode
       if (AppConfig.isRetail) {
+        // Licence first, admin login second — an expired or revoked device must
+        // reach the lock screen, not the till. A retail device that never
+        // activated has licenseInfo == null and falls straight through, which
+        // keeps the pre-licensing behaviour intact.
+        final lic = locator<LicenseStore>();
+        if (lic.licenseInfo != null &&
+            (!lic.isLicensed || !lic.hasVerifiedManifest)) {
+          if (!mounted) return;
+          LicenseStore.navigateToNextScreen(context);
+          return;
+        }
+
         // Gate retail behind admin login — restores an existing session if
         // one was saved (admin_session), otherwise sends to LoginScreen.
         final loggedIn = await authService.initialize();

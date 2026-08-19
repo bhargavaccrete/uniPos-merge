@@ -17,6 +17,8 @@ import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_item_model_212.dart';
 import 'package:billberrylite/data/models/retail/hive_model/supplier_model_205.dart';
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 
 class AddPurchaseOrderScreen extends StatefulWidget {
   final PurchaseOrderModel? purchaseOrder;
@@ -105,6 +107,10 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
   }
 
   Future<void> _savePO() async {
+    if (!PlanGuard.allowedOr(context, RetailEntKeys.purchaseCreate,
+        featureName: 'Purchase Orders')) {
+      return;
+    }
     if (_selectedSupplier == null) {
       NotificationService.instance.showError('Please select a supplier');
       return;

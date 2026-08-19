@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
@@ -6,6 +7,8 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
+import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
@@ -157,10 +160,20 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
   /// settle. A cart already in progress is deliberately never blocked at
   /// checkout — that would strand work the user has already done.
   ///
-  /// No entitlement checks here: `PlanEnforce._bypassed` includes
-  /// `AppConfig.isRetail`, so any PlanGuard call on this side always passes.
+  /// Entitlement gate mirrors restaurant's billing-entrance check: retail
+  /// enforces once a manifest is present (see `PlanEnforce._bypassed`); until
+  /// then it's a no-op, so this is safe on an unlicensed retail device.
   Future<bool> _passesBillingGates() async {
     if (!mounted) return false;
+
+    // Plan gate — billing module must be included in the plan.
+    if (!PlanEnforce.allows(RetailEntKeys.billing)) {
+      if (mounted) {
+        NotificationService.instance
+            .showError('Billing isn’t included in your current plan.');
+      }
+      return false;
+    }
 
     // End of Day pending → no new sales until it is completed.
     if (await DayManagementService.isEodStrictlyPending()) {
@@ -816,6 +829,11 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
 
   /*----------------------------------SCANNER CONTAINER ----------------------------------*/
 
+  /// Fraction of the preview box the scan window covers. The camera still
+  /// fills the whole box (BoxFit.cover), but detection is clipped to this rect.
+  static const double _scanWindowWidthFactor = 0.82;
+  static const double _scanWindowHeightFactor = 0.58;
+
   Widget _buildScannerContainer() {
     return Container(
       height: 150,
@@ -833,65 +851,129 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: Stack(
-          children: [
-            if (_scannerController != null)
-              MobileScanner(
-                controller: _scannerController!,
-                onDetect: (capture) {
-                  final List<Barcode> barcodes = capture.barcodes;
-                  for (final barcode in barcodes) {
-                    if (barcode.rawValue != null) {
-                      _handleBarcodeScanned(barcode.rawValue!);
-                    }
-                  }
-                },
-              ),
-            Center(
-              child: Container(
-                width: 250,
-                height: 100,
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.success, width: 3),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: 5,
-              left: 0,
-              right: 0,
-              child: Text(
-                "Align barcode within frame",
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                  color: AppColors.white,
-                  fontSize: AppResponsive.smallFontSize(context) ,
-                  fontWeight: FontWeight.w500,
-                  shadows: [
-                    Shadow(
-                      color: Colors.black54,
-                      blurRadius: 4,
+        // The scan window is a Rect in the scanner's own layout space, so it
+        // has to be measured, not guessed. The old fixed 250×100 frame also
+        // overflowed on narrow phones.
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final Size previewSize = constraints.biggest;
+            final Rect scanWindow = Rect.fromCenter(
+              center: previewSize.center(Offset.zero),
+              width: previewSize.width * _scanWindowWidthFactor,
+              height: previewSize.height * _scanWindowHeightFactor,
+            );
+
+            return Stack(
+              children: [
+                if (_scannerController != null) ...[
+                  MobileScanner(
+                    controller: _scannerController!,
+                    // Without this the detector reads the FULL camera frame and
+                    // the frame below is decoration only — a barcode anywhere in
+                    // view got added to the cart.
+                    scanWindow: scanWindow,
+                    scanWindowUpdateThreshold: 10,
+                    onDetect: (capture) {
+                      for (final barcode in capture.barcodes) {
+                        final value = barcode.rawValue;
+                        if (value == null) continue;
+                        if (!_isInsideScanWindow(
+                            barcode, capture.size, scanWindow, previewSize)) {
+                          continue;
+                        }
+                        _handleBarcodeScanned(value);
+                      }
+                    },
+                  ),
+                  // Dims everything outside the window and draws the border at
+                  // exactly the rect the detector filters on, so what the
+                  // cashier sees is what actually scans.
+                  Positioned.fill(
+                    child: ScanWindowOverlay(
+                      controller: _scannerController!,
+                      scanWindow: scanWindow,
+                      borderColor: AppColors.success,
+                      borderWidth: 3,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                  ],
+                  ),
+                ],
+                Positioned(
+                  bottom: 5,
+                  left: 0,
+                  right: 0,
+                  child: Text(
+                    "Align barcode within frame",
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      color: AppColors.white,
+                      fontSize: AppResponsive.smallFontSize(context) ,
+                      fontWeight: FontWeight.w500,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black54,
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            Positioned(
-              top: 8,
-              right: 0,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: AppColors.white, size: 20),
-                onPressed: _toggleScanner,
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.black45,
+                Positioned(
+                  top: 8,
+                  right: 0,
+                  child: IconButton(
+                    icon: const Icon(Icons.close, color: AppColors.white, size: 20),
+                    onPressed: _toggleScanner,
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.black45,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ],
+              ],
+            );
+          },
         ),
       ),
     );
+  }
+
+  /// Web fallback for [MobileScanner.scanWindow].
+  ///
+  /// Android/iOS/desktop drop out-of-window barcodes natively; the web
+  /// implementation of `updateScanWindow` is a documented no-op, so there the
+  /// rect has to be enforced here. Anything we can't measure passes through —
+  /// a missed scan is worse than a loose one.
+  bool _isInsideScanWindow(
+    Barcode barcode,
+    Size imageSize,
+    Rect scanWindow,
+    Size previewSize,
+  ) {
+    if (!kIsWeb) return true;
+    if (imageSize.isEmpty || barcode.corners.isEmpty) return true;
+
+    // Both the window and the barcode get expressed as fractions of the camera
+    // texture — the widget and the texture are different sizes.
+    final Rect window =
+        ScanWindowUtils.calculateScanWindowRelativeToTextureInPercentage(
+      BoxFit.cover,
+      scanWindow,
+      textureSize: imageSize,
+      widgetSize: previewSize,
+    );
+
+    double sumX = 0;
+    double sumY = 0;
+    for (final corner in barcode.corners) {
+      sumX += corner.dx;
+      sumY += corner.dy;
+    }
+    final int count = barcode.corners.length;
+
+    return window.contains(Offset(
+      sumX / count / imageSize.width,
+      sumY / count / imageSize.height,
+    ));
   }
 
 

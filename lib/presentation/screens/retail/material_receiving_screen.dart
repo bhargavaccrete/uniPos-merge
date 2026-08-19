@@ -12,6 +12,8 @@ import '../../../core/di/service_locator.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model_211.dart';
 import 'package:billberrylite/data/models/retail/hive_model/grn_model_213.dart';
 import 'package:billberrylite/data/models/retail/hive_model/grn_item_model_214.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 
 class MaterialReceivingScreen extends StatefulWidget {
   final PurchaseOrderModel purchaseOrder;
@@ -384,6 +386,10 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
   }
 
   Future<void> _saveAndConfirmGRN() async {
+    if (!PlanGuard.allowedOr(context, RetailEntKeys.purchaseReceive,
+        featureName: 'Goods Receipt')) {
+      return;
+    }
     // Validation
     final hasReceivedItems = _receivingItems.any((item) => item.receivedQty > 0);
     if (!hasReceivedItems) {

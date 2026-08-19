@@ -1,9 +1,9 @@
 import 'package:mobx/mobx.dart';
 import '../../../core/config/app_config.dart';
-import '../../../core/plan/entitlement_keys.dart';
 import '../../../core/plan/plan_enforcement.dart';
 import '../../../data/models/common/customer_model_125.dart';
 import '../../../data/repositories/common/customer_repository.dart';
+import '../../../core/plan/mode_keys.dart';
 
 part 'customer_store.g.dart';
 
@@ -104,14 +104,17 @@ abstract class _CustomerStore with Store {
     try {
       // Plan gate — customer module + cap (also covers on-the-fly creation at
       // checkout). Availability = module flag; the cap only bites when positive.
-      // PlanEnforce itself bypasses retail (no entitlement system yet), so
-      // this only ever blocks restaurant.
-      if (!PlanEnforce.allows(EntKeys.customers)) {
+      // Unified store: ModeKeys picks the mode's own key so each side reads its
+      // own plan (restaurant `customers`, retail `retail.customers`). Each is a
+      // no-op until that mode has a manifest.
+      final moduleKey = ModeKeys.customers;
+      final maxKey = ModeKeys.customersMax;
+      if (!PlanEnforce.allows(moduleKey)) {
         errorMessage = 'Your plan doesn’t include saved customers.';
         return false;
       }
-      if (!PlanEnforce.withinLimit(EntKeys.customersMax, customers.length)) {
-        final max = PlanEnforce.limit(EntKeys.customersMax);
+      if (!PlanEnforce.withinLimit(maxKey, customers.length)) {
+        final max = PlanEnforce.limit(maxKey);
         errorMessage = 'Customer limit reached (max $max). Upgrade to add more.';
         return false;
       }

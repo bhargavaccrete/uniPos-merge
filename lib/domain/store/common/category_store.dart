@@ -1,11 +1,11 @@
 import 'package:mobx/mobx.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/di/service_locator.dart';
-import '../../../core/plan/entitlement_keys.dart';
 import '../../../core/plan/plan_enforcement.dart';
 import '../../../data/models/common/categorymodel_300.dart';
 import '../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../data/repositories/common/category_repository.dart';
+import '../../../core/plan/mode_keys.dart';
 
 part 'category_store.g.dart';
 
@@ -107,9 +107,9 @@ abstract class _CategoryStore with Store {
       isLoading = true;
       errorMessage = null;
 
-      // Plan gate — PlanEnforce itself bypasses retail (no entitlement system
-      // yet), so this only ever blocks restaurant.
-      if (!PlanEnforce.allows(EntKeys.manageMenuCategoriesAdd)) {
+      // Plan gate — ModeKeys picks retail's or restaurant's category key, since
+      // this store serves both. Retail stays open until a manifest arrives.
+      if (!PlanEnforce.allows(ModeKeys.categoriesAdd)) {
         errorMessage =
             'Adding categories isn’t available on your current plan.';
         return false;
@@ -145,9 +145,8 @@ abstract class _CategoryStore with Store {
       isLoading = true;
       errorMessage = null;
 
-      // Plan gate — PlanEnforce itself bypasses retail (no entitlement system
-      // yet), so this only ever blocks restaurant.
-      if (!PlanEnforce.allows(EntKeys.manageMenuCategoriesEdit)) {
+      // Plan gate — ModeKeys picks retail's or restaurant's category key.
+      if (!PlanEnforce.allows(ModeKeys.categoriesEdit)) {
         errorMessage = 'Editing categories isn’t available on your current plan.';
         return false;
       }
@@ -175,9 +174,8 @@ abstract class _CategoryStore with Store {
       isLoading = true;
       errorMessage = null;
 
-      // Plan gate — PlanEnforce itself bypasses retail (no entitlement system
-      // yet), so this only ever blocks restaurant.
-      if (!PlanEnforce.allows(EntKeys.manageMenuCategoriesDelete)) {
+      // Plan gate — ModeKeys picks retail's or restaurant's category key.
+      if (!PlanEnforce.allows(ModeKeys.categoriesDelete)) {
         errorMessage = 'Deleting categories isn’t available on your current plan.';
         return false;
       }

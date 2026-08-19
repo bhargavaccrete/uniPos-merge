@@ -6,6 +6,8 @@ import '../../../data/models/retail/hive_model/variante_model_201.dart';
 import '../../../data/repositories/retail/product_repository.dart';
 import '../../../data/repositories/retail/variant_repository.dart';
 import '../../../core/di/service_locator.dart';
+import '../../../core/plan/plan_enforcement.dart';
+import '../../../core/plan/retail_entitlement_keys.dart';
 
 
 part 'product_store.g.dart';
@@ -71,6 +73,18 @@ abstract class _ProductStore with Store {
     // Update UI state
     products.add(product);
   }
+
+  /// Plan gate for adding a product: module + add action allowed, AND under the
+  /// products cap. Mirrors restaurant's `item_store.addItem`
+  /// (`manage_menu.items` + `.add` + `.max`).
+  /// No-op (true) until a retail manifest is present — see `PlanEnforce`.
+  bool get canAddProduct =>
+      PlanEnforce.allows(RetailEntKeys.catalog) &&
+      PlanEnforce.allows(RetailEntKeys.catalogProductsAdd) &&
+      PlanEnforce.withinLimit(RetailEntKeys.catalogProductsMax, products.length);
+
+  /// The products cap for messages; null = unlimited.
+  int? get productLimit => PlanEnforce.limit(RetailEntKeys.catalogProductsMax);
 
   /// Create a single-variant product in one step — used by the POS "product not
   /// found for this barcode" flow. Model construction lives here rather than in

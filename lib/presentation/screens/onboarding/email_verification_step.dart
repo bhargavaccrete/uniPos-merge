@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 import 'package:billberrylite/stores/setup_wizard_store.dart';
@@ -262,10 +263,52 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
             padding: AppResponsive.screenPadding(context),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: [_phaseContent(context)],
+              children: [
+                _phaseContent(context),
+                if (_showSkip) _skipAction(context),
+              ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// Retail-only testing escape from the licence step. Hidden once a licence
+  /// actually exists, so it can never sit next to an activated state.
+  bool get _showSkip =>
+      AppConfig.isRetail &&
+      AppConfig.retailLicenseSkipForTesting &&
+      !_license.isLicensed;
+
+  /// Advances the wizard WITHOUT activating. No fake licence, no bypass flag —
+  /// `licenseInfo` stays null, which is exactly the state retail is in today,
+  /// so every gate keeps bypassing (see `PlanEnforce._bypassed`).
+  Widget _skipAction(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(top: AppResponsive.mediumSpacing(context)),
+      child: Column(
+        children: [
+          TextButton(
+            onPressed: widget.onNext,
+            child: Text(
+              'Skip for now',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          Text(
+            'Testing only — retail licensing is not live yet',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.captionFontSize(context),
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
       ),
     );
   }

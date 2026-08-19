@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/config/tax_feature.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
+import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/domain/services/retail/gst_service.dart';
@@ -23,6 +25,7 @@ import 'package:billberrylite/domain/services/restaurant/notification_service.da
 import 'package:uuid/uuid.dart';
 
 import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -152,7 +155,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   double get _grandTotal => _bill.grandTotal;
 
   /// Process a Credit/Pay Later sale
+  /// Plan gate — blocks a NEW bill once the per-day cap is reached. Counts
+  /// today's completed sales. No-op until a retail manifest is present, and
+  /// `0/absent = unlimited` (see PlanEnforce). Mirrors restaurant's per-day cap
+  /// enforced at the order entrance (customerdetails.dart).
+  Future<bool> _withinDailyBillCap() async {
+    final billsToday = (await saleStore.getTodaySales()).length;
+    if (PlanEnforce.withinLimit(RetailEntKeys.billingPerDayMax, billsToday)) {
+      return true;
+    }
+    final max = PlanEnforce.limit(RetailEntKeys.billingPerDayMax);
+    if (mounted) {
+      NotificationService.instance.showError(
+          'Daily bill limit reached${max != null ? ' (max $max)' : ''}. Upgrade your plan to bill more today.');
+    }
+    return false;
+  }
+
   Future<void> _processCreditSale() async {
+    // Plan gate — daily bill cap (a credit sale is still a bill).
+    if (!await _withinDailyBillCap()) return;
+
     // Require customer for credit sales
     if (customerStore.selectedCustomer == null) {
       NotificationService.instance.showError('Customer is required for Pay Later sales');
@@ -406,6 +429,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _processCheckout() async {
     if (_isProcessing) return;
+
+    // Plan gate — daily bill cap, checked before we start processing.
+    if (!await _withinDailyBillCap()) return;
 
     setState(() {
       _isProcessing = true;
@@ -996,6 +1022,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 onChanged: redeemable <= 0
                     ? null
                     : (on) {
+                        // Show-and-block, not hide: the card stays visible and
+                        // the upgrade sheet explains why. Gating the toggle
+                        // (the entrance) rather than the commit at settle keeps
+                        // a redemption already in the cart from breaking.
+                        if (on &&
+                            !PlanGuard.allowedOr(
+                                context, RetailEntKeys.loyalty,
+                                featureName: 'Loyalty Points')) {
+                          return;
+                        }
                         setState(() => _pointsRedeemed = on ? redeemable : 0);
                         retailCartStore
                             .setLoyaltyRedemption(_pointsRedeemed.toDouble());

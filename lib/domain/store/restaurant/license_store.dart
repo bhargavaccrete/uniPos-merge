@@ -745,7 +745,16 @@ abstract class _LicenseStore with Store {
       return;
     }
 
-    // 3. Fully valid and verified -> Proceed to POS Home or Login based on login state
+    // 3. Fully valid and verified -> hand over to the mode's own entry point.
+    // Steps 1 and 2 above are mode-agnostic (lock / key entry are the same
+    // decision for both), so only this destination branches.
+    if (AppConfig.isRetail) {
+      // Retail has no staff session; its own admin login runs after this,
+      // driven by splashScreen's authService.initialize().
+      Navigator.pushReplacementNamed(context, RouteNames.retailBilling);
+      return;
+    }
+
     final isLoggedIn = RestaurantSession.isLoggedIn;
     if (isLoggedIn) {
       Navigator.pushReplacementNamed(context, RouteNames.restaurantHome);

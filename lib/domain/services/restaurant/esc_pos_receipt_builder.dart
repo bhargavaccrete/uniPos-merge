@@ -4,7 +4,7 @@ import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/restaurant/print_settings.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
-import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/mode_keys.dart';
 import 'package:billberrylite/domain/services/restaurant/tax_breakdown.dart';
 import 'package:billberrylite/core/di/service_locator.dart'
     show taxStore, attributeStore;
@@ -489,7 +489,7 @@ class EscPosReceiptBuilder {
     }
     // "Powered by Bill Berry Lite" + company line. Forced when the admin keeps
     // `billing.invoice.print` on; otherwise the shop's "Powered By" toggle decides.
-    if (PlanEnforce.allows(EntKeys.billingInvoicePrint) ||
+    if (PlanEnforce.allows(ModeKeys.billingInvoicePrint) ||
         PrintSettings.showPoweredBy) {
       bytes.addAll(_text('Powered by Bill Berry Lite'));
       bytes.addAll(_text('Accrete Infosolution Technologies Private Limited'));

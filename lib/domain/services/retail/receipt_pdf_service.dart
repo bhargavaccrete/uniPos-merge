@@ -11,7 +11,7 @@ import '../../../data/models/retail/printer_settings_model.dart';
 import '../../../util/restaurant/print_settings.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/plan/plan_enforcement.dart';
-import '../../../core/plan/entitlement_keys.dart';
+import '../../../core/plan/mode_keys.dart';
 import '../../../core/di/service_locator.dart' show taxStore, attributeStore;
 import '../../../util/restaurant/staticswitch.dart';
 import '../restaurant/tax_breakdown.dart';
@@ -621,6 +621,12 @@ class ReceiptPdfService {
           // Items Header
           pw.Row(
             children: [
+              // HSN/SAC — retail bills only; restaurant header is unchanged.
+              if (AppConfig.isRetail)
+                pw.Expanded(
+                  flex: 2,
+                  child: pw.Text('HSN', style: pw.TextStyle(fontSize: tableHeaderSize, fontWeight: pw.FontWeight.bold)),
+                ),
               pw.Expanded(
                 flex: 3,
                 child: pw.Text('Item', style: pw.TextStyle(fontSize: tableHeaderSize, fontWeight: pw.FontWeight.bold)),
@@ -812,7 +818,7 @@ class ReceiptPdfService {
               ),
             // "Powered by" + company line — forced by the admin flag, else the
             // shop's "Powered By" toggle decides.
-            if (PlanEnforce.allows(EntKeys.billingInvoicePrint) ||
+            if (PlanEnforce.allows(ModeKeys.billingInvoicePrint) ||
                 PrintSettings.showPoweredBy) ...[
               pw.SizedBox(height: 4),
               pw.Text(
@@ -1306,7 +1312,7 @@ class ReceiptPdfService {
               // "Powered by" + company line — restaurant only. Forced by the admin
               // `billing.invoice.print` flag; otherwise the shop's toggle decides.
               if (AppConfig.isRestaurant &&
-                  (PlanEnforce.allows(EntKeys.billingInvoicePrint) ||
+                  (PlanEnforce.allows(ModeKeys.billingInvoicePrint) ||
                       PrintSettings.showPoweredBy)) ...[
                 pw.SizedBox(height: 4),
                 pw.Text(
@@ -1614,6 +1620,8 @@ class ReceiptPdfService {
     final lineAmount = receiptLineGross(item);
     final unitPrice = item.qty > 0 ? lineAmount / item.qty : lineAmount;
 
+    final hsn = (item.hsnCode?.trim().isNotEmpty ?? false) ? item.hsnCode!.trim() : '-';
+
     return pw.Padding(
       padding: pw.EdgeInsets.symmetric(vertical: isPaperSaver ? 0.5 : 2.0),
       child: pw.Column(
@@ -1624,6 +1632,12 @@ class ReceiptPdfService {
             // name wraps to two lines.
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
+              // HSN/SAC — retail bills only; must mirror the header's flex.
+              if (AppConfig.isRetail)
+                pw.Expanded(
+                  flex: 2,
+                  child: pw.Text(hsn, style: pw.TextStyle(fontSize: fontSize)),
+                ),
               pw.Expanded(
                 flex: 3,
                 child: pw.Text(displayName, style: pw.TextStyle(fontSize: fontSize)),
@@ -1801,26 +1815,30 @@ class ReceiptPdfService {
 
   /// Build items table for A4 invoice
   pw.Widget _buildInvoiceTable(List<SaleItemModel> items) {
+    // HSN/SAC column is retail-only; restaurant keeps the original 6 columns.
+    final isRetail = AppConfig.isRetail;
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
-      columnWidths: {
-        0: const pw.FlexColumnWidth(1),
-        1: const pw.FlexColumnWidth(4),
-        2: const pw.FlexColumnWidth(2),
-        3: const pw.FlexColumnWidth(1),
-        4: const pw.FlexColumnWidth(2),
-        5: const pw.FlexColumnWidth(2),
-      },
+      columnWidths: <pw.TableColumnWidth>[
+        const pw.FlexColumnWidth(1), // #
+        if (isRetail) const pw.FlexColumnWidth(2), // HSN
+        const pw.FlexColumnWidth(4), // Product
+        const pw.FlexColumnWidth(2), // Unit Price
+        const pw.FlexColumnWidth(1), // Qty
+        if (!isRetail) const pw.FlexColumnWidth(2), // Discount (restaurant only)
+        const pw.FlexColumnWidth(2), // Total
+      ].asMap(),
       children: [
         // Header
         pw.TableRow(
           decoration: const pw.BoxDecoration(color: PdfColors.green800),
           children: [
             _buildTableHeader('#'),
+            if (isRetail) _buildTableHeader('HSN'),
             _buildTableHeader('Product'),
             _buildTableHeader('Unit Price'),
             _buildTableHeader('Qty'),
-            _buildTableHeader('Discount'),
+            if (!isRetail) _buildTableHeader('Discount'),
             _buildTableHeader('Total'),
           ],
         ),
@@ -1834,15 +1852,24 @@ class ReceiptPdfService {
             decoration: pw.BoxDecoration(color: bgColor),
             children: [
               _buildTableCell('${index + 1}', align: pw.TextAlign.center),
+              if (isRetail)
+                _buildTableCell(
+                  (item.hsnCode?.trim().isNotEmpty ?? false) ? item.hsnCode!.trim() : '-',
+                  align: pw.TextAlign.center,
+                ),
               _buildProductCell(item),
               _buildTableCell(_formatCurrency(item.price), align: pw.TextAlign.right),
               _buildTableCell('${item.qty}', align: pw.TextAlign.center),
-              _buildTableCell(
-                item.discountAmount != null && item.discountAmount! > 0
-                    ? _formatCurrency(item.discountAmount!)
-                    : '-',
-                align: pw.TextAlign.right,
-              ),
+              // Per-item Discount column — restaurant only. Retail discounts are
+              // bill-level (shown in the totals block), so the per-line column was
+              // always '-' and is dropped from the retail invoice.
+              if (!isRetail)
+                _buildTableCell(
+                  item.discountAmount != null && item.discountAmount! > 0
+                      ? _formatCurrency(item.discountAmount!)
+                      : '-',
+                  align: pw.TextAlign.right,
+                ),
               // Gross, matching the "Item Total" row in the totals block —
               // the Discount column beside it is subtracted once there, not
               // twice. item.total was tax-inclusive on retail, so this column

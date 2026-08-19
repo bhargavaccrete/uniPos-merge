@@ -16,6 +16,8 @@ import 'package:billberrylite/presentation/widget/componets/common/app_text_fiel
 import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 
 class SupplierListScreen extends StatefulWidget {
   const SupplierListScreen({super.key});
@@ -195,6 +197,20 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
     final trimmedAddress = address.trim();
     final trimmedGst = gst.trim();
 
+    // Plan gate — block a NEW supplier once the cap is reached (edits exempt).
+    // No-op until a retail manifest is present (see PlanEnforce).
+    if (existing == null && !supplierStore.canAddSupplier) {
+      final max = supplierStore.supplierLimit;
+      NotificationService.instance.showError(
+          'Supplier limit reached${max != null ? ' (max $max)' : ''}. Upgrade your plan to add more.');
+      return;
+    }
+    if (existing != null &&
+        !PlanGuard.allowedOr(context, RetailEntKeys.suppliersEdit,
+            featureName: 'Edit Suppliers')) {
+      return;
+    }
+
     try {
       if (existing != null) {
         // Emptying an optional field must actually clear it.
@@ -240,6 +256,10 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
   // ==================== DELETE ====================
 
   Future<void> _deleteSupplier(SupplierModel supplier) async {
+    if (!PlanGuard.allowedOr(context, RetailEntKeys.suppliersDelete,
+        featureName: 'Delete Suppliers')) {
+      return;
+    }
     // Purchases/POs/GRNs resolve the supplier name by id at render time, so
     // removing a supplier with history would leave those screens blank.
     final references = await supplierStore.countReferences(supplier.supplierId);

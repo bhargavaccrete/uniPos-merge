@@ -23,6 +23,8 @@ import 'package:billberrylite/presentation/screens/retail/payment_methods_screen
 import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 
 /// Display name and version shown in the About dialog.
 ///
@@ -134,6 +136,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: 'Configure store name, address, and contact details',
             iconColor: AppColors.success,
             onTap: () {
+              if (!PlanGuard.allowedOr(context, RetailEntKeys.settings,
+                  featureName: 'Store Information')) {
+                return;
+              }
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const StoreInfoSettingsScreen()),
@@ -151,6 +157,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: 'Manage your data backups',
             iconColor: Colors.blue,
             onTap: () {
+              if (!PlanGuard.allowedOr(context, RetailEntKeys.dataBackup,
+                  featureName: 'Backup & Restore')) {
+                return;
+              }
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const BackupScreen()),
@@ -259,6 +269,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: 'Manage global attributes (Color, Size, etc.)',
             iconColor: const Color(0xFF9C27B0),
             onTap: () {
+              if (!PlanGuard.allowedOr(context, RetailEntKeys.catalog,
+                  featureName: 'Product Attributes')) {
+                return;
+              }
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const AttributesScreen()),
@@ -272,6 +286,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: 'Choose the fields shown on simple products',
             iconColor: const Color(0xFF3F51B5),
             onTap: () {
+              if (!PlanGuard.allowedOr(context, RetailEntKeys.catalog,
+                  featureName: 'Simple Product Fields')) {
+                return;
+              }
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -314,6 +332,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: 'Configure available payment options',
             iconColor: AppColors.success,
             onTap: () {
+              if (!PlanGuard.allowedOr(context, RetailEntKeys.settings,
+                  featureName: 'Payment Methods')) {
+                return;
+              }
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const PaymentMethodsScreen()),
@@ -337,6 +359,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               subtitle: 'Tax rates, defaults and inclusive pricing',
               iconColor: AppColors.success,
               onTap: () {
+                if (!PlanGuard.allowedOr(context, RetailEntKeys.settings,
+                    featureName: 'Tax Settings')) {
+                  return;
+                }
                 Navigator.push(
                   context,
                   MaterialPageRoute(

@@ -1,8 +1,8 @@
 import 'package:mobx/mobx.dart';
-import '../../../core/plan/entitlement_keys.dart';
 import '../../../core/plan/plan_enforcement.dart';
 import '../../../data/models/common/staffModel_310.dart';
 import '../../../data/repositories/common/staff_repository.dart';
+import '../../../core/plan/mode_keys.dart';
 
 part 'staff_store.g.dart';
 
@@ -92,16 +92,20 @@ abstract class _StaffStore with Store {
   @action
   Future<bool> addStaff(StaffModel newStaff) async {
     try {
-      // Plan gate — staff module + user cap.
-      if (!PlanEnforce.allows(EntKeys.users)) {
+      // Plan gate — staff module + user cap. Unified store: ModeKeys picks the
+      // mode's own key (restaurant `users`, retail `retail.users`); each is a
+      // no-op until that mode has a manifest.
+      final moduleKey = ModeKeys.users;
+      final maxKey = ModeKeys.usersMax;
+      if (!PlanEnforce.allows(moduleKey)) {
         errorMessage = 'Your plan doesn’t include staff management.';
         return false;
       }
       // TODO(backend): confirm whether users.max INCLUDES the admin/owner. We
       // currently cap the staff list at users.max (admin not counted). If the
       // backend spec counts the admin, subtract 1 here. Left as-is until confirmed.
-      if (!PlanEnforce.withinLimit(EntKeys.usersMax, staff.length)) {
-        final max = PlanEnforce.limit(EntKeys.usersMax);
+      if (!PlanEnforce.withinLimit(maxKey, staff.length)) {
+        final max = PlanEnforce.limit(maxKey);
         errorMessage = 'Staff limit reached (max $max). Upgrade to add more.';
         return false;
       }

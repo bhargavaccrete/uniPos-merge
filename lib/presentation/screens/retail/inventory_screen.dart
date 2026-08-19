@@ -19,6 +19,8 @@ import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.d
 import 'package:billberrylite/presentation/screens/retail/scanner_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/add_product_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/product_detail_screen.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 
 class InventoryScreen extends StatefulWidget {
   /// True when hosted as a tab of ProductManagementScreen — the host owns the
@@ -207,6 +209,10 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   Future<void> _deleteProduct(ProductModel product) async {
+    if (!PlanGuard.allowedOr(context, RetailEntKeys.catalogProductsDelete,
+        featureName: 'Delete Products')) {
+      return;
+    }
     // Deleting the product takes its variants with it (productStore.deleteProduct
     // prunes them), so say so before asking.
     final variantCount = productStore.variantCountFor(product.productId);

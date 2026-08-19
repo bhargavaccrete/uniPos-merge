@@ -592,11 +592,11 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
   }
 
   @override
-  void nextStep() {
+  void nextStep({int? maxStep}) {
     final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
         name: '_SetupWizardStore.nextStep');
     try {
-      return super.nextStep();
+      return super.nextStep(maxStep: maxStep);
     } finally {
       _$_SetupWizardStoreActionController.endAction(_$actionInfo);
     }

@@ -1,4 +1,4 @@
-import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/mode_keys.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
 
 /// The `reports.history_limit_days` data scope, asked as a question about a
@@ -18,7 +18,7 @@ class ReportHistoryWindow {
   /// guard, so a 0 would push the cutoff to `now` and blank every report while
   /// the filter buttons stayed unlocked.
   static int? get limitDays {
-    final days = PlanEnforce.windowDays(EntKeys.reportsHistoryLimitDays);
+    final days = PlanEnforce.windowDays(ModeKeys.reportsHistoryLimitDays);
     return (days == null || days <= 0) ? null : days;
   }
 

@@ -52,6 +52,18 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
   // filtered out once the manifest loads at the Verify Email step.
   int get _totalSteps => SetupStep.getSteps().length;
 
+  /// `currentStep` clamped into the CURRENT step list.
+  ///
+  /// The list shrinks at runtime — answering "not tax registered" drops Tax
+  /// Setup, and a manifest that withholds `users`/`settings` drops Staff and
+  /// Payment. If that happens while the user sits past the new end, indexing
+  /// the list throws a RangeError mid-build and the screen stops responding.
+  int get _safeStep {
+    final last = _totalSteps - 1;
+    if (last < 0) return 0;
+    return _store.currentStep > last ? last : _store.currentStep;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -133,9 +145,12 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
     // Dismiss keyboard before moving to next step
     FocusScope.of(context).unfocus();
 
-    if (_store.currentStep < _totalSteps - 1) {
-      final next = _store.currentStep + 1;
-      _store.nextStep();
+    if (_safeStep < _totalSteps - 1) {
+      final next = _safeStep + 1;
+      // setCurrentStep, not nextStep(): the guard above already bounded `next`
+      // against the REAL step count, and the store must not apply a second,
+      // different ceiling or it desyncs from the PageView.
+      _store.setCurrentStep(next);
       _saveWizardProgress(next);
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
@@ -164,7 +179,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         }
       }
       final prev = _store.currentStep - 1;
-      _store.previousStep();
+      _store.setCurrentStep(prev);
       _saveWizardProgress(prev);
       _pageController.previousPage(
         duration: const Duration(milliseconds: 300),
@@ -221,7 +236,21 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
             );
           }
         } else {
-          Navigator.pushReplacementNamed(context, '/retail-billing');
+          // Retail takes the same deferred-activation path: if a key was saved
+          // but not yet activated, hand off to the activation screen first —
+          // otherwise the device reaches the dashboard with no manifest and
+          // every gate silently bypassed.
+          if (hasPendingKey) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    LicenseActivatedScreen(businessName: _store.storeName),
+              ),
+            );
+          } else {
+            Navigator.pushReplacementNamed(context, '/retail-billing');
+          }
         }
       }
     } catch (e) {
@@ -380,7 +409,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
 
   Widget _buildDesktopHeader() {
     final steps = SetupStep.getSteps();
-    final currentStepInfo = steps[_store.currentStep];
+    final currentStepInfo = steps[_safeStep];
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 25),
@@ -443,7 +472,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
   }
 
   Widget _buildHeader() {
-    final currentStepInfo = SetupStep.getSteps()[_store.currentStep];
+    final currentStepInfo = SetupStep.getSteps()[_safeStep];
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: AppResponsive.mediumSpacing(context),
@@ -551,10 +580,10 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         ),
       ),
 
-      // Step 3: Verify Email - self-signup OTP + license key. Restaurant only —
-      // retail has no licensing/entitlement system yet (see PlanEnforce._bypassed).
-      if (AppConfig.isRestaurant)
-        SlideTransition(
+      // Step 3: Verify Email - self-signup OTP + license key. BOTH modes: retail
+      // now activates the same way, so a signed manifest can reach it at all.
+      // Runs before Product/Staff setup so those steps can enforce item/user caps.
+      SlideTransition(
           position: _slideAnimation,
           child: FadeTransition(
             opacity: _fadeAnimation,
@@ -990,14 +1019,13 @@ class SetupStep {
         description: 'Basic details about your store',
         estimatedTime: '2 min',
       ),
-      // Restaurant only — retail has no licensing/entitlement system yet.
-      if (AppConfig.isRestaurant)
-        const SetupStep(
-          title: 'Verify Email',
-          icon: Icons.mark_email_read_rounded,
-          description: 'Verify your email and activate your license',
-          estimatedTime: '2 min',
-        ),
+      // Both modes — retail activates through the same OTP + key flow.
+      const SetupStep(
+        title: 'Verify Email',
+        icon: Icons.mark_email_read_rounded,
+        description: 'Verify your email and activate your license',
+        estimatedTime: '2 min',
+      ),
       if (PlanEnforce.allows(EntKeys.settings) &&
           locator<SetupWizardStore>().taxEnabled)
         const SetupStep(

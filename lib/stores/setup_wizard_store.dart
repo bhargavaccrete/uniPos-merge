@@ -171,9 +171,14 @@ abstract class _SetupWizardStore with Store {
     currentStep = step;
   }
 
+  /// Prefer [setCurrentStep] from the wizard screen, which knows the real step
+  /// count. The step list is DYNAMIC (business type, tax registration, and the
+  /// settings/users entitlements all add or remove steps), so a hardcoded
+  /// ceiling here would disagree with the rendered PageView the moment the list
+  /// changes — leaving Continue doing nothing.
   @action
-  void nextStep() {
-    if (currentStep < 9) {
+  void nextStep({int? maxStep}) {
+    if (maxStep == null || currentStep < maxStep) {
       currentStep++;
     }
   }
@@ -678,6 +683,13 @@ abstract class _SetupWizardStore with Store {
   // ==================== HELPER METHODS ====================
 
   /// Server business-category code. Samples used 3 for restaurant.
+  ///
+  /// TODO(backend): retail's code is UNKNOWN and currently reuses restaurant's 3.
+  /// This now matters — retail goes through self-signup + activation too, so a
+  /// retail shop would be registered under the restaurant category and could be
+  /// served the wrong plan catalog. Confirm the retail value and set it here.
+  /// (Note `LicenseStore.activateLicense` separately defaults `businessCategory`
+  /// to 6, so signup and activation do not agree today — confirm both.)
   int get _businessCategoryCode =>
       selectedBusinessTypeId == 'retail' ? 3 : 3;
 

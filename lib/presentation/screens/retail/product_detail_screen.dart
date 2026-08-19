@@ -22,6 +22,8 @@ import '../../../domain/services/common/notification_service.dart';
 import '../../../domain/services/retail/simple_product_fields_service.dart';
 import '../../../domain/services/retail/variant_attribute_mapper.dart';
 import '../../../domain/store/retail/product_store.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 
 /// Money input — digits with at most two decimals, the same rule the checkout,
 /// expense and add-product screens apply.
@@ -139,6 +141,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Future<void> _deleteVariant(VarianteModel variant) async {
+    if (!PlanGuard.allowedOr(context, RetailEntKeys.catalogVariantsDelete,
+        featureName: 'Delete Variants')) {
+      return;
+    }
     // A product with no variants still shows in the list but the POS refuses
     // it ("No variants available"), so it would be invisible stock.
     if (productStore.variantCountFor(widget.product.productId) <= 1) {
@@ -787,6 +793,10 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
   }
 
   Future<void> _save() async {
+    if (!PlanGuard.allowedOr(context, RetailEntKeys.catalogVariantsAdd,
+        featureName: 'Add Variants')) {
+      return;
+    }
     if (!_formKey.currentState!.validate() || _saving) return;
 
     final barcode = _barcodeController.text.trim();
@@ -1021,6 +1031,10 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
   }
 
   Future<void> _save() async {
+    if (!PlanGuard.allowedOr(context, RetailEntKeys.catalogVariantsEdit,
+        featureName: 'Edit Variants')) {
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
 
     final mrpText = _mrpController.text.trim();
@@ -1302,6 +1316,10 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
   }
 
   Future<void> _save() async {
+    if (!PlanGuard.allowedOr(context, RetailEntKeys.catalogVariantsAdd,
+        featureName: 'Add Variants')) {
+      return;
+    }
     if (!_formKey.currentState!.validate() || _saving) return;
 
     final values = _chosenValues;

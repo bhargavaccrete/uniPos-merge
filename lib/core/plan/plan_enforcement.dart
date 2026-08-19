@@ -15,8 +15,22 @@ import 'entitlements.dart';
 class PlanEnforce {
   PlanEnforce._();
 
+  // Restaurant is unaffected: AppConfig.isRetail is false, so this reduces to
+  // `licenseBypassed` exactly as before. Retail enforces ONLY once it has been
+  // licensed — until the backend sends a manifest, retail stays fully open.
+  //
+  // The `licenseInfo == null` clause is a FAIL-CLOSED guard, not a nicety.
+  // A lock-out (`_lockOutKeepingStatus` on EXPIRED/SUSPENDED) clears the
+  // manifest but deliberately KEEPS licenseInfo. Without this clause an empty
+  // manifest read as "retail has no licensing yet" and re-opened the entire
+  // app — a revoke would have GRANTED access instead of removing it. So:
+  //   never licensed  → licenseInfo null  → bypass (today's open behaviour)
+  //   licensed, locked→ licenseInfo kept  → enforce → guard shows the lock screen
   static bool get _bypassed =>
-      AppConfig.isRetail || locator<LicenseStore>().licenseBypassed;
+      locator<LicenseStore>().licenseBypassed ||
+      (AppConfig.isRetail &&
+          !Entitlements.instance.hasManifest &&
+          locator<LicenseStore>().licenseInfo == null);
 
   /// Action / module / submodule permission (add/edit/delete/export/view/create…).
   static bool allows(String key) => _bypassed || Entitlements.instance.can(key);

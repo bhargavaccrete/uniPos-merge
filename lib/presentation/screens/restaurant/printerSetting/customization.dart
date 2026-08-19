@@ -5,7 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
-import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/mode_keys.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -737,7 +737,7 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
           // enabled; when the admin turns that flag off, the user controls it.
           // `shown` drives the visuals; `locked` disables input.
           final bool locked =
-              key == 'Powered By' && PlanEnforce.allows(EntKeys.billingInvoicePrint);
+              key == 'Powered By' && PlanEnforce.allows(ModeKeys.billingInvoicePrint);
           final bool shown = locked ? true : isEnabled;
 
           return Container(

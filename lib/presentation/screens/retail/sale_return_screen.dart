@@ -9,6 +9,8 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
 import '../../../core/di/service_locator.dart';
+import '../../../core/plan/plan_enforcement.dart';
+import '../../../core/plan/retail_entitlement_keys.dart';
 import '../../../domain/services/retail/return_service.dart';
 
 class SaleReturnScreen extends StatefulWidget {
@@ -65,6 +67,14 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
 
   Future<void> _processReturn() async {
     if (_sale == null) return;
+
+    // Plan gate — returns/refunds must be included in the plan (mirrors
+    // restaurant `billing.returns`). No-op until a retail manifest is present.
+    if (!PlanEnforce.allows(RetailEntKeys.billingReturns)) {
+      NotificationService.instance
+          .showError('Returns aren’t included in your current plan.');
+      return;
+    }
 
     final isFull = _returnType == 'full';
     final refundAmount =

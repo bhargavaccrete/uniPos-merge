@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/mode_keys.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -258,7 +258,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     // when that flag is off the user controls it. `shown` drives the visuals,
     // `locked` disables input. Same rule as restaurant.
     final bool locked = toggle.label == 'Powered By' &&
-        PlanEnforce.allows(EntKeys.billingInvoicePrint);
+        PlanEnforce.allows(ModeKeys.billingInvoicePrint);
     final bool shown = locked ? true : toggle.value;
 
     Future<void> setValue(bool value) async {

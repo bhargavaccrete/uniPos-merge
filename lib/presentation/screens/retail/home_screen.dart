@@ -23,6 +23,8 @@ import 'package:billberrylite/presentation/screens/retail/cash_drawer_screen.dar
 import 'package:billberrylite/presentation/screens/retail/settings_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/login_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/change_password_screen.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -498,6 +500,25 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ==================== MENU CARDS ====================
+  /// Wrap a card's tap in its plan gate. DashboardMenuCard is deliberately
+  /// presentational ("pass an already-guarded onTap"), so the guard lives here —
+  /// the same place restaurant's welcome_Admin puts it. Show-and-block: the card
+  /// stays visible and the upgrade sheet explains why.
+  VoidCallback _gated(
+    BuildContext context,
+    String entitlementKey,
+    String featureName,
+    VoidCallback go,
+  ) {
+    return () {
+      if (!PlanGuard.allowedOr(context, entitlementKey,
+          featureName: featureName)) {
+        return;
+      }
+      go();
+    };
+  }
+
   /// Built fresh on every build so the reactive Stock Alerts tile keeps
   /// tracking its observables — never hoist or memoise this list.
   List<Widget> _buildAllMenuCards(BuildContext context) {
@@ -506,7 +527,8 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.point_of_sale_rounded,
         title: 'Billing',
         color: Colors.blue,
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RetailPosScreen())),
+        onTap: _gated(context, RetailEntKeys.billing, 'Billing',
+            () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RetailPosScreen()))),
       ),
       // One card for the whole catalog — products, their categories and the
       // attributes that build variants all live behind the Products hub.
@@ -514,57 +536,66 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.inventory_2_rounded,
         title: 'Products',
         color: Colors.amber,
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ProductManagementScreen())),
+        onTap: _gated(context, RetailEntKeys.catalog, 'Products',
+            () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ProductManagementScreen()))),
       ),
       DashboardMenuCard(
         icon: Icons.people_rounded,
         title: 'Customers',
         color: Colors.indigo,
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CustomerListScreen())),
+        onTap: _gated(context, RetailEntKeys.customers, 'Customers',
+            () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CustomerListScreen()))),
       ),
       DashboardMenuCard(
         icon: Icons.storefront_rounded,
         title: 'Suppliers',
         color: Colors.brown,
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SupplierListScreen())),
+        onTap: _gated(context, RetailEntKeys.suppliers, 'Suppliers',
+            () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SupplierListScreen()))),
       ),
       DashboardMenuCard(
         icon: Icons.assignment_rounded,
         title: 'Purchase Orders',
         color: Colors.cyan,
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PurchaseOrderListScreen())),
+        onTap: _gated(context, RetailEntKeys.purchase, 'Purchase Orders',
+            () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PurchaseOrderListScreen()))),
       ),
       // Returns, claims and write-offs raised from damaged goods on a GRN.
       DashboardMenuCard(
         icon: Icons.assignment_return_rounded,
         title: 'Returns & Claims',
         color: Colors.deepPurple,
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const DamagedGoodsHubScreen())),
+        onTap: _gated(context, RetailEntKeys.purchaseDamaged, 'Returns & Claims',
+            () => Navigator.push(context, MaterialPageRoute(builder: (context) => const DamagedGoodsHubScreen()))),
       ),
       DashboardMenuCard(
         icon: Icons.receipt_long_rounded,
         title: 'Sales',
         color: Colors.green,
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SalesHistoryScreen())),
+        onTap: _gated(context, RetailEntKeys.reports, 'Sales',
+            () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SalesHistoryScreen()))),
       ),
       DashboardMenuCard(
         icon: Icons.account_balance_wallet_rounded,
         title: 'Cash Drawer',
         color: const Color(0xFF00897B),
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CashDrawerScreen())),
+        onTap: _gated(context, RetailEntKeys.cashDrawer, 'Cash Drawer',
+            () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CashDrawerScreen()))),
       ),
       DashboardMenuCard(
         icon: Icons.bar_chart_rounded,
         title: 'Reports',
         color: Colors.orange,
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ReportsScreen())),
+        onTap: _gated(context, RetailEntKeys.reports, 'Reports',
+            () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ReportsScreen()))),
       ),
       _buildStockAlertCard(context),
       DashboardMenuCard(
         icon: Icons.settings_rounded,
         title: 'Settings',
         color: Colors.blueGrey,
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen())),
+        onTap: _gated(context, RetailEntKeys.settings, 'Settings',
+            () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen()))),
       ),
 
       // DashboardMenuCard(
@@ -595,10 +626,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       : const Color(0xFFFF9800),
                 )
               : null,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const StockAlertsScreen()),
-          ),
+          onTap: _gated(context, RetailEntKeys.inventory, 'Stock Alerts',
+              () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const StockAlertsScreen()),
+                  )),
         );
       },
     );

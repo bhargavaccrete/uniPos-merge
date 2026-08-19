@@ -3,6 +3,8 @@ import 'package:billberrylite/data/models/retail/hive_model/supplier_model_205.d
 import 'package:billberrylite/data/repositories/retail/grn_repository.dart';
 import 'package:billberrylite/data/repositories/retail/purchase_order_repository.dart';
 import 'package:billberrylite/data/repositories/retail/supplier_repository.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
+import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 
 
 part 'supplier_store.g.dart';
@@ -47,6 +49,17 @@ abstract class _SupplierStore with Store {
     await _supplierRepository.addSupplier(supplier);
     suppliers.insert(0, supplier);
   }
+
+  /// Plan gate for adding a supplier: module + add action allowed, AND under
+  /// the cap. No-op (true) until a retail manifest is present — see
+  /// `PlanEnforce`.
+  bool get canAddSupplier =>
+      PlanEnforce.allows(RetailEntKeys.suppliers) &&
+      PlanEnforce.allows(RetailEntKeys.suppliersAdd) &&
+      PlanEnforce.withinLimit(RetailEntKeys.suppliersMax, suppliers.length);
+
+  /// The suppliers cap for messages; null = unlimited.
+  int? get supplierLimit => PlanEnforce.limit(RetailEntKeys.suppliersMax);
 
   @action
   Future<void> updateSupplier(SupplierModel supplier) async {

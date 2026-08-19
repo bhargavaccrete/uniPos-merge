@@ -26,6 +26,8 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../core/config/tax_feature.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 
 const _uuid = Uuid();
 
@@ -349,6 +351,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
   /// [ProductDetailScreen], so nothing here touches them.
   Future<void> _updateProduct() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!PlanGuard.allowedOr(context, RetailEntKeys.catalogProductsEdit,
+        featureName: 'Edit Products')) {
+      return;
+    }
 
     final existing = widget.product!;
     final taxRate = _taxRateFor(_selectedTaxId);
@@ -449,6 +455,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
             .firstWhere((t) => t.id == _selectedTaxId,
                 orElse: () => Tax(id: '', taxname: '', taxperecentage: null))
             .taxperecentage;
+
+    // Plan gate — block a NEW product once the products cap is reached.
+    // No-op until a retail manifest is present (see PlanEnforce).
+    if (!productStore.canAddProduct) {
+      final max = productStore.productLimit;
+      NotificationService.instance.showError(
+          'Product limit reached${max != null ? ' (max $max)' : ''}. Upgrade your plan to add more.');
+      return;
+    }
 
     // Create ProductModel
     final productId = _uuid.v4();
