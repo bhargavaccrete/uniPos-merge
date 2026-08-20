@@ -69,6 +69,9 @@ import 'package:billberrylite/data/models/retail/hive_model/purchase_return_item
 import 'package:billberrylite/data/models/retail/hive_model/supplier_claim_model_176.dart';
 import 'package:billberrylite/data/models/retail/hive_model/supplier_claim_item_model_177.dart';
 import 'package:billberrylite/data/models/retail/hive_model/inventory_loss_model_178.dart';
+import '../../../data/models/restaurant/db/stock_movement_model.dart';
+import '../../../data/models/retail/hive_model/stock_take_model_180.dart';
+import '../../../data/models/retail/hive_model/stock_take_item_model_181.dart';
 import 'package:billberrylite/data/models/retail/hive_model/hold_sale_model_209.dart';
 import 'package:billberrylite/data/models/retail/hive_model/hold_sale_item_model_210.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model_211.dart';
@@ -980,6 +983,40 @@ class UnifiedBackupService {
         exportMap["supplierClaims"] = [];
         exportMap["supplierClaimItems"] = [];
         exportMap["inventoryLosses"] = [];
+      }
+
+      // Manual stock adjustments. The audit trail for the one stock movement
+      // with no document behind it, so it has to survive a restore — without
+      // it a restored shop cannot explain its own stock levels.
+      try {
+        exportMap["stockMovements"] =
+            Hive.box<StockMovementModel>(HiveBoxNames.restaurantStockMovements)
+                .values
+                .map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>)
+                .toList();
+      } catch (e) {
+        debugPrint("⚠️ Stock movements box error: $e");
+        exportMap["stockMovements"] = [];
+      }
+
+      // Physical stock counts. The completed ones justify the adjustments in
+      // the movement log, so they travel together or the trail loses its
+      // paperwork.
+      try {
+        exportMap["stockTakes"] =
+            Hive.box<StockTakeModel>(HiveBoxNames.stockTakes)
+                .values
+                .map((e) => e.toMap())
+                .toList();
+        exportMap["stockTakeItems"] =
+            Hive.box<StockTakeItemModel>(HiveBoxNames.stockTakeItems)
+                .values
+                .map((e) => e.toMap())
+                .toList();
+      } catch (e) {
+        debugPrint("⚠️ Stock take boxes error: $e");
+        exportMap["stockTakes"] = [];
+        exportMap["stockTakeItems"] = [];
       }
 
       // Categories (String list)
@@ -2252,6 +2289,32 @@ class UnifiedBackupService {
       Hive.box<InventoryLossModel>(HiveBoxNames.inventoryLosses),
       (m) => InventoryLossModel.fromMap(m),
       (l) => l.lossId,
+    );
+
+    // Manual stock adjustment audit trail.
+    try {
+      await restoreBoxTypedWithId(
+        "stockMovements",
+        Hive.box<StockMovementModel>(HiveBoxNames.restaurantStockMovements),
+        (m) => StockMovementModel.fromMap(m),
+        (m) => m.id,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring stock movements: $e");
+    }
+
+    // Physical stock count paperwork.
+    await restoreBoxTypedWithId(
+      "stockTakes",
+      Hive.box<StockTakeModel>(HiveBoxNames.stockTakes),
+      (m) => StockTakeModel.fromMap(m),
+      (t) => t.takeId,
+    );
+    await restoreBoxTypedWithId(
+      "stockTakeItems",
+      Hive.box<StockTakeItemModel>(HiveBoxNames.stockTakeItems),
+      (m) => StockTakeItemModel.fromMap(m),
+      (i) => i.takeItemId,
     );
 
     // ✅ Restore EOD Reports - hardcoded for retail mode (we're inside _restoreRetailData)

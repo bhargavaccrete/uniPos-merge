@@ -20,8 +20,11 @@ import '../../../data/models/retail/hive_model/product_model_200.dart';
 import '../../../data/models/retail/hive_model/variante_model_201.dart';
 import '../../../domain/services/common/notification_service.dart';
 import '../../../domain/services/retail/simple_product_fields_service.dart';
+import '../../../domain/services/retail/stock_adjustment_service.dart';
 import '../../../domain/services/retail/variant_attribute_mapper.dart';
 import '../../../domain/store/retail/product_store.dart';
+import 'package:billberrylite/presentation/widget/componets/retail/stock_adjustment_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/retail/stock_history_dialog.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 
@@ -137,6 +140,41 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  /// Why this product's stock is what it is — adjustments only.
+  ///
+  /// Deliberately NOT a full stock ledger: sales and receipts already have
+  /// their own reports, and mixing them in here would imply this is the
+  /// complete movement history when it is only the manual corrections.
+  void _openStockHistory() {
+    showDialog(
+      context: context,
+      builder: (_) => StockHistoryDialog(
+        productId: widget.product.productId,
+        productName: widget.product.productName,
+      ),
+    );
+  }
+
+  /// The one sanctioned way to change stock from this screen. Gated on
+  /// `retail.inventory` because an adjustment is an inventory operation, not a
+  /// catalog edit — editing the variant and correcting its stock are different
+  /// privileges.
+  Future<void> _openAdjustStock(VarianteModel variant) async {
+    if (!PlanGuard.allowedOr(
+      context,
+      RetailEntKeys.inventory,
+      featureName: 'Stock Adjustment',
+    )) {
+      return;
+    }
+
+    await StockAdjustmentDialog.show(
+      context,
+      variant: variant,
+      productName: widget.product.productName,
+    );
+  }
+
   Future<void> _deleteVariant(VarianteModel variant) async {
     if (!PlanGuard.allowedOr(
       context,
@@ -215,6 +253,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 case 'edit':
                   _editDetails();
                   break;
+                case 'history':
+                  _openStockHistory();
+                  break;
               }
             },
             itemBuilder: (context) => [
@@ -226,6 +267,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
               const PopupMenuDivider(),
               _menuItem('edit', Icons.edit_outlined, 'Edit Details'),
+              _menuItem('history', Icons.history_rounded, 'Stock History'),
             ],
           ),
           const SizedBox(width: 4),
@@ -676,6 +718,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               onSelected: (value) {
                 if (value == 'edit') {
                   _openEditVariant(variant);
+                } else if (value == 'adjust') {
+                  _openAdjustStock(variant);
                 } else if (value == 'delete') {
                   _deleteVariant(variant);
                 }
@@ -701,6 +745,29 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ],
                   ),
                 ),
+                // Admin-only: hidden entirely rather than shown-and-refused,
+                // so a cashier is never told about a control they can't use.
+                if (StockAdjustmentService.canAdjust)
+                  PopupMenuItem<String>(
+                    value: 'adjust',
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.tune_rounded,
+                          size: 20,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Adjust Stock',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 PopupMenuItem<String>(
                   value: 'delete',
                   child: Row(
@@ -1031,7 +1098,6 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
   late final TextEditingController _sellingPriceController;
   late final TextEditingController _costPriceController;
   late final TextEditingController _mrpController;
-  late final TextEditingController _stockController;
   late final TextEditingController _minStockController;
 
   /// False parks the variant: it keeps its stock and history but disappears
@@ -1052,7 +1118,6 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
       text: v.costPrice?.toString() ?? '',
     );
     _mrpController = TextEditingController(text: v.mrp?.toString() ?? '');
-    _stockController = TextEditingController(text: v.stockQty.toString());
     _minStockController = TextEditingController(
       text: v.minStock?.toString() ?? '',
     );
@@ -1071,7 +1136,6 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
     _sellingPriceController.dispose();
     _costPriceController.dispose();
     _mrpController.dispose();
-    _stockController.dispose();
     _minStockController.dispose();
     for (final attr in _customAttributes) {
       attr.dispose();
@@ -1102,7 +1166,6 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
           : double.tryParse(_costPriceController.text.trim()),
       mrp: mrpText.isEmpty ? null : double.tryParse(mrpText),
       clearMrp: mrpText.isEmpty,
-      stockQty: int.tryParse(_stockController.text.trim()) ?? 0,
       minStock: minStockText.isEmpty ? null : int.tryParse(minStockText),
       clearMinStock: minStockText.isEmpty,
       status: _active ? kActiveVariantStatus : kInactiveVariantStatus,
@@ -1163,17 +1226,11 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
               inputFormatters: _moneyFormatters,
             ),
             const SizedBox(height: 12),
-            AppTextField(
-              controller: _stockController,
-              label: 'Stock Quantity',
-              hint: '0',
-              icon: Icons.inventory_2_outlined,
-              required: true,
-              keyboardType: TextInputType.number,
-              inputFormatters: _qtyFormatters,
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Required' : null,
-            ),
+            // Stock is deliberately NOT editable here. Typing over it left no
+            // reason, no audit row and no before/after, which is exactly what
+            // made stock discrepancies unexplainable. Changes go through
+            // Adjust Stock in the variant's overflow menu instead.
+            ReadOnlyStockTile(stock: widget.variant.stockQty),
             const SizedBox(height: 12),
             AppTextField(
               controller: _minStockController,

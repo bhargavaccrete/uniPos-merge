@@ -11,6 +11,7 @@ import 'package:billberrylite/presentation/screens/retail/reports/variant_wise_s
 import 'package:billberrylite/presentation/screens/retail/reports/category_wise_sales_report_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/reports/supplier_wise_purchase_report_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/reports/low_stock_report_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/reports/stock_adjustment_report_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/reports/top_selling_products_report_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/reports/profit_report_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/reports/purchase_summary_report_screen.dart';
@@ -261,6 +262,20 @@ class ReportsScreen extends StatelessWidget {
                 ),
               ),
               entitlementKey: RetailEntKeys.reportsLowStock,
+            ),
+            _buildReportCard(
+              context,
+              title: 'Stock Adjustments',
+              subtitle: 'Manual stock corrections and who made them',
+              icon: Icons.tune_rounded,
+              color: const Color(0xFF7E57C2),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const StockAdjustmentReportScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsStockAdjustment,
             ),
             const SizedBox(height: 16),
             _buildSectionHeader(context, 'Financial Reports'),

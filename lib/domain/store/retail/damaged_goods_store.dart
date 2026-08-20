@@ -520,6 +520,58 @@ abstract class _DamagedGoodsStore with Store {
   @computed
   int get totalLossQty =>
       inventoryLosses.fold(0, (sum, l) => sum + l.quantity);
+
+  // ==================== STOCK ADJUSTMENT LOSS ====================
+
+  /// Record the cost of stock removed by a loss-bearing manual adjustment.
+  ///
+  /// **Called only by `StockAdjustmentService`, and only after the stock has
+  /// already been moved.** This writes the money side, never the units — see
+  /// [InventoryLossModel]'s doc for why the two are split.
+  ///
+  /// Unlike the GRN-sourced losses there is no supplier and no source document:
+  /// nobody is going to reimburse a shop for its own breakage. Returns the loss
+  /// number so the caller can surface it.
+  @action
+  Future<String?> recordAdjustmentLoss({
+    required String variantId,
+    required String productId,
+    String? productName,
+    String? variantInfo,
+    required int quantity,
+    double? costPrice,
+    required String reason,
+    String? note,
+  }) async {
+    if (quantity <= 0) return null;
+
+    try {
+      final number = await _numbers.next(
+        _lossPrefix,
+        isTaken: (n) => inventoryLosses.any((l) => l.lossNumber == n),
+      );
+
+      final loss = InventoryLossModel.create(
+        lossNumber: number,
+        source: InventoryLossSource.stockAdjustment,
+        variantId: variantId,
+        productId: productId,
+        productName: productName,
+        variantInfo: variantInfo,
+        quantity: quantity,
+        costPrice: costPrice,
+        reason: reason,
+        note: note,
+      );
+
+      await _lossRepository.save(loss);
+      inventoryLosses.insert(0, loss);
+      return number;
+    } catch (e) {
+      errorMessage = 'Loss could not be recorded: $e';
+      return null;
+    }
+  }
 }
 
 /// What [_DamagedGoodsStore.recordFromGRN] created, so the caller can tell the

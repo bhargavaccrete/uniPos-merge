@@ -118,6 +118,13 @@ class HiveTypeIds {
   /// balance can be explained, not just stated.
   static const int retailSupplierLedgerEntry = 179;
 
+  /// Physical stock count. Header + lines, following the PO/GRN pair
+  /// convention: the header is the count session, each line one variant that
+  /// was counted. Committing a line goes through `StockAdjustmentService`, so
+  /// these boxes hold the count paperwork, never the stock movement itself.
+  static const int retailStockTake = 180;
+  static const int retailStockTakeItem = 181;
+
   // ==================== HELPER METHODS ====================
 
   /// Check if a typeId belongs to retail models
@@ -149,6 +156,8 @@ class HiveTypeIds {
     retailSupplierClaimItem,
     retailInventoryLoss,
     retailSupplierLedgerEntry,
+    retailStockTake,
+    retailStockTakeItem,
     retailHoldSale,
     retailHoldSaleItem,
     retailPurchaseOrder,

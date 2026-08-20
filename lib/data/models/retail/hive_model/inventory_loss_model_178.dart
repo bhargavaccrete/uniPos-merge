@@ -6,9 +6,8 @@ part 'inventory_loss_model_178.g.dart';
 
 const _uuid = Uuid();
 
-/// Where a loss originated. Only [grnDamage] exists today; the field is here so
-/// later sources (expiry, breakage on the shop floor, stock count shortfall)
-/// can share the same report without a model change.
+/// Where a loss originated. Sources share one report, so a new kind of loss
+/// only needs a constant here rather than a model of its own.
 class InventoryLossSource {
   InventoryLossSource._();
   static const String grnDamage = 'grn_damage';
@@ -16,20 +15,32 @@ class InventoryLossSource {
   /// Raised by hand after a supplier rejected the claim for these goods, so
   /// the already-billed damage becomes the business's cost.
   static const String claimRejected = 'claim_rejected';
+
+  /// Raised by a manual stock adjustment whose reason was loss-bearing —
+  /// breakage, expiry, theft, internal use, samples. Unlike the two sources
+  /// above, these units WERE in inventory, so `StockAdjustmentService` removes
+  /// them as well as recording the loss. See [grnId] being null for these.
+  static const String stockAdjustment = 'stock_adjustment';
 }
 
-/// Inventory Loss — damaged goods written off at receipt
-/// (`DamagedHandling.writeOff` on a GRN line).
+/// Inventory Loss — stock the business absorbed the cost of.
+///
+/// Two very different origins share this row, distinguished by [source]:
+///
+/// | Source | Were the units ever in stock? | Who decrements? |
+/// |---|---|---|
+/// | `grnDamage`, `claimRejected` | No — excluded from `acceptedQty` at GRN confirm | nobody |
+/// | `stockAdjustment` | Yes — they were on the shelf | `StockAdjustmentService` |
+///
+/// **So this model never decrements stock itself.** For the GRN sources there
+/// is nothing to subtract; for an adjustment the caller has already moved the
+/// stock and writes this row only to record the cost. Either way the row's job
+/// is to make the loss visible, reportable and priced — never to move units.
 ///
 /// **Flat by design.** Purchase returns and claims are documents with a
 /// lifecycle and a counterparty; a write-off is terminal the moment it's
-/// recorded and has neither. One row per damaged GRN line also makes the
+/// recorded and has neither. One row per damaged line also makes the
 /// damaged-items report a single fold instead of a header/item join.
-///
-/// **This does NOT decrement stock.** Damaged units are excluded from
-/// `acceptedQty` at GRN confirm, so they never entered inventory — subtracting
-/// here would remove stock that was never added. The row exists to make the
-/// loss visible and reportable, and to record its cost.
 @HiveType(typeId: HiveTypeIds.retailInventoryLoss)
 class InventoryLossModel extends HiveObject {
   @HiveField(0)

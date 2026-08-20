@@ -10,6 +10,7 @@ import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
 import 'package:billberrylite/data/repositories/retail/grn_item_repository.dart';
+import 'package:billberrylite/domain/services/retail/stock_adjustment_service.dart';
 import 'package:billberrylite/util/restaurant/report_history_window.dart';
 import 'package:billberrylite/util/retail/sale_revenue_filter.dart';
 import 'package:billberrylite/data/repositories/restaurant/cash_movement_repository.dart';
@@ -1297,6 +1298,47 @@ class ReportService {
               'statusDisplay': r.statusDisplay,
               'creditNoteNumber': r.creditNoteNumber,
               'creditNoteAmount': r.creditNoteAmount,
+            })
+        .toList();
+  }
+
+  // ==================== Stock Adjustment Report ====================
+
+  /// Every manual stock adjustment in the window, newest first.
+  ///
+  /// This is the audit trail for the one stock movement that has no document
+  /// behind it. Reads the movement log rather than deriving anything: the log
+  /// stores `balanceAfter`, so the before-level is recovered by backing the
+  /// signed change out of it — that stays correct even when later movements
+  /// have since changed the variant's stock.
+  ///
+  /// Loss value is intentionally NOT computed here. Whether an adjustment cost
+  /// money is decided by its reason at the time it was made, and that decision
+  /// is already recorded as an `InventoryLossModel` — see the Damaged Items
+  /// report. Recomputing it from today's cost price would disagree with it.
+  Future<List<Map<String, dynamic>>> getStockAdjustmentReport({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final movements = StockAdjustmentService.allAdjustments()
+        .where((m) => _inWindow(m.timestamp, startDate, endDate))
+        .toList();
+
+    return movements
+        .map((m) => {
+              'timestamp': m.timestamp.toIso8601String(),
+              'itemName': m.itemName,
+              'productId': m.itemId,
+              'variantId': m.variantId,
+              'type': m.type,
+              'isIn': m.isIn,
+              'quantity': m.quantity.toInt(),
+              'signedQuantity': m.signedQuantity.toInt(),
+              'balanceAfter': m.balanceAfter.toInt(),
+              'balanceBefore': (m.balanceAfter - m.signedQuantity).toInt(),
+              'reason': m.reason,
+              'note': m.note ?? '',
+              'staffName': m.staffName,
             })
         .toList();
   }

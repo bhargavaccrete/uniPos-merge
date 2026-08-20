@@ -189,6 +189,31 @@ mixin _$DamagedGoodsStore on _DamagedGoodsStore, Store {
         .run(() => super.writeOffRejectedClaim(claimId));
   }
 
+  late final _$recordAdjustmentLossAsyncAction =
+      AsyncAction('_DamagedGoodsStore.recordAdjustmentLoss', context: context);
+
+  @override
+  Future<String?> recordAdjustmentLoss(
+      {required String variantId,
+      required String productId,
+      String? productName,
+      String? variantInfo,
+      required int quantity,
+      double? costPrice,
+      required String reason,
+      String? note}) {
+    return _$recordAdjustmentLossAsyncAction.run(() => super
+        .recordAdjustmentLoss(
+            variantId: variantId,
+            productId: productId,
+            productName: productName,
+            variantInfo: variantInfo,
+            quantity: quantity,
+            costPrice: costPrice,
+            reason: reason,
+            note: note));
+  }
+
   @override
   String toString() {
     return '''

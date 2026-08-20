@@ -19,6 +19,7 @@ import 'package:billberrylite/domain/services/retail/gst_service.dart';
 import 'package:billberrylite/domain/services/retail/sku_generator_service.dart';
 import 'package:billberrylite/domain/services/retail/customer_id_generator_service.dart';
 import 'package:billberrylite/domain/store/retail/damaged_goods_store.dart';
+import 'package:billberrylite/domain/store/retail/stock_take_store.dart';
 import 'package:billberrylite/domain/services/retail/print_service.dart';
 import 'package:billberrylite/domain/services/retail/report_service.dart';
 import 'package:billberrylite/domain/services/retail/stock_alert_service.dart';
@@ -177,6 +178,7 @@ Future<void> _registerRetailDependencies() async {
   locator.registerLazySingleton<CustomerIdGeneratorService>(
       () => CustomerIdGeneratorService());
   locator.registerLazySingleton<DamagedGoodsStore>(() => DamagedGoodsStore());
+  locator.registerLazySingleton<StockTakeStore>(() => StockTakeStore());
 
   // Register Repositories
   locator.registerLazySingleton<retail.VariantRepository>(() => retail.VariantRepository());
@@ -433,6 +435,7 @@ ProductStore get productStore => locator<ProductStore>();
 SaleStore get saleStore => locator<SaleStore>();
 SupplierStore get supplierStore => locator<SupplierStore>();
 DamagedGoodsStore get damagedGoodsStore => locator<DamagedGoodsStore>();
+StockTakeStore get stockTakeStore => locator<StockTakeStore>();
 PurchaseOrderStore get purchaseOrderStore => locator<PurchaseOrderStore>();
 HoldSaleStore get holdSaleStore => locator<HoldSaleStore>();
 StockAlertStore get stockAlertStore => locator<StockAlertStore>();

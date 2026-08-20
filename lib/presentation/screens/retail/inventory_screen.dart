@@ -21,6 +21,8 @@ import 'package:billberrylite/presentation/screens/retail/add_product_screen.dar
 import 'package:billberrylite/presentation/screens/retail/product_detail_screen.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
+import 'package:billberrylite/domain/services/retail/stock_adjustment_service.dart';
+import 'package:billberrylite/presentation/screens/retail/stock_take_list_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   /// True when hosted as a tab of ProductManagementScreen — the host owns the
@@ -283,6 +285,22 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
+  /// Bulk counting lives on its own screen rather than inline here: a count is
+  /// a session with a draft lifecycle, not a filter over this list.
+  void _openStockTakes() {
+    if (!PlanGuard.allowedOr(
+      context,
+      RetailEntKeys.inventoryStockTake,
+      featureName: 'Stock Take',
+    )) {
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const StockTakeListScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -293,6 +311,14 @@ class _InventoryScreenState extends State<InventoryScreen>
           : buildPrimaryAppBar(
               title: 'Inventory',
               actions: [
+                // Admin-only, so a cashier is never shown a control that would
+                // just refuse them.
+                if (StockAdjustmentService.canAdjust)
+                  IconButton(
+                    icon: const Icon(Icons.fact_check_outlined),
+                    onPressed: _openStockTakes,
+                    tooltip: 'Stock Takes',
+                  ),
                 IconButton(
                   icon: const Icon(Icons.add),
                   onPressed: () => openAddProductScreen(context),

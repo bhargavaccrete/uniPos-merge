@@ -5,7 +5,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/presentation/screens/retail/add_product_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/category_management_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/inventory_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/stock_take_list_screen.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
+import 'package:billberrylite/domain/services/retail/stock_adjustment_service.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 
@@ -87,6 +91,23 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
     }
   }
 
+  /// Bulk counting belongs to the Products tab, and the hub owns the only
+  /// AppBar — the embedded InventoryScreen has none, so this action cannot live
+  /// there.
+  void _openStockTakes() {
+    if (!PlanGuard.allowedOr(
+      context,
+      RetailEntKeys.inventoryStockTake,
+      featureName: 'Stock Take',
+    )) {
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const StockTakeListScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isTablet = !AppResponsive.isMobile(context);
@@ -98,6 +119,22 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
         title: 'Products',
         titleFontSize: isTablet ? 22 : 20,
         actions: [
+          // Products tab only, admin only. Shares the tab-tracking builder
+          // below because its visibility depends on the same animation value.
+          AnimatedBuilder(
+            animation: _tabController.animation!,
+            builder: (_, child) {
+              final index = _tabController.animation!.value.round();
+              if (index != 0 || !StockAdjustmentService.canAdjust) {
+                return const SizedBox.shrink();
+              }
+              return IconButton(
+                icon: const Icon(Icons.fact_check_outlined),
+                tooltip: 'Stock Takes',
+                onPressed: _openStockTakes,
+              );
+            },
+          ),
           // Both the icon's action and its visibility depend on the active tab,
           // so it tracks the tab animation as well as the stores.
           AnimatedBuilder(

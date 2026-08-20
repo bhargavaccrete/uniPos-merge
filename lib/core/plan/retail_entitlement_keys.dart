@@ -17,6 +17,7 @@ class RetailEntKeys {
   static const customers = 'retail.customers';
   static const users = 'retail.users'; // staff
   static const inventory = 'retail.inventory';
+  static const inventoryStockTake = 'retail.inventory.stock_take';
   static const suppliers = 'retail.suppliers';
   static const purchase = 'retail.purchase'; // PO + GRN
   static const reports = 'retail.reports';
@@ -50,6 +51,7 @@ class RetailEntKeys {
   static const reportsProfit = 'retail.reports.profit';
   static const reportsGst = 'retail.reports.gst';
   static const reportsLowStock = 'retail.reports.low_stock';
+  static const reportsStockAdjustment = 'retail.reports.stock_adjustment';
   // Purchasing side
   static const reportsPurchaseSummary = 'retail.reports.purchase_summary';
   static const reportsSupplierPurchase = 'retail.reports.supplier_purchase';

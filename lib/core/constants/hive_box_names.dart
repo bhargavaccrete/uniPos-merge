@@ -84,6 +84,10 @@ class HiveBoxNames {
   static const String supplierClaimItems = 'supplierClaimItems';
   static const String inventoryLosses = 'inventoryLosses';
 
+  /// Physical stock count paperwork — header and counted lines.
+  static const String stockTakes = 'stockTakes';
+  static const String stockTakeItems = 'stockTakeItems';
+
   /// Purchase order items box
   static const String purchaseOrderItems = 'purchaseOrderItems';
 
@@ -258,6 +262,8 @@ class HiveBoxNames {
     supplierClaims,
     supplierClaimItems,
     inventoryLosses,
+    stockTakes,
+    stockTakeItems,
     purchaseOrderItems,
     grns,
     grnItems,
