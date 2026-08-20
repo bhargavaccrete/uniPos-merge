@@ -123,14 +123,23 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
           return ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             itemCount: categories.length,
-            itemBuilder: (context, index) => _buildCategoryCard(categories[index]),
+            itemBuilder: (context, index) =>
+                _buildCategoryCard(categories[index]),
           );
         }
 
-        final columns =
-            AppResponsive.gridColumns(context, mobile: 1, tablet: 2, desktop: 3);
-        final spacing = AppResponsive.getValue(context,
-            mobile: 16.0, tablet: 16.0, desktop: 24.0);
+        final columns = AppResponsive.gridColumns(
+          context,
+          mobile: 1,
+          tablet: 2,
+          desktop: 3,
+        );
+        final spacing = AppResponsive.getValue(
+          context,
+          mobile: 16.0,
+          tablet: 16.0,
+          desktop: 24.0,
+        );
         return GridView.builder(
           padding: AppResponsive.getValue(
             context,
@@ -145,7 +154,8 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
             childAspectRatio: 2.4,
           ),
           itemCount: categories.length,
-          itemBuilder: (context, index) => _buildCategoryCard(categories[index]),
+          itemBuilder: (context, index) =>
+              _buildCategoryCard(categories[index]),
         );
       },
     );
@@ -184,8 +194,11 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
         suffixIcon: _searchQuery.isEmpty
             ? null
             : IconButton(
-                icon: const Icon(Icons.close_rounded,
-                    color: AppColors.textSecondary, size: 20),
+                icon: const Icon(
+                  Icons.close_rounded,
+                  color: AppColors.textSecondary,
+                  size: 20,
+                ),
                 tooltip: 'Clear search',
                 visualDensity: VisualDensity.compact,
                 onPressed: _clearSearch,
@@ -209,7 +222,10 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
         border: Border.all(color: AppColors.divider),
         boxShadow: const [
           BoxShadow(
-              color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2)),
+            color: Color(0x08000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
         ],
       ),
       child: InkWell(
@@ -226,8 +242,11 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
                   color: AppColors.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.category_rounded,
-                    color: AppColors.primary, size: 22),
+                child: const Icon(
+                  Icons.category_rounded,
+                  color: AppColors.primary,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -240,7 +259,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.poppins(
-                        fontSize: 15,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
@@ -249,7 +268,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
                     Text(
                       '$productCount product${productCount == 1 ? '' : 's'}',
                       style: GoogleFonts.poppins(
-                        fontSize: 12,
+                        fontSize: AppResponsive.smallFontSize(context),
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -258,12 +277,16 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
               ),
               // Edit/delete stay behind the overflow menu — never extra chips.
               PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert,
-                    color: AppColors.textSecondary, size: 20),
+                icon: const Icon(
+                  Icons.more_vert,
+                  color: AppColors.textSecondary,
+                  size: 20,
+                ),
                 // M3 tints menu surfaces by default; keep them plain white.
                 color: AppColors.white,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 onSelected: (value) {
                   if (value == 'edit') {
                     _showEditCategoryDialog(category);
@@ -276,12 +299,19 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
                     value: 'edit',
                     child: Row(
                       children: [
-                        const Icon(Icons.edit_outlined,
-                            size: 20, color: AppColors.textSecondary),
+                        const Icon(
+                          Icons.edit_outlined,
+                          size: 20,
+                          color: AppColors.textSecondary,
+                        ),
                         const SizedBox(width: 12),
-                        Text('Edit',
-                            style: GoogleFonts.poppins(
-                                fontSize: 14, color: AppColors.textPrimary)),
+                        Text(
+                          'Edit',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -289,12 +319,19 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
                     value: 'delete',
                     child: Row(
                       children: [
-                        const Icon(Icons.delete_outline_rounded,
-                            size: 20, color: AppColors.danger),
+                        const Icon(
+                          Icons.delete_outline_rounded,
+                          size: 20,
+                          color: AppColors.danger,
+                        ),
                         const SizedBox(width: 12),
-                        Text('Delete',
-                            style: GoogleFonts.poppins(
-                                fontSize: 14, color: AppColors.danger)),
+                        Text(
+                          'Delete',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            color: AppColors.danger,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -326,11 +363,13 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
     final success = await categoryStore.updateCategory(updated);
     if (!mounted) return;
     if (success) {
-      NotificationService.instance
-          .showSuccess('Category "${updated.name}" updated');
+      NotificationService.instance.showSuccess(
+        'Category "${updated.name}" updated',
+      );
     } else {
       NotificationService.instance.showError(
-          categoryStore.errorMessage ?? 'Failed to update category');
+        categoryStore.errorMessage ?? 'Failed to update category',
+      );
     }
   }
 
@@ -342,7 +381,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
       title: 'Delete Category?',
       message: productCount > 0
           ? 'Delete "${category.name}"? $productCount product'
-              '${productCount == 1 ? '' : 's'} will be moved to Uncategorized.'
+                '${productCount == 1 ? '' : 's'} will be moved to Uncategorized.'
           : 'Delete "${category.name}"?',
       confirmLabel: 'Delete',
       accent: AppColors.danger,
@@ -353,11 +392,13 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
     final success = await categoryStore.deleteCategory(category.id);
     if (!mounted) return;
     if (success) {
-      NotificationService.instance
-          .showSuccess('Category "${category.name}" deleted');
+      NotificationService.instance.showSuccess(
+        'Category "${category.name}" deleted',
+      );
     } else {
       NotificationService.instance.showError(
-          categoryStore.errorMessage ?? 'Failed to delete category');
+        categoryStore.errorMessage ?? 'Failed to delete category',
+      );
     }
   }
 }
@@ -386,11 +427,13 @@ Future<void> showAddCategoryDialog(BuildContext context) async {
   final success = await categoryStore.addCategory(category);
   if (!context.mounted) return;
   if (success) {
-    NotificationService.instance
-        .showSuccess('Category "${category.name}" added');
+    NotificationService.instance.showSuccess(
+      'Category "${category.name}" added',
+    );
   } else {
-    NotificationService.instance
-        .showError(categoryStore.errorMessage ?? 'Failed to add category');
+    NotificationService.instance.showError(
+      categoryStore.errorMessage ?? 'Failed to add category',
+    );
   }
 }
 

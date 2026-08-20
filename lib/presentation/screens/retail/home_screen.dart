@@ -25,6 +25,7 @@ import 'package:billberrylite/presentation/screens/retail/login_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/change_password_screen.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -40,6 +41,11 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadStoreName();
+    // The desktop sidebar's Customers stat reads customerStore.customers, and
+    // CustomerStore is the one store here that does NOT hydrate in its
+    // constructor — sale/product/stockAlert all call _init(). Without this the
+    // stat sat at 0 until the user opened Customers and came back.
+    customerStore.loadCustomers();
   }
 
   Future<void> _loadStoreName() async {
@@ -114,13 +120,29 @@ class _HomeScreenState extends State<HomeScreen> {
     final columns = AppResponsive.gridColumns(context);
     final rows = (cards.length / columns).ceil();
 
-    final spacing = isDesktop ? 20.0 : isTablet ? 16.0 : 12.0;
-    final padH = isDesktop ? 28.0 : isTablet ? 24.0 : 16.0;
-    final padTop = isDesktop ? 12.0 : isTablet ? 8.0 : 4.0;
+    final spacing = isDesktop
+        ? 20.0
+        : isTablet
+        ? 16.0
+        : 12.0;
+    final padH = isDesktop
+        ? 28.0
+        : isTablet
+        ? 24.0
+        : 16.0;
+    final padTop = isDesktop
+        ? 12.0
+        : isTablet
+        ? 8.0
+        : 4.0;
     final pad = EdgeInsets.fromLTRB(padH, padTop, padH, padH);
 
     // The densest the cards should ever be.
-    final naturalRatio = isDesktop ? 1.4 : isTablet ? 1.3 : 1.2;
+    final naturalRatio = isDesktop
+        ? 1.4
+        : isTablet
+        ? 1.3
+        : 1.2;
 
     final grid = LayoutBuilder(
       builder: (context, constraints) {
@@ -227,7 +249,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text(
                   'Dashboard',
                   style: GoogleFonts.poppins(
-                    fontSize: 26,
+                    fontSize: AppResponsive.getValue(
+                      context,
+                      mobile: 26.0,
+                      tablet: 30.0,
+                      desktop: 34.0,
+                    ),
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
                   ),
@@ -236,7 +263,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text(
                   'Manage your business operations',
                   style: GoogleFonts.poppins(
-                    fontSize: 15,
+                    fontSize: AppResponsive.bodyFontSize(context),
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -276,8 +303,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: AppColors.white,
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Icon(Icons.store_rounded,
-                      color: AppColors.primary, size: 28),
+                  child: Icon(
+                    Icons.store_rounded,
+                    color: AppColors.primary,
+                    size: 28,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -290,7 +320,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.poppins(
-                          fontSize: 20,
+                          fontSize: AppResponsive.headingFontSize(context),
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
                         ),
@@ -301,7 +331,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.poppins(
-                            fontSize: 12,
+                            fontSize: AppResponsive.smallFontSize(context),
                             fontWeight: FontWeight.w500,
                             color: Colors.white70,
                           ),
@@ -324,7 +354,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   'Quick Stats',
                   style: GoogleFonts.poppins(
                     color: Colors.white70,
-                    fontSize: 12,
+                    fontSize: AppResponsive.smallFontSize(context),
                     fontWeight: FontWeight.w600,
                     letterSpacing: 1.2,
                   ),
@@ -337,22 +367,44 @@ class _HomeScreenState extends State<HomeScreen> {
                     final todaySales = saleStore.sales.where((sale) {
                       try {
                         final saleDate = DateTime.parse(sale.createdAt);
-                        return saleDate.isAfter(todayStart) || saleDate.isAtSameMomentAs(todayStart);
+                        return saleDate.isAfter(todayStart) ||
+                            saleDate.isAtSameMomentAs(todayStart);
                       } catch (_) {
                         return false;
                       }
                     });
-                    final total = todaySales.fold(0.0, (sum, sale) => sum + (sale.grandTotal ?? sale.totalAmount));
-                    return _buildSidebarStat(Icons.receipt_long_rounded, 'Today\'s Sales', '₹${total.toStringAsFixed(2)}');
+                    final total = todaySales.fold(
+                      0.0,
+                      (sum, sale) =>
+                          sum + (sale.grandTotal ?? sale.totalAmount),
+                    );
+                    // MoneyScope so the figure re-renders if the store's
+                    // currency or decimal precision is changed in Settings —
+                    // this is the only money on the dashboard.
+                    return MoneyScope(
+                      child: _buildSidebarStat(
+                        Icons.receipt_long_rounded,
+                        'Today\'s Sales',
+                        formatMoney(total),
+                      ),
+                    );
                   },
                 ),
                 const SizedBox(height: 12),
                 Observer(
-                  builder: (context) => _buildSidebarStat(Icons.inventory_2_rounded, 'Products', '${productStore.products.length}'),
+                  builder: (context) => _buildSidebarStat(
+                    Icons.inventory_2_rounded,
+                    'Products',
+                    '${productStore.products.length}',
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Observer(
-                  builder: (context) => _buildSidebarStat(Icons.people_rounded, 'Customers', '${customerStore.customers.length}'),
+                  builder: (context) => _buildSidebarStat(
+                    Icons.people_rounded,
+                    'Customers',
+                    '${customerStore.customers.length}',
+                  ),
                 ),
               ],
             ),
@@ -371,7 +423,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   '© 2025 Bill Berry Lite',
                   style: GoogleFonts.poppins(
                     color: Colors.white54,
-                    fontSize: 11,
+                    fontSize: AppResponsive.captionFontSize(context),
                   ),
                 ),
               ],
@@ -412,7 +464,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   label,
                   style: GoogleFonts.poppins(
                     color: Colors.white70,
-                    fontSize: 11,
+                    fontSize: AppResponsive.captionFontSize(context),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -422,7 +474,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
                     color: Colors.white,
-                    fontSize: 18,
+                    fontSize: AppResponsive.subheadingFontSize(context),
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -444,7 +496,9 @@ class _HomeScreenState extends State<HomeScreen> {
           case 'change_password':
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => const ChangePasswordScreen()),
+              MaterialPageRoute(
+                builder: (context) => const ChangePasswordScreen(),
+              ),
             );
             break;
           case 'logout':
@@ -472,12 +526,19 @@ class _HomeScreenState extends State<HomeScreen> {
           value: 'change_password',
           child: Row(
             children: [
-              const Icon(Icons.lock_outline_rounded,
-                  size: 20, color: AppColors.textSecondary),
+              const Icon(
+                Icons.lock_outline_rounded,
+                size: 20,
+                color: AppColors.textSecondary,
+              ),
               const SizedBox(width: 12),
-              Text('Change PIN',
-                  style: GoogleFonts.poppins(
-                      fontSize: 14, color: AppColors.textPrimary)),
+              Text(
+                'Change PIN',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  color: AppColors.textPrimary,
+                ),
+              ),
             ],
           ),
         ),
@@ -486,12 +547,19 @@ class _HomeScreenState extends State<HomeScreen> {
           value: 'logout',
           child: Row(
             children: [
-              const Icon(Icons.logout_rounded,
-                  size: 20, color: AppColors.danger),
+              const Icon(
+                Icons.logout_rounded,
+                size: 20,
+                color: AppColors.danger,
+              ),
               const SizedBox(width: 12),
-              Text('Logout',
-                  style: GoogleFonts.poppins(
-                      fontSize: 14, color: AppColors.danger)),
+              Text(
+                'Logout',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  color: AppColors.danger,
+                ),
+              ),
             ],
           ),
         ),
@@ -511,8 +579,11 @@ class _HomeScreenState extends State<HomeScreen> {
     VoidCallback go,
   ) {
     return () {
-      if (!PlanGuard.allowedOr(context, entitlementKey,
-          featureName: featureName)) {
+      if (!PlanGuard.allowedOr(
+        context,
+        entitlementKey,
+        featureName: featureName,
+      )) {
         return;
       }
       go();
@@ -527,8 +598,15 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.point_of_sale_rounded,
         title: 'Billing',
         color: Colors.blue,
-        onTap: _gated(context, RetailEntKeys.billing, 'Billing',
-            () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RetailPosScreen()))),
+        onTap: _gated(
+          context,
+          RetailEntKeys.billing,
+          'Billing',
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const RetailPosScreen()),
+          ),
+        ),
       ),
       // One card for the whole catalog — products, their categories and the
       // attributes that build variants all live behind the Products hub.
@@ -536,66 +614,135 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.inventory_2_rounded,
         title: 'Products',
         color: Colors.amber,
-        onTap: _gated(context, RetailEntKeys.catalog, 'Products',
-            () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ProductManagementScreen()))),
+        onTap: _gated(
+          context,
+          RetailEntKeys.catalog,
+          'Products',
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const ProductManagementScreen(),
+            ),
+          ),
+        ),
       ),
       DashboardMenuCard(
         icon: Icons.people_rounded,
         title: 'Customers',
         color: Colors.indigo,
-        onTap: _gated(context, RetailEntKeys.customers, 'Customers',
-            () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CustomerListScreen()))),
+        onTap: _gated(
+          context,
+          RetailEntKeys.customers,
+          'Customers',
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const CustomerListScreen()),
+          ),
+        ),
       ),
       DashboardMenuCard(
         icon: Icons.storefront_rounded,
         title: 'Suppliers',
         color: Colors.brown,
-        onTap: _gated(context, RetailEntKeys.suppliers, 'Suppliers',
-            () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SupplierListScreen()))),
+        onTap: _gated(
+          context,
+          RetailEntKeys.suppliers,
+          'Suppliers',
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const SupplierListScreen()),
+          ),
+        ),
       ),
       DashboardMenuCard(
         icon: Icons.assignment_rounded,
         title: 'Purchase Orders',
         color: Colors.cyan,
-        onTap: _gated(context, RetailEntKeys.purchase, 'Purchase Orders',
-            () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PurchaseOrderListScreen()))),
+        onTap: _gated(
+          context,
+          RetailEntKeys.purchase,
+          'Purchase Orders',
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const PurchaseOrderListScreen(),
+            ),
+          ),
+        ),
       ),
       // Returns, claims and write-offs raised from damaged goods on a GRN.
       DashboardMenuCard(
         icon: Icons.assignment_return_rounded,
         title: 'Returns & Claims',
         color: Colors.deepPurple,
-        onTap: _gated(context, RetailEntKeys.purchaseDamaged, 'Returns & Claims',
-            () => Navigator.push(context, MaterialPageRoute(builder: (context) => const DamagedGoodsHubScreen()))),
+        onTap: _gated(
+          context,
+          RetailEntKeys.purchaseDamaged,
+          'Returns & Claims',
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const DamagedGoodsHubScreen(),
+            ),
+          ),
+        ),
       ),
       DashboardMenuCard(
         icon: Icons.receipt_long_rounded,
         title: 'Sales',
         color: Colors.green,
-        onTap: _gated(context, RetailEntKeys.reports, 'Sales',
-            () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SalesHistoryScreen()))),
+        onTap: _gated(
+          context,
+          RetailEntKeys.reports,
+          'Sales',
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const SalesHistoryScreen()),
+          ),
+        ),
       ),
       DashboardMenuCard(
         icon: Icons.account_balance_wallet_rounded,
         title: 'Cash Drawer',
         color: const Color(0xFF00897B),
-        onTap: _gated(context, RetailEntKeys.cashDrawer, 'Cash Drawer',
-            () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CashDrawerScreen()))),
+        onTap: _gated(
+          context,
+          RetailEntKeys.cashDrawer,
+          'Cash Drawer',
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const CashDrawerScreen()),
+          ),
+        ),
       ),
       DashboardMenuCard(
         icon: Icons.bar_chart_rounded,
         title: 'Reports',
         color: Colors.orange,
-        onTap: _gated(context, RetailEntKeys.reports, 'Reports',
-            () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ReportsScreen()))),
+        onTap: _gated(
+          context,
+          RetailEntKeys.reports,
+          'Reports',
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const ReportsScreen()),
+          ),
+        ),
       ),
       _buildStockAlertCard(context),
       DashboardMenuCard(
         icon: Icons.settings_rounded,
         title: 'Settings',
         color: Colors.blueGrey,
-        onTap: _gated(context, RetailEntKeys.settings, 'Settings',
-            () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen()))),
+        onTap: _gated(
+          context,
+          RetailEntKeys.settings,
+          'Settings',
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const SettingsScreen()),
+          ),
+        ),
       ),
 
       // DashboardMenuCard(
@@ -626,12 +773,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       : const Color(0xFFFF9800),
                 )
               : null,
-          onTap: _gated(context, RetailEntKeys.inventory, 'Stock Alerts',
-              () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const StockAlertsScreen()),
-                  )),
+          onTap: _gated(
+            context,
+            RetailEntKeys.inventory,
+            'Stock Alerts',
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const StockAlertsScreen(),
+              ),
+            ),
+          ),
         );
       },
     );

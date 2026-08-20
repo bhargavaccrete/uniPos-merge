@@ -14,6 +14,7 @@ import 'package:billberrylite/presentation/widget/componets/common/dialog_dispos
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 /// A single purchase return: what went back, and where the supplier's credit
 /// note stands.
@@ -101,10 +102,13 @@ class _PurchaseReturnDetailScreenState
                   controller: amountController,
                   label: 'Credit Amount',
                   icon: Icons.account_balance_wallet_outlined,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d*\.?\d{0,2}'),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -112,7 +116,7 @@ class _PurchaseReturnDetailScreenState
                   'Recording a credit note closes the return. It does not change '
                   'the supplier balance — damaged units were never billed.',
                   style: GoogleFonts.poppins(
-                    fontSize: 11.5,
+                    fontSize: AppResponsive.captionFontSize(context),
                     height: 1.4,
                     color: AppColors.textSecondary,
                   ),
@@ -128,8 +132,9 @@ class _PurchaseReturnDetailScreenState
                 onPressed: () async {
                   final number = numberController.text.trim();
                   if (number.isEmpty) {
-                    NotificationService.instance
-                        .showError('Credit note number is required');
+                    NotificationService.instance.showError(
+                      'Credit note number is required',
+                    );
                     return;
                   }
 
@@ -141,15 +146,17 @@ class _PurchaseReturnDetailScreenState
 
                   if (!dialogContext.mounted) return;
                   if (!ok) {
-                    NotificationService.instance
-                        .showError('Could not record the credit note');
+                    NotificationService.instance.showError(
+                      'Could not record the credit note',
+                    );
                     return;
                   }
 
                   Navigator.pop(dialogContext);
                   _refreshFromStore();
-                  NotificationService.instance
-                      .showSuccess('Credit note recorded');
+                  NotificationService.instance.showSuccess(
+                    'Credit note recorded',
+                  );
                 },
               ),
             ],
@@ -177,8 +184,9 @@ class _PurchaseReturnDetailScreenState
     if (!mounted) return;
 
     if (!ok) {
-      NotificationService.instance
-          .showError('Only a pending return can be cancelled');
+      NotificationService.instance.showError(
+        'Only a pending return can be cancelled',
+      );
       return;
     }
     _refreshFromStore();
@@ -195,26 +203,53 @@ class _PurchaseReturnDetailScreenState
       body: MoneyScope(
         child: _isLoading
             ? const Center(
-                child: CircularProgressIndicator(color: AppColors.primary))
+                child: CircularProgressIndicator(color: AppColors.primary),
+              )
             : SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeaderCard(),
-                    const SizedBox(height: 16),
-                    _buildSourceCard(),
-                    const SizedBox(height: 16),
-                    _buildItemsCard(),
-                    if (_model.creditNoteNumber != null) ...[
-                      const SizedBox(height: 16),
-                      _buildCreditNoteCard(),
+                padding: EdgeInsets.fromLTRB(
+                  AppResponsive.padding(context).left,
+                  AppResponsive.mediumSpacing(context),
+                  AppResponsive.padding(context).left,
+                  AppResponsive.largeSpacing(context),
+                ),
+                child: _capped(
+                  context,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildHeaderCard(),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
+                      _buildSourceCard(),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
+                      _buildItemsCard(),
+                      if (_model.creditNoteNumber != null) ...[
+                        SizedBox(height: AppResponsive.largeSpacing(context)),
+                        _buildCreditNoteCard(),
+                      ],
+                      SizedBox(
+                        height: AppResponsive.extraLargeSpacing(context),
+                      ),
+                      _buildActions(),
                     ],
-                    const SizedBox(height: 20),
-                    _buildActions(),
-                  ],
+                  ),
                 ),
               ),
+      ),
+    );
+  }
+
+  /// Caps content width on large screens so a stack of detail cards doesn't
+  /// stretch across a laptop.
+  Widget _capped(BuildContext context, Widget child) {
+    final maxWidth = AppResponsive.maxCardWidth(context);
+    if (maxWidth == double.infinity) return child;
+    return Align(
+      // topCenter, not Center: Center aligns on BOTH axes, so a
+      // shrink-wrapping child floats in the vertical middle.
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: child,
       ),
     );
   }
@@ -223,10 +258,12 @@ class _PurchaseReturnDetailScreenState
     final color = purchaseReturnStatusColor(_model.statusEnum);
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: AppColors.primary,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -239,23 +276,27 @@ class _PurchaseReturnDetailScreenState
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
-                    fontSize: 17,
+                    fontSize: AppResponsive.subheadingFontSize(context),
                     fontWeight: FontWeight.w700,
                     color: AppColors.white,
                   ),
                 ),
               ),
+              const SizedBox(width: 8),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.white,
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   _model.statusDisplay,
+                  maxLines: 1,
                   style: GoogleFonts.poppins(
-                    fontSize: 11,
+                    fontSize: AppResponsive.captionFontSize(context),
                     fontWeight: FontWeight.w700,
                     color: color,
                   ),
@@ -263,14 +304,19 @@ class _PurchaseReturnDetailScreenState
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
+          // Expanded thirds, not fixed 24px gaps — "Value ₹12,345.00" plus a
+          // date needed more than a 320px phone had, and the Row overflowed.
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _headerStat('Quantity', '${_model.totalQty}'),
-              const SizedBox(width: 24),
-              _headerStat('Value', formatMoney(_model.totalAmount)),
-              const SizedBox(width: 24),
-              _headerStat('Raised', _formatDate(_model.returnDate)),
+              Expanded(child: _headerStat('Quantity', '${_model.totalQty}')),
+              Expanded(
+                child: _headerStat('Value', formatMoney(_model.totalAmount)),
+              ),
+              Expanded(
+                child: _headerStat('Raised', _formatDate(_model.returnDate)),
+              ),
             ],
           ),
         ],
@@ -284,18 +330,24 @@ class _PurchaseReturnDetailScreenState
       children: [
         Text(
           label,
+          maxLines: 1,
           style: GoogleFonts.poppins(
-            fontSize: 11,
+            fontSize: AppResponsive.captionFontSize(context),
             color: AppColors.white.withValues(alpha: 0.75),
           ),
         ),
         const SizedBox(height: 2),
-        Text(
-          value,
-          style: GoogleFonts.poppins(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: AppColors.white,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            value,
+            maxLines: 1,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w700,
+              color: AppColors.white,
+            ),
           ),
         ),
       ],
@@ -324,11 +376,15 @@ class _PurchaseReturnDetailScreenState
           Text(
             'No line items recorded.',
             style: GoogleFonts.poppins(
-                fontSize: 13, color: AppColors.textSecondary),
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+            ),
           ),
         for (final item in _items)
           Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: EdgeInsets.only(
+              bottom: AppResponsive.smallSpacing(context),
+            ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -338,8 +394,10 @@ class _PurchaseReturnDetailScreenState
                     children: [
                       Text(
                         item.productName ?? 'Unknown product',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.poppins(
-                          fontSize: 13.5,
+                          fontSize: AppResponsive.smallFontSize(context),
                           fontWeight: FontWeight.w500,
                           color: AppColors.textPrimary,
                         ),
@@ -347,21 +405,25 @@ class _PurchaseReturnDetailScreenState
                       if (item.variantInfo?.isNotEmpty ?? false)
                         Text(
                           item.variantInfo!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.poppins(
-                            fontSize: 11.5,
+                            fontSize: AppResponsive.captionFontSize(context),
                             color: AppColors.textSecondary,
                           ),
                         ),
                     ],
                   ),
                 ),
+                const SizedBox(width: 8),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
                       '${item.returnedQty} pcs',
+                      maxLines: 1,
                       style: GoogleFonts.poppins(
-                        fontSize: 13,
+                        fontSize: AppResponsive.smallFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
@@ -369,8 +431,9 @@ class _PurchaseReturnDetailScreenState
                     if (item.totalAmount != null)
                       Text(
                         formatMoney(item.totalAmount!),
+                        maxLines: 1,
                         style: GoogleFonts.poppins(
-                          fontSize: 11.5,
+                          fontSize: AppResponsive.captionFontSize(context),
                           color: AppColors.textSecondary,
                         ),
                       ),
@@ -406,54 +469,82 @@ class _PurchaseReturnDetailScreenState
     if (!_model.isOpen) {
       return Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(14),
+        padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
         decoration: BoxDecoration(
           color: AppColors.surfaceMedium,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.smallBorderRadius(context),
+          ),
         ),
         child: Text(
           'This return is ${_model.statusDisplay.toLowerCase()} — no further action available.',
           textAlign: TextAlign.center,
           style: GoogleFonts.poppins(
-              fontSize: 12.5, color: AppColors.textSecondary),
+            fontSize: AppResponsive.smallFontSize(context),
+            color: AppColors.textSecondary,
+          ),
         ),
       );
     }
+
+    final btnRadius = BorderRadius.circular(
+      AppResponsive.smallBorderRadius(context),
+    );
+    final btnPad = EdgeInsets.symmetric(
+      vertical: AppResponsive.getValue(
+        context,
+        mobile: 13.0,
+        tablet: 15.0,
+        desktop: 17.0,
+      ),
+    );
 
     return Row(
       children: [
         Expanded(
           child: OutlinedButton.icon(
             onPressed: _cancelReturn,
-            icon: const Icon(Icons.block, size: 18),
-            label: Text('Cancel',
-                style: GoogleFonts.poppins(
-                    fontSize: 13, fontWeight: FontWeight.w600)),
+            icon: Icon(Icons.block, size: AppResponsive.smallIconSize(context)),
+            label: Text(
+              'Cancel',
+              maxLines: 1,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.danger,
               side: const BorderSide(color: AppColors.danger),
-              padding: const EdgeInsets.symmetric(vertical: 13),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+              padding: btnPad,
+              shape: RoundedRectangleBorder(borderRadius: btnRadius),
             ),
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: AppResponsive.mediumSpacing(context)),
         Expanded(
           flex: 2,
           child: ElevatedButton.icon(
             onPressed: _recordCreditNote,
-            icon: const Icon(Icons.receipt_long_rounded, size: 18),
-            label: Text('Record Credit Note',
-                style: GoogleFonts.poppins(
-                    fontSize: 13, fontWeight: FontWeight.w600)),
+            icon: Icon(
+              Icons.receipt_long_rounded,
+              size: AppResponsive.smallIconSize(context),
+            ),
+            label: Text(
+              'Record Credit Note',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.success,
               foregroundColor: AppColors.white,
               elevation: 0,
-              padding: const EdgeInsets.symmetric(vertical: 13),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+              padding: btnPad,
+              shape: RoundedRectangleBorder(borderRadius: btnRadius),
             ),
           ),
         ),
@@ -469,27 +560,40 @@ class _PurchaseReturnDetailScreenState
     Color? iconColor,
     required List<Widget> children,
   }) {
+    final side = AppResponsive.padding(context).left;
+    final vGap = AppResponsive.mediumSpacing(context);
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            padding: EdgeInsets.fromLTRB(side, vGap, side, vGap),
             child: Row(
               children: [
-                Icon(icon, size: 19, color: iconColor ?? AppColors.primary),
+                Icon(
+                  icon,
+                  size: AppResponsive.iconSize(context),
+                  color: iconColor ?? AppColors.primary,
+                ),
                 const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: GoogleFonts.poppins(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                 ),
               ],
@@ -497,7 +601,7 @@ class _PurchaseReturnDetailScreenState
           ),
           const Divider(height: 1, color: AppColors.divider),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+            padding: EdgeInsets.fromLTRB(side, vGap, side, 6),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: children,
@@ -510,23 +614,32 @@ class _PurchaseReturnDetailScreenState
 
   Widget _row(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Capped label column: wide enough for the longest label, but it stops
+          // growing on a laptop so every extra pixel goes to the value.
           SizedBox(
-            width: 120,
+            width: AppResponsive.getValue(
+              context,
+              mobile: 110.0,
+              tablet: 130.0,
+              desktop: 150.0,
+            ),
             child: Text(
               label,
               style: GoogleFonts.poppins(
-                  fontSize: 13, color: AppColors.textSecondary),
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
           Expanded(
             child: Text(
               value,
               style: GoogleFonts.poppins(
-                fontSize: 13.5,
+                fontSize: AppResponsive.smallFontSize(context),
                 fontWeight: FontWeight.w500,
                 color: AppColors.textPrimary,
               ),

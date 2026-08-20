@@ -75,9 +75,9 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
 
   /// Live item count behind each pill — read inside an Observer.
   int _countFor(int index) => switch (index) {
-        0 => productStore.products.length,
-        _ => categoryStore.categories.length,
-      };
+    0 => productStore.products.length,
+    _ => categoryStore.categories.length,
+  };
 
   void _addForCurrentTab() {
     if (_tabController.index == 0) {
@@ -145,7 +145,9 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
       children: [
         InventoryScreen(embedded: true, clearSearchSignal: _searchResetSignal),
         CategoryManagementScreen(
-            embedded: true, clearSearchSignal: _searchResetSignal),
+          embedded: true,
+          clearSearchSignal: _searchResetSignal,
+        ),
       ],
     );
   }
@@ -172,9 +174,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
               children: [
                 for (var i = 0; i < _titles.length; i++) ...[
                   if (i > 0) const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildTabButton(i, _titles[i], _countFor(i)),
-                  ),
+                  Expanded(child: _buildTabButton(i, _titles[i], _countFor(i))),
                 ],
               ],
             );
@@ -215,7 +215,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.center,
           style: GoogleFonts.poppins(
-            fontSize: 13,
+            fontSize: AppResponsive.bodyFontSize(context),
             fontWeight: FontWeight.w600,
             color: isSelected ? AppColors.white : AppColors.textPrimary,
           ),

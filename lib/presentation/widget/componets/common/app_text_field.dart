@@ -74,6 +74,10 @@ class AppTextField extends StatefulWidget {
   /// on name fields).
   final TextCapitalization textCapitalization;
 
+  /// Horizontal alignment of the entered text. Right-aligned suits numeric
+  /// fields where the digits should line up with a total beside them.
+  final TextAlign textAlign;
+
   /// When to auto-validate. Defaults to [AutovalidateMode.onUserInteraction] so
   /// a shown "… is required" error clears as soon as the user fills the field
   /// (and re-appears if they clear it) — instead of lingering until the next
@@ -104,6 +108,7 @@ class AppTextField extends StatefulWidget {
     this.onTap,
     this.textInputAction,
     this.inputFormatters,
+    this.textAlign = TextAlign.start,
     this.prefixWidget,
     this.enableSuggestions = true,
     this.autocorrect = true,
@@ -163,6 +168,7 @@ class _AppTextFieldState extends State<AppTextField> {
 
     return TextFormField(
       controller: widget.controller,
+      textAlign: widget.textAlign,
       initialValue: widget.controller == null ? widget.initialValue : null,
       focusNode: widget.focusNode,
       keyboardType: widget.keyboardType,

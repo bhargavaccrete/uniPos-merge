@@ -22,7 +22,8 @@ class InventoryLossListScreen extends StatefulWidget {
   const InventoryLossListScreen({super.key, this.embedded = false});
 
   @override
-  State<InventoryLossListScreen> createState() => _InventoryLossListScreenState();
+  State<InventoryLossListScreen> createState() =>
+      _InventoryLossListScreenState();
 }
 
 class _InventoryLossListScreenState extends State<InventoryLossListScreen> {
@@ -65,32 +66,58 @@ class _InventoryLossListScreenState extends State<InventoryLossListScreen> {
     );
   }
 
+  /// Caps content width on large screens. Backgrounds still span edge to edge —
+  /// only what you read is constrained.
+  Widget _capped(BuildContext context, Widget child) {
+    final maxWidth = AppResponsive.maxContentWidth(context);
+    if (maxWidth == double.infinity) return child;
+    return Align(
+      // topCenter, not Center: Center aligns on BOTH axes, so a
+      // shrink-wrapping child floats in the vertical middle.
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: child,
+      ),
+    );
+  }
+
   Widget _buildBody(BuildContext context) {
-    final isTablet = !AppResponsive.isMobile(context);
+    final side = AppResponsive.padding(context).left;
 
     return Column(
       children: [
         Container(
           color: AppColors.white,
           padding: EdgeInsets.fromLTRB(
-              isTablet ? 20 : 16, isTablet ? 16 : 12, isTablet ? 20 : 16, 12),
-          child: AppTextField(
-            controller: _searchController,
-            hint: 'Search by product, supplier, GRN or reason...',
-            icon: Icons.search_rounded,
-            onChanged: (_) => setState(() {}),
-            suffixIcon: _searchController.text.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear, size: 20),
-                    onPressed: () {
-                      _searchController.clear();
-                      setState(() {});
-                    },
-                  )
-                : null,
+            side,
+            AppResponsive.mediumSpacing(context),
+            side,
+            12,
+          ),
+          child: _capped(
+            context,
+            AppTextField(
+              controller: _searchController,
+              hint: 'Search by product, supplier, GRN or reason...',
+              icon: Icons.search_rounded,
+              onChanged: (_) => setState(() {}),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: Icon(
+                        Icons.clear,
+                        size: AppResponsive.smallIconSize(context),
+                      ),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {});
+                      },
+                    )
+                  : null,
+            ),
           ),
         ),
-        _buildTotals(isTablet),
+        _buildTotals(context),
         Expanded(
           child: Observer(
             builder: (context) {
@@ -114,10 +141,13 @@ class _InventoryLossListScreenState extends State<InventoryLossListScreen> {
                 );
               }
 
-              return ListView.builder(
-                padding: EdgeInsets.all(isTablet ? 20 : 16),
-                itemCount: losses.length,
-                itemBuilder: (context, index) => _buildCard(losses[index]),
+              return _capped(
+                context,
+                ListView.builder(
+                  padding: AppResponsive.padding(context),
+                  itemCount: losses.length,
+                  itemBuilder: (context, index) => _buildCard(losses[index]),
+                ),
               );
             },
           ),
@@ -126,7 +156,7 @@ class _InventoryLossListScreenState extends State<InventoryLossListScreen> {
     );
   }
 
-  Widget _buildTotals(bool isTablet) {
+  Widget _buildTotals(BuildContext context) {
     return Observer(
       builder: (context) {
         if (damagedGoodsStore.inventoryLosses.isEmpty) {
@@ -137,23 +167,31 @@ class _InventoryLossListScreenState extends State<InventoryLossListScreen> {
           width: double.infinity,
           color: AppColors.danger.withValues(alpha: 0.06),
           padding: EdgeInsets.symmetric(
-              horizontal: isTablet ? 20 : 16, vertical: 10),
-          child: Row(
-            children: [
-              const Icon(Icons.trending_down_rounded,
-                  size: 15, color: AppColors.danger),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  '${damagedGoodsStore.totalLossQty} units written off • ${formatMoney(damagedGoodsStore.totalLossValue)} total',
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.danger,
+            horizontal: AppResponsive.padding(context).left,
+            vertical: AppResponsive.smallSpacing(context),
+          ),
+          child: _capped(
+            context,
+            Row(
+              children: [
+                Icon(
+                  Icons.trending_down_rounded,
+                  size: AppResponsive.smallIconSize(context),
+                  color: AppColors.danger,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${damagedGoodsStore.totalLossQty} units written off • ${formatMoney(damagedGoodsStore.totalLossValue)} total',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.danger,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -162,11 +200,13 @@ class _InventoryLossListScreenState extends State<InventoryLossListScreen> {
 
   Widget _buildCard(InventoryLossModel loss) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(14),
+      margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
+      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
       child: Column(
@@ -183,7 +223,7 @@ class _InventoryLossListScreenState extends State<InventoryLossListScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.poppins(
-                        fontSize: 14,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
@@ -191,29 +231,34 @@ class _InventoryLossListScreenState extends State<InventoryLossListScreen> {
                     if (loss.variantInfo?.isNotEmpty ?? false)
                       Text(
                         loss.variantInfo!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.poppins(
-                          fontSize: 11.5,
+                          fontSize: AppResponsive.captionFontSize(context),
                           color: AppColors.textSecondary,
                         ),
                       ),
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
                     '${loss.quantity} pcs',
+                    maxLines: 1,
                     style: GoogleFonts.poppins(
-                      fontSize: 13.5,
+                      fontSize: AppResponsive.smallFontSize(context),
                       fontWeight: FontWeight.w700,
                       color: AppColors.danger,
                     ),
                   ),
                   Text(
                     formatMoney(loss.lossValue),
+                    maxLines: 1,
                     style: GoogleFonts.poppins(
-                      fontSize: 11.5,
+                      fontSize: AppResponsive.captionFontSize(context),
                       color: AppColors.textSecondary,
                     ),
                   ),
@@ -221,11 +266,11 @@ class _InventoryLossListScreenState extends State<InventoryLossListScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           const Divider(height: 1, color: AppColors.divider),
-          const SizedBox(height: 10),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           Wrap(
-            spacing: 12,
+            spacing: AppResponsive.mediumSpacing(context),
             runSpacing: 4,
             children: [
               _meta(Icons.tag_rounded, loss.lossNumber),
@@ -240,7 +285,7 @@ class _InventoryLossListScreenState extends State<InventoryLossListScreen> {
           Text(
             _formatDate(loss.recordedAt),
             style: GoogleFonts.poppins(
-              fontSize: 11,
+              fontSize: AppResponsive.captionFontSize(context),
               color: AppColors.textSecondary,
             ),
           ),
@@ -253,12 +298,17 @@ class _InventoryLossListScreenState extends State<InventoryLossListScreen> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 12, color: AppColors.textSecondary),
+        Icon(
+          icon,
+          size: AppResponsive.smallIconSize(context),
+          color: AppColors.textSecondary,
+        ),
         const SizedBox(width: 4),
         Text(
           text,
+          maxLines: 1,
           style: GoogleFonts.poppins(
-            fontSize: 11,
+            fontSize: AppResponsive.captionFontSize(context),
             color: AppColors.textSecondary,
           ),
         ),

@@ -46,13 +46,17 @@ class PurchaseReturnReportScreen extends StatelessWidget {
       loader: (start, end) =>
           service.getPurchaseReturnReport(startDate: start, endDate: end),
       summaryCards: (rows) {
-        final value =
-            rows.fold<double>(0, (s, r) => s + (r['totalAmount'] as double));
+        final value = rows.fold<double>(
+          0,
+          (s, r) => s + (r['totalAmount'] as double),
+        );
         final pending = rows
             .where((r) => r['status'] == PurchaseReturnStatus.pending.name)
             .toList();
-        final pendingValue =
-            pending.fold<double>(0, (s, r) => s + (r['totalAmount'] as double));
+        final pendingValue = pending.fold<double>(
+          0,
+          (s, r) => s + (r['totalAmount'] as double),
+        );
 
         return [
           ReportSummaryCard(
@@ -89,20 +93,26 @@ class PurchaseReturnReportScreen extends StatelessWidget {
         ReportTable.column(context, 'Credit Note'),
         ReportTable.column(context, 'Status'),
       ],
-      rowBuilder: (context, row) => DataRow(cells: [
-        DataCell(Text(row['returnNumber'] as String)),
-        DataCell(Text(row['supplierName'] as String)),
-        DataCell(Text(row['grnNumber'] as String)),
-        DataCell(Text(_date(row['returnDate'] as String))),
-        DataCell(Text('${row['totalQty']}')),
-        DataCell(Text(formatMoney(row['totalAmount'] as double))),
-        DataCell(Text(row['creditNoteNumber'] as String? ?? '—')),
-        DataCell(AppStatusPill(
-          dense: true,
-          label: row['statusDisplay'] as String,
-          color: purchaseReturnStatusColor(_statusOf(row['status'] as String)),
-        )),
-      ]),
+      rowBuilder: (context, row) => DataRow(
+        cells: [
+          DataCell(Text(row['returnNumber'] as String)),
+          DataCell(Text(row['supplierName'] as String)),
+          DataCell(Text(row['grnNumber'] as String)),
+          DataCell(Text(_date(row['returnDate'] as String))),
+          DataCell(Text('${row['totalQty']}')),
+          DataCell(Text(formatMoney(row['totalAmount'] as double))),
+          DataCell(Text(row['creditNoteNumber'] as String? ?? '—')),
+          DataCell(
+            AppStatusPill(
+              dense: true,
+              label: row['statusDisplay'] as String,
+              color: purchaseReturnStatusColor(
+                _statusOf(row['status'] as String),
+              ),
+            ),
+          ),
+        ],
+      ),
       exportData: (rows) => ReportExportData(
         headers: const [
           'Return Number',
@@ -117,27 +127,30 @@ class PurchaseReturnReportScreen extends StatelessWidget {
           'Credit Amount',
         ],
         rows: rows
-            .map((r) => [
-                  r['returnNumber'],
-                  r['supplierName'],
-                  r['grnNumber'],
-                  r['poNumber'],
-                  _date(r['returnDate'] as String),
-                  r['totalQty'],
-                  ReportExportService.formatCurrency(
-                      r['totalAmount'] as double),
-                  r['statusDisplay'],
-                  r['creditNoteNumber'] ?? '',
-                  r['creditNoteAmount'] == null
-                      ? ''
-                      : ReportExportService.formatCurrency(
-                          r['creditNoteAmount'] as double),
-                ])
+            .map(
+              (r) => [
+                r['returnNumber'],
+                r['supplierName'],
+                r['grnNumber'],
+                r['poNumber'],
+                _date(r['returnDate'] as String),
+                r['totalQty'],
+                ReportExportService.formatCurrency(r['totalAmount'] as double),
+                r['statusDisplay'],
+                r['creditNoteNumber'] ?? '',
+                r['creditNoteAmount'] == null
+                    ? ''
+                    : ReportExportService.formatCurrency(
+                        r['creditNoteAmount'] as double,
+                      ),
+              ],
+            )
             .toList(),
         summary: {
           'Returns': rows.length,
           'Total Value': ReportExportService.formatCurrency(
-              rows.fold<double>(0, (s, r) => s + (r['totalAmount'] as double))),
+            rows.fold<double>(0, (s, r) => s + (r['totalAmount'] as double)),
+          ),
         },
       ),
     );

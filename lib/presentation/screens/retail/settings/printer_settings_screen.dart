@@ -85,10 +85,15 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
           const SizedBox(width: 4),
         ],
       ),
-      body: Center(
+      // topCenter, not Center: Center aligns on BOTH axes, so on a short
+      // settings list (A4 paper hides the template section) the whole page
+      // would float in the vertical middle.
+      body: Align(
+        alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints:
-              BoxConstraints(maxWidth: isTablet ? 700 : double.infinity),
+          constraints: BoxConstraints(
+            maxWidth: AppResponsive.maxCardWidth(context),
+          ),
           child: SingleChildScrollView(
             padding: AppResponsive.padding(context),
             child: Column(
@@ -108,11 +113,12 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
 
                 // Toggle groups, all but Branding — that goes last so the
                 // "Powered By" lock reads as a footnote, as restaurant does.
-                ..._toggleGroups()
-                    .entries
+                ..._toggleGroups().entries
                     .where((g) => g.key != 'Branding')
-                    .map((g) =>
-                        _buildToggleGroup(context, g.key, g.value, isTablet)),
+                    .map(
+                      (g) =>
+                          _buildToggleGroup(context, g.key, g.value, isTablet),
+                    ),
 
                 // Footer message, immediately before Branding — restaurant's
                 // ordering exactly.
@@ -127,16 +133,19 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                ..._toggleGroups()
-                    .entries
+                ..._toggleGroups().entries
                     .where((g) => g.key == 'Branding')
-                    .map((g) =>
-                        _buildToggleGroup(context, g.key, g.value, isTablet)),
+                    .map(
+                      (g) =>
+                          _buildToggleGroup(context, g.key, g.value, isTablet),
+                    ),
 
                 Center(
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.surfaceMedium,
                       borderRadius: BorderRadius.circular(20),
@@ -145,8 +154,11 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.cloud_done,
-                            color: AppColors.success, size: 18),
+                        const Icon(
+                          Icons.cloud_done,
+                          color: AppColors.success,
+                          size: 18,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           'Settings auto-save',
@@ -185,50 +197,99 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     final s = _settings;
     return {
       'Store Information': [
-        _PrintToggle('Store Logo', Icons.image_outlined,
-            'Show store logo at the top of receipts', s.showLogo,
-            _printerService.setShowLogo),
-        _PrintToggle('Store Name', Icons.storefront_outlined,
-            'Show store name on receipts', s.showStoreName,
-            _printerService.setShowStoreName),
-        _PrintToggle('Store Address', Icons.location_on_outlined,
-            'Show store address', s.showStoreAddress,
-            _printerService.setShowStoreAddress),
-        _PrintToggle('Store Mobile No', Icons.phone_outlined,
-            'Show contact number', s.showStorePhone,
-            _printerService.setShowStorePhone),
+        _PrintToggle(
+          'Store Logo',
+          Icons.image_outlined,
+          'Show store logo at the top of receipts',
+          s.showLogo,
+          _printerService.setShowLogo,
+        ),
+        _PrintToggle(
+          'Store Name',
+          Icons.storefront_outlined,
+          'Show store name on receipts',
+          s.showStoreName,
+          _printerService.setShowStoreName,
+        ),
+        _PrintToggle(
+          'Store Address',
+          Icons.location_on_outlined,
+          'Show store address',
+          s.showStoreAddress,
+          _printerService.setShowStoreAddress,
+        ),
+        _PrintToggle(
+          'Store Mobile No',
+          Icons.phone_outlined,
+          'Show contact number',
+          s.showStorePhone,
+          _printerService.setShowStorePhone,
+        ),
       ],
       'Invoice Details': [
-        _PrintToggle('Invoice Number', Icons.numbers,
-            'Show invoice/bill number', s.showInvoiceNumber,
-            _printerService.setShowInvoiceNumber),
+        _PrintToggle(
+          'Invoice Number',
+          Icons.numbers,
+          'Show invoice/bill number',
+          s.showInvoiceNumber,
+          _printerService.setShowInvoiceNumber,
+        ),
         // Restaurant has a single "Ordered Time"; retail stores date and time
         // as two fields, so one switch drives both rather than exposing a
         // split restaurant does not have.
-        _PrintToggle('Invoice Time', Icons.access_time,
-            'Show invoice date and time', s.showInvoiceDate && s.showInvoiceTime,
-            _setInvoiceDateTime),
-        _PrintToggle('Customer Name', Icons.person_outline,
-            'Show customer name if available', s.showCustomerDetails,
-            _printerService.setShowCustomerDetails),
+        _PrintToggle(
+          'Invoice Time',
+          Icons.access_time,
+          'Show invoice date and time',
+          s.showInvoiceDate && s.showInvoiceTime,
+          _setInvoiceDateTime,
+        ),
+        _PrintToggle(
+          'Customer Name',
+          Icons.person_outline,
+          'Show customer name if available',
+          s.showCustomerDetails,
+          _printerService.setShowCustomerDetails,
+        ),
       ],
       'Payment & Pricing': [
-        _PrintToggle('Payment Type', Icons.payment,
-            'Show payment method (Cash/Card/UPI)', s.showPaymentMethod,
-            _printerService.setShowPaymentMethod),
-        _PrintToggle('Tax', Icons.percent, 'Show GST/tax breakdown', s.showTax,
-            _printerService.setShowTax),
-        _PrintToggle('Subtotal', Icons.calculate_outlined,
-            'Show subtotal before tax', s.showSubtotal,
-            _printerService.setShowSubtotal),
-        _PrintToggle('Payment Paid', Icons.money,
-            'Show cash received and change', s.showAmountReceived,
-            _printerService.setShowAmountReceived),
+        _PrintToggle(
+          'Payment Type',
+          Icons.payment,
+          'Show payment method (Cash/Card/UPI)',
+          s.showPaymentMethod,
+          _printerService.setShowPaymentMethod,
+        ),
+        _PrintToggle(
+          'Tax',
+          Icons.percent,
+          'Show GST/tax breakdown',
+          s.showTax,
+          _printerService.setShowTax,
+        ),
+        _PrintToggle(
+          'Subtotal',
+          Icons.calculate_outlined,
+          'Show subtotal before tax',
+          s.showSubtotal,
+          _printerService.setShowSubtotal,
+        ),
+        _PrintToggle(
+          'Payment Paid',
+          Icons.money,
+          'Show cash received and change',
+          s.showAmountReceived,
+          _printerService.setShowAmountReceived,
+        ),
       ],
       'Branding': [
-        _PrintToggle('Powered By', Icons.verified_outlined,
-            'Show "Powered by Bill Berry Lite" at the bottom of the bill',
-            s.showPoweredBy, _printerService.setShowPoweredBy),
+        _PrintToggle(
+          'Powered By',
+          Icons.verified_outlined,
+          'Show "Powered by Bill Berry Lite" at the bottom of the bill',
+          s.showPoweredBy,
+          _printerService.setShowPoweredBy,
+        ),
       ],
     };
   }
@@ -239,8 +300,12 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     await _printerService.setShowInvoiceTime(value);
   }
 
-  Widget _buildToggleGroup(BuildContext context, String title,
-      List<_PrintToggle> toggles, bool isTablet) {
+  Widget _buildToggleGroup(
+    BuildContext context,
+    String title,
+    List<_PrintToggle> toggles,
+    bool isTablet,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -253,11 +318,15 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   }
 
   Widget _buildToggleCard(
-      BuildContext context, _PrintToggle toggle, bool isTablet) {
+    BuildContext context,
+    _PrintToggle toggle,
+    bool isTablet,
+  ) {
     // "Powered By" is forced ON while the admin keeps `billing.invoice.print`;
     // when that flag is off the user controls it. `shown` drives the visuals,
     // `locked` disables input. Same rule as restaurant.
-    final bool locked = toggle.label == 'Powered By' &&
+    final bool locked =
+        toggle.label == 'Powered By' &&
         PlanEnforce.allows(ModeKeys.billingInvoicePrint);
     final bool shown = locked ? true : toggle.value;
 
@@ -285,7 +354,8 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
           onTap: () {
             if (locked) {
               NotificationService.instance.showInfo(
-                  'Upgrade to Premium to remove the "Powered by Bill Berry Lite" footer.');
+                'Upgrade to Premium to remove the "Powered by Bill Berry Lite" footer.',
+              );
               return;
             }
             setValue(!toggle.value);
@@ -304,8 +374,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                   ),
                   child: Icon(
                     toggle.icon,
-                    color:
-                        shown ? AppColors.primary : AppColors.textSecondary,
+                    color: shown ? AppColors.primary : AppColors.textSecondary,
                     size: 22,
                   ),
                 ),
@@ -330,8 +399,11 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                           ),
                           if (locked) ...[
                             const SizedBox(width: 6),
-                            const Icon(Icons.lock_rounded,
-                                size: 14, color: AppColors.textSecondary),
+                            const Icon(
+                              Icons.lock_rounded,
+                              size: 14,
+                              color: AppColors.textSecondary,
+                            ),
                           ],
                         ],
                       ),
@@ -391,14 +463,14 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   }
 
   Widget _card({required Widget child}) => Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.divider),
-        ),
-        child: child,
-      );
+    width: double.infinity,
+    decoration: BoxDecoration(
+      color: AppColors.white,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: AppColors.divider),
+    ),
+    child: child,
+  );
 
   Widget _buildTemplateSection(BuildContext context, bool isTablet) {
     final current = _settings.billTemplate;
@@ -471,14 +543,19 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(icon,
-                    color: isSelected
-                        ? AppColors.primary
-                        : AppColors.textSecondary,
-                    size: 20),
+                Icon(
+                  icon,
+                  color: isSelected
+                      ? AppColors.primary
+                      : AppColors.textSecondary,
+                  size: 20,
+                ),
                 if (isSelected)
-                  const Icon(Icons.check_circle_rounded,
-                      color: AppColors.primary, size: 16),
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    color: AppColors.primary,
+                    size: 16,
+                  ),
               ],
             ),
             const SizedBox(height: 8),
@@ -534,10 +611,15 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: hasLogo
-                      ? Image.file(File(_settings.logoPath!),
-                          fit: BoxFit.contain)
-                      : const Icon(Icons.storefront_outlined,
-                          color: AppColors.textSecondary, size: 28),
+                      ? Image.file(
+                          File(_settings.logoPath!),
+                          fit: BoxFit.contain,
+                        )
+                      : const Icon(
+                          Icons.storefront_outlined,
+                          color: AppColors.textSecondary,
+                          size: 28,
+                        ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -559,7 +641,8 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                             side: const BorderSide(color: AppColors.primary),
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                         ),
                       ),
@@ -628,7 +711,11 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   }
 
   Widget _cardHeading(
-      BuildContext context, IconData icon, String title, String description) {
+    BuildContext context,
+    IconData icon,
+    String title,
+    String description,
+  ) {
     return Row(
       children: [
         Container(
@@ -679,20 +766,22 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
 
       if (image != null) {
         final bytes = await image.readAsBytes();
-        
+
         // Validate image size (max 2MB)
         if (bytes.length > 2 * 1024 * 1024) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Image is too large. Please select an image under 2MB.'),
+                content: Text(
+                  'Image is too large. Please select an image under 2MB.',
+                ),
                 backgroundColor: Colors.red,
               ),
             );
           }
           return;
         }
-        
+
         // Get app's documents directory
         final Directory appDir = await getApplicationDocumentsDirectory();
         final String logoDir = '${appDir.path}/logos';
@@ -740,7 +829,8 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     final confirmed = await showAppConfirmDialog(
       context: context,
       title: 'Remove Logo?',
-      message: 'The logo will no longer print on receipts. '
+      message:
+          'The logo will no longer print on receipts. '
           'You can add it again anytime.',
       confirmLabel: 'Remove',
       accent: AppColors.danger,
@@ -774,7 +864,8 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     final confirmed = await showAppConfirmDialog(
       context: context,
       title: 'Reset Settings?',
-      message: 'This will restore every print setting to its default value, '
+      message:
+          'This will restore every print setting to its default value, '
           'including paper size and template.',
       confirmLabel: 'Reset',
       accent: AppColors.danger,
@@ -799,5 +890,10 @@ class _PrintToggle {
   final Future<void> Function(bool) onChanged;
 
   const _PrintToggle(
-      this.label, this.icon, this.description, this.value, this.onChanged);
+    this.label,
+    this.icon,
+    this.description,
+    this.value,
+    this.onChanged,
+  );
 }

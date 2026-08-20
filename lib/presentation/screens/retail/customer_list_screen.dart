@@ -135,10 +135,13 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                   label: 'Credit Limit',
                   hint: '0 = Unlimited',
                   icon: Icons.credit_card_outlined,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d*\.?\d{0,2}'),
+                    ),
                   ],
                   textInputAction: TextInputAction.next,
                 ),
@@ -148,10 +151,13 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                   label: 'Opening Balance',
                   hint: 'Due carried forward from previous records',
                   icon: Icons.account_balance_wallet_outlined,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d*\.?\d{0,2}'),
+                    ),
                   ],
                 ),
 
@@ -220,8 +226,9 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     // getCustomerByPhone (used by POS lookup) return an arbitrary record.
     final existing = await customerStore.getCustomerByPhone(trimmedPhone);
     if (existing != null) {
-      NotificationService.instance
-          .showError('A customer with this phone number already exists');
+      NotificationService.instance.showError(
+        'A customer with this phone number already exists',
+      );
       return;
     }
 
@@ -246,8 +253,9 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     // addCustomer reports failure through its return value — don't claim
     // success when the plan gate or Hive rejected the write.
     if (!added) {
-      NotificationService.instance
-          .showError(customerStore.errorMessage ?? 'Failed to add customer');
+      NotificationService.instance.showError(
+        customerStore.errorMessage ?? 'Failed to add customer',
+      );
       return;
     }
 
@@ -265,7 +273,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       child: Text(
         text.toUpperCase(),
         style: GoogleFonts.poppins(
-          fontSize: 11,
+          fontSize: AppResponsive.captionFontSize(context),
           fontWeight: FontWeight.w600,
           letterSpacing: 0.8,
           color: AppColors.textSecondary,
@@ -283,10 +291,25 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     ).then((_) => customerStore.loadCustomers());
   }
 
+  /// Caps content width on large screens. Backgrounds (the white search strip)
+  /// still span edge to edge — only what you read is constrained, so a laptop
+  /// doesn't stretch a one-line customer row across 1900px.
+  Widget _capped(BuildContext context, Widget child) {
+    final maxWidth = AppResponsive.maxContentWidth(context);
+    if (maxWidth == double.infinity) return child;
+    return Align(
+      // topCenter, not Center: Center aligns on BOTH axes, so a
+      // shrink-wrapping child floats in the vertical middle.
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: child,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isTablet = !AppResponsive.isMobile(context);
-
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
@@ -312,25 +335,31 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
           children: [
             Container(
               color: AppColors.white,
-              padding: EdgeInsets.all(isTablet ? 20 : 16),
-              child: AppTextField(
-                controller: _searchController,
-                hint: 'Search by name or phone...',
-                icon: Icons.search_rounded,
-                onChanged: _onSearchChanged,
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear, size: 20),
-                        onPressed: () {
-                          _searchController.clear();
-                          _onSearchChanged('');
-                        },
-                      )
-                    : null,
+              padding: AppResponsive.padding(context),
+              child: _capped(
+                context,
+                AppTextField(
+                  controller: _searchController,
+                  hint: 'Search by name or phone...',
+                  icon: Icons.search_rounded,
+                  onChanged: _onSearchChanged,
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(
+                            Icons.clear,
+                            size: AppResponsive.smallIconSize(context),
+                          ),
+                          onPressed: () {
+                            _searchController.clear();
+                            _onSearchChanged('');
+                          },
+                        )
+                      : null,
+                ),
               ),
             ),
 
-            _buildStatsRow(isTablet),
+            _buildStatsRow(context),
 
             Expanded(
               child: Observer(
@@ -338,7 +367,8 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                   if (customerStore.isLoading) {
                     return const Center(
                       child: CircularProgressIndicator(
-                          color: AppColors.primary),
+                        color: AppColors.primary,
+                      ),
                     );
                   }
 
@@ -364,11 +394,14 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                           );
                   }
 
-                  return ListView.builder(
-                    padding: EdgeInsets.all(isTablet ? 20 : 16),
-                    itemCount: customers.length,
-                    itemBuilder: (context, index) =>
-                        _buildCustomerCard(customers[index], isTablet),
+                  return _capped(
+                    context,
+                    ListView.builder(
+                      padding: AppResponsive.padding(context),
+                      itemCount: customers.length,
+                      itemBuilder: (context, index) =>
+                          _buildCustomerCard(context, customers[index]),
+                    ),
                   );
                 },
               ),
@@ -381,77 +414,130 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
 
   /// Headline numbers across the whole customer base (unfiltered — these
   /// describe the book, not the current search).
-  Widget _buildStatsRow(bool isTablet) {
+  Widget _buildStatsRow(BuildContext context) {
     return Observer(
       builder: (context) {
         final customers = customerStore.customers;
         if (customers.isEmpty) return const SizedBox.shrink();
 
+        final specs = <(String, IconData, Color)>[
+          (
+            '${customers.length} customers',
+            Icons.people_rounded,
+            AppColors.primary,
+          ),
+          (
+            '${formatMoney(customerStore.totalOutstandingCredit)} due',
+            Icons.account_balance_wallet_rounded,
+            AppColors.danger,
+          ),
+          (
+            '${customers.fold(0, (sum, c) => sum + c.loyaltyPoints)} pts',
+            Icons.stars_rounded,
+            AppColors.warning,
+          ),
+        ];
+
+        final gap = AppResponsive.smallSpacing(context);
+
+        // Three equal chips only fit one line above ~360px. Below that, Wrap
+        // lets them flow to a second row — truncating "₹12,345.00 due" down to
+        // "₹12,34…" hides the very number the chip exists to show.
+        final Widget content = AppResponsive.isMobile(context)
+            ? Wrap(
+                spacing: gap,
+                runSpacing: gap,
+                children: [
+                  for (final (label, icon, color) in specs)
+                    _buildStatChip(
+                      context,
+                      label,
+                      icon,
+                      color,
+                      expanded: false,
+                    ),
+                ],
+              )
+            : Row(
+                children: [
+                  for (var i = 0; i < specs.length; i++) ...[
+                    if (i > 0) SizedBox(width: gap),
+                    _buildStatChip(
+                      context,
+                      specs[i].$1,
+                      specs[i].$2,
+                      specs[i].$3,
+                    ),
+                  ],
+                ],
+              );
+
         return Padding(
           padding: EdgeInsets.symmetric(
-              horizontal: isTablet ? 20 : 16, vertical: 8),
-          child: Row(
-            children: [
-              _buildStatChip('${customers.length} customers',
-                  Icons.people_rounded, AppColors.primary),
-              const SizedBox(width: 8),
-              _buildStatChip(
-                '${formatMoney(customerStore.totalOutstandingCredit)} due',
-                Icons.account_balance_wallet_rounded,
-                AppColors.danger,
-              ),
-              const SizedBox(width: 8),
-              _buildStatChip(
-                '${customers.fold(0, (sum, c) => sum + c.loyaltyPoints)} pts',
-                Icons.stars_rounded,
-                AppColors.warning,
-              ),
-            ],
+            horizontal: AppResponsive.padding(context).left,
+            vertical: AppResponsive.smallSpacing(context),
           ),
+          child: _capped(context, content),
         );
       },
     );
   }
 
-  Widget _buildStatChip(String label, IconData icon, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.poppins(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: color,
-                ),
-              ),
-            ),
-          ],
-        ),
+  Widget _buildStatChip(
+    BuildContext context,
+    String label,
+    IconData icon,
+    Color color, {
+    bool expanded = true,
+  }) {
+    final text = Text(
+      label,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: GoogleFonts.poppins(
+        fontSize: AppResponsive.captionFontSize(context),
+        fontWeight: FontWeight.w500,
+        color: color,
       ),
     );
+
+    final chip = Container(
+      padding: EdgeInsets.symmetric(
+        vertical: AppResponsive.smallSpacing(context),
+        horizontal: AppResponsive.smallSpacing(context),
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: expanded ? MainAxisSize.max : MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: AppResponsive.smallIconSize(context), color: color),
+          const SizedBox(width: 6),
+          // Flexible ONLY in the Expanded/Row case. Inside a Wrap the chip gets
+          // unbounded width, and a flex child under unbounded constraints
+          // throws — there it sizes to its text instead.
+          if (expanded) Flexible(child: text) else text,
+        ],
+      ),
+    );
+
+    return expanded ? Expanded(child: chip) : chip;
   }
 
-  Widget _buildCustomerCard(Customer customer, bool isTablet) {
+  Widget _buildCustomerCard(BuildContext context, Customer customer) {
     final hasDue = customer.creditBalance > 0;
+    final radius = AppResponsive.borderRadius(context);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(radius),
         border: Border.all(
           color: hasDue
               ? AppColors.danger.withValues(alpha: 0.3)
@@ -460,26 +546,29 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       ),
       child: InkWell(
         onTap: () => _openCustomerDetails(customer),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(radius),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: EdgeInsets.symmetric(
+            horizontal: AppResponsive.mediumSpacing(context),
+            vertical: AppResponsive.smallSpacing(context),
+          ),
           child: Row(
             children: [
               CircleAvatar(
-                radius: isTablet ? 20 : 18,
+                radius: AppResponsive.smallAvatarSize(context) / 2,
                 backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                 child: Text(
                   (customer.name?.isNotEmpty ?? false)
                       ? customer.name![0].toUpperCase()
                       : '?',
                   style: GoogleFonts.poppins(
-                    fontSize: 16,
+                    fontSize: AppResponsive.subheadingFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: AppColors.primary,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -489,7 +578,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.poppins(
-                        fontSize: 14,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
@@ -497,7 +586,8 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                     const SizedBox(height: 2),
                     Text(
                       [
-                        if (customer.phone?.isNotEmpty ?? false) customer.phone!,
+                        if (customer.phone?.isNotEmpty ?? false)
+                          customer.phone!,
                         if (customer.totalVisites > 0)
                           '${customer.totalVisites} visits',
                         if (customer.totalPurchaseAmount > 0)
@@ -508,7 +598,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.poppins(
-                        fontSize: 11,
+                        fontSize: AppResponsive.captionFontSize(context),
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -516,18 +606,21 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                 ),
               ),
               if (hasDue) ...[
-                const SizedBox(width: 8),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.danger.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     'Due ${formatMoney(customer.creditBalance)}',
+                    maxLines: 1,
                     style: GoogleFonts.poppins(
-                      fontSize: 10,
+                      fontSize: AppResponsive.captionFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: AppColors.danger,
                     ),
@@ -535,8 +628,11 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                 ),
               ],
               const SizedBox(width: 4),
-              Icon(Icons.chevron_right_rounded,
-                  size: 20, color: AppColors.textSecondary),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: AppResponsive.iconSize(context),
+                color: AppColors.textSecondary,
+              ),
             ],
           ),
         ),

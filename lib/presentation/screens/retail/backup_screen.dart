@@ -37,13 +37,13 @@ class _BackupScreenState extends State<BackupScreen> {
 
   /// Card wrapper shared by the two new setting rows.
   Widget _settingCard({required Widget child}) => Container(
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.divider),
-        ),
-        child: child,
-      );
+    decoration: BoxDecoration(
+      color: AppColors.white,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: AppColors.divider),
+    ),
+    child: child,
+  );
 
   Widget _buildPasswordCard(BuildContext context) {
     final accent = _hasBackupPassword ? AppColors.success : AppColors.warning;
@@ -96,8 +96,10 @@ class _BackupScreenState extends State<BackupScreen> {
             ),
             if (_hasBackupPassword)
               IconButton(
-                icon: const Icon(Icons.delete_outline_rounded,
-                    color: AppColors.danger),
+                icon: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: AppColors.danger,
+                ),
                 tooltip: 'Remove password',
                 onPressed: () async {
                   final removed = await confirmRemoveBackupPassword(context);
@@ -124,10 +126,11 @@ class _BackupScreenState extends State<BackupScreen> {
         secondary: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: (_autoBackupEnabled
-                    ? AppColors.success
-                    : AppColors.textSecondary)
-                .withValues(alpha: 0.1),
+            color:
+                (_autoBackupEnabled
+                        ? AppColors.success
+                        : AppColors.textSecondary)
+                    .withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
@@ -172,18 +175,23 @@ class _BackupScreenState extends State<BackupScreen> {
     try {
       final dir = Directory(backupDir);
       if (await dir.exists()) {
-        final files = dir.listSync()
+        final files = dir
+            .listSync()
             .whereType<File>()
-            .where((file) =>
-                file.path.endsWith('.zip') &&
-                // Match current and all legacy backup prefixes so older
-                // backups still appear: UniPOS_*, BillBerry_*, BillBerryLite_*.
-                (file.path.contains('UniPOS_') ||
-                    file.path.contains('BillBerry')))
+            .where(
+              (file) =>
+                  file.path.endsWith('.zip') &&
+                  // Match current and all legacy backup prefixes so older
+                  // backups still appear: UniPOS_*, BillBerry_*, BillBerryLite_*.
+                  (file.path.contains('UniPOS_') ||
+                      file.path.contains('BillBerry')),
+            )
             .toList();
 
         // Sort by modified date (newest first)
-        files.sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+        files.sort(
+          (a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()),
+        );
 
         setState(() {
           _backups = files;
@@ -214,7 +222,10 @@ class _BackupScreenState extends State<BackupScreen> {
           children: [
             Text(
               'Backups are stored at:',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: AppResponsive.bodyFontSize(context)),
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: AppResponsive.bodyFontSize(context),
+              ),
             ),
             const SizedBox(height: 12),
             Container(
@@ -226,20 +237,29 @@ class _BackupScreenState extends State<BackupScreen> {
               ),
               child: SelectableText(
                 _backupDirectory ?? 'Loading...',
-                style: TextStyle(fontSize: AppResponsive.captionFontSize(context), fontFamily: 'monospace'),
+                style: TextStyle(
+                  fontSize: AppResponsive.captionFontSize(context),
+                  fontFamily: 'monospace',
+                ),
               ),
             ),
             const SizedBox(height: 16),
             Text(
               'You can access these files using:',
-              style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: AppColors.textSecondary),
+              style: TextStyle(
+                fontSize: AppResponsive.captionFontSize(context),
+                color: AppColors.textSecondary,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               '• File Manager app on your device\n'
-                  '• Connect device to computer via USB\n'
-                  '• Share button to export to cloud storage',
-              style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: AppColors.textSecondary),
+              '• Connect device to computer via USB\n'
+              '• Share button to export to cloud storage',
+              style: TextStyle(
+                fontSize: AppResponsive.captionFontSize(context),
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ),
@@ -268,7 +288,9 @@ class _BackupScreenState extends State<BackupScreen> {
         setState(() => _isLoading = false);
 
         if (backupFilePath != null) {
-          NotificationService.instance.showSuccess('Backup created successfully: ${backupFilePath.split('/').last}');
+          NotificationService.instance.showSuccess(
+            'Backup created successfully: ${backupFilePath.split('/').last}',
+          );
           _loadData();
         } else {
           NotificationService.instance.showError('Failed to create backup');
@@ -284,7 +306,9 @@ class _BackupScreenState extends State<BackupScreen> {
 
   Future<void> _shareBackup(File file) async {
     try {
-      await Share.shareXFiles([XFile(file.path)], text: 'Bill Berry Lite Backup');
+      await Share.shareXFiles([
+        XFile(file.path),
+      ], text: 'Bill Berry Lite Backup');
     } catch (e) {
       if (mounted) {
         NotificationService.instance.showError('Failed to share backup: $e');
@@ -310,12 +334,18 @@ class _BackupScreenState extends State<BackupScreen> {
             children: [
               _buildInfoRow('File Name', fileName),
               _buildInfoRow('File Size', _formatFileSize(fileSize)),
-              _buildInfoRow('Last Modified', _formatDate(lastModified.toIso8601String())),
+              _buildInfoRow(
+                'Last Modified',
+                _formatDate(lastModified.toIso8601String()),
+              ),
               _buildInfoRow('Format', 'ZIP Archive'),
               const SizedBox(height: 12),
               Text(
                 'This is a complete backup including all products, sales, customers, suppliers, purchases, and settings.',
-                style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: AppColors.textSecondary),
+                style: TextStyle(
+                  fontSize: AppResponsive.captionFontSize(context),
+                  color: AppColors.textSecondary,
+                ),
               ),
             ],
           ),
@@ -335,7 +365,9 @@ class _BackupScreenState extends State<BackupScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Delete Backup'),
-        content: Text('Are you sure you want to delete ${file.path.split(Platform.pathSeparator).last}?'),
+        content: Text(
+          'Are you sure you want to delete ${file.path.split(Platform.pathSeparator).last}?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -356,7 +388,9 @@ class _BackupScreenState extends State<BackupScreen> {
           await file.delete();
         }
         if (mounted) {
-          NotificationService.instance.showSuccess('Backup deleted successfully');
+          NotificationService.instance.showSuccess(
+            'Backup deleted successfully',
+          );
           _loadData();
         }
       } catch (e) {
@@ -367,7 +401,6 @@ class _BackupScreenState extends State<BackupScreen> {
     }
   }
 
-
   Future<void> _importBackup() async {
     try {
       // Open file picker to select backup file (ZIP or JSON)
@@ -376,9 +409,7 @@ class _BackupScreenState extends State<BackupScreen> {
         extensions: ['zip', 'json'],
       );
 
-      final XFile? file = await openFile(
-        acceptedTypeGroups: [typeGroup],
-      );
+      final XFile? file = await openFile(acceptedTypeGroups: [typeGroup]);
 
       if (file == null) {
         // User cancelled the picker
@@ -404,12 +435,18 @@ class _BackupScreenState extends State<BackupScreen> {
               children: [
                 Text(
                   'Found backup file:',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: AppResponsive.bodyFontSize(context)),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: AppResponsive.bodyFontSize(context),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 _buildInfoRow('File Name', fileName),
                 _buildInfoRow('File Size', _formatFileSize(fileSize)),
-                _buildInfoRow('Format', fileName.endsWith('.zip') ? 'ZIP Archive' : 'JSON'),
+                _buildInfoRow(
+                  'Format',
+                  fileName.endsWith('.zip') ? 'ZIP Archive' : 'JSON',
+                ),
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -420,13 +457,18 @@ class _BackupScreenState extends State<BackupScreen> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.warning, color: Colors.orange.shade700, size: 20),
+                      Icon(
+                        Icons.warning,
+                        color: Colors.orange.shade700,
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'This will restore all data from the backup file.',
                           style: TextStyle(
-                              fontSize: AppResponsive.captionFontSize(context)),
+                            fontSize: AppResponsive.captionFontSize(context),
+                          ),
                         ),
                       ),
                     ],
@@ -473,7 +515,9 @@ class _BackupScreenState extends State<BackupScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Are you sure you want to restore from ${file.path.split('/').last}?'),
+            Text(
+              'Are you sure you want to restore from ${file.path.split('/').last}?',
+            ),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
@@ -490,7 +534,8 @@ class _BackupScreenState extends State<BackupScreen> {
                     child: Text(
                       'This will add data from the backup to your current data.',
                       style: TextStyle(
-                          fontSize: AppResponsive.captionFontSize(context)),
+                        fontSize: AppResponsive.captionFontSize(context),
+                      ),
                     ),
                   ),
                 ],
@@ -520,7 +565,10 @@ class _BackupScreenState extends State<BackupScreen> {
         setState(() => _isLoading = true);
 
         // Use UnifiedBackupService to restore
-        final success = await UnifiedBackupService.importFromFilePath(context, file.path);
+        final success = await UnifiedBackupService.importFromFilePath(
+          context,
+          file.path,
+        );
 
         if (mounted) {
           setState(() => _isLoading = false);
@@ -537,7 +585,9 @@ class _BackupScreenState extends State<BackupScreen> {
                     Text('Restore Successful'),
                   ],
                 ),
-                content: Text('Backup restored successfully! All data has been imported.'),
+                content: Text(
+                  'Backup restored successfully! All data has been imported.',
+                ),
                 actions: [
                   TextButton(
                     onPressed: () {
@@ -552,13 +602,17 @@ class _BackupScreenState extends State<BackupScreen> {
 
             _loadData();
           } else {
-            NotificationService.instance.showError('Restore failed. Please check the backup file.');
+            NotificationService.instance.showError(
+              'Restore failed. Please check the backup file.',
+            );
           }
         }
       } catch (e) {
         if (mounted) {
           setState(() => _isLoading = false);
-          NotificationService.instance.showError('Failed to restore backup: $e');
+          NotificationService.instance.showError(
+            'Failed to restore backup: $e',
+          );
         }
       }
     }
@@ -607,114 +661,148 @@ class _BackupScreenState extends State<BackupScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : ListView(
-        padding: AppResponsive.padding(context),
-        children: [
-
-          // Backup password — retail had no way to set, change or clear it,
-          // even though every backup is encrypted with it and the shared
-          // service already supports all three.
-          _buildPasswordCard(context),
-
-          const SizedBox(height: 12),
-
-          // Daily reminder — the same AutoBackupService toggle restaurant has.
-          _buildReminderCard(context),
-
-          const SizedBox(height: 20),
-
-          // Create Backup Button
-          ElevatedButton.icon(
-            onPressed: _createBackup,
-            icon: const Icon(Icons.add_circle_outline),
-            label: Text('Create New Backup'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // Import Backup Button
-          OutlinedButton.icon(
-            onPressed: _importBackup,
-            icon: const Icon(Icons.file_upload),
-            label: Text('Import Backup File'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Backups List Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Local Backups',
-                style: TextStyle(fontSize: AppResponsive.subheadingFontSize(context), fontWeight: FontWeight.w600),
-              ),
-              Row(
+      body: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxCardWidth(context),
+        child: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              )
+            : ListView(
+                padding: AppResponsive.padding(context),
                 children: [
-                  TextButton.icon(
-                    onPressed: _showBackupLocation,
-                    icon: const Icon(Icons.folder_outlined, size: 16),
-                    label: Text('Location', style: TextStyle(fontSize: AppResponsive.captionFontSize(context))),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  // Backup password — retail had no way to set, change or clear it,
+                  // even though every backup is encrypted with it and the shared
+                  // service already supports all three.
+                  _buildPasswordCard(context),
+
+                  const SizedBox(height: 12),
+
+                  // Daily reminder — the same AutoBackupService toggle restaurant has.
+                  _buildReminderCard(context),
+
+                  const SizedBox(height: 20),
+
+                  // Create Backup Button
+                  ElevatedButton.icon(
+                    onPressed: _createBackup,
+                    icon: const Icon(Icons.add_circle_outline),
+                    label: Text('Create New Backup'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${_backups.length} backups',
-                    style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: AppColors.textSecondary),
+
+                  const SizedBox(height: 12),
+
+                  // Import Backup Button
+                  OutlinedButton.icon(
+                    onPressed: _importBackup,
+                    icon: const Icon(Icons.file_upload),
+                    label: Text('Import Backup File'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
                   ),
+
+                  const SizedBox(height: 24),
+
+                  // Backups List Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Local Backups',
+                        style: TextStyle(
+                          fontSize: AppResponsive.subheadingFontSize(context),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          TextButton.icon(
+                            onPressed: _showBackupLocation,
+                            icon: const Icon(Icons.folder_outlined, size: 16),
+                            label: Text(
+                              'Location',
+                              style: TextStyle(
+                                fontSize: AppResponsive.captionFontSize(
+                                  context,
+                                ),
+                              ),
+                            ),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${_backups.length} backups',
+                            style: TextStyle(
+                              fontSize: AppResponsive.captionFontSize(context),
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Backups List
+                  if (_backups.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(40),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.divider),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.folder_open,
+                            size: 64,
+                            color: Colors.grey.shade300,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No backups found',
+                            style: TextStyle(
+                              fontSize: AppResponsive.subheadingFontSize(
+                                context,
+                              ),
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Create your first backup to get started',
+                            style: TextStyle(
+                              fontSize: AppResponsive.captionFontSize(context),
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    ..._backups.map((file) => _buildBackupCard(file)),
                 ],
               ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          // Backups List
-          if (_backups.isEmpty)
-            Container(
-              padding: const EdgeInsets.all(40),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.divider),
-              ),
-              child: Column(
-                children: [
-                  Icon(Icons.folder_open, size: 64, color: Colors.grey.shade300),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No backups found',
-                    style: TextStyle(fontSize: AppResponsive.subheadingFontSize(context), color: AppColors.textSecondary),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Create your first backup to get started',
-                    style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: AppColors.textSecondary),
-                  ),
-                ],
-              ),
-            )
-          else
-            ..._backups.map((file) => _buildBackupCard(file)),
-        ],
       ),
     );
   }
@@ -745,13 +833,19 @@ class _BackupScreenState extends State<BackupScreen> {
                   children: [
                     Text(
                       fileName,
-                      style: TextStyle(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '${_formatFileSize(fileSize)} • ${DateFormat('MMM dd, yyyy hh:mm a').format(lastModified)}',
-                      style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: AppColors.textSecondary),
+                      style: TextStyle(
+                        fontSize: AppResponsive.captionFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),

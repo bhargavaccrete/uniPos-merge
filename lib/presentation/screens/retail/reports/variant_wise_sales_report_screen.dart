@@ -31,7 +31,8 @@ class VariantWiseSalesReportScreen extends StatelessWidget {
         ReportSummaryCard(
           title: 'Revenue',
           value: formatMoney(
-              rows.fold<double>(0, (s, r) => s + (r['totalRevenue'] as double))),
+            rows.fold<double>(0, (s, r) => s + (r['totalRevenue'] as double)),
+          ),
           subtitle: '${rows.length} variants',
           icon: Icons.payments_rounded,
           color: AppColors.success,
@@ -52,13 +53,15 @@ class VariantWiseSalesReportScreen extends StatelessWidget {
         ReportTable.column(context, 'Discount', numeric: true),
         ReportTable.column(context, 'Revenue', numeric: true),
       ],
-      rowBuilder: (context, row) => DataRow(cells: [
-        DataCell(Text(row['productName'] as String)),
-        DataCell(Text(row['variantLabel'] as String)),
-        DataCell(Text('${row['totalQuantity']}')),
-        DataCell(Text(formatMoney(row['totalDiscount'] as double))),
-        DataCell(Text(formatMoney(row['totalRevenue'] as double))),
-      ]),
+      rowBuilder: (context, row) => DataRow(
+        cells: [
+          DataCell(Text(row['productName'] as String)),
+          DataCell(Text(row['variantLabel'] as String)),
+          DataCell(Text('${row['totalQuantity']}')),
+          DataCell(Text(formatMoney(row['totalDiscount'] as double))),
+          DataCell(Text(formatMoney(row['totalRevenue'] as double))),
+        ],
+      ),
       exportData: (rows) => ReportExportData(
         headers: const [
           'Product',
@@ -66,24 +69,27 @@ class VariantWiseSalesReportScreen extends StatelessWidget {
           'Qty',
           'Discount',
           'Tax',
-          'Revenue'
+          'Revenue',
         ],
         rows: rows
-            .map((r) => [
-                  r['productName'],
-                  r['variantLabel'],
-                  r['totalQuantity'],
-                  ReportExportService.formatCurrency(
-                      r['totalDiscount'] as double),
-                  ReportExportService.formatCurrency(r['totalTax'] as double),
-                  ReportExportService.formatCurrency(
-                      r['totalRevenue'] as double),
-                ])
+            .map(
+              (r) => [
+                r['productName'],
+                r['variantLabel'],
+                r['totalQuantity'],
+                ReportExportService.formatCurrency(
+                  r['totalDiscount'] as double,
+                ),
+                ReportExportService.formatCurrency(r['totalTax'] as double),
+                ReportExportService.formatCurrency(r['totalRevenue'] as double),
+              ],
+            )
             .toList(),
         summary: {
           'Variants': rows.length,
-          'Total Revenue': ReportExportService.formatCurrency(rows.fold<double>(
-              0, (s, r) => s + (r['totalRevenue'] as double))),
+          'Total Revenue': ReportExportService.formatCurrency(
+            rows.fold<double>(0, (s, r) => s + (r['totalRevenue'] as double)),
+          ),
         },
       ),
     );

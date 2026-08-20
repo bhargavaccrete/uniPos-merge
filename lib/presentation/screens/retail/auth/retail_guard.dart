@@ -4,6 +4,7 @@ import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 import 'package:billberrylite/presentation/screens/restaurant/auth/license_lock_screen.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 /// Route wrapper enforcing plan **entitlements** for retail, mirroring
 /// `RestaurantGuard` — but entitlement + licence only: retail has no role or
@@ -76,35 +77,47 @@ class _RetailUpgradeRequiredScreen extends StatelessWidget {
         leading: BackButton(onPressed: () => Navigator.of(context).maybePop()),
       ),
       backgroundColor: Colors.grey.shade50,
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.workspace_premium_rounded,
-                  size: 64, color: Colors.amber.shade700),
-              const SizedBox(height: 16),
-              const Text(
-                'Not in your plan',
-                style: TextStyle(
-                    fontSize: 20,
+      body: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxFormWidth(context),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.workspace_premium_rounded,
+                  size: 64,
+                  color: Colors.amber.shade700,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Not in your plan',
+                  style: TextStyle(
+                    fontSize: AppResponsive.headingFontSize(context),
                     fontWeight: FontWeight.w700,
-                    color: Colors.black87),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'This feature isn’t included in your current plan.\n'
-                'Please contact Bill Berry to upgrade.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-              ),
-              const SizedBox(height: 24),
-              TextButton(
-                onPressed: () => Navigator.of(context).maybePop(),
-                child: const Text('Go Back'),
-              ),
-            ],
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'This feature isn’t included in your current plan.\n'
+                  'Please contact Bill Berry to upgrade.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                TextButton(
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  child: const Text('Go Back'),
+                ),
+              ],
+            ),
           ),
         ),
       ),

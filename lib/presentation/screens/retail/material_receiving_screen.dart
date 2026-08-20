@@ -8,6 +8,7 @@ import 'package:billberrylite/domain/services/restaurant/notification_service.da
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import '../../../core/di/service_locator.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model_211.dart';
 import 'package:billberrylite/data/models/retail/hive_model/grn_model_213.dart';
@@ -21,7 +22,8 @@ class MaterialReceivingScreen extends StatefulWidget {
   const MaterialReceivingScreen({super.key, required this.purchaseOrder});
 
   @override
-  State<MaterialReceivingScreen> createState() => _MaterialReceivingScreenState();
+  State<MaterialReceivingScreen> createState() =>
+      _MaterialReceivingScreenState();
 }
 
 class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
@@ -53,22 +55,26 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
       final variant = await productStore.getVariantById(poItem.variantId);
 
       // Get already received quantity for this PO item
-      final alreadyReceived = await purchaseOrderStore.getReceivedQtyForPOItem(poItem.poItemId);
+      final alreadyReceived = await purchaseOrderStore.getReceivedQtyForPOItem(
+        poItem.poItemId,
+      );
       final remainingQty = poItem.orderedQty - alreadyReceived;
 
       // Only add items that still have remaining quantity to receive
       if (remainingQty > 0) {
-        items.add(ReceivingItemData(
-          poItemId: poItem.poItemId,
-          variantId: poItem.variantId,
-          productId: poItem.productId,
-          productName: poItem.productName ?? 'Unknown Product',
-          variantInfo: poItem.variantInfo,
-          orderedQty: remainingQty, // Show only remaining quantity
-          receivedQty: remainingQty, // Default to full receipt of remaining
-          damagedQty: 0,
-          costPrice: poItem.estimatedPrice ?? variant?.costPrice ?? 0,
-        ));
+        items.add(
+          ReceivingItemData(
+            poItemId: poItem.poItemId,
+            variantId: poItem.variantId,
+            productId: poItem.productId,
+            productName: poItem.productName ?? 'Unknown Product',
+            variantInfo: poItem.variantInfo,
+            orderedQty: remainingQty, // Show only remaining quantity
+            receivedQty: remainingQty, // Default to full receipt of remaining
+            damagedQty: 0,
+            costPrice: poItem.estimatedPrice ?? variant?.costPrice ?? 0,
+          ),
+        );
       }
     }
 
@@ -93,17 +99,17 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
     }
   }
 
-
-
-
   void _showEditItemDialog(int index) {
     final item = _receivingItems[index];
-    final receivedController =
-        TextEditingController(text: item.receivedQty.toString());
-    final damagedController =
-        TextEditingController(text: item.damagedQty.toString());
-    final priceController =
-        TextEditingController(text: item.costPrice.toStringAsFixed(2));
+    final receivedController = TextEditingController(
+      text: item.receivedQty.toString(),
+    );
+    final damagedController = TextEditingController(
+      text: item.damagedQty.toString(),
+    );
+    final priceController = TextEditingController(
+      text: item.costPrice.toStringAsFixed(2),
+    );
     DamagedHandling selectedHandling = item.damagedHandling;
 
     showDialog<void>(
@@ -159,7 +165,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                       Text(
                         'WHAT HAPPENS TO THE DAMAGED UNITS',
                         style: GoogleFonts.poppins(
-                          fontSize: 10.5,
+                          fontSize: AppResponsive.captionFontSize(context),
                           fontWeight: FontWeight.w600,
                           letterSpacing: 0.6,
                           color: AppColors.textSecondary,
@@ -175,7 +181,8 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                         label: 'Return to Supplier',
                         caption: 'Raises a purchase return',
                         color: AppColors.info,
-                        onTap: (v) => setDialogState(() => selectedHandling = v),
+                        onTap: (v) =>
+                            setDialogState(() => selectedHandling = v),
                       ),
                       const SizedBox(height: 6),
                       _handlingTile(
@@ -184,7 +191,8 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                         label: 'Keep for Claim',
                         caption: 'Opens a supplier claim',
                         color: AppColors.warning,
-                        onTap: (v) => setDialogState(() => selectedHandling = v),
+                        onTap: (v) =>
+                            setDialogState(() => selectedHandling = v),
                       ),
                       const SizedBox(height: 6),
                       _handlingTile(
@@ -193,7 +201,8 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                         label: 'Write Off as Loss',
                         caption: 'Records an inventory loss',
                         color: AppColors.danger,
-                        onTap: (v) => setDialogState(() => selectedHandling = v),
+                        onTap: (v) =>
+                            setDialogState(() => selectedHandling = v),
                       ),
                     ],
                     const SizedBox(height: 14),
@@ -201,11 +210,13 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                       controller: priceController,
                       label: 'Cost Price per Unit',
                       icon: Icons.sell_outlined,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(
-                            RegExp(r'^\d*\.?\d{0,2}')),
+                          RegExp(r'^\d*\.?\d{0,2}'),
+                        ),
                       ],
                       onChanged: (_) => setDialogState(() {}),
                     ),
@@ -226,7 +237,8 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                     onPressed: () {
                       if (damaged > received) {
                         NotificationService.instance.showError(
-                            'Damaged quantity cannot exceed received quantity');
+                          'Damaged quantity cannot exceed received quantity',
+                        );
                         return;
                       }
 
@@ -297,7 +309,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                   Text(
                     label,
                     style: GoogleFonts.poppins(
-                      fontSize: 13,
+                      fontSize: AppResponsive.smallFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: isSelected ? color : AppColors.textPrimary,
                     ),
@@ -305,7 +317,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                   Text(
                     caption,
                     style: GoogleFonts.poppins(
-                      fontSize: 10.5,
+                      fontSize: AppResponsive.captionFontSize(context),
                       color: AppColors.textSecondary,
                     ),
                   ),
@@ -341,23 +353,28 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
           Text(
             overDamaged ? 'Check the quantities' : 'Summary',
             style: GoogleFonts.poppins(
-              fontSize: 12,
+              fontSize: AppResponsive.smallFontSize(context),
               fontWeight: FontWeight.w600,
-              color:
-                  overDamaged ? AppColors.danger : AppColors.textPrimary,
+              color: overDamaged ? AppColors.danger : AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 8),
-          _summaryLine('Accepted (to stock)', '$accepted items',
-              overDamaged ? AppColors.danger : AppColors.success),
-          if (damaged > 0)
-            _summaryLine('Damaged',
-                '$damaged items (${formatMoney(damaged * price)})',
-                AppColors.danger),
           _summaryLine(
-              'Stock Value',
-              formatMoney((accepted < 0 ? 0 : accepted) * price),
-              AppColors.info),
+            'Accepted (to stock)',
+            '$accepted items',
+            overDamaged ? AppColors.danger : AppColors.success,
+          ),
+          if (damaged > 0)
+            _summaryLine(
+              'Damaged',
+              '$damaged items (${formatMoney(damaged * price)})',
+              AppColors.danger,
+            ),
+          _summaryLine(
+            'Stock Value',
+            formatMoney((accepted < 0 ? 0 : accepted) * price),
+            AppColors.info,
+          ),
         ],
       ),
     );
@@ -369,15 +386,25 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
+          Flexible(
+            child: Text(
+              label,
               style: GoogleFonts.poppins(
-                  fontSize: 12.5, color: AppColors.textSecondary)),
-          Text(
-            value,
-            style: GoogleFonts.poppins(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-              color: color,
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
             ),
           ),
         ],
@@ -386,45 +413,78 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
   }
 
   Future<void> _saveAndConfirmGRN() async {
-    if (!PlanGuard.allowedOr(context, RetailEntKeys.purchaseReceive,
-        featureName: 'Goods Receipt')) {
+    if (!PlanGuard.allowedOr(
+      context,
+      RetailEntKeys.purchaseReceive,
+      featureName: 'Goods Receipt',
+    )) {
       return;
     }
     // Validation
-    final hasReceivedItems = _receivingItems.any((item) => item.receivedQty > 0);
+    final hasReceivedItems = _receivingItems.any(
+      (item) => item.receivedQty > 0,
+    );
     if (!hasReceivedItems) {
-      NotificationService.instance.showError('Please enter received quantities for at least one item');
+      NotificationService.instance.showError(
+        'Please enter received quantities for at least one item',
+      );
       return;
     }
 
     // Check if damaged handling is selected for items with damage
-    final itemsWithUnhandledDamage = _receivingItems.where(
-      (item) => item.damagedQty > 0 && item.damagedHandling == DamagedHandling.none,
-    ).toList();
+    final itemsWithUnhandledDamage = _receivingItems
+        .where(
+          (item) =>
+              item.damagedQty > 0 &&
+              item.damagedHandling == DamagedHandling.none,
+        )
+        .toList();
 
     if (itemsWithUnhandledDamage.isNotEmpty) {
-      NotificationService.instance.showError('Please select handling method for damaged items');
+      NotificationService.instance.showError(
+        'Please select handling method for damaged items',
+      );
       return;
     }
 
     // Calculate totals
-    final totalOrdered = _receivingItems.fold<int>(0, (sum, item) => sum + item.orderedQty);
-    final totalReceived = _receivingItems.fold<int>(0, (sum, item) => sum + item.receivedQty);
-    final totalAccepted = _receivingItems.fold<int>(0, (sum, item) => sum + item.acceptedQty);
-    final totalDamaged = _receivingItems.fold<int>(0, (sum, item) => sum + item.damagedQty);
-    final totalAcceptedAmount = _receivingItems.fold<double>(0.0, (sum, item) => sum + item.acceptedAmount);
-    final totalDamagedAmount = _receivingItems.fold<double>(0.0, (sum, item) => sum + item.damagedAmount);
+    final totalOrdered = _receivingItems.fold<int>(
+      0,
+      (sum, item) => sum + item.orderedQty,
+    );
+    final totalReceived = _receivingItems.fold<int>(
+      0,
+      (sum, item) => sum + item.receivedQty,
+    );
+    final totalAccepted = _receivingItems.fold<int>(
+      0,
+      (sum, item) => sum + item.acceptedQty,
+    );
+    final totalDamaged = _receivingItems.fold<int>(
+      0,
+      (sum, item) => sum + item.damagedQty,
+    );
+    final totalAcceptedAmount = _receivingItems.fold<double>(
+      0.0,
+      (sum, item) => sum + item.acceptedAmount,
+    );
+    final totalDamagedAmount = _receivingItems.fold<double>(
+      0.0,
+      (sum, item) => sum + item.damagedAmount,
+    );
 
     // Count items by handling method
-    final returnToSupplierItems = _receivingItems.where(
-      (item) => item.damagedHandling == DamagedHandling.returnToSupplier
-    ).toList();
-    final keepForClaimItems = _receivingItems.where(
-      (item) => item.damagedHandling == DamagedHandling.keepForClaim
-    ).toList();
-    final writeOffItems = _receivingItems.where(
-      (item) => item.damagedHandling == DamagedHandling.writeOff
-    ).toList();
+    final returnToSupplierItems = _receivingItems
+        .where(
+          (item) => item.damagedHandling == DamagedHandling.returnToSupplier,
+        )
+        .toList();
+    final keepForClaimItems = _receivingItems
+        .where((item) => item.damagedHandling == DamagedHandling.keepForClaim)
+        .toList();
+    final writeOffItems = _receivingItems
+        .where((item) => item.damagedHandling == DamagedHandling.writeOff)
+        .toList();
 
     // Create GRN
     final grn = GRNModel.create(
@@ -436,28 +496,35 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
       receivedDate: _receivedDate.toIso8601String(),
       totalOrderedQty: totalOrdered,
       totalReceivedQty: totalReceived,
-      totalAmount: totalAcceptedAmount, // Only accepted amount goes to stock value
-      invoiceNumber: _invoiceController.text.isEmpty ? null : _invoiceController.text.trim(),
-      notes: _notesController.text.isEmpty ? null : _notesController.text.trim(),
+      totalAmount:
+          totalAcceptedAmount, // Only accepted amount goes to stock value
+      invoiceNumber: _invoiceController.text.isEmpty
+          ? null
+          : _invoiceController.text.trim(),
+      notes: _notesController.text.isEmpty
+          ? null
+          : _notesController.text.trim(),
     );
 
     // Create GRN Items with acceptedQty and damagedHandling
     final grnItems = _receivingItems
         .where((item) => item.receivedQty > 0)
-        .map((item) => GRNItemModel.create(
-              grnId: grn.grnId,
-              poItemId: item.poItemId,
-              variantId: item.variantId,
-              productId: item.productId,
-              productName: item.productName,
-              variantInfo: item.variantInfo,
-              orderedQty: item.orderedQty,
-              receivedQty: item.receivedQty,
-              acceptedQty: item.acceptedQty, // Only good items
-              damagedQty: item.damagedQty > 0 ? item.damagedQty : null,
-              damagedHandling: item.damagedQty > 0 ? item.damagedHandling : null,
-              costPrice: item.costPrice,
-            ))
+        .map(
+          (item) => GRNItemModel.create(
+            grnId: grn.grnId,
+            poItemId: item.poItemId,
+            variantId: item.variantId,
+            productId: item.productId,
+            productName: item.productName,
+            variantInfo: item.variantInfo,
+            orderedQty: item.orderedQty,
+            receivedQty: item.receivedQty,
+            acceptedQty: item.acceptedQty, // Only good items
+            damagedQty: item.damagedQty > 0 ? item.damagedQty : null,
+            damagedHandling: item.damagedQty > 0 ? item.damagedHandling : null,
+            costPrice: item.costPrice,
+          ),
+        )
         .toList();
 
     // Show confirmation dialog with detailed breakdown
@@ -473,18 +540,26 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _confirmSection('Goes into stock', Icons.inventory_2_rounded,
-                  AppColors.success),
+              _confirmSection(
+                'Goes into stock',
+                Icons.inventory_2_rounded,
+                AppColors.success,
+              ),
               _buildConfirmItem('$totalAccepted items added to inventory'),
               _buildConfirmItem(
-                  'Stock value ${formatMoney(totalAcceptedAmount)}'),
+                'Stock value ${formatMoney(totalAcceptedAmount)}',
+              ),
               _buildConfirmItem(
-                  'Supplier billed ${formatMoney(totalAcceptedAmount)}'),
+                'Supplier billed ${formatMoney(totalAcceptedAmount)}',
+              ),
 
               if (totalDamaged > 0) ...[
                 const SizedBox(height: 14),
-                _confirmSection('Damaged — never enters stock',
-                    Icons.report_gmailerrorred_rounded, AppColors.danger),
+                _confirmSection(
+                  'Damaged — never enters stock',
+                  Icons.report_gmailerrorred_rounded,
+                  AppColors.danger,
+                ),
                 _buildConfirmItem(
                   '$totalDamaged damaged (${formatMoney(totalDamagedAmount)}), not billed',
                   color: AppColors.danger,
@@ -508,8 +583,11 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
 
               if (totalReceived < totalOrdered) ...[
                 const SizedBox(height: 14),
-                _confirmSection('Still outstanding',
-                    Icons.hourglass_top_rounded, AppColors.warning),
+                _confirmSection(
+                  'Still outstanding',
+                  Icons.hourglass_top_rounded,
+                  AppColors.warning,
+                ),
                 _buildConfirmItem(
                   '${totalOrdered - totalReceived} items not received — the order stays open',
                   color: AppColors.warning,
@@ -527,7 +605,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                 child: Text(
                   'Confirming moves stock and updates the supplier balance. This cannot be undone.',
                   style: GoogleFonts.poppins(
-                    fontSize: 11.5,
+                    fontSize: AppResponsive.captionFontSize(context),
                     height: 1.4,
                     color: AppColors.textSecondary,
                   ),
@@ -567,7 +645,10 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
 
           // Also update cost price if provided
           if (item.costPrice != null && item.costPrice! > 0) {
-            await productStore.updateVariantCostPrice(item.variantId, item.costPrice!);
+            await productStore.updateVariantCostPrice(
+              item.variantId,
+              item.costPrice!,
+            );
           }
         }
       }
@@ -608,14 +689,16 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: color),
+          Icon(icon, size: AppResponsive.smallIconSize(context), color: color),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-              color: color,
+          Expanded(
+            child: Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
             ),
           ),
         ],
@@ -643,7 +726,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
             child: Text(
               text,
               style: GoogleFonts.poppins(
-                fontSize: 12.5,
+                fontSize: AppResponsive.smallFontSize(context),
                 height: 1.35,
                 color: color ?? AppColors.textPrimary,
               ),
@@ -658,13 +741,44 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
     return '${date.day}/${date.month}/${date.year}';
   }
 
+  /// Caps content width on large screens. Backgrounds still span edge to edge —
+  /// only what you read is constrained.
+  Widget _capped(BuildContext context, Widget child) {
+    final maxWidth = AppResponsive.maxContentWidth(context);
+    if (maxWidth == double.infinity) return child;
+    return Align(
+      // topCenter, not Center: Center aligns on BOTH axes, so a
+      // shrink-wrapping child floats in the vertical middle.
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: child,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final totalOrdered = _receivingItems.fold<int>(0, (sum, item) => sum + item.orderedQty);
-    final totalReceived = _receivingItems.fold<int>(0, (sum, item) => sum + item.receivedQty);
-    final totalAccepted = _receivingItems.fold<int>(0, (sum, item) => sum + item.acceptedQty);
-    final totalDamaged = _receivingItems.fold<int>(0, (sum, item) => sum + item.damagedQty);
-    final totalAcceptedAmount = _receivingItems.fold<double>(0.0, (sum, item) => sum + item.acceptedAmount);
+    final totalOrdered = _receivingItems.fold<int>(
+      0,
+      (sum, item) => sum + item.orderedQty,
+    );
+    final totalReceived = _receivingItems.fold<int>(
+      0,
+      (sum, item) => sum + item.receivedQty,
+    );
+    final totalAccepted = _receivingItems.fold<int>(
+      0,
+      (sum, item) => sum + item.acceptedQty,
+    );
+    final totalDamaged = _receivingItems.fold<int>(
+      0,
+      (sum, item) => sum + item.damagedQty,
+    );
+    final totalAcceptedAmount = _receivingItems.fold<double>(
+      0.0,
+      (sum, item) => sum + item.acceptedAmount,
+    );
     final shortage = totalOrdered - totalReceived;
 
     return Scaffold(
@@ -676,8 +790,10 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
           children: [
             Text(
               'Material Receiving',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: GoogleFonts.poppins(
-                fontSize: 18,
+                fontSize: AppResponsive.subheadingFontSize(context),
                 fontWeight: FontWeight.w600,
                 color: AppColors.white,
               ),
@@ -686,8 +802,10 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
               _grnNumber.isEmpty
                   ? widget.purchaseOrder.poNumber
                   : '$_grnNumber  •  ${widget.purchaseOrder.poNumber}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: GoogleFonts.poppins(
-                fontSize: 12,
+                fontSize: AppResponsive.smallFontSize(context),
                 fontWeight: FontWeight.w500,
                 color: AppColors.white.withValues(alpha: 0.75),
               ),
@@ -698,265 +816,384 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _receivingItems.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.check_circle, size: 80, color: Colors.green[300]),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'All items received!',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          ? Center(
+              child: Padding(
+                padding: AppResponsive.padding(context),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      size: AppResponsive.getValue(
+                        context,
+                        mobile: 80.0,
+                        tablet: 92.0,
+                        desktop: 104.0,
                       ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'No pending items to receive for this PO',
-                        style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                      color: Colors.green[300],
+                    ),
+                    SizedBox(height: AppResponsive.largeSpacing(context)),
+                    Text(
+                      'All items received!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: AppResponsive.subheadingFontSize(context),
+                        fontWeight: FontWeight.w600,
                       ),
-                      const SizedBox(height: 24),
-                      ElevatedButton(
+                    ),
+                    SizedBox(height: AppResponsive.smallSpacing(context)),
+                    Text(
+                      'No pending items to receive for this PO',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+                    SizedBox(
+                      height: AppResponsive.buttonHeight(context),
+                      child: ElevatedButton(
                         onPressed: () => Navigator.pop(context),
                         child: const Text('Go Back'),
                       ),
-                    ],
-                  ),
-                )
-              : Column(
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : Column(
               children: [
                 // Header Info
                 Container(
                   color: Colors.white,
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _grnNumber,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'PO: ${widget.purchaseOrder.poNumber}',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          InkWell(
-                            onTap: _selectReceivedDate,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: AppColors.divider),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Row(
+                  padding: AppResponsive.padding(context),
+                  child: _capped(
+                    context,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(Icons.calendar_today, size: 16, color: AppColors.textSecondary),
-                                  const SizedBox(width: 8),
                                   Text(
-                                    _formatDate(_receivedDate),
-                                    style: const TextStyle(fontSize: 13),
+                                    _grnNumber,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize:
+                                          AppResponsive.subheadingFontSize(
+                                            context,
+                                          ),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'PO: ${widget.purchaseOrder.poNumber}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: AppResponsive.smallFontSize(
+                                        context,
+                                      ),
+                                      color: AppColors.textSecondary,
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          const Icon(Icons.storefront, size: 16, color: AppColors.textSecondary),
-                          const SizedBox(width: 8),
-                          Text(
-                            widget.purchaseOrder.supplierName ?? 'Unknown Supplier',
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _invoiceController,
-                        decoration: const InputDecoration(
-                          labelText: 'Supplier Invoice Number (Optional)',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            const SizedBox(width: 8),
+                            InkWell(
+                              onTap: _selectReceivedDate,
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: AppResponsive.mediumSpacing(
+                                    context,
+                                  ),
+                                  vertical: AppResponsive.smallSpacing(context),
+                                ),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: AppColors.divider),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.calendar_today,
+                                      size: AppResponsive.smallIconSize(
+                                        context,
+                                      ),
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      _formatDate(_receivedDate),
+                                      maxLines: 1,
+                                      style: TextStyle(
+                                        fontSize: AppResponsive.smallFontSize(
+                                          context,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
+                        SizedBox(height: AppResponsive.mediumSpacing(context)),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.storefront,
+                              size: AppResponsive.smallIconSize(context),
+                              color: AppColors.textSecondary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                widget.purchaseOrder.supplierName ??
+                                    'Unknown Supplier',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: AppResponsive.bodyFontSize(context),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: AppResponsive.mediumSpacing(context)),
+                        AppTextField(
+                          controller: _invoiceController,
+                          label: 'Supplier Invoice Number (Optional)',
+                          icon: Icons.receipt_long_outlined,
+                          textCapitalization: TextCapitalization.characters,
+                          textInputAction: TextInputAction.next,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
 
                 // Summary
                 Container(
                   color: Colors.white,
-                  margin: const EdgeInsets.only(top: 8),
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildSummaryItem('Ordered', totalOrdered.toString(), AppColors.textSecondary),
-                          ),
-                          Expanded(
-                            child: _buildSummaryItem('Received', totalReceived.toString(), AppColors.success),
-                          ),
-                          Expanded(
-                            child: _buildSummaryItem(
-                              'To Stock',
-                              totalAccepted.toString(),
-                              AppColors.info,
-                            ),
-                          ),
-                          Expanded(
-                            child: _buildSummaryItem(
-                              'Damaged',
-                              totalDamaged.toString(),
-                              totalDamaged > 0 ? AppColors.danger : AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (totalDamaged > 0 || shortage > 0) ...[
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.warning.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.info_outline, size: 16, color: AppColors.warning),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  totalDamaged > 0 && shortage > 0
-                                      ? '$totalDamaged damaged, $shortage not received'
-                                      : totalDamaged > 0
-                                          ? '$totalDamaged items damaged'
-                                          : '$shortage items not received',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.orange,
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                formatMoney(totalAcceptedAmount),
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.info,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      if (totalDamaged == 0 && shortage == 0) ...[
-                        const SizedBox(height: 8),
+                  margin: EdgeInsets.only(
+                    top: AppResponsive.smallSpacing(context),
+                  ),
+                  padding: AppResponsive.padding(context),
+                  child: _capped(
+                    context,
+                    Column(
+                      children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            Text(
-                              'Stock Value: ${formatMoney(totalAcceptedAmount)}',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.info,
+                            Expanded(
+                              child: _buildSummaryItem(
+                                'Ordered',
+                                totalOrdered.toString(),
+                                AppColors.textSecondary,
+                              ),
+                            ),
+                            Expanded(
+                              child: _buildSummaryItem(
+                                'Received',
+                                totalReceived.toString(),
+                                AppColors.success,
+                              ),
+                            ),
+                            Expanded(
+                              child: _buildSummaryItem(
+                                'To Stock',
+                                totalAccepted.toString(),
+                                AppColors.info,
+                              ),
+                            ),
+                            Expanded(
+                              child: _buildSummaryItem(
+                                'Damaged',
+                                totalDamaged.toString(),
+                                totalDamaged > 0
+                                    ? AppColors.danger
+                                    : AppColors.textSecondary,
                               ),
                             ),
                           ],
                         ),
+                        if (totalDamaged > 0 || shortage > 0) ...[
+                          SizedBox(
+                            height: AppResponsive.mediumSpacing(context),
+                          ),
+                          Container(
+                            padding: EdgeInsets.all(
+                              AppResponsive.mediumSpacing(context),
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.warning.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(
+                                AppResponsive.smallBorderRadius(context),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  size: AppResponsive.smallIconSize(context),
+                                  color: AppColors.warning,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    totalDamaged > 0 && shortage > 0
+                                        ? '$totalDamaged damaged, $shortage not received'
+                                        : totalDamaged > 0
+                                        ? '$totalDamaged items damaged'
+                                        : '$shortage items not received',
+                                    style: TextStyle(
+                                      fontSize: AppResponsive.smallFontSize(
+                                        context,
+                                      ),
+                                      color: AppColors.orange,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  formatMoney(totalAcceptedAmount),
+                                  maxLines: 1,
+                                  style: TextStyle(
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.info,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        if (totalDamaged == 0 && shortage == 0) ...[
+                          SizedBox(height: AppResponsive.smallSpacing(context)),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  'Stock Value: ${formatMoney(totalAcceptedAmount)}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.info,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
 
                 // Items Header
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      const Text(
-                        'Items',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.padding(context).left,
+                    vertical: AppResponsive.mediumSpacing(context),
+                  ),
+                  child: _capped(
+                    context,
+                    Row(
+                      children: [
+                        Text(
+                          'Items',
+                          style: TextStyle(
+                            fontSize: AppResponsive.subheadingFontSize(context),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        'Tap item to edit',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[500],
+                        const Spacer(),
+                        Text(
+                          'Tap item to edit',
+                          style: TextStyle(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            color: Colors.grey[500],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
 
                 // Items List
                 Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: _receivingItems.length,
-                    itemBuilder: (context, index) {
-                      return _buildReceivingItemCard(index);
-                    },
+                  child: _capped(
+                    context,
+                    ListView.builder(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppResponsive.padding(context).left,
+                      ),
+                      itemCount: _receivingItems.length,
+                      itemBuilder: (context, index) {
+                        return _buildReceivingItemCard(index);
+                      },
+                    ),
                   ),
                 ),
 
                 // Notes
                 Container(
                   color: Colors.white,
-                  padding: const EdgeInsets.all(16),
-                  child: TextField(
-                    controller: _notesController,
-                    decoration: const InputDecoration(
-                      labelText: 'Notes (Optional)',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                      hintText: 'e.g., 5 shirts damaged during shipping',
+                  padding: AppResponsive.padding(context),
+                  child: _capped(
+                    context,
+                    AppTextField(
+                      controller: _notesController,
+                      label: 'Notes (Optional)',
+                      hint: 'e.g., 5 shirts damaged during shipping',
+                      icon: Icons.notes_rounded,
+                      maxLines: 2,
+                      minLines: 2,
                     ),
-                    maxLines: 2,
                   ),
                 ),
 
                 // Action Button
                 Container(
                   color: Colors.white,
-                  padding: const EdgeInsets.all(16),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _saveAndConfirmGRN,
-                      icon: const Icon(Icons.check_circle),
-                      label: const Text('Confirm Receipt & Update Stock'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        textStyle: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                  padding: AppResponsive.padding(context),
+                  child: _capped(
+                    context,
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _saveAndConfirmGRN,
+                        icon: Icon(
+                          Icons.check_circle,
+                          size: AppResponsive.iconSize(context),
+                        ),
+                        label: const Text('Confirm Receipt & Update Stock'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(
+                            vertical: AppResponsive.largeSpacing(context),
+                          ),
+                          textStyle: TextStyle(
+                            fontSize: AppResponsive.subheadingFontSize(context),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
@@ -972,16 +1209,18 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
       children: [
         Text(
           value,
+          maxLines: 1,
           style: TextStyle(
-            fontSize: 18,
+            fontSize: AppResponsive.subheadingFontSize(context),
             fontWeight: FontWeight.w600,
             color: color,
           ),
         ),
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 11,
+          maxLines: 1,
+          style: TextStyle(
+            fontSize: AppResponsive.captionFontSize(context),
             color: AppColors.textSecondary,
           ),
         ),
@@ -994,21 +1233,25 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
     final isShortage = item.receivedQty < item.orderedQty;
     final hasDamage = item.damagedQty > 0;
 
+    final radius = AppResponsive.smallBorderRadius(context);
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(radius),
         border: Border.all(
-          color: isShortage || hasDamage ? AppColors.warning : AppColors.divider,
+          color: isShortage || hasDamage
+              ? AppColors.warning
+              : AppColors.divider,
           width: isShortage || hasDamage ? 1.5 : 0.5,
         ),
       ),
       child: InkWell(
         onTap: () => _showEditItemDialog(index),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(radius),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1020,40 +1263,61 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                       children: [
                         Text(
                           item.productName,
-                          style: const TextStyle(
-                            fontSize: 14,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: AppResponsive.bodyFontSize(context),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         if (item.variantInfo != null)
                           Text(
                             item.variantInfo!,
-                            style: const TextStyle(
-                              fontSize: 12,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: AppResponsive.smallFontSize(context),
                               color: AppColors.textSecondary,
                             ),
                           ),
                       ],
                     ),
                   ),
-                  const Icon(Icons.edit, size: 18, color: AppColors.textSecondary),
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.edit,
+                    size: AppResponsive.smallIconSize(context),
+                    color: AppColors.textSecondary,
+                  ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Row(
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
+              // Wrap, not Row+Spacer: three chips plus the amount need ~285px,
+              // which overflows a 320px phone once padding is taken out. A
+              // Spacer contributes zero when there's no slack, so it can't save
+              // the row — the amount just ran off the edge.
+              Wrap(
+                spacing: AppResponsive.smallSpacing(context),
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  _buildQtyChip('Ordered', item.orderedQty, AppColors.textSecondary),
-                  const SizedBox(width: 8),
-                  _buildQtyChip('Received', item.receivedQty, AppColors.success),
-                  if (hasDamage) ...[
-                    const SizedBox(width: 8),
+                  _buildQtyChip(
+                    'Ordered',
+                    item.orderedQty,
+                    AppColors.textSecondary,
+                  ),
+                  _buildQtyChip(
+                    'Received',
+                    item.receivedQty,
+                    AppColors.success,
+                  ),
+                  if (hasDamage)
                     _buildQtyChip('Damaged', item.damagedQty, AppColors.danger),
-                  ],
-                  const Spacer(),
                   Text(
                     formatMoney(item.receivedQty * item.costPrice),
-                    style: const TextStyle(
-                      fontSize: 14,
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: AppColors.success,
                     ),
@@ -1062,25 +1326,31 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
               ),
               if (isShortage || hasDamage)
                 Padding(
-                  padding: const EdgeInsets.only(top: 8),
+                  padding: EdgeInsets.only(
+                    top: AppResponsive.smallSpacing(context),
+                  ),
                   child: Wrap(
-                    spacing: 8,
+                    spacing: AppResponsive.smallSpacing(context),
+                    runSpacing: 4,
                     children: [
                       if (isShortage)
                         Text(
                           'Shortage: ${item.orderedQty - item.receivedQty}',
-                          style: const TextStyle(
-                            fontSize: 12,
+                          style: TextStyle(
+                            fontSize: AppResponsive.smallFontSize(context),
                             color: AppColors.warning,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                      if (hasDamage && item.damagedHandling != DamagedHandling.none)
+                      if (hasDamage &&
+                          item.damagedHandling != DamagedHandling.none)
                         Text(
                           _getDamagedHandlingText(item.damagedHandling),
                           style: TextStyle(
-                            fontSize: 12,
-                            color: _getDamagedHandlingColor(item.damagedHandling),
+                            fontSize: AppResponsive.smallFontSize(context),
+                            color: _getDamagedHandlingColor(
+                              item.damagedHandling,
+                            ),
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -1103,8 +1373,9 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
       ),
       child: Text(
         '$label: $qty',
+        maxLines: 1,
         style: TextStyle(
-          fontSize: 11,
+          fontSize: AppResponsive.captionFontSize(context),
           fontWeight: FontWeight.w500,
           color: color,
         ),

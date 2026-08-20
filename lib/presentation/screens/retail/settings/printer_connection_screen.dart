@@ -45,16 +45,15 @@ class _RetailPrinterConnectionScreenState
   void _openAddPrinter() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-          builder: (_) => const AddPrinter(assignToRole: _role)),
+      MaterialPageRoute(builder: (_) => const AddPrinter(assignToRole: _role)),
     ).then((_) => printerStore.loadSavedPrinters());
   }
 
   IconData _iconFor(SavedPrinterModel p) => p.isBluetooth
       ? Icons.bluetooth
       : p.isUsb
-          ? Icons.usb
-          : Icons.wifi;
+      ? Icons.usb
+      : Icons.wifi;
 
   @override
   Widget build(BuildContext context) {
@@ -70,13 +69,15 @@ class _RetailPrinterConnectionScreenState
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.white,
         icon: const Icon(Icons.add),
-        label: Text('Add Printer',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        label: Text(
+          'Add Printer',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
       body: AppResponsive.constrainedContent(
         context: context,
+        alignment: Alignment.topCenter,
         child: Observer(
           builder: (_) {
             final active = printerStore.defaultReceiptPrinter;
@@ -91,7 +92,8 @@ class _RetailPrinterConnectionScreenState
               return const AppEmptyState(
                 icon: Icons.print_disabled_rounded,
                 title: 'No printer connected',
-                message: 'Pair a thermal printer over WiFi, Bluetooth or USB '
+                message:
+                    'Pair a thermal printer over WiFi, Bluetooth or USB '
                     'to print receipts directly.\n\nWithout one, receipts fall '
                     'back to the PDF preview.',
               );
@@ -102,10 +104,7 @@ class _RetailPrinterConnectionScreenState
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
               children: [
                 _sectionHeader('ACTIVE PRINTER'),
-                if (active != null)
-                  _activeCard(active)
-                else
-                  _noActiveCard(),
+                if (active != null) _activeCard(active) else _noActiveCard(),
                 if (others.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   _sectionHeader('OTHER SAVED PRINTERS'),
@@ -146,20 +145,29 @@ class _RetailPrinterConnectionScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(p.name,
-                        style: GoogleFonts.poppins(
-                            fontSize: 16, fontWeight: FontWeight.w600)),
+                    Text(
+                      p.name,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.subheadingFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 2),
-                    Text('${p.type.toUpperCase()} · ${p.paperSize}mm · ${p.address}',
-                        style: GoogleFonts.poppins(
-                            fontSize: 12, color: AppColors.textSecondary)),
+                    Text(
+                      '${p.type.toUpperCase()} · ${p.paperSize}mm · ${p.address}',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ],
                 ),
               ),
               AppStatusPill(
-                  label: 'Active',
-                  color: AppColors.success,
-                  icon: Icons.check_circle),
+                label: 'Active',
+                color: AppColors.success,
+                icon: Icons.check_circle,
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -169,15 +177,20 @@ class _RetailPrinterConnectionScreenState
                 child: OutlinedButton.icon(
                   onPressed: () => _testPrint(p),
                   icon: const Icon(Icons.print_outlined, size: 18),
-                  label: Text('Test Print',
-                      style: GoogleFonts.poppins(
-                          fontSize: 13, fontWeight: FontWeight.w500)),
+                  label: Text(
+                    'Test Print',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.primary,
                     side: BorderSide(color: AppColors.primary),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               ),
@@ -185,16 +198,23 @@ class _RetailPrinterConnectionScreenState
               OutlinedButton.icon(
                 onPressed: () => _confirmDelete(p),
                 icon: const Icon(Icons.delete_outline, size: 18),
-                label: Text('Remove',
-                    style: GoogleFonts.poppins(
-                        fontSize: 13, fontWeight: FontWeight.w500)),
+                label: Text(
+                  'Remove',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.danger,
                   side: BorderSide(color: AppColors.danger),
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 12),
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
             ],
@@ -222,7 +242,9 @@ class _RetailPrinterConnectionScreenState
             child: Text(
               'No printer selected — tap one below to make it active.',
               style: GoogleFonts.poppins(
-                  fontSize: 12.5, color: AppColors.textPrimary),
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
         ],
@@ -242,23 +264,37 @@ class _RetailPrinterConnectionScreenState
       child: ListTile(
         onTap: () => setActiveForSlot(p, _role),
         leading: Icon(_iconFor(p), color: AppColors.info),
-        title: Text(p.name,
-            style:
-                GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
-        subtitle: Text('${p.type.toUpperCase()} · ${p.paperSize}mm',
-            style: GoogleFonts.poppins(
-                fontSize: 11.5, color: AppColors.textSecondary)),
+        title: Text(
+          p.name,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        subtitle: Text(
+          '${p.type.toUpperCase()} · ${p.paperSize}mm',
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.captionFontSize(context),
+            color: AppColors.textSecondary,
+          ),
+        ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Set active',
-                style: GoogleFonts.poppins(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primary)),
+            Text(
+              'Set active',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.captionFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
+            ),
             IconButton(
-              icon: Icon(Icons.delete_outline,
-                  size: 20, color: AppColors.danger),
+              icon: Icon(
+                Icons.delete_outline,
+                size: 20,
+                color: AppColors.danger,
+              ),
               tooltip: 'Delete',
               onPressed: () => _confirmDelete(p),
             ),
@@ -290,8 +326,9 @@ class _RetailPrinterConnectionScreenState
     if (success) {
       NotificationService.instance.showSuccess('Test print sent!');
     } else {
-      NotificationService.instance
-          .showError(printerStore.errorMessage ?? 'Test print failed');
+      NotificationService.instance.showError(
+        printerStore.errorMessage ?? 'Test print failed',
+      );
     }
   }
 

@@ -109,40 +109,48 @@ class _InventoryScreenState extends State<InventoryScreen>
     final names = categoryStore.categoryNameById;
     final index = productStore.variantsByProduct;
 
-    return productStore.products.where((product) {
-      if (_searchQuery.isEmpty) return true;
-      final categoryName = (names[product.category] ?? '').toLowerCase();
-      if (product.productName.toLowerCase().contains(_searchQuery) ||
-          categoryName.contains(_searchQuery)) {
-        return true;
-      }
-      // The search hint promises barcodes, and a typed SKU is just as likely —
-      // both live on the variants, not the product.
-      final variants = index[product.productId] ?? const <VarianteModel>[];
-      return variants.any((v) =>
-          (v.barcode?.toLowerCase().contains(_searchQuery) ?? false) ||
-          (v.sku?.toLowerCase().contains(_searchQuery) ?? false));
-    }).map((product) {
-      final variants = index[product.productId] ?? const <VarianteModel>[];
-      final totalStock =
-          variants.fold<int>(0, (sum, v) => sum + v.stockQty);
-      return _ProductRow(
-        product: product,
-        variants: variants,
-        categoryName: names[product.category] ?? product.category,
-        totalStock: totalStock,
-        status: productStore.stockStatusForQty(totalStock),
-        price: productStore.costPriceFor(product.productId),
-      );
-    }).toList();
+    return productStore.products
+        .where((product) {
+          if (_searchQuery.isEmpty) return true;
+          final categoryName = (names[product.category] ?? '').toLowerCase();
+          if (product.productName.toLowerCase().contains(_searchQuery) ||
+              categoryName.contains(_searchQuery)) {
+            return true;
+          }
+          // The search hint promises barcodes, and a typed SKU is just as likely —
+          // both live on the variants, not the product.
+          final variants = index[product.productId] ?? const <VarianteModel>[];
+          return variants.any(
+            (v) =>
+                (v.barcode?.toLowerCase().contains(_searchQuery) ?? false) ||
+                (v.sku?.toLowerCase().contains(_searchQuery) ?? false),
+          );
+        })
+        .map((product) {
+          final variants = index[product.productId] ?? const <VarianteModel>[];
+          final totalStock = variants.fold<int>(
+            0,
+            (sum, v) => sum + v.stockQty,
+          );
+          return _ProductRow(
+            product: product,
+            variants: variants,
+            categoryName: names[product.category] ?? product.category,
+            totalStock: totalStock,
+            status: productStore.stockStatusForQty(totalStock),
+            price: productStore.costPriceFor(product.productId),
+          );
+        })
+        .toList();
   }
 
   Future<void> _openProductByBarcode(String barcode) async {
     final product = await productStore.findByBarcode(barcode);
     if (!mounted) return;
     if (product == null) {
-      NotificationService.instance
-          .showWarning('No product found for that barcode');
+      NotificationService.instance.showWarning(
+        'No product found for that barcode',
+      );
       return;
     }
     _searchController.clear();
@@ -164,8 +172,11 @@ class _InventoryScreenState extends State<InventoryScreen>
   /// chips, matching the Categories tab and the variant rows.
   Widget _buildProductMenu(ProductModel product) {
     return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert,
-          color: AppColors.textSecondary, size: 20),
+      icon: const Icon(
+        Icons.more_vert,
+        color: AppColors.textSecondary,
+        size: 20,
+      ),
       padding: EdgeInsets.zero,
       // M3 tints menu surfaces by default; keep them plain white.
       color: AppColors.white,
@@ -182,12 +193,19 @@ class _InventoryScreenState extends State<InventoryScreen>
           value: 'edit',
           child: Row(
             children: [
-              const Icon(Icons.edit_outlined,
-                  size: 20, color: AppColors.textSecondary),
+              const Icon(
+                Icons.edit_outlined,
+                size: 20,
+                color: AppColors.textSecondary,
+              ),
               const SizedBox(width: 12),
-              Text('Edit Product',
-                  style: GoogleFonts.poppins(
-                      fontSize: 14, color: AppColors.textPrimary)),
+              Text(
+                'Edit Product',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  color: AppColors.textPrimary,
+                ),
+              ),
             ],
           ),
         ),
@@ -195,12 +213,19 @@ class _InventoryScreenState extends State<InventoryScreen>
           value: 'delete',
           child: Row(
             children: [
-              const Icon(Icons.delete_outline_rounded,
-                  size: 20, color: AppColors.danger),
+              const Icon(
+                Icons.delete_outline_rounded,
+                size: 20,
+                color: AppColors.danger,
+              ),
               const SizedBox(width: 12),
-              Text('Delete Product',
-                  style: GoogleFonts.poppins(
-                      fontSize: 14, color: AppColors.danger)),
+              Text(
+                'Delete Product',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  color: AppColors.danger,
+                ),
+              ),
             ],
           ),
         ),
@@ -209,8 +234,11 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   Future<void> _deleteProduct(ProductModel product) async {
-    if (!PlanGuard.allowedOr(context, RetailEntKeys.catalogProductsDelete,
-        featureName: 'Delete Products')) {
+    if (!PlanGuard.allowedOr(
+      context,
+      RetailEntKeys.catalogProductsDelete,
+      featureName: 'Delete Products',
+    )) {
       return;
     }
     // Deleting the product takes its variants with it (productStore.deleteProduct
@@ -222,8 +250,8 @@ class _InventoryScreenState extends State<InventoryScreen>
       title: 'Delete Product?',
       message: variantCount > 0
           ? 'Delete "${product.productName}"? Its $variantCount variant'
-              '${variantCount == 1 ? '' : 's'} and all their stock are removed '
-              'with it.'
+                '${variantCount == 1 ? '' : 's'} and all their stock are removed '
+                'with it.'
           : 'Delete "${product.productName}"?',
       confirmLabel: 'Delete',
       accent: AppColors.danger,
@@ -233,8 +261,7 @@ class _InventoryScreenState extends State<InventoryScreen>
 
     await productStore.deleteProduct(product.productId);
     if (!mounted) return;
-    NotificationService.instance
-        .showSuccess('${product.productName} deleted');
+    NotificationService.instance.showSuccess('${product.productName} deleted');
   }
 
   /// Plain price label — no listener of its own; the [MoneyScope] around the
@@ -278,8 +305,8 @@ class _InventoryScreenState extends State<InventoryScreen>
           child: AppResponsive.isDesktop(context)
               ? _buildDesktopLayout(context)
               : AppResponsive.isTablet(context)
-                  ? _buildTabletLayout(context)
-                  : _buildMobileLayout(context),
+              ? _buildTabletLayout(context)
+              : _buildMobileLayout(context),
         ),
       ),
     );
@@ -324,7 +351,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               Text(
                 'Product Inventory',
                 style: GoogleFonts.poppins(
-                  fontSize: 20,
+                  fontSize: AppResponsive.headingFontSize(context),
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
                 ),
@@ -332,8 +359,10 @@ class _InventoryScreenState extends State<InventoryScreen>
               const SizedBox(width: 16),
               Observer(
                 builder: (context) => Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
@@ -341,7 +370,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                   child: Text(
                     '${productStore.products.length} products',
                     style: GoogleFonts.poppins(
-                      fontSize: 13,
+                      fontSize: AppResponsive.smallFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: AppColors.primary,
                     ),
@@ -351,10 +380,7 @@ class _InventoryScreenState extends State<InventoryScreen>
             ],
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.all(24),
-          child: _buildSearchBarRow(),
-        ),
+        Padding(padding: const EdgeInsets.all(24), child: _buildSearchBarRow()),
         Expanded(child: _buildProductGrid(context)),
       ],
     );
@@ -367,12 +393,30 @@ class _InventoryScreenState extends State<InventoryScreen>
     }
 
     // Column counts preserved from the previous hardcoded layouts.
-    final columns =
-        AppResponsive.gridColumns(context, mobile: 1, tablet: 2, desktop: 3);
-    final spacing =
-        AppResponsive.getValue(context, mobile: 16.0, tablet: 16.0, desktop: 24.0);
-    final aspectRatio =
-        AppResponsive.getValue(context, mobile: 1.3, tablet: 1.3, desktop: 1.4);
+    final columns = AppResponsive.gridColumns(
+      context,
+      mobile: 1,
+      tablet: 2,
+      desktop: 3,
+    );
+    final spacing = AppResponsive.getValue(
+      context,
+      mobile: 16.0,
+      tablet: 16.0,
+      desktop: 24.0,
+    );
+    // Cell HEIGHT per breakpoint, not derived from width. The card's height
+    // follows its FONT sizes, not the column width — deriving it from width
+    // made a 304px desktop cell 217px tall and the Spacer ate the difference.
+    // Each value is the sum of the AppResponsive steps _buildProductGridCard
+    // uses (cardPadding + 48px menu row + smallSpacing + caption chip +
+    // smallFont stock + mediumSpacing + subheading price) plus ~10px slack.
+    final cellHeight = AppResponsive.getValue(
+      context,
+      mobile: 180.0,
+      tablet: 196.0,
+      desktop: 222.0,
+    );
     final padding = AppResponsive.getValue(
       context,
       mobile: const EdgeInsets.all(20),
@@ -392,7 +436,7 @@ class _InventoryScreenState extends State<InventoryScreen>
             crossAxisCount: columns,
             crossAxisSpacing: spacing,
             mainAxisSpacing: spacing,
-            childAspectRatio: aspectRatio,
+            mainAxisExtent: cellHeight,
           ),
           itemCount: rows.length,
           itemBuilder: (context, index) => _buildProductGridCard(rows[index]),
@@ -402,35 +446,43 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   Widget _buildProductGridCard(_ProductRow row) {
+    final radius = AppResponsive.borderRadius(context);
+
     return InkWell(
       onTap: () => _openProduct(row.product),
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(radius),
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(radius),
           border: Border.all(color: AppColors.divider, width: 1),
           // Same soft lift the POS and report cards use.
           boxShadow: const [
             BoxShadow(
-                color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2)),
+              color: Color(0x08000000),
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: AppResponsive.cardPadding(context),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildThumbnail(row.product, 38),
-                  const SizedBox(width: 10),
+                  _buildThumbnail(
+                    row.product,
+                    AppResponsive.avatarSize(context),
+                  ),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
                   Expanded(
                     child: Text(
                       row.product.productName,
                       style: GoogleFonts.poppins(
-                        fontSize: 15,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
@@ -441,10 +493,9 @@ class _InventoryScreenState extends State<InventoryScreen>
                   _buildProductMenu(row.product),
                 ],
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: AppResponsive.smallSpacing(context)),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(4),
@@ -452,10 +503,12 @@ class _InventoryScreenState extends State<InventoryScreen>
                 child: Text(
                   row.categoryName,
                   style: GoogleFonts.poppins(
-                    fontSize: 11,
+                    fontSize: AppResponsive.captionFontSize(context),
                     color: AppColors.primary,
                     fontWeight: FontWeight.w500,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               const Spacer(),
@@ -463,14 +516,14 @@ class _InventoryScreenState extends State<InventoryScreen>
                 children: [
                   Icon(
                     Icons.inventory_2_outlined,
-                    size: 14,
+                    size: AppResponsive.smallIconSize(context),
                     color: _stockColor(row.status),
                   ),
                   const SizedBox(width: 4),
                   Text(
                     'Stock: ${row.totalStock}',
                     style: GoogleFonts.poppins(
-                      fontSize: 12,
+                      fontSize: AppResponsive.smallFontSize(context),
                       color: _stockColor(row.status),
                       fontWeight: _stockWeight(row.status),
                     ),
@@ -481,10 +534,10 @@ class _InventoryScreenState extends State<InventoryScreen>
                   ],
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               _buildPriceText(
                 row.price,
-                fontSize: 18,
+                fontSize: AppResponsive.subheadingFontSize(context),
                 color: AppColors.primary,
               ),
             ],
@@ -539,7 +592,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                     Text(
                       row.product.productName,
                       style: GoogleFonts.poppins(
-                        fontSize: 14,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
@@ -547,48 +600,41 @@ class _InventoryScreenState extends State<InventoryScreen>
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            row.categoryName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              color: AppColors.textSecondary,
+                    // One Text.rich, not a Row of five Texts: only the category
+                    // was Flexible, so a long name plus stock plus the variant
+                    // count overflowed a narrow card. Spans keep the per-part
+                    // colours the Row had while letting the whole line
+                    // ellipsize as one.
+                    Text.rich(
+                      TextSpan(
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.captionFontSize(context),
+                          color: AppColors.textSecondary,
+                        ),
+                        children: [
+                          TextSpan(text: row.categoryName),
+                          const TextSpan(text: ' • '),
+                          TextSpan(
+                            text: 'Stock: ${row.totalStock}',
+                            style: TextStyle(
+                              color: _stockColor(row.status),
+                              fontWeight: _stockWeight(row.status),
                             ),
                           ),
-                        ),
-                        Text(
-                          ' • ',
-                          style: GoogleFonts.poppins(
-                              fontSize: 11, color: AppColors.textSecondary),
-                        ),
-                        Text(
-                          'Stock: ${row.totalStock}',
-                          style: GoogleFonts.poppins(
-                            fontSize: 11,
-                            color: _stockColor(row.status),
-                            fontWeight: _stockWeight(row.status),
-                          ),
-                        ),
-                        if (row.product.hasVariants) ...[
-                          Text(
-                            ' • ',
-                            style: GoogleFonts.poppins(
-                                fontSize: 11, color: AppColors.textSecondary),
-                          ),
-                          Text(
-                            '${row.variants.length} variants',
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w500,
+                          if (row.product.hasVariants) ...[
+                            const TextSpan(text: ' • '),
+                            TextSpan(
+                              text: '${row.variants.length} variants',
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                          ),
+                          ],
                         ],
-                      ],
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -596,7 +642,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               const SizedBox(width: 12),
               _buildPriceText(
                 row.price,
-                fontSize: 15,
+                fontSize: AppResponsive.subheadingFontSize(context),
                 color: AppColors.primary,
               ),
               _buildProductMenu(row.product),
@@ -618,8 +664,11 @@ class _InventoryScreenState extends State<InventoryScreen>
         height: size,
         color: AppColors.surfaceMedium,
         child: bytes == null
-            ? Icon(Icons.inventory_2_outlined,
-                size: size * 0.5, color: AppColors.textSecondary)
+            ? Icon(
+                Icons.inventory_2_outlined,
+                size: size * 0.5,
+                color: AppColors.textSecondary,
+              )
             : Image.memory(bytes, fit: BoxFit.cover),
       ),
     );
@@ -635,7 +684,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       child: Text(
         '$count variants',
         style: GoogleFonts.poppins(
-          fontSize: 10,
+          fontSize: AppResponsive.captionFontSize(context),
           color: AppColors.info,
           fontWeight: FontWeight.w500,
         ),
@@ -658,21 +707,29 @@ class _InventoryScreenState extends State<InventoryScreen>
             // Only offered once there is something to clear.
             if (_searchQuery.isNotEmpty)
               IconButton(
-                icon: const Icon(Icons.close_rounded,
-                    color: AppColors.textSecondary, size: 20),
+                icon: const Icon(
+                  Icons.close_rounded,
+                  color: AppColors.textSecondary,
+                  size: 20,
+                ),
                 tooltip: 'Clear search',
                 visualDensity: VisualDensity.compact,
                 onPressed: _clearSearch,
               ),
             IconButton(
-              icon: const Icon(Icons.qr_code_scanner,
-                  color: AppColors.primary, size: 20),
+              icon: const Icon(
+                Icons.qr_code_scanner,
+                color: AppColors.primary,
+                size: 20,
+              ),
               tooltip: 'Scan barcode',
               visualDensity: VisualDensity.compact,
               onPressed: () async {
                 final String? barcode = await Navigator.push<String>(
                   context,
-                  MaterialPageRoute(builder: (context) => const ScannerScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const ScannerScreen(),
+                  ),
                 );
                 if (barcode == null || !mounted) return;
                 await _openProductByBarcode(barcode);
@@ -716,8 +773,8 @@ class _InventoryScreenState extends State<InventoryScreen>
   // ==================== PRESENTATION MAPPERS ====================
   Color _stockColor(RetailStockStatus status) =>
       status == RetailStockStatus.inStock
-          ? AppColors.textSecondary
-          : AppColors.danger;
+      ? AppColors.textSecondary
+      : AppColors.danger;
 
   FontWeight _stockWeight(RetailStockStatus status) =>
       status == RetailStockStatus.inStock ? FontWeight.w400 : FontWeight.w600;

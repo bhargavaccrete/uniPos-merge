@@ -68,9 +68,12 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
 
     final nameController = TextEditingController(text: existing?.name ?? '');
     final phoneController = TextEditingController(text: existing?.phone ?? '');
-    final addressController =
-        TextEditingController(text: existing?.address ?? '');
-    final gstController = TextEditingController(text: existing?.gstNumber ?? '');
+    final addressController = TextEditingController(
+      text: existing?.address ?? '',
+    );
+    final gstController = TextEditingController(
+      text: existing?.gstNumber ?? '',
+    );
     // Opening balance is the starting point of the ledger — editing it after
     // purchases have moved the current balance would silently rewrite history,
     // so it's add-only.
@@ -138,11 +141,13 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                     label: 'Opening Balance',
                     hint: 'Amount already owed to this supplier',
                     icon: Icons.account_balance_wallet_outlined,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(
-                          RegExp(r'^\d*\.?\d{0,2}')),
+                        RegExp(r'^\d*\.?\d{0,2}'),
+                      ),
                     ],
                   ),
                 ],
@@ -202,12 +207,16 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
     if (existing == null && !supplierStore.canAddSupplier) {
       final max = supplierStore.supplierLimit;
       NotificationService.instance.showError(
-          'Supplier limit reached${max != null ? ' (max $max)' : ''}. Upgrade your plan to add more.');
+        'Supplier limit reached${max != null ? ' (max $max)' : ''}. Upgrade your plan to add more.',
+      );
       return;
     }
     if (existing != null &&
-        !PlanGuard.allowedOr(context, RetailEntKeys.suppliersEdit,
-            featureName: 'Edit Suppliers')) {
+        !PlanGuard.allowedOr(
+          context,
+          RetailEntKeys.suppliersEdit,
+          featureName: 'Edit Suppliers',
+        )) {
       return;
     }
 
@@ -256,8 +265,11 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
   // ==================== DELETE ====================
 
   Future<void> _deleteSupplier(SupplierModel supplier) async {
-    if (!PlanGuard.allowedOr(context, RetailEntKeys.suppliersDelete,
-        featureName: 'Delete Suppliers')) {
+    if (!PlanGuard.allowedOr(
+      context,
+      RetailEntKeys.suppliersDelete,
+      featureName: 'Delete Suppliers',
+    )) {
       return;
     }
     // Purchases/POs/GRNs resolve the supplier name by id at render time, so
@@ -314,7 +326,9 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
               if (supplier.gstNumber?.isNotEmpty ?? false)
                 _buildDetailRow('GST Number', supplier.gstNumber!),
               _buildDetailRow(
-                  'Opening Balance', formatMoney(supplier.openingBalance)),
+                'Opening Balance',
+                formatMoney(supplier.openingBalance),
+              ),
               _buildDetailRow(
                 'Current Balance',
                 formatMoney(supplier.currentBalance.abs()) +
@@ -346,16 +360,23 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
 
   Widget _buildDetailRow(String label, String value, {Color? valueColor}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Capped label column: wide enough for the longest label, but it stops
+          // growing on a laptop so every extra pixel goes to the value.
           SizedBox(
-            width: 120,
+            width: AppResponsive.getValue(
+              context,
+              mobile: 110.0,
+              tablet: 130.0,
+              desktop: 150.0,
+            ),
             child: Text(
               label,
               style: GoogleFonts.poppins(
-                fontSize: 13,
+                fontSize: AppResponsive.smallFontSize(context),
                 color: AppColors.textSecondary,
               ),
             ),
@@ -364,7 +385,7 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
             child: Text(
               value,
               style: GoogleFonts.poppins(
-                fontSize: 13.5,
+                fontSize: AppResponsive.smallFontSize(context),
                 fontWeight: FontWeight.w500,
                 color: valueColor ?? AppColors.textPrimary,
               ),
@@ -389,8 +410,7 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
           child: StatefulBuilder(
             builder: (context, setLocalState) => AppDialogShell(
               title: 'Update Balance',
-              subtitle:
-                  'Current: ${formatMoney(supplier.currentBalance)}',
+              subtitle: 'Current: ${formatMoney(supplier.currentBalance)}',
               accent: AppColors.primary,
               icon: Icons.account_balance_wallet_outlined,
               body: Column(
@@ -415,11 +435,13 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                     controller: amountController,
                     label: 'Amount',
                     icon: Icons.currency_rupee_rounded,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(
-                          RegExp(r'^\d*\.?\d{0,2}')),
+                        RegExp(r'^\d*\.?\d{0,2}'),
+                      ),
                     ],
                     autofocus: true,
                   ),
@@ -431,28 +453,34 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                 appDialogPrimaryButton(
                   label: 'Update',
                   onPressed: () async {
-                    final amount =
-                        double.tryParse(amountController.text.trim());
+                    final amount = double.tryParse(
+                      amountController.text.trim(),
+                    );
                     if (amount == null || amount <= 0) {
-                      NotificationService.instance
-                          .showError('Please enter a valid amount');
+                      NotificationService.instance.showError(
+                        'Please enter a valid amount',
+                      );
                       return;
                     }
 
                     try {
                       await supplierStore.updateSupplierBalance(
-                          supplier.supplierId, isDebit ? amount : -amount);
+                        supplier.supplierId,
+                        isDebit ? amount : -amount,
+                      );
                     } catch (e) {
                       if (!mounted) return;
-                      NotificationService.instance
-                          .showError('Failed to update balance: $e');
+                      NotificationService.instance.showError(
+                        'Failed to update balance: $e',
+                      );
                       return;
                     }
 
                     if (!dialogContext.mounted) return;
                     Navigator.pop(dialogContext);
-                    NotificationService.instance
-                        .showSuccess('Balance updated successfully');
+                    NotificationService.instance.showSuccess(
+                      'Balance updated successfully',
+                    );
                   },
                 ),
               ],
@@ -469,16 +497,20 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
     required bool selected,
     required VoidCallback onTap,
   }) {
+    final radius = AppResponsive.smallBorderRadius(context);
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(radius),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.mediumSpacing(context),
+          vertical: AppResponsive.smallSpacing(context),
+        ),
         decoration: BoxDecoration(
           color: selected
               ? AppColors.primary.withValues(alpha: 0.06)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(radius),
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.divider,
             width: selected ? 1.5 : 1,
@@ -490,10 +522,10 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
               selected
                   ? Icons.radio_button_checked_rounded
                   : Icons.radio_button_unchecked_rounded,
-              size: 20,
+              size: AppResponsive.iconSize(context),
               color: selected ? AppColors.primary : AppColors.textSecondary,
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -501,7 +533,7 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                   Text(
                     label,
                     style: GoogleFonts.poppins(
-                      fontSize: 13.5,
+                      fontSize: AppResponsive.smallFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: selected
                           ? AppColors.primary
@@ -511,7 +543,7 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                   Text(
                     caption,
                     style: GoogleFonts.poppins(
-                      fontSize: 11,
+                      fontSize: AppResponsive.captionFontSize(context),
                       color: AppColors.textSecondary,
                     ),
                   ),
@@ -526,10 +558,25 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
 
   // ==================== BUILD ====================
 
+  /// Caps content width on large screens. Backgrounds still span edge to edge —
+  /// only what you read is constrained, so a laptop doesn't stretch a one-line
+  /// supplier row across the whole window.
+  Widget _capped(BuildContext context, Widget child) {
+    final maxWidth = AppResponsive.maxContentWidth(context);
+    if (maxWidth == double.infinity) return child;
+    return Align(
+      // topCenter, not Center: Center aligns on BOTH axes, so a
+      // shrink-wrapping child floats in the vertical middle.
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: child,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isTablet = !AppResponsive.isMobile(context);
-
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
@@ -554,24 +601,30 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
           children: [
             Container(
               color: AppColors.white,
-              padding: EdgeInsets.all(isTablet ? 20 : 16),
-              child: AppTextField(
-                controller: _searchController,
-                hint: 'Search by name, phone, or GST...',
-                icon: Icons.search_rounded,
-                onChanged: _onSearchChanged,
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear, size: 20),
-                        onPressed: () {
-                          _searchController.clear();
-                          _onSearchChanged('');
-                        },
-                      )
-                    : null,
+              padding: AppResponsive.padding(context),
+              child: _capped(
+                context,
+                AppTextField(
+                  controller: _searchController,
+                  hint: 'Search by name, phone, or GST...',
+                  icon: Icons.search_rounded,
+                  onChanged: _onSearchChanged,
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(
+                            Icons.clear,
+                            size: AppResponsive.smallIconSize(context),
+                          ),
+                          onPressed: () {
+                            _searchController.clear();
+                            _onSearchChanged('');
+                          },
+                        )
+                      : null,
+                ),
               ),
             ),
-            _buildSummaryRow(isTablet),
+            _buildSummaryRow(context),
             Expanded(
               child: Observer(
                 builder: (context) {
@@ -597,11 +650,14 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                           );
                   }
 
-                  return ListView.builder(
-                    padding: EdgeInsets.all(isTablet ? 20 : 16),
-                    itemCount: suppliers.length,
-                    itemBuilder: (context, index) =>
-                        _buildSupplierCard(suppliers[index], isTablet),
+                  return _capped(
+                    context,
+                    ListView.builder(
+                      padding: AppResponsive.padding(context),
+                      itemCount: suppliers.length,
+                      itemBuilder: (context, index) =>
+                          _buildSupplierCard(context, suppliers[index]),
+                    ),
                   );
                 },
               ),
@@ -612,45 +668,69 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
     );
   }
 
-  Widget _buildSummaryRow(bool isTablet) {
+  Widget _buildSummaryRow(BuildContext context) {
     return Observer(
       builder: (context) {
         if (supplierStore.suppliers.isEmpty) return const SizedBox.shrink();
 
         final net = supplierStore.totalOutstanding;
         return Padding(
-          padding:
-              EdgeInsets.symmetric(horizontal: isTablet ? 20 : 16, vertical: 8),
-          child: Row(
-            children: [
-              _buildStatChip('${supplierStore.supplierCount} suppliers',
-                  Icons.storefront_rounded, AppColors.primary),
-              const SizedBox(width: 8),
-              // Net of advances — a supplier you've overpaid offsets the rest.
-              _buildStatChip(
-                '${formatMoney(net.abs())} ${net < 0 ? 'advance' : 'payable'}',
-                Icons.account_balance_wallet_rounded,
-                net > 0 ? AppColors.danger : AppColors.success,
-              ),
-            ],
+          padding: EdgeInsets.symmetric(
+            horizontal: AppResponsive.padding(context).left,
+            vertical: AppResponsive.smallSpacing(context),
+          ),
+          child: _capped(
+            context,
+            Row(
+              children: [
+                _buildStatChip(
+                  context,
+                  '${supplierStore.supplierCount} suppliers',
+                  Icons.storefront_rounded,
+                  AppColors.primary,
+                ),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
+                // Net of advances — a supplier you've overpaid offsets the rest.
+                _buildStatChip(
+                  context,
+                  '${formatMoney(net.abs())} ${net < 0 ? 'advance' : 'payable'}',
+                  Icons.account_balance_wallet_rounded,
+                  net > 0 ? AppColors.danger : AppColors.success,
+                ),
+              ],
+            ),
           ),
         );
       },
     );
   }
 
-  Widget _buildStatChip(String label, IconData icon, Color color) {
+  Widget _buildStatChip(
+    BuildContext context,
+    String label,
+    IconData icon,
+    Color color,
+  ) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+        padding: EdgeInsets.symmetric(
+          vertical: AppResponsive.smallSpacing(context),
+          horizontal: AppResponsive.smallSpacing(context),
+        ),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.smallBorderRadius(context),
+          ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 14, color: color),
+            Icon(
+              icon,
+              size: AppResponsive.smallIconSize(context),
+              color: color,
+            ),
             const SizedBox(width: 6),
             Flexible(
               child: Text(
@@ -658,7 +738,7 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.poppins(
-                  fontSize: 11,
+                  fontSize: AppResponsive.captionFontSize(context),
                   fontWeight: FontWeight.w500,
                   color: color,
                 ),
@@ -670,16 +750,17 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
     );
   }
 
-  Widget _buildSupplierCard(SupplierModel supplier, bool isTablet) {
+  Widget _buildSupplierCard(BuildContext context, SupplierModel supplier) {
     final balance = supplier.currentBalance;
     final hasBalance = balance != 0;
     final isAdvance = balance < 0;
+    final radius = AppResponsive.borderRadius(context);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(radius),
         border: Border.all(
           color: balance > 0
               ? AppColors.danger.withValues(alpha: 0.3)
@@ -688,24 +769,30 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
       ),
       child: InkWell(
         onTap: () => _showSupplierDetails(supplier),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(radius),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
+          // Right stays tight — the popup menu carries its own tap padding.
+          padding: EdgeInsets.fromLTRB(
+            AppResponsive.mediumSpacing(context),
+            AppResponsive.smallSpacing(context),
+            4,
+            AppResponsive.smallSpacing(context),
+          ),
           child: Row(
             children: [
               CircleAvatar(
-                radius: isTablet ? 20 : 18,
+                radius: AppResponsive.smallAvatarSize(context) / 2,
                 backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                 child: Text(
                   _initial(supplier.name),
                   style: GoogleFonts.poppins(
-                    fontSize: 16,
+                    fontSize: AppResponsive.subheadingFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: AppColors.primary,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -717,7 +804,7 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.poppins(
-                        fontSize: 14,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
@@ -725,14 +812,15 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                     const SizedBox(height: 2),
                     Text(
                       [
-                        if (supplier.phone?.isNotEmpty ?? false) supplier.phone!,
+                        if (supplier.phone?.isNotEmpty ?? false)
+                          supplier.phone!,
                         if (supplier.gstNumber?.isNotEmpty ?? false)
                           supplier.gstNumber!,
                       ].join('  •  '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.poppins(
-                        fontSize: 11,
+                        fontSize: AppResponsive.captionFontSize(context),
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -740,10 +828,12 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                 ),
               ),
               if (hasBalance) ...[
-                const SizedBox(width: 8),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: (isAdvance ? AppColors.success : AppColors.danger)
                         .withValues(alpha: 0.1),
@@ -751,8 +841,9 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                   ),
                   child: Text(
                     '${formatMoney(balance.abs())} ${isAdvance ? 'advance' : 'due'}',
+                    maxLines: 1,
                     style: GoogleFonts.poppins(
-                      fontSize: 10,
+                      fontSize: AppResponsive.captionFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: isAdvance ? AppColors.success : AppColors.danger,
                     ),
@@ -760,13 +851,17 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                 ),
               ],
               PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert_rounded,
-                    color: AppColors.textSecondary, size: 20),
+                icon: Icon(
+                  Icons.more_vert_rounded,
+                  color: AppColors.textSecondary,
+                  size: AppResponsive.iconSize(context),
+                ),
                 color: AppColors.white,
                 surfaceTintColor: AppColors.white,
                 elevation: 4,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 onSelected: (value) {
                   if (value == 'edit') _showSupplierForm(existing: supplier);
                   if (value == 'delete') _deleteSupplier(supplier);
@@ -776,12 +871,19 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                     value: 'edit',
                     child: Row(
                       children: [
-                        const Icon(Icons.edit_outlined,
-                            size: 18, color: AppColors.primary),
+                        const Icon(
+                          Icons.edit_outlined,
+                          size: 18,
+                          color: AppColors.primary,
+                        ),
                         const SizedBox(width: 10),
-                        Text('Edit',
-                            style: GoogleFonts.poppins(
-                                fontSize: 13, color: AppColors.textPrimary)),
+                        Text(
+                          'Edit',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -789,12 +891,19 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                     value: 'delete',
                     child: Row(
                       children: [
-                        const Icon(Icons.delete_outline,
-                            size: 18, color: AppColors.danger),
+                        const Icon(
+                          Icons.delete_outline,
+                          size: 18,
+                          color: AppColors.danger,
+                        ),
                         const SizedBox(width: 10),
-                        Text('Delete',
-                            style: GoogleFonts.poppins(
-                                fontSize: 13, color: AppColors.danger)),
+                        Text(
+                          'Delete',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            color: AppColors.danger,
+                          ),
+                        ),
                       ],
                     ),
                   ),

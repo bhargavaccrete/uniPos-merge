@@ -27,7 +27,8 @@ class PurchaseOrderListScreen extends StatefulWidget {
   const PurchaseOrderListScreen({super.key});
 
   @override
-  State<PurchaseOrderListScreen> createState() => _PurchaseOrderListScreenState();
+  State<PurchaseOrderListScreen> createState() =>
+      _PurchaseOrderListScreenState();
 }
 
 class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
@@ -162,7 +163,9 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
   /// "Received 50, Accepted 48, Remaining 0": the supplier delivered
   /// everything, but two units never made it into stock.
   Widget _buildItemReceiptBreakdown(POItemReceipt? receipt) {
-    if (receipt == null || receipt.received == 0) return const SizedBox.shrink();
+    if (receipt == null || receipt.received == 0) {
+      return const SizedBox.shrink();
+    }
 
     return Padding(
       padding: const EdgeInsets.only(top: 10),
@@ -183,9 +186,7 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
               _receiptChip(
                 'Remaining',
                 receipt.remaining,
-                receipt.remaining == 0
-                    ? AppColors.success
-                    : AppColors.warning,
+                receipt.remaining == 0 ? AppColors.success : AppColors.warning,
               ),
             ],
           ),
@@ -200,12 +201,15 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
         children: [
           TextSpan(
             text: '$label: ',
-            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+            style: TextStyle(
+              fontSize: AppResponsive.captionFontSize(context),
+              color: AppColors.textSecondary,
+            ),
           ),
           TextSpan(
             text: '$value',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: AppResponsive.smallFontSize(context),
               fontWeight: FontWeight.w700,
               color: color,
             ),
@@ -216,251 +220,351 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
   }
 
   Widget _buildPODetailsSheet(
-      PurchaseOrderModel po, Map<String, POItemReceipt> receipts) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.75,
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: AppColors.divider)),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        po.poNumber,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        po.supplierName ?? 'Unknown Supplier',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(po.statusEnum).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(
-                    _getStatusLabel(po.statusEnum),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: _getStatusColor(po.statusEnum),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Observer(
-              builder: (context) {
-                final items = purchaseOrderStore.currentPOItems;
-                final grns = purchaseOrderStore.currentPOGRNs;
+    PurchaseOrderModel po,
+    Map<String, POItemReceipt> receipts,
+  ) {
+    final pad = AppResponsive.padding(context);
 
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildInfoRow('Expected Delivery', _formatDate(po.expectedDeliveryDate)),
-                      _buildInfoRow('Created', _formatDate(po.createdAt)),
-                      _buildInfoRow('Total Items', '${po.totalItems}'),
-                      if (po.estimatedTotal > 0)
-                        _buildInfoRow('Estimated Total', formatMoney(po.estimatedTotal)),
-                      if (po.notes != null && po.notes!.isNotEmpty)
-                        _buildInfoRow('Notes', po.notes!),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Order Items',
+    // Anchored bottom but width-capped — unconstrained, this sheet stretched
+    // across a full laptop window. heightFactor keeps it sized to the sheet,
+    // otherwise Align fills the screen and kills tap-to-dismiss above it.
+    return Align(
+      alignment: Alignment.bottomCenter,
+      heightFactor: 1,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: AppResponsive.maxCardWidth(context),
+        ),
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.75,
+          decoration: const BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: pad,
+                decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: AppColors.divider)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            po.poNumber,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: AppResponsive.subheadingFontSize(
+                                context,
+                              ),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            po.supplierName ?? 'Unknown Supplier',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: AppResponsive.bodyFontSize(context),
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(
+                          po.statusEnum,
+                        ).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        _getStatusLabel(po.statusEnum),
+                        maxLines: 1,
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: AppResponsive.smallFontSize(context),
                           fontWeight: FontWeight.w600,
+                          color: _getStatusColor(po.statusEnum),
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      ...items.map((item) => Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceMedium,
-                              borderRadius: BorderRadius.circular(8),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Observer(
+                  builder: (context) {
+                    final items = purchaseOrderStore.currentPOItems;
+                    final grns = purchaseOrderStore.currentPOGRNs;
+
+                    return SingleChildScrollView(
+                      padding: pad,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildInfoRow(
+                            'Expected Delivery',
+                            _formatDate(po.expectedDeliveryDate),
+                          ),
+                          _buildInfoRow('Created', _formatDate(po.createdAt)),
+                          _buildInfoRow('Total Items', '${po.totalItems}'),
+                          if (po.estimatedTotal > 0)
+                            _buildInfoRow(
+                              'Estimated Total',
+                              formatMoney(po.estimatedTotal),
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                          if (po.notes != null && po.notes!.isNotEmpty)
+                            _buildInfoRow('Notes', po.notes!),
+                          SizedBox(height: AppResponsive.largeSpacing(context)),
+                          Text(
+                            'Order Items',
+                            style: TextStyle(
+                              fontSize: AppResponsive.subheadingFontSize(
+                                context,
+                              ),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          SizedBox(
+                            height: AppResponsive.mediumSpacing(context),
+                          ),
+                          ...items.map(
+                            (item) => Container(
+                              margin: EdgeInsets.only(
+                                bottom: AppResponsive.smallSpacing(context),
+                              ),
+                              padding: EdgeInsets.all(
+                                AppResponsive.mediumSpacing(context),
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceMedium,
+                                borderRadius: BorderRadius.circular(
+                                  AppResponsive.smallBorderRadius(context),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
                                     children: [
-                                      Text(
-                                        item.productName ?? 'Unknown Product',
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500,
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              item.productName ??
+                                                  'Unknown Product',
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize:
+                                                    AppResponsive.bodyFontSize(
+                                                      context,
+                                                    ),
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                            if (item.variantInfo != null)
+                                              Text(
+                                                item.variantInfo!,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize:
+                                                      AppResponsive.smallFontSize(
+                                                        context,
+                                                      ),
+                                                  color:
+                                                      AppColors.textSecondary,
+                                                ),
+                                              ),
+                                          ],
                                         ),
                                       ),
-                                      if (item.variantInfo != null)
-                                        Text(
-                                          item.variantInfo!,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: AppColors.textSecondary,
+                                      const SizedBox(width: 8),
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            'Qty: ${item.orderedQty}',
+                                            maxLines: 1,
+                                            style: TextStyle(
+                                              fontSize:
+                                                  AppResponsive.bodyFontSize(
+                                                    context,
+                                                  ),
+                                              fontWeight: FontWeight.w600,
+                                            ),
                                           ),
-                                        ),
+                                          if (item.estimatedPrice != null)
+                                            Text(
+                                              formatMoney(
+                                                item.estimatedTotal ?? 0,
+                                              ),
+                                              maxLines: 1,
+                                              style: TextStyle(
+                                                fontSize:
+                                                    AppResponsive.smallFontSize(
+                                                      context,
+                                                    ),
+                                                color: AppColors.success,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
                                     ],
                                   ),
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      'Qty: ${item.orderedQty}',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    if (item.estimatedPrice != null)
-                                      Text(
-                                        formatMoney(item.estimatedTotal ?? 0),
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: AppColors.success,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ],
+                                  _buildItemReceiptBreakdown(
+                                    receipts[item.poItemId],
+                                  ),
+                                ],
+                              ),
                             ),
-                                _buildItemReceiptBreakdown(
-                                    receipts[item.poItemId]),
-                              ],
+                          ),
+                          // GRN History Section
+                          if (grns.isNotEmpty) ...[
+                            SizedBox(
+                              height: AppResponsive.extraLargeSpacing(context),
                             ),
-                          )),
-                      // GRN History Section
-                      if (grns.isNotEmpty) ...[
-                        const SizedBox(height: 24),
-                        const Text(
-                          'Receiving History',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                            Text(
+                              'Receiving History',
+                              style: TextStyle(
+                                fontSize: AppResponsive.subheadingFontSize(
+                                  context,
+                                ),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            SizedBox(
+                              height: AppResponsive.mediumSpacing(context),
+                            ),
+                            ...grns.map((grn) => _buildGRNSummaryCard(grn)),
+                          ],
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              Container(
+                padding: pad,
+                decoration: const BoxDecoration(
+                  border: Border(top: BorderSide(color: AppColors.divider)),
+                ),
+                child: SizedBox(
+                  height: AppResponsive.buttonHeight(context),
+                  child: Row(
+                    children: [
+                      if (po.canEdit) ...[
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _navigateToAddPO(po: po);
+                            },
+                            icon: Icon(
+                              Icons.edit,
+                              size: AppResponsive.smallIconSize(context),
+                            ),
+                            label: const Text('Edit'),
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        ...grns.map((grn) => _buildGRNSummaryCard(grn)),
+                        SizedBox(width: AppResponsive.mediumSpacing(context)),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              await purchaseOrderStore.updatePOStatus(
+                                po.poId,
+                                POStatus.sent,
+                              );
+                              // `context` here is the State's, so `mounted` is the
+                              // matching guard — the sheet is popped off it.
+                              if (!mounted) return;
+                              Navigator.pop(context);
+                              NotificationService.instance.showSuccess(
+                                '${po.poNumber} marked as sent',
+                              );
+                            },
+                            icon: Icon(
+                              Icons.send,
+                              size: AppResponsive.smallIconSize(context),
+                            ),
+                            label: const Text('Mark Sent'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.info,
+                              foregroundColor: AppColors.white,
+                            ),
+                          ),
+                        ),
+                      ] else if (po.canReceive) ...[
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _navigateToReceiving(po);
+                            },
+                            icon: Icon(
+                              Icons.local_shipping,
+                              size: AppResponsive.smallIconSize(context),
+                            ),
+                            label: const Text('Receive Items'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: AppColors.white,
+                            ),
+                          ),
+                        ),
+                      ] else ...[
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Close'),
+                          ),
+                        ),
                       ],
                     ],
                   ),
-                );
-              },
-            ),
+                ),
+              ),
+            ],
           ),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: AppColors.divider)),
-            ),
-            child: Row(
-              children: [
-                if (po.canEdit) ...[
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _navigateToAddPO(po: po);
-                      },
-                      icon: const Icon(Icons.edit),
-                      label: const Text('Edit'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () async {
-                        await purchaseOrderStore.updatePOStatus(
-                            po.poId, POStatus.sent);
-                        // `context` here is the State's, so `mounted` is the
-                        // matching guard — the sheet is popped off it.
-                        if (!mounted) return;
-                        Navigator.pop(context);
-                        NotificationService.instance
-                            .showSuccess('${po.poNumber} marked as sent');
-                      },
-                      icon: const Icon(Icons.send),
-                      label: const Text('Mark Sent'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.info,
-                        foregroundColor: AppColors.white,
-                      ),
-                    ),
-                  ),
-                ] else if (po.canReceive) ...[
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _navigateToReceiving(po);
-                      },
-                      icon: const Icon(Icons.local_shipping),
-                      label: const Text('Receive Items'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: AppColors.white,
-                      ),
-                    ),
-                  ),
-                ] else ...[
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Close'),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Capped label column: wide enough for the longest label, but it stops
+          // growing on a laptop so every extra pixel goes to the value.
           SizedBox(
-            width: 130,
+            width: AppResponsive.getValue(
+              context,
+              mobile: 110.0,
+              tablet: 130.0,
+              desktop: 150.0,
+            ),
             child: Text(
               label,
-              style: const TextStyle(
-                fontSize: 14,
+              style: TextStyle(
+                fontSize: AppResponsive.smallFontSize(context),
                 color: AppColors.textSecondary,
               ),
             ),
@@ -468,8 +572,8 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
-                fontSize: 14,
+              style: TextStyle(
+                fontSize: AppResponsive.smallFontSize(context),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -483,7 +587,9 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
   /// own tab — previously "Done" merged fullyCompleted with cancelled, which
   /// hid cancellations among genuinely completed orders.
   List<PurchaseOrderModel> _applyFilters(
-      List<PurchaseOrderModel> pos, int tabIndex) {
+    List<PurchaseOrderModel> pos,
+    int tabIndex,
+  ) {
     final status = _tabStatuses[tabIndex];
 
     return pos.where((po) {
@@ -500,10 +606,16 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
         // Compare on calendar days so an order created late in the day still
         // falls inside a range that ends that day.
         final day = DateTime(created.year, created.month, created.day);
-        final start = DateTime(_dateFilter!.start.year,
-            _dateFilter!.start.month, _dateFilter!.start.day);
+        final start = DateTime(
+          _dateFilter!.start.year,
+          _dateFilter!.start.month,
+          _dateFilter!.start.day,
+        );
         final end = DateTime(
-            _dateFilter!.end.year, _dateFilter!.end.month, _dateFilter!.end.day);
+          _dateFilter!.end.year,
+          _dateFilter!.end.month,
+          _dateFilter!.end.day,
+        );
         if (day.isBefore(start) || day.isAfter(end)) return false;
       }
 
@@ -517,35 +629,40 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
     // dismissed sheet (null) leaves the current filter alone.
     const allSuppliers = '';
 
-    final result = await showModalBottomSheet<String>(
+    final result = await showDialog<String>(
       context: context,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
+      builder: (dialogContext) => AppDialogShell(
+        title: 'Filter by Supplier',
+        subtitle: 'Show purchase orders from one supplier',
+        accent: AppColors.primary,
+        icon: Icons.filter_alt_outlined,
+        // Plain Column, not a ListView — AppDialogShell already wraps the body
+        // in a SingleChildScrollView, and nesting two scrollables makes them
+        // fight over the drag.
+        body: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ListTile(
-              leading: const Icon(Icons.clear_all_rounded),
-              title: const Text('All suppliers'),
+            _supplierFilterTile(
+              dialogContext,
+              icon: Icons.clear_all_rounded,
+              label: 'All suppliers',
               selected: _supplierFilter == null,
-              onTap: () => Navigator.pop(sheetContext, allSuppliers),
+              value: allSuppliers,
             ),
-            const Divider(height: 1),
-            Flexible(
-              child: ListView(
-                shrinkWrap: true,
-                children: supplierStore.suppliers
-                    .map((s) => ListTile(
-                          leading: const Icon(Icons.storefront_outlined),
-                          title: Text(s.name),
-                          selected:
-                              _supplierFilter?.supplierId == s.supplierId,
-                          onTap: () => Navigator.pop(sheetContext, s.supplierId),
-                        ))
-                    .toList(),
+            if (supplierStore.suppliers.isNotEmpty)
+              const Divider(height: 1, color: AppColors.divider),
+            for (final s in supplierStore.suppliers)
+              _supplierFilterTile(
+                dialogContext,
+                icon: Icons.storefront_outlined,
+                label: s.name,
+                selected: _supplierFilter?.supplierId == s.supplierId,
+                value: s.supplierId,
               ),
-            ),
           ],
         ),
+        actions: [appDialogCancelButton(dialogContext, label: 'Close')],
       ),
     );
 
@@ -555,9 +672,47 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
       _supplierFilter = result == allSuppliers
           ? null
           : supplierStore.suppliers
-              .where((s) => s.supplierId == result)
-              .firstOrNull;
+                .where((s) => s.supplierId == result)
+                .firstOrNull;
     });
+  }
+
+  /// One row of the supplier-filter dialog. Pops the supplier id so the caller
+  /// can tell "All" (empty string) apart from a dismiss (null).
+  Widget _supplierFilterTile(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required bool selected,
+    required String value,
+  }) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      dense: AppResponsive.isMobile(context),
+      leading: Icon(
+        icon,
+        size: AppResponsive.iconSize(context),
+        color: selected ? AppColors.primary : AppColors.textSecondary,
+      ),
+      title: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.bodyFontSize(context),
+          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+          color: selected ? AppColors.primary : AppColors.textPrimary,
+        ),
+      ),
+      trailing: selected
+          ? Icon(
+              Icons.check_circle_rounded,
+              size: AppResponsive.smallIconSize(context),
+              color: AppColors.primary,
+            )
+          : null,
+      onTap: () => Navigator.pop(context, value),
+    );
   }
 
   Future<void> _pickDateFilter() async {
@@ -579,6 +734,23 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
     });
   }
 
+  /// Caps content width on large screens. Backgrounds still span edge to edge —
+  /// only what you read is constrained, so a laptop doesn't stretch a PO card
+  /// across the whole window.
+  Widget _capped(BuildContext context, Widget child) {
+    final maxWidth = AppResponsive.maxContentWidth(context);
+    if (maxWidth == double.infinity) return child;
+    return Align(
+      // topCenter, not Center: Center aligns on BOTH axes, so a
+      // shrink-wrapping child floats in the vertical middle.
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: child,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -589,16 +761,20 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
           // A tinted icon would vanish against the primary AppBar, so an active
           // filter is flagged with a filled icon instead of a colour change.
           IconButton(
-            icon: Icon(_supplierFilter != null
-                ? Icons.filter_alt
-                : Icons.filter_alt_outlined),
+            icon: Icon(
+              _supplierFilter != null
+                  ? Icons.filter_alt
+                  : Icons.filter_alt_outlined,
+            ),
             tooltip: 'Filter by supplier',
             onPressed: _pickSupplierFilter,
           ),
           IconButton(
-            icon: Icon(_dateFilter != null
-                ? Icons.event_available
-                : Icons.date_range_outlined),
+            icon: Icon(
+              _dateFilter != null
+                  ? Icons.event_available
+                  : Icons.date_range_outlined,
+            ),
             tooltip: 'Filter by date',
             onPressed: _pickDateFilter,
           ),
@@ -606,17 +782,50 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
+          // Phones can't fit six labels, so they scroll. From tablet up there
+          // is room to divide the width evenly, which also kills the dead space
+          // that left-packed scrollable tabs leave on a wide screen.
+          isScrollable: AppResponsive.isMobile(context),
+          tabAlignment: AppResponsive.isMobile(context)
+              ? TabAlignment.start
+              : TabAlignment.fill,
           labelColor: AppColors.white,
           unselectedLabelColor: AppColors.white.withValues(alpha: 0.7),
           indicatorColor: AppColors.white,
           indicatorWeight: 3,
-          labelStyle:
-              GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600),
-          unselectedLabelStyle:
-              GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500),
-          tabs: [for (final label in _tabLabels) Tab(text: label)],
+          // Underline hugs the word rather than the whole tab cell — with
+          // scrollable tabs the cell is wider than its label, so a full-width
+          // indicator reads as misaligned.
+          indicatorSize: TabBarIndicatorSize.label,
+          // Scrolling: a wide gutter so six labels aren't packed together.
+          // Filling: a narrow one, because each tab is already an equal slice
+          // and a big gutter would squeeze "Completed" into an ellipsis on the
+          // smallest tablet.
+          labelPadding: EdgeInsets.symmetric(
+            horizontal: AppResponsive.isMobile(context)
+                ? AppResponsive.largeSpacing(context)
+                : AppResponsive.smallSpacing(context),
+          ),
+          labelStyle: GoogleFonts.poppins(
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w600,
+          ),
+          unselectedLabelStyle: GoogleFonts.poppins(
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w500,
+          ),
+          tabs: [
+            for (final label in _tabLabels)
+              Tab(
+                height: AppResponsive.getValue(
+                  context,
+                  mobile: 44.0,
+                  tablet: 48.0,
+                  desktop: 52.0,
+                ),
+                text: label,
+              ),
+          ],
         ),
       ),
       body: MoneyScope(
@@ -645,30 +854,40 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
   }
 
   Widget _buildSearchBar() {
-    final isTablet = !AppResponsive.isMobile(context);
+    final side = AppResponsive.padding(context).left;
 
     return Container(
       color: AppColors.white,
       padding: EdgeInsets.fromLTRB(
-          isTablet ? 20 : 16, isTablet ? 16 : 12, isTablet ? 20 : 16, 12),
-      child: AppTextField(
-        controller: _searchController,
-        hint: 'Search by PO number or supplier...',
-        icon: Icons.search_rounded,
-        onChanged: (value) {
-          _onSearchChanged(value);
-          setState(() {});
-        },
-        suffixIcon: _searchController.text.isNotEmpty
-            ? IconButton(
-                icon: const Icon(Icons.clear, size: 20),
-                onPressed: () {
-                  _searchController.clear();
-                  _onSearchChanged('');
-                  setState(() {});
-                },
-              )
-            : null,
+        side,
+        AppResponsive.mediumSpacing(context),
+        side,
+        12,
+      ),
+      child: _capped(
+        context,
+        AppTextField(
+          controller: _searchController,
+          hint: 'Search by PO number or supplier...',
+          icon: Icons.search_rounded,
+          onChanged: (value) {
+            _onSearchChanged(value);
+            setState(() {});
+          },
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  icon: Icon(
+                    Icons.clear,
+                    size: AppResponsive.smallIconSize(context),
+                  ),
+                  onPressed: () {
+                    _searchController.clear();
+                    _onSearchChanged('');
+                    setState(() {});
+                  },
+                )
+              : null,
+        ),
       ),
     );
   }
@@ -676,67 +895,87 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
   Widget _buildSummaryCard() {
     return Observer(
       builder: (context) {
+        final side = AppResponsive.padding(context).left;
+        final gap = AppResponsive.mediumSpacing(context);
+
         return Container(
           color: AppColors.white,
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-          child: Row(
-            children: [
-              Expanded(
-                child: _buildStatItem(
-                  'Draft',
-                  purchaseOrderStore.draftPOCount.toString(),
-                  Icons.edit_note,
-                  AppColors.textSecondary,
+          padding: EdgeInsets.fromLTRB(
+            side,
+            AppResponsive.smallSpacing(context),
+            side,
+            gap,
+          ),
+          child: _capped(
+            context,
+            Row(
+              children: [
+                Expanded(
+                  child: _buildStatItem(
+                    'Draft',
+                    purchaseOrderStore.draftPOCount.toString(),
+                    Icons.edit_note,
+                    AppColors.textSecondary,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildStatItem(
-                  'Pending',
-                  purchaseOrderStore.pendingReceivingCount.toString(),
-                  Icons.local_shipping,
-                  AppColors.info,
+                SizedBox(width: gap),
+                Expanded(
+                  child: _buildStatItem(
+                    'Pending',
+                    purchaseOrderStore.pendingReceivingCount.toString(),
+                    Icons.local_shipping,
+                    AppColors.info,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildStatItem(
-                  'Total',
-                  purchaseOrderStore.poCount.toString(),
-                  Icons.list_alt,
-                  AppColors.primary,
+                SizedBox(width: gap),
+                Expanded(
+                  child: _buildStatItem(
+                    'Total',
+                    purchaseOrderStore.poCount.toString(),
+                    Icons.list_alt,
+                    AppColors.primary,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
     );
   }
 
-  Widget _buildStatItem(String label, String value, IconData icon, Color color) {
+  Widget _buildStatItem(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
       ),
       child: Column(
         children: [
-          Icon(icon, size: 20, color: color),
+          Icon(icon, size: AppResponsive.iconSize(context), color: color),
           const SizedBox(height: 6),
           Text(
             value,
+            maxLines: 1,
             style: TextStyle(
-              fontSize: 18,
+              fontSize: AppResponsive.subheadingFontSize(context),
               fontWeight: FontWeight.w600,
               color: color,
             ),
           ),
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 11,
+            maxLines: 1,
+            style: TextStyle(
+              fontSize: AppResponsive.captionFontSize(context),
               color: AppColors.textSecondary,
             ),
           ),
@@ -758,12 +997,15 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
           return _buildEmptyState(tabIndex);
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: filteredPOs.length,
-          itemBuilder: (context, index) {
-            return _buildPOCard(filteredPOs[index]);
-          },
+        return _capped(
+          context,
+          ListView.builder(
+            padding: AppResponsive.padding(context),
+            itemCount: filteredPOs.length,
+            itemBuilder: (context, index) {
+              return _buildPOCard(filteredPOs[index]);
+            },
+          ),
         );
       },
     );
@@ -784,34 +1026,47 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
     return Container(
       width: double.infinity,
       color: AppColors.info.withValues(alpha: 0.08),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          const Icon(Icons.filter_alt, size: 14, color: AppColors.info),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              parts.join('  •  '),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12, color: AppColors.info),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.padding(context).left,
+        vertical: AppResponsive.smallSpacing(context),
+      ),
+      child: _capped(
+        context,
+        Row(
+          children: [
+            Icon(
+              Icons.filter_alt,
+              size: AppResponsive.smallIconSize(context),
+              color: AppColors.info,
             ),
-          ),
-          InkWell(
-            onTap: _clearExtraFilters,
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
+            Expanded(
               child: Text(
-                'Clear',
+                parts.join('  •  '),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                  fontSize: AppResponsive.smallFontSize(context),
                   color: AppColors.info,
                 ),
               ),
             ),
-          ),
-        ],
+            InkWell(
+              onTap: _clearExtraFilters,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  'Clear',
+                  style: TextStyle(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.info,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -828,50 +1083,62 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
     }
 
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.assignment_outlined,
-            size: 80,
-            color: AppColors.divider,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            message,
-            style: const TextStyle(
-              fontSize: 16,
-              color: AppColors.textSecondary,
+      child: Padding(
+        padding: AppResponsive.padding(context),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.assignment_outlined,
+              size: AppResponsive.getValue(
+                context,
+                mobile: 80.0,
+                tablet: 92.0,
+                desktop: 104.0,
+              ),
+              color: AppColors.divider,
             ),
-          ),
-          if (tabIndex == 0) ...[
-            const SizedBox(height: 8),
-            const Text(
-              'Create your first PO using the + button',
+            SizedBox(height: AppResponsive.largeSpacing(context)),
+            Text(
+              message,
+              textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: AppResponsive.subheadingFontSize(context),
                 color: AppColors.textSecondary,
               ),
             ),
+            if (tabIndex == 0) ...[
+              SizedBox(height: AppResponsive.smallSpacing(context)),
+              Text(
+                'Create your first PO using the + button',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildPOCard(PurchaseOrderModel po) {
+    final radius = AppResponsive.smallBorderRadius(context);
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: AppColors.divider, width: 0.5),
       ),
       child: InkWell(
         onTap: () => _showPODetails(po),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(radius),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: AppResponsive.cardPadding(context),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -880,23 +1147,31 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
                   Expanded(
                     child: Text(
                       po.poNumber,
-                      style: const TextStyle(
-                        fontSize: 15,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: _getStatusColor(po.statusEnum).withValues(alpha: 0.1),
+                      color: _getStatusColor(
+                        po.statusEnum,
+                      ).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       _getStatusLabel(po.statusEnum),
+                      maxLines: 1,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: AppResponsive.captionFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: _getStatusColor(po.statusEnum),
                       ),
@@ -909,20 +1184,34 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
                       width: 32,
                       child: PopupMenuButton<String>(
                         padding: EdgeInsets.zero,
-                        icon: const Icon(Icons.more_vert,
-                            size: 18, color: AppColors.textSecondary),
+                        icon: const Icon(
+                          Icons.more_vert,
+                          size: 18,
+                          color: AppColors.textSecondary,
+                        ),
                         onSelected: (value) {
                           if (value == 'cancel') _cancelPO(po);
                           if (value == 'delete') _deletePO(po);
                         },
-                        itemBuilder: (_) => const [
+                        itemBuilder: (_) => [
                           PopupMenuItem(
                             value: 'cancel',
                             child: Row(
                               children: [
-                                Icon(Icons.block, size: 18, color: AppColors.warning),
+                                Icon(
+                                  Icons.block,
+                                  size: 18,
+                                  color: AppColors.warning,
+                                ),
                                 SizedBox(width: 10),
-                                Text('Cancel PO', style: TextStyle(fontSize: 13)),
+                                Text(
+                                  'Cancel PO',
+                                  style: TextStyle(
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -930,10 +1219,21 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
                             value: 'delete',
                             child: Row(
                               children: [
-                                Icon(Icons.delete_outline, size: 18, color: AppColors.danger),
+                                Icon(
+                                  Icons.delete_outline,
+                                  size: 18,
+                                  color: AppColors.danger,
+                                ),
                                 SizedBox(width: 10),
-                                Text('Delete',
-                                    style: TextStyle(fontSize: 13, color: AppColors.danger)),
+                                Text(
+                                  'Delete',
+                                  style: TextStyle(
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
+                                    color: AppColors.danger,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -942,56 +1242,66 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
                     ),
                 ],
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: AppResponsive.smallSpacing(context)),
               Text(
                 po.supplierName ?? 'Unknown Supplier',
-                style: const TextStyle(
-                  fontSize: 14,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: AppResponsive.bodyFontSize(context),
                   color: AppColors.textSecondary,
                 ),
               ),
               _buildCardProgress(po),
-              const SizedBox(height: 12),
-              Row(
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
+              // Wrap, not Row: date + item count + amount need ~265px of fixed
+              // content, which overflows a 320px phone once the card and list
+              // padding are taken out. A Spacer can't shrink below zero.
+              Wrap(
+                spacing: AppResponsive.mediumSpacing(context),
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  const Icon(Icons.calendar_today, size: 14, color: AppColors.textSecondary),
-                  const SizedBox(width: 4),
-                  Text(
+                  _poMetaItem(
+                    Icons.calendar_today,
                     'Delivery: ${_formatDate(po.expectedDeliveryDate)}',
-                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    AppColors.textSecondary,
                   ),
-                  const SizedBox(width: 16),
-                  const Icon(Icons.inventory_2, size: 14, color: AppColors.info),
-                  const SizedBox(width: 4),
-                  Text(
+                  _poMetaItem(
+                    Icons.inventory_2,
                     '${po.totalItems} items',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.info,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    AppColors.info,
+                    bold: true,
                   ),
-                  if (po.estimatedTotal > 0) ...[
-                    const Spacer(),
+                  if (po.estimatedTotal > 0)
                     Text(
                       formatMoney(po.estimatedTotal),
-                      style: const TextStyle(
-                        fontSize: 12,
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: AppResponsive.smallFontSize(context),
                         color: AppColors.success,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ],
                 ],
               ),
               if (po.canReceive) ...[
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 SizedBox(
                   width: double.infinity,
+                  height: AppResponsive.buttonHeight(context),
                   child: OutlinedButton.icon(
                     onPressed: () => _navigateToReceiving(po),
-                    icon: const Icon(Icons.local_shipping, size: 18),
-                    label: const Text('Receive Items'),
+                    icon: Icon(
+                      Icons.local_shipping,
+                      size: AppResponsive.smallIconSize(context),
+                    ),
+                    label: Text(
+                      'Receive Items',
+                      style: TextStyle(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                      ),
+                    ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primary,
                       side: const BorderSide(color: AppColors.primary),
@@ -1006,6 +1316,32 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
     );
   }
 
+  /// One icon+label pair of the PO card's meta line. Sized to its content so it
+  /// can sit in a Wrap and drop to the next row instead of overflowing.
+  Widget _poMetaItem(
+    IconData icon,
+    String label,
+    Color color, {
+    bool bold = false,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: AppResponsive.smallIconSize(context), color: color),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          maxLines: 1,
+          style: TextStyle(
+            fontSize: AppResponsive.smallFontSize(context),
+            color: color,
+            fontWeight: bold ? FontWeight.w500 : FontWeight.normal,
+          ),
+        ),
+      ],
+    );
+  }
+
   /// "12/50 received · 4,800 accepted" — reads the store's synchronous
   /// progress helper so every card can render without its own FutureBuilder.
   Widget _buildCardProgress(PurchaseOrderModel po) {
@@ -1016,32 +1352,23 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
 
         final complete = progress.remaining == 0;
         return Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Row(
+          padding: EdgeInsets.only(top: AppResponsive.smallSpacing(context)),
+          child: Wrap(
+            spacing: AppResponsive.mediumSpacing(context),
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Icon(
+              _poMetaItem(
                 complete ? Icons.check_circle : Icons.local_shipping_outlined,
-                size: 14,
-                color: complete
-                    ? AppColors.success
-                    : AppColors.warning,
-              ),
-              const SizedBox(width: 4),
-              Text(
                 '${progress.received}/${progress.ordered} received',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: complete
-                      ? AppColors.success
-                      : AppColors.warning,
-                ),
+                complete ? AppColors.success : AppColors.warning,
+                bold: true,
               ),
-              const SizedBox(width: 12),
               Text(
                 '${formatMoney(progress.acceptedAmount)} accepted',
-                style: const TextStyle(
-                  fontSize: 12,
+                maxLines: 1,
+                style: TextStyle(
+                  fontSize: AppResponsive.smallFontSize(context),
                   color: AppColors.textSecondary,
                 ),
               ),
@@ -1073,16 +1400,16 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
     if (ok) {
       NotificationService.instance.showSuccess('${po.poNumber} cancelled');
     } else {
-      NotificationService.instance
-          .showError('Only draft purchase orders can be cancelled');
+      NotificationService.instance.showError(
+        'Only draft purchase orders can be cancelled',
+      );
     }
   }
 
   Future<void> _deletePO(PurchaseOrderModel po) async {
     // Draft-only AND nothing received — a GRN stores poId and would be
     // orphaned along with the stock it already moved.
-    final canDelete =
-        await purchaseOrderStore.canDeletePurchaseOrder(po.poId);
+    final canDelete = await purchaseOrderStore.canDeletePurchaseOrder(po.poId);
     if (!mounted) return;
 
     if (!canDelete) {
@@ -1115,14 +1442,31 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
       future: purchaseOrderStore.getGRNItemsForGRN(grn.grnId),
       builder: (context, snapshot) {
         final grnItems = snapshot.data ?? [];
-        final totalAccepted = grnItems.fold<int>(0, (sum, item) => sum + item.acceptedQty);
-        final totalDamaged = grnItems.fold<int>(0, (sum, item) => sum + (item.damagedQty ?? 0));
-        final damagedAmount = grnItems.fold<double>(0.0, (sum, item) => sum + (item.damagedAmount ?? 0));
+        final totalAccepted = grnItems.fold<int>(
+          0,
+          (sum, item) => sum + item.acceptedQty,
+        );
+        final totalDamaged = grnItems.fold<int>(
+          0,
+          (sum, item) => sum + (item.damagedQty ?? 0),
+        );
+        final damagedAmount = grnItems.fold<double>(
+          0.0,
+          (sum, item) => sum + (item.damagedAmount ?? 0),
+        );
 
         // Group damaged items by handling method
-        final returnToSupplier = grnItems.where((i) => i.damagedHandlingEnum == DamagedHandling.returnToSupplier).toList();
-        final keepForClaim = grnItems.where((i) => i.damagedHandlingEnum == DamagedHandling.keepForClaim).toList();
-        final writeOff = grnItems.where((i) => i.damagedHandlingEnum == DamagedHandling.writeOff).toList();
+        final returnToSupplier = grnItems
+            .where(
+              (i) => i.damagedHandlingEnum == DamagedHandling.returnToSupplier,
+            )
+            .toList();
+        final keepForClaim = grnItems
+            .where((i) => i.damagedHandlingEnum == DamagedHandling.keepForClaim)
+            .toList();
+        final writeOff = grnItems
+            .where((i) => i.damagedHandlingEnum == DamagedHandling.writeOff)
+            .toList();
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -1143,17 +1487,27 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.receipt_long, size: 16, color: AppColors.primary),
+                    const Icon(
+                      Icons.receipt_long,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         grn.grnNumber,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                     Text(
                       _formatDate(grn.receivedDate),
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      style: TextStyle(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -1166,18 +1520,30 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
                   children: [
                     Row(
                       children: [
-                        _buildGRNStat('Received', grn.totalReceivedQty.toString(), AppColors.success),
+                        _buildGRNStat(
+                          'Received',
+                          grn.totalReceivedQty.toString(),
+                          AppColors.success,
+                        ),
                         const SizedBox(width: 16),
-                        _buildGRNStat('To Stock', totalAccepted.toString(), AppColors.info),
+                        _buildGRNStat(
+                          'To Stock',
+                          totalAccepted.toString(),
+                          AppColors.info,
+                        ),
                         if (totalDamaged > 0) ...[
                           const SizedBox(width: 16),
-                          _buildGRNStat('Damaged', totalDamaged.toString(), AppColors.danger),
+                          _buildGRNStat(
+                            'Damaged',
+                            totalDamaged.toString(),
+                            AppColors.danger,
+                          ),
                         ],
                         const Spacer(),
                         Text(
                           formatMoney(grn.totalAmount ?? 0),
-                          style: const TextStyle(
-                            fontSize: 14,
+                          style: TextStyle(
+                            fontSize: AppResponsive.bodyFontSize(context),
                             fontWeight: FontWeight.w600,
                             color: AppColors.success,
                           ),
@@ -1198,12 +1564,18 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.warning_amber, size: 14, color: AppColors.warning),
+                                const Icon(
+                                  Icons.warning_amber,
+                                  size: 14,
+                                  color: AppColors.warning,
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
                                   '$totalDamaged damaged (${formatMoney(damagedAmount)})',
-                                  style: const TextStyle(
-                                    fontSize: 12,
+                                  style: TextStyle(
+                                    fontSize: AppResponsive.smallFontSize(
+                                      context,
+                                    ),
                                     fontWeight: FontWeight.w600,
                                     color: AppColors.orange,
                                   ),
@@ -1214,19 +1586,28 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
                             if (returnToSupplier.isNotEmpty)
                               _buildDamagedRow(
                                 'Return to Supplier',
-                                returnToSupplier.fold<int>(0, (s, i) => s + (i.damagedQty ?? 0)),
+                                returnToSupplier.fold<int>(
+                                  0,
+                                  (s, i) => s + (i.damagedQty ?? 0),
+                                ),
                                 AppColors.warning,
                               ),
                             if (keepForClaim.isNotEmpty)
                               _buildDamagedRow(
                                 'Keep for Claim',
-                                keepForClaim.fold<int>(0, (s, i) => s + (i.damagedQty ?? 0)),
+                                keepForClaim.fold<int>(
+                                  0,
+                                  (s, i) => s + (i.damagedQty ?? 0),
+                                ),
                                 AppColors.info,
                               ),
                             if (writeOff.isNotEmpty)
                               _buildDamagedRow(
                                 'Write Off',
-                                writeOff.fold<int>(0, (s, i) => s + (i.damagedQty ?? 0)),
+                                writeOff.fold<int>(
+                                  0,
+                                  (s, i) => s + (i.damagedQty ?? 0),
+                                ),
                                 AppColors.textSecondary,
                               ),
                           ],
@@ -1264,7 +1645,7 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
               Text(
                 'Linked Documents',
                 style: GoogleFonts.poppins(
-                  fontSize: 12,
+                  fontSize: AppResponsive.smallFontSize(context),
                   fontWeight: FontWeight.w600,
                   color: AppColors.textSecondary,
                 ),
@@ -1348,7 +1729,7 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
             Text(
               label,
               style: GoogleFonts.poppins(
-                fontSize: 11.5,
+                fontSize: AppResponsive.captionFontSize(context),
                 fontWeight: FontWeight.w600,
                 color: color,
               ),
@@ -1364,8 +1745,21 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
   Widget _buildGRNStat(String label, String value, Color color) {
     return Row(
       children: [
-        Text('$label: ', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-        Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
+        Text(
+          '$label: ',
+          style: TextStyle(
+            fontSize: AppResponsive.smallFontSize(context),
+            color: AppColors.textSecondary,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: AppResponsive.smallFontSize(context),
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
       ],
     );
   }
@@ -1377,7 +1771,13 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
         children: [
           Icon(Icons.circle, size: 6, color: color),
           const SizedBox(width: 6),
-          Text('$qty x $label', style: TextStyle(fontSize: 11, color: color)),
+          Text(
+            '$qty x $label',
+            style: TextStyle(
+              fontSize: AppResponsive.captionFontSize(context),
+              color: color,
+            ),
+          ),
         ],
       ),
     );

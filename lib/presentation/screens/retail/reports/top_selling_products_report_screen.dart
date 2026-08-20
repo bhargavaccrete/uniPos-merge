@@ -40,7 +40,7 @@ class TopSellingProductsReportScreen extends StatelessWidget {
         // Stamp the rank now, while the revenue-desc order from the service is
         // still intact — the table paginates, so index-in-page would be wrong.
         return [
-          for (var i = 0; i < rows.length; i++) {...rows[i], '__rank': i + 1}
+          for (var i = 0; i < rows.length; i++) {...rows[i], '__rank': i + 1},
         ];
       },
       summaryCards: (rows) => [
@@ -54,7 +54,8 @@ class TopSellingProductsReportScreen extends StatelessWidget {
         ReportSummaryCard(
           title: 'Revenue',
           value: formatMoney(
-              rows.fold<double>(0, (s, r) => s + (r['totalRevenue'] as double))),
+            rows.fold<double>(0, (s, r) => s + (r['totalRevenue'] as double)),
+          ),
           subtitle: 'from top ${rows.length}',
           icon: Icons.payments_rounded,
           color: AppColors.success,
@@ -70,31 +71,36 @@ class TopSellingProductsReportScreen extends StatelessWidget {
         // Rank comes from the service's revenue-desc order, so it survives
         // pagination.
         final rank = row['__rank'] as int?;
-        return DataRow(cells: [
-          DataCell(Text(
-            rank == null ? '' : '$rank',
-            style: GoogleFonts.poppins(
-              fontWeight: FontWeight.w700,
-              color: rank != null && rank <= 3
-                  ? AppColors.accent
-                  : AppColors.textSecondary,
+        return DataRow(
+          cells: [
+            DataCell(
+              Text(
+                rank == null ? '' : '$rank',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w700,
+                  color: rank != null && rank <= 3
+                      ? AppColors.accent
+                      : AppColors.textSecondary,
+                ),
+              ),
             ),
-          )),
-          DataCell(Text(row['productName'] as String)),
-          DataCell(Text('${row['totalQuantity']}')),
-          DataCell(Text(formatMoney(row['totalRevenue'] as double))),
-        ]);
+            DataCell(Text(row['productName'] as String)),
+            DataCell(Text('${row['totalQuantity']}')),
+            DataCell(Text(formatMoney(row['totalRevenue'] as double))),
+          ],
+        );
       },
       exportData: (rows) => ReportExportData(
         headers: const ['Rank', 'Product', 'Qty', 'Revenue'],
         rows: rows
-            .map((r) => [
-                  r['__rank'],
-                  r['productName'],
-                  r['totalQuantity'],
-                  ReportExportService.formatCurrency(
-                      r['totalRevenue'] as double),
-                ])
+            .map(
+              (r) => [
+                r['__rank'],
+                r['productName'],
+                r['totalQuantity'],
+                ReportExportService.formatCurrency(r['totalRevenue'] as double),
+              ],
+            )
             .toList(),
         summary: {'Products': rows.length},
       ),

@@ -169,8 +169,9 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
     if (existing != null) {
       if (!mounted || !dialogContext.mounted) return;
       Navigator.pop(dialogContext);
-      NotificationService.instance
-          .showError('That phone already belongs to ${existing.name ?? 'a customer'} — selected instead');
+      NotificationService.instance.showError(
+        'That phone already belongs to ${existing.name ?? 'a customer'} — selected instead',
+      );
       _selectCustomer(existing);
       return;
     }
@@ -189,8 +190,9 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
     // Never attach an unsaved customer to the bill — the sale would reference
     // a customerId that isn't in the box.
     if (!added) {
-      NotificationService.instance
-          .showError(customerStore.errorMessage ?? 'Failed to add customer');
+      NotificationService.instance.showError(
+        customerStore.errorMessage ?? 'Failed to add customer',
+      );
       return;
     }
 
@@ -218,68 +220,73 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
           const SizedBox(width: 4),
         ],
       ),
-      body: MoneyScope(
-        child: Column(
-          children: [
-            Container(
-              color: AppColors.white,
-              padding: const EdgeInsets.all(16),
-              child: AppTextField(
-                controller: _searchController,
-                focusNode: _searchFocusNode,
-                autofocus: true,
-                hint: 'Type name or mobile number...',
-                icon: Icons.search_rounded,
-                onChanged: _onSearchChanged,
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear, size: 20),
-                        onPressed: () {
-                          _searchController.clear();
-                          _onSearchChanged('');
-                        },
-                      )
-                    : null,
+      body: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        child: MoneyScope(
+          child: Column(
+            children: [
+              Container(
+                color: AppColors.white,
+                padding: const EdgeInsets.all(16),
+                child: AppTextField(
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  autofocus: true,
+                  hint: 'Type name or mobile number...',
+                  icon: Icons.search_rounded,
+                  onChanged: _onSearchChanged,
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 20),
+                          onPressed: () {
+                            _searchController.clear();
+                            _onSearchChanged('');
+                          },
+                        )
+                      : null,
+                ),
               ),
-            ),
-            Expanded(
-              child: Observer(
-                builder: (context) {
-                  if (_searchController.text.isEmpty) {
-                    return const AppEmptyState(
-                      icon: Icons.person_search_rounded,
-                      title: 'Search for a customer',
-                      message:
-                          'Type a name or mobile number to find customers.',
+              Expanded(
+                child: Observer(
+                  builder: (context) {
+                    if (_searchController.text.isEmpty) {
+                      return const AppEmptyState(
+                        icon: Icons.person_search_rounded,
+                        title: 'Search for a customer',
+                        message:
+                            'Type a name or mobile number to find customers.',
+                      );
+                    }
+
+                    final results = customerStore.filteredCustomers;
+
+                    if (results.isEmpty) {
+                      return AppEmptyState(
+                        icon: Icons.person_add_alt_1_outlined,
+                        title: 'No customer found',
+                        message: 'No results for "${_searchController.text}".',
+                        action: appEmptyStateAction(
+                          label: 'Add New Customer',
+                          onPressed: _showAddCustomerDialog,
+                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: results.length + 1,
+                      itemBuilder: (context, index) {
+                        if (index == 0) return _buildAddNewCustomerTile();
+                        return _buildCustomerTile(results[index - 1]);
+                      },
                     );
-                  }
-
-                  final results = customerStore.filteredCustomers;
-
-                  if (results.isEmpty) {
-                    return AppEmptyState(
-                      icon: Icons.person_add_alt_1_outlined,
-                      title: 'No customer found',
-                      message: 'No results for "${_searchController.text}".',
-                      action: appEmptyStateAction(
-                        label: 'Add New Customer',
-                        onPressed: _showAddCustomerDialog,
-                      ),
-                    );
-                  }
-
-                  return ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: results.length + 1,
-                    itemBuilder: (context, index) {
-                      if (index == 0) return _buildAddNewCustomerTile();
-                      return _buildCustomerTile(results[index - 1]);
-                    },
-                  );
-                },
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -390,7 +397,8 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
                     const SizedBox(height: 2),
                     Text(
                       [
-                        if (customer.phone?.isNotEmpty ?? false) customer.phone!,
+                        if (customer.phone?.isNotEmpty ?? false)
+                          customer.phone!,
                         if (customer.totalPurchaseAmount > 0)
                           formatMoney(customer.totalPurchaseAmount),
                         if (customer.loyaltyPoints > 0)
@@ -411,8 +419,10 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
               if (hasDue) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.danger.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
@@ -428,8 +438,11 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
                 ),
               ],
               const SizedBox(width: 4),
-              Icon(Icons.chevron_right_rounded,
-                  size: 20, color: AppColors.textSecondary),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: AppColors.textSecondary,
+              ),
             ],
           ),
         ),

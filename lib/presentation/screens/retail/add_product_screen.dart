@@ -77,8 +77,8 @@ class CustomAttributeData {
   final TextEditingController valueController;
 
   CustomAttributeData({required this.id})
-      : keyController = TextEditingController(),
-        valueController = TextEditingController();
+    : keyController = TextEditingController(),
+      valueController = TextEditingController();
 
   void dispose() {
     keyController.dispose();
@@ -102,24 +102,23 @@ class VariantFormData {
   /// controllers so a shop can use Flavour, Volume, Capacity instead.
   final Map<String, TextEditingController> fieldControllers = {};
 
-  VariantFormData({
-    required this.id,
-  })  : barcodeController = TextEditingController(),
-        costPriceController = TextEditingController(),
-        priceController = TextEditingController(),
-        mrpController = TextEditingController(),
-        stockController = TextEditingController(),
-        skuController = TextEditingController(),
-        customAttributes = [];
+  VariantFormData({required this.id})
+    : barcodeController = TextEditingController(),
+      costPriceController = TextEditingController(),
+      priceController = TextEditingController(),
+      mrpController = TextEditingController(),
+      stockController = TextEditingController(),
+      skuController = TextEditingController(),
+      customAttributes = [];
 
   /// Controller for a configured field, created on first use.
   TextEditingController fieldController(String attributeId) =>
       fieldControllers.putIfAbsent(attributeId, () => TextEditingController());
 
   void addCustomAttribute() {
-    customAttributes.add(CustomAttributeData(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-    ));
+    customAttributes.add(
+      CustomAttributeData(id: DateTime.now().millisecondsSinceEpoch.toString()),
+    );
   }
 
   void removeCustomAttribute(int index) {
@@ -177,6 +176,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   /// Product photo. Bytes rather than a path so it works on web too — the same
   /// convention the restaurant Items model uses.
   Uint8List? _imageBytes;
+
   /// Distinguishes "never touched the image" from "removed it", which
   /// copyWith cannot express on its own.
   bool _imageCleared = false;
@@ -263,7 +263,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final keptIds = fields.map((a) => a.attributeId).toSet();
     for (final variant in _variants) {
       for (final id in variant.fieldControllers.keys.toList()) {
-        if (!keptIds.contains(id)) variant.fieldControllers.remove(id)?.dispose();
+        if (!keptIds.contains(id))
+          variant.fieldControllers.remove(id)?.dispose();
       }
     }
 
@@ -316,16 +317,18 @@ class _AddProductScreenState extends State<AddProductScreen> {
       final suggestedTaxId = productStore.findTaxIdByHsnCode(value);
       if (suggestedTaxId != null && suggestedTaxId != _selectedTaxId) {
         setState(() => _selectedTaxId = suggestedTaxId);
-        NotificationService.instance.showInfo('Tax rate auto-filled from HSN $value');
+        NotificationService.instance.showInfo(
+          'Tax rate auto-filled from HSN $value',
+        );
       }
     });
   }
 
   void _addVariant() {
     setState(() {
-      _variants.add(VariantFormData(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-      ));
+      _variants.add(
+        VariantFormData(id: DateTime.now().millisecondsSinceEpoch.toString()),
+      );
     });
   }
 
@@ -351,8 +354,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
   /// [ProductDetailScreen], so nothing here touches them.
   Future<void> _updateProduct() async {
     if (!_formKey.currentState!.validate()) return;
-    if (!PlanGuard.allowedOr(context, RetailEntKeys.catalogProductsEdit,
-        featureName: 'Edit Products')) {
+    if (!PlanGuard.allowedOr(
+      context,
+      RetailEntKeys.catalogProductsEdit,
+      featureName: 'Edit Products',
+    )) {
       return;
     }
 
@@ -391,8 +397,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
   double? _taxRateFor(String? taxId) {
     if (taxId == null) return null;
     return taxStore.taxes
-        .firstWhere((t) => t.id == taxId,
-            orElse: () => Tax(id: '', taxname: '', taxperecentage: null))
+        .firstWhere(
+          (t) => t.id == taxId,
+          orElse: () => Tax(id: '', taxname: '', taxperecentage: null),
+        )
         .taxperecentage;
   }
 
@@ -416,7 +424,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
     if (manualVariants.isEmpty && _generatedVariants.isEmpty) {
       NotificationService.instance.showError(
-          'Add at least one variant, or generate them from attributes');
+        'Add at least one variant, or generate them from attributes',
+      );
       return;
     }
 
@@ -425,13 +434,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final seenBarcodes = <String>{};
     for (final variant in manualVariants) {
       if (variant.priceController.text.trim().isEmpty) {
-        NotificationService.instance
-            .showError('Please enter selling price for all variants');
+        NotificationService.instance.showError(
+          'Please enter selling price for all variants',
+        );
         return;
       }
       if (variant.stockController.text.trim().isEmpty) {
-        NotificationService.instance
-            .showError('Please enter stock for all variants');
+        NotificationService.instance.showError(
+          'Please enter stock for all variants',
+        );
         return;
       }
       // Against the catalogue AND against the other rows in this same form —
@@ -439,8 +450,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
       final barcode = variant.barcodeController.text.trim();
       if (barcode.isEmpty) continue;
       if (productStore.isBarcodeTaken(barcode) || !seenBarcodes.add(barcode)) {
-        NotificationService.instance
-            .showError('Barcode "$barcode" is already used by another variant');
+        NotificationService.instance.showError(
+          'Barcode "$barcode" is already used by another variant',
+        );
         return;
       }
     }
@@ -452,16 +464,19 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final taxRate = _selectedTaxId == null
         ? null
         : taxStore.taxes
-            .firstWhere((t) => t.id == _selectedTaxId,
-                orElse: () => Tax(id: '', taxname: '', taxperecentage: null))
-            .taxperecentage;
+              .firstWhere(
+                (t) => t.id == _selectedTaxId,
+                orElse: () => Tax(id: '', taxname: '', taxperecentage: null),
+              )
+              .taxperecentage;
 
     // Plan gate — block a NEW product once the products cap is reached.
     // No-op until a retail manifest is present (see PlanEnforce).
     if (!productStore.canAddProduct) {
       final max = productStore.productLimit;
       NotificationService.instance.showError(
-          'Product limit reached${max != null ? ' (max $max)' : ''}. Upgrade your plan to add more.');
+        'Product limit reached${max != null ? ' (max $max)' : ''}. Upgrade your plan to add more.',
+      );
       return;
     }
 
@@ -475,14 +490,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final product = ProductModel.fromProduct(
       productId: productId,
       productName: _nameController.text.trim(),
-      brandName: _brandController.text.trim().isEmpty ? null : _brandController.text.trim(),
+      brandName: _brandController.text.trim().isEmpty
+          ? null
+          : _brandController.text.trim(),
       category: _selectedCategoryModel?.id ?? '',
       imagePath: null,
-      description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
+      description: _descriptionController.text.trim().isEmpty
+          ? null
+          : _descriptionController.text.trim(),
       hasVariants: variantCount > 1,
       productType: variantCount > 1 ? 'variable' : 'simple',
       gstRate: taxRate,
-      hsnCode: _hsnCodeController.text.trim().isEmpty ? null : _hsnCodeController.text.trim(),
+      hsnCode: _hsnCodeController.text.trim().isEmpty
+          ? null
+          : _hsnCodeController.text.trim(),
       taxId: _selectedTaxId,
       imageBytes: _imageBytes,
     );
@@ -492,48 +513,53 @@ class _AddProductScreenState extends State<AddProductScreen> {
     // Attribute-generated variants.
     for (final variant in _generatedVariants) {
       // Point them at the id we just created.
-      await productStore.addVariant(variant.copyWith(
-        productId: productId,
-        taxRate: taxRate,
-        taxId: _selectedTaxId,
-      ));
+      await productStore.addVariant(
+        variant.copyWith(
+          productId: productId,
+          taxRate: taxRate,
+          taxId: _selectedTaxId,
+        ),
+      );
     }
 
     // Manually entered variants.
     for (final variantData in manualVariants) {
       final fieldValues = _mapFieldValues(variantData);
 
-      await productStore.addVariant(VarianteModel.create(
-        varianteId: _uuid.v4(),
-        productId: productId,
-        sku: variantData.skuController.text.trim().isEmpty
-            ? null
-            : variantData.skuController.text.trim(),
-        barcode: variantData.barcodeController.text.trim().isEmpty
-            ? null
-            : variantData.barcodeController.text.trim(),
-        // The field labelled "Selling Price" must land in sellingPrice — that
-        // is what the cart bills (cart_store: sellingPrice ?? mrp ?? 0). It
-        // used to be written to mrp, leaving sellingPrice null and the MRP box
-        // discarded entirely.
-        sellingPrice:
-            double.tryParse(variantData.priceController.text.trim()) ?? 0.0,
-        mrp: variantData.mrpController.text.trim().isEmpty
-            ? null
-            : double.tryParse(variantData.mrpController.text.trim()),
-        costPrice: variantData.costPriceController.text.trim().isEmpty
-            ? null
-            : double.tryParse(variantData.costPriceController.text.trim()),
-        stockQty: int.tryParse(variantData.stockController.text.trim()) ?? 0,
-        taxRate: taxRate,
-        taxId: _selectedTaxId,
-        customAttributes: fieldValues,
-      ));
+      await productStore.addVariant(
+        VarianteModel.create(
+          varianteId: _uuid.v4(),
+          productId: productId,
+          sku: variantData.skuController.text.trim().isEmpty
+              ? null
+              : variantData.skuController.text.trim(),
+          barcode: variantData.barcodeController.text.trim().isEmpty
+              ? null
+              : variantData.barcodeController.text.trim(),
+          // The field labelled "Selling Price" must land in sellingPrice — that
+          // is what the cart bills (cart_store: sellingPrice ?? mrp ?? 0). It
+          // used to be written to mrp, leaving sellingPrice null and the MRP box
+          // discarded entirely.
+          sellingPrice:
+              double.tryParse(variantData.priceController.text.trim()) ?? 0.0,
+          mrp: variantData.mrpController.text.trim().isEmpty
+              ? null
+              : double.tryParse(variantData.mrpController.text.trim()),
+          costPrice: variantData.costPriceController.text.trim().isEmpty
+              ? null
+              : double.tryParse(variantData.costPriceController.text.trim()),
+          stockQty: int.tryParse(variantData.stockController.text.trim()) ?? 0,
+          taxRate: taxRate,
+          taxId: _selectedTaxId,
+          customAttributes: fieldValues,
+        ),
+      );
     }
 
     if (mounted) {
       NotificationService.instance.showSuccess(
-          '${product.productName} with $variantCount variant(s) added');
+        '${product.productName} with $variantCount variant(s) added',
+      );
       Navigator.pop(context);
     }
   }
@@ -547,19 +573,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final rows = <Widget>[];
     for (var i = 0; i < _simpleFields.length; i += 2) {
       final left = _simpleFields[i];
-      final right =
-          i + 1 < _simpleFields.length ? _simpleFields[i + 1] : null;
+      final right = i + 1 < _simpleFields.length ? _simpleFields[i + 1] : null;
 
-      rows.add(Row(
-        children: [
-          Expanded(child: _buildFieldInput(variant, left)),
-          const SizedBox(width: 12),
-          if (right != null)
-            Expanded(child: _buildFieldInput(variant, right))
-          else
-            const Expanded(child: SizedBox.shrink()),
-        ],
-      ));
+      rows.add(
+        Row(
+          children: [
+            Expanded(child: _buildFieldInput(variant, left)),
+            const SizedBox(width: 12),
+            if (right != null)
+              Expanded(child: _buildFieldInput(variant, right))
+            else
+              const Expanded(child: SizedBox.shrink()),
+          ],
+        ),
+      );
       rows.add(const SizedBox(height: 12));
     }
     return rows;
@@ -579,20 +606,30 @@ class _AddProductScreenState extends State<AddProductScreen> {
       suffixIcon: values.isEmpty
           ? null
           : PopupMenuButton<String>(
-              icon: const Icon(Icons.keyboard_arrow_down_rounded,
-                  size: 22, color: AppColors.textSecondary),
+              icon: const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 22,
+                color: AppColors.textSecondary,
+              ),
               tooltip: 'Choose ${attribute.name}',
               // M3 tints menu surfaces by default; keep them plain white.
               color: AppColors.white,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(12),
+              ),
               onSelected: (value) => setState(() => controller.text = value),
               itemBuilder: (_) => values
-                  .map((v) => PopupMenuItem<String>(
-                        value: v.value,
-                        child: Text(v.value,
-                            style: GoogleFonts.poppins(fontSize: 14)),
-                      ))
+                  .map(
+                    (v) => PopupMenuItem<String>(
+                      value: v.value,
+                      child: Text(
+                        v.value,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.bodyFontSize(context),
+                        ),
+                      ),
+                    ),
+                  )
                   .toList(),
             ),
     );
@@ -609,7 +646,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final entered = <String, String>{};
     for (final attribute in _simpleFields) {
       final value =
-          variantData.fieldControllers[attribute.attributeId]?.text.trim() ?? '';
+          variantData.fieldControllers[attribute.attributeId]?.text.trim() ??
+          '';
       if (value.isNotEmpty) entered[attribute.name] = value;
     }
 
@@ -625,166 +663,186 @@ class _AddProductScreenState extends State<AddProductScreen> {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
-          title: _isEditing ? 'Edit Product' : 'Add Product'),
+        title: _isEditing ? 'Edit Product' : 'Add Product',
+      ),
       body: Observer(
         builder: (context) => Form(
           key: _formKey,
-          child: ListView(
-            padding: AppResponsive.screenPadding(context),
-            children: [
-              // Product Information Section
-              _buildSectionHeader('Product Information'),
-              const SizedBox(height: 12),
-              UniversalImageUploader(
-                imageBytes: _imageBytes,
-                height: 160,
-                uploadLabel: 'Add Product Photo',
-                sizeHint: 'Optional • shown on the billing screen',
-                onTap: () async {
-                  final bytes = await UniversalImagePicker.showPicker(context);
-                  if (bytes == null || !mounted) return;
-                  setState(() {
-                    _imageBytes = bytes;
-                    _imageCleared = false;
-                  });
-                },
-                onDelete: _imageBytes == null
-                    ? null
-                    : () => setState(() {
+          // A single column of form fields stretched across a laptop is
+          // unreadable — cap it at the form width like the other retail forms.
+          child: AppResponsive.constrainedContent(
+            context: context,
+            alignment: Alignment.topCenter,
+            maxWidth: AppResponsive.maxCardWidth(context),
+            child: ListView(
+              padding: AppResponsive.screenPadding(context),
+              children: [
+                // Product Information Section
+                _buildSectionHeader('Product Information'),
+                const SizedBox(height: 12),
+                UniversalImageUploader(
+                  imageBytes: _imageBytes,
+                  height: 160,
+                  uploadLabel: 'Add Product Photo',
+                  sizeHint: 'Optional • shown on the billing screen',
+                  onTap: () async {
+                    final bytes = await UniversalImagePicker.showPicker(
+                      context,
+                    );
+                    if (bytes == null || !mounted) return;
+                    setState(() {
+                      _imageBytes = bytes;
+                      _imageCleared = false;
+                    });
+                  },
+                  onDelete: _imageBytes == null
+                      ? null
+                      : () => setState(() {
                           _imageBytes = null;
                           _imageCleared = true;
                         }),
-              ),
-              const SizedBox(height: 16),
-              _buildTextField(
-                controller: _nameController,
-                label: 'Product Name',
-                hint: 'e.g., Puma T-Shirt',
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter product name';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              _buildTextField(
-                controller: _brandController,
-                label: 'Brand Name (Optional)',
-                hint: 'e.g., Puma, Nike',
-              ),
-              const SizedBox(height: 12),
-              _buildCategoryDropdown(),
-              const SizedBox(height: 12),
-              _buildTextField(
-                controller: _descriptionController,
-                label: 'Description (Optional)',
-                hint: 'Enter product description',
-                maxLines: 3,
-              ),
-              const SizedBox(height: 12),
-              _buildTextField(
-                controller: _hsnCodeController,
-                label: 'HSN Code (Optional)',
-                hint: 'e.g., 6109',
-                onChanged: _onHsnCodeChanged,
-              ),
-              if (TaxFeature.enabled) ...[
-                const SizedBox(height: 12),
-                _buildTaxDropdown(),
-              ],
-              const SizedBox(height: 16),
-
-              // Editing touches product fields only — variants are managed on
-              // the product's own screen, which is where you came from.
-              if (!_isEditing) ...[
-                const SizedBox(height: 8),
-
-                // ── One Variants section for every product ──────────────
-                // There is no Simple/Variable mode: a product simply has
-                // variants. Type them in, generate them from attributes, or
-                // both. The POS already decides how to behave by counting
-                // them (posscreen: variants.length == 1 → straight to cart).
-                _buildSectionHeader(
-                  'Variants (${_variants.length + _generatedVariants.length})',
-                  trailing: IconButton(
-                    icon: const Icon(Icons.tune,
-                        size: 20, color: AppColors.primary),
-                    tooltip: 'Choose which detail fields appear',
-                    visualDensity: VisualDensity.compact,
-                    onPressed: _openSimpleFieldSettings,
-                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  controller: _nameController,
+                  label: 'Product Name',
+                  hint: 'e.g., Puma T-Shirt',
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter product name';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 12),
-
-                // Manually entered variants.
-                ..._variants.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final variant = entry.value;
-                  return _buildVariantCard(variant, index);
-                }),
-
+                _buildTextField(
+                  controller: _brandController,
+                  label: 'Brand Name (Optional)',
+                  hint: 'e.g., Puma, Nike',
+                ),
                 const SizedBox(height: 12),
+                _buildCategoryDropdown(),
+                const SizedBox(height: 12),
+                _buildTextField(
+                  controller: _descriptionController,
+                  label: 'Description (Optional)',
+                  hint: 'Enter product description',
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 12),
+                _buildTextField(
+                  controller: _hsnCodeController,
+                  label: 'HSN Code (Optional)',
+                  hint: 'e.g., 6109',
+                  onChanged: _onHsnCodeChanged,
+                ),
+                if (TaxFeature.enabled) ...[
+                  const SizedBox(height: 12),
+                  _buildTaxDropdown(),
+                ],
+                const SizedBox(height: 16),
+
+                // Editing touches product fields only — variants are managed on
+                // the product's own screen, which is where you came from.
+                if (!_isEditing) ...[
+                  const SizedBox(height: 8),
+
+                  // ── One Variants section for every product ──────────────
+                  // There is no Simple/Variable mode: a product simply has
+                  // variants. Type them in, generate them from attributes, or
+                  // both. The POS already decides how to behave by counting
+                  // them (posscreen: variants.length == 1 → straight to cart).
+                  _buildSectionHeader(
+                    'Variants (${_variants.length + _generatedVariants.length})',
+                    trailing: IconButton(
+                      icon: const Icon(
+                        Icons.tune,
+                        size: 20,
+                        color: AppColors.primary,
+                      ),
+                      tooltip: 'Choose which detail fields appear',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: _openSimpleFieldSettings,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Manually entered variants.
+                  ..._variants.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final variant = entry.value;
+                    return _buildVariantCard(variant, index);
+                  }),
+
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _addVariant,
+                      icon: const Icon(
+                        Icons.add,
+                        size: 18,
+                        color: AppColors.primary,
+                      ),
+                      label: Text(
+                        'Add variant',
+                        style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // ── Bulk add: many variants at once, from attributes ─────
+                  const SizedBox(height: 16),
+                  _buildBulkAddPanel(),
+
+                  if (_generatedVariants.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    _buildSectionHeader(
+                      'Generated Variants (${_generatedVariants.length})',
+                    ),
+                    const SizedBox(height: 12),
+                    _buildBulkEditBar(),
+                    const SizedBox(height: 12),
+                    _buildGeneratedVariantsList(),
+                  ],
+                ],
+
+                const SizedBox(height: 32),
+
+                // Save Button
                 SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: _addVariant,
-                    icon: const Icon(Icons.add,
-                        size: 18, color: AppColors.primary),
-                    label: Text('Add variant',
-                        style:
-                            GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      side: const BorderSide(color: AppColors.primary),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _isEditing ? _updateProduct : _saveProduct,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.white,
+                      elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                  ),
-                ),
-
-                // ── Bulk add: many variants at once, from attributes ─────
-                const SizedBox(height: 16),
-                _buildBulkAddPanel(),
-
-                if (_generatedVariants.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  _buildSectionHeader(
-                      'Generated Variants (${_generatedVariants.length})'),
-                  const SizedBox(height: 12),
-                  _buildBulkEditBar(),
-                  const SizedBox(height: 12),
-                  _buildGeneratedVariantsList(),
-                ],
-              ],
-
-              const SizedBox(height: 32),
-
-              // Save Button
-              SizedBox(
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _isEditing ? _updateProduct : _saveProduct,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: AppColors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                    child: Text(
+                      _isEditing
+                          ? 'Save Changes'
+                          : 'Add Product with ${_variants.length + _generatedVariants.length} Variant(s)',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.subheadingFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                  child: Text(
-                    _isEditing
-                        ? 'Save Changes'
-                        : 'Add Product with ${_variants.length + _generatedVariants.length} Variant(s)',
-                    style: GoogleFonts.poppins(
-                        fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -810,7 +868,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
         ),
         boxShadow: const [
           BoxShadow(
-              color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2)),
+            color: Color(0x08000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
         ],
       ),
       child: Column(
@@ -819,7 +880,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
           InkWell(
             borderRadius: BorderRadius.circular(12),
             onTap: () => setState(
-                () => _showAttributeGenerator = !_showAttributeGenerator),
+              () => _showAttributeGenerator = !_showAttributeGenerator,
+            ),
             child: Padding(
               padding: const EdgeInsets.all(14),
               child: Row(
@@ -830,8 +892,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       color: AppColors.info.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.auto_awesome,
-                        size: 20, color: AppColors.info),
+                    child: const Icon(
+                      Icons.auto_awesome,
+                      size: 20,
+                      color: AppColors.info,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -903,7 +968,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
         // Same soft lift the POS and report cards use.
         boxShadow: const [
           BoxShadow(
-              color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2)),
+            color: Color(0x08000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
         ],
       ),
       child: Column(
@@ -922,7 +990,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   'Variant ${index + 1}',
                   style: GoogleFonts.poppins(
                     color: Colors.white,
-                    fontSize: 12,
+                    fontSize: AppResponsive.smallFontSize(context),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -930,11 +998,17 @@ class _AddProductScreenState extends State<AddProductScreen> {
               const Spacer(),
               if (_variants.length > 1)
                 IconButton(
-                  icon: const Icon(Icons.delete_outline,
-                      color: AppColors.danger, size: 20),
+                  icon: const Icon(
+                    Icons.delete_outline,
+                    color: AppColors.danger,
+                    size: 20,
+                  ),
                   onPressed: () => _removeVariant(index),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
                 ),
             ],
           ),
@@ -948,8 +1022,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
             label: 'Barcode',
             hint: 'Scan or enter',
             suffixIcon: IconButton(
-              icon: const Icon(Icons.qr_code_scanner,
-                  color: AppColors.primary, size: 20),
+              icon: const Icon(
+                Icons.qr_code_scanner,
+                color: AppColors.primary,
+                size: 20,
+              ),
               onPressed: () => _scanBarcode(variant),
             ),
           ),
@@ -1026,7 +1103,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               Text(
                 'One-off details (this product only)',
                 style: GoogleFonts.poppins(
-                  fontSize: 13,
+                  fontSize: AppResponsive.smallFontSize(context),
                   fontWeight: FontWeight.w600,
                   color: AppColors.textSecondary,
                 ),
@@ -1065,7 +1142,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       child: Autocomplete<String>(
                         optionsBuilder: (value) {
                           final query = value.text.trim().toLowerCase();
-                          if (query.isEmpty) return const Iterable<String>.empty();
+                          if (query.isEmpty)
+                            return const Iterable<String>.empty();
                           return attributeStore.attributes
                               .map((a) => a.name)
                               .where((n) => n.toLowerCase().contains(query));
@@ -1074,17 +1152,17 @@ class _AddProductScreenState extends State<AddProductScreen> {
                             attr.keyController.text = selection,
                         fieldViewBuilder:
                             (context, controller, focusNode, onSubmitted) {
-                          // Mirror the shared controller so save-time reads
-                          // still see what was typed.
-                          controller.value = attr.keyController.value;
-                          return _buildTextField(
-                            controller: controller,
-                            focusNode: focusNode,
-                            label: 'Detail',
-                            hint: 'e.g., Material',
-                            onChanged: (v) => attr.keyController.text = v,
-                          );
-                        },
+                              // Mirror the shared controller so save-time reads
+                              // still see what was typed.
+                              controller.value = attr.keyController.value;
+                              return _buildTextField(
+                                controller: controller,
+                                focusNode: focusNode,
+                                label: 'Detail',
+                                hint: 'e.g., Material',
+                                onChanged: (v) => attr.keyController.text = v,
+                              );
+                            },
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -1096,15 +1174,21 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.remove_circle_outline,
-                          color: AppColors.danger, size: 20),
+                      icon: const Icon(
+                        Icons.remove_circle_outline,
+                        color: AppColors.danger,
+                        size: 20,
+                      ),
                       onPressed: () {
                         setState(() {
                           variant.removeCustomAttribute(attrIndex);
                         });
                       },
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
                     ),
                   ],
                 ),
@@ -1116,7 +1200,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               'For details you record just this once. Fields you use on every '
               'product belong in Settings → Simple Product Fields.',
               style: GoogleFonts.poppins(
-                fontSize: 11,
+                fontSize: AppResponsive.captionFontSize(context),
                 color: AppColors.textSecondary,
                 fontStyle: FontStyle.italic,
               ),
@@ -1173,27 +1257,30 @@ class _AddProductScreenState extends State<AddProductScreen> {
   /// Dropdown chrome matching [AppTextField], so the pickers sit flush with
   /// the text fields around them instead of using Material defaults.
   InputDecoration _pickerDecoration(String label) => InputDecoration(
-        labelText: label,
-        labelStyle: GoogleFonts.poppins(
-            fontSize: 14, color: AppColors.textSecondary),
-        filled: true,
-        fillColor: AppColors.surfaceLight,
-        isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.divider),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.divider),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-        ),
-      );
+    labelText: label,
+    // Matches AppTextField: a 13px label and NO isDense. With isDense and a
+    // 14px label the floated label collided with the top border, and the
+    // picker sat shorter than the text fields stacked above it.
+    labelStyle: GoogleFonts.poppins(
+      fontSize: AppResponsive.smallFontSize(context),
+      color: AppColors.textSecondary,
+    ),
+    filled: true,
+    fillColor: AppColors.surfaceLight,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: AppColors.divider),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: AppColors.divider),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+    ),
+  );
 
   /// Category picker.
   ///
@@ -1220,8 +1307,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
               },
               borderRadius: BorderRadius.circular(12),
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 15,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceLight,
                   borderRadius: BorderRadius.circular(12),
@@ -1231,18 +1320,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.folder_outlined,
-                        size: 20,
-                        color: selected == null
-                            ? AppColors.textSecondary
-                            : AppColors.primary),
+                    Icon(
+                      Icons.folder_outlined,
+                      size: 20,
+                      color: selected == null
+                          ? AppColors.textSecondary
+                          : AppColors.primary,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         selected?.name ?? 'Select category',
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.poppins(
-                          fontSize: 14,
+                          fontSize: AppResponsive.bodyFontSize(context),
                           fontWeight: selected == null
                               ? FontWeight.w400
                               : FontWeight.w500,
@@ -1252,8 +1343,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         ),
                       ),
                     ),
-                    const Icon(Icons.keyboard_arrow_down_rounded,
-                        color: AppColors.textSecondary),
+                    const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: AppColors.textSecondary,
+                    ),
                   ],
                 ),
               ),
@@ -1264,7 +1357,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 child: Text(
                   state.errorText!,
                   style: GoogleFonts.poppins(
-                      fontSize: 12, color: AppColors.danger),
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: AppColors.danger,
+                  ),
                 ),
               ),
           ],
@@ -1294,15 +1389,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
                 child: Row(
                   children: [
-                    Text('Select Category',
-                        style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary)),
+                    Text(
+                      'Select Category',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.subheadingFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
                     const Spacer(),
                     IconButton(
-                      icon: const Icon(Icons.close_rounded,
-                          color: AppColors.textSecondary),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: AppColors.textSecondary,
+                      ),
                       onPressed: () => Navigator.pop(sheetContext),
                     ),
                   ],
@@ -1313,10 +1413,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 child: _categories.isEmpty
                     ? Padding(
                         padding: const EdgeInsets.all(24),
-                        child: Text('No categories yet.',
-                            style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                color: AppColors.textSecondary)),
+                        child: Text(
+                          'No categories yet.',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
                       )
                     : ListView.builder(
                         shrinkWrap: true,
@@ -1335,19 +1438,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                   : AppColors.textSecondary,
                               size: 20,
                             ),
-                            title: Text(category.name,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 14,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
-                                  color: isSelected
-                                      ? AppColors.primary
-                                      : AppColors.textPrimary,
-                                )),
+                            title: Text(
+                              category.name,
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.bodyFontSize(context),
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : AppColors.textPrimary,
+                              ),
+                            ),
                             onTap: () {
-                              setState(
-                                  () => _selectedCategoryModel = category);
+                              setState(() => _selectedCategoryModel = category);
                               Navigator.pop(sheetContext);
                             },
                           );
@@ -1356,19 +1460,26 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ),
               const Divider(height: 1, color: AppColors.divider),
               ListTile(
-                leading: const Icon(Icons.tune_rounded,
-                    color: AppColors.primary, size: 20),
-                title: Text('Manage Categories',
-                    style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary)),
+                leading: const Icon(
+                  Icons.tune_rounded,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+                title: Text(
+                  'Manage Categories',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
                 onTap: () async {
                   Navigator.pop(sheetContext);
                   await Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const CategoryManagementScreen()),
+                      builder: (_) => const CategoryManagementScreen(),
+                    ),
                   );
                   await _loadCategories();
                 },
@@ -1390,17 +1501,31 @@ class _AddProductScreenState extends State<AddProductScreen> {
       borderRadius: BorderRadius.circular(12),
       menuMaxHeight: 320,
       elevation: 3,
-      icon: const Icon(Icons.keyboard_arrow_down_rounded,
-          color: AppColors.textSecondary),
+      icon: const Icon(
+        Icons.keyboard_arrow_down_rounded,
+        color: AppColors.textSecondary,
+      ),
       items: [
         DropdownMenuItem(
-            value: null,
-            child: Text('No tax', style: GoogleFonts.poppins(fontSize: 14))),
-        ...taxes.map((tax) => DropdownMenuItem(
-              value: tax.id,
-              child: Text('${tax.taxname} (${tax.taxperecentage ?? 0}%)',
-                  style: GoogleFonts.poppins(fontSize: 14)),
-            )),
+          value: null,
+          child: Text(
+            'No tax',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+            ),
+          ),
+        ),
+        ...taxes.map(
+          (tax) => DropdownMenuItem(
+            value: tax.id,
+            child: Text(
+              '${tax.taxname} (${tax.taxperecentage ?? 0}%)',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+              ),
+            ),
+          ),
+        ),
       ],
       onChanged: (value) => setState(() {
         _selectedTaxId = value;
@@ -1420,8 +1545,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
       productId: _draftProductId,
       defaultPrice: double.tryParse(_defaultPriceController.text),
       defaultCostPrice: double.tryParse(_defaultCostController.text),
-      existingVariants:
-          _generatedVariants.isNotEmpty ? _generatedVariants : null,
+      existingVariants: _generatedVariants.isNotEmpty
+          ? _generatedVariants
+          : null,
       // Attribute picks are owned by the selector; the parent only needs a
       // rebuild so the sections below stay in sync.
       onAttributesChanged: (_) => setState(() {}),
@@ -1435,7 +1561,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   /// Bulk Edit Bar - WooCommerce-style "Set prices for all"
   Widget _buildBulkEditBar() {
-    final allSelected = _selectedVariantsForBulk.length == _generatedVariants.length;
+    final allSelected =
+        _selectedVariantsForBulk.length == _generatedVariants.length;
     final noneSelected = _selectedVariantsForBulk.isEmpty;
     final selectedCount = _selectedVariantsForBulk.length;
 
@@ -1458,7 +1585,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 child: Text(
                   'Bulk Edit - $selectedCount / ${_generatedVariants.length} selected',
                   style: GoogleFonts.poppins(
-                    fontSize: 14,
+                    fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: AppColors.warning,
                   ),
@@ -1466,14 +1593,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ),
               // Select All button
               TextButton(
-                onPressed: allSelected ? null : () {
-                  setState(() {
-                    _selectedVariantsForBulk.clear();
-                    for (var v in _generatedVariants) {
-                      _selectedVariantsForBulk.add(v.varianteId);
-                    }
-                  });
-                },
+                onPressed: allSelected
+                    ? null
+                    : () {
+                        setState(() {
+                          _selectedVariantsForBulk.clear();
+                          for (var v in _generatedVariants) {
+                            _selectedVariantsForBulk.add(v.varianteId);
+                          }
+                        });
+                      },
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   minimumSize: Size.zero,
@@ -1482,22 +1611,26 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 child: Text(
                   'Select All',
                   style: GoogleFonts.poppins(
-                    fontSize: 12,
+                    fontSize: AppResponsive.smallFontSize(context),
                     color: allSelected
                         ? AppColors.textSecondary
                         : AppColors.warning,
                   ),
                 ),
               ),
-              Text(' | ',
-                  style: GoogleFonts.poppins(color: AppColors.textSecondary)),
+              Text(
+                ' | ',
+                style: GoogleFonts.poppins(color: AppColors.textSecondary),
+              ),
               // Unselect All button
               TextButton(
-                onPressed: noneSelected ? null : () {
-                  setState(() {
-                    _selectedVariantsForBulk.clear();
-                  });
-                },
+                onPressed: noneSelected
+                    ? null
+                    : () {
+                        setState(() {
+                          _selectedVariantsForBulk.clear();
+                        });
+                      },
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   minimumSize: Size.zero,
@@ -1506,7 +1639,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 child: Text(
                   'Unselect All',
                   style: GoogleFonts.poppins(
-                    fontSize: 12,
+                    fontSize: AppResponsive.smallFontSize(context),
                     color: noneSelected
                         ? AppColors.textSecondary
                         : AppColors.danger,
@@ -1581,8 +1714,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              child: Text('Apply',
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+              child: Text(
+                'Apply',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+              ),
             ),
           ),
 
@@ -1590,7 +1725,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           Text(
             'Enter values and click Apply to update all variants at once',
             style: GoogleFonts.poppins(
-              fontSize: 11,
+              fontSize: AppResponsive.captionFontSize(context),
               color: AppColors.textSecondary,
               fontStyle: FontStyle.italic,
             ),
@@ -1608,7 +1743,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final stock = int.tryParse(_defaultStockController.text);
 
     if (costPrice == null && sellingPrice == null) {
-      NotificationService.instance.showWarning('Please enter at least one price value');
+      NotificationService.instance.showWarning(
+        'Please enter at least one price value',
+      );
       return;
     }
 
@@ -1619,7 +1756,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
         ? _generatedVariants.length
         : _selectedVariantsForBulk.length;
 
-    NotificationService.instance.showSuccess('Applied to $appliedCount variant(s)');
+    NotificationService.instance.showSuccess(
+      'Applied to $appliedCount variant(s)',
+    );
   }
 
   /// Apply values to selected variants only
@@ -1633,7 +1772,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
       for (var i = 0; i < _generatedVariants.length; i++) {
         final variant = _generatedVariants[i];
         // Only apply to selected variants (or all if none selected)
-        if (_selectedVariantsForBulk.isEmpty || _selectedVariantsForBulk.contains(variant.varianteId)) {
+        if (_selectedVariantsForBulk.isEmpty ||
+            _selectedVariantsForBulk.contains(variant.varianteId)) {
           _generatedVariants[i] = variant.copyWith(
             costPrice: costPrice ?? variant.costPrice,
             sellingPrice: sellingPrice ?? variant.sellingPrice,
@@ -1661,12 +1801,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
     // Use Key to force rebuild when variant data changes
     return Container(
-      key: ValueKey('${variant.varianteId}_${variant.costPrice}_${variant.sellingPrice}_${variant.mrp}_${variant.stockQty}_$isSelected'),
+      key: ValueKey(
+        '${variant.varianteId}_${variant.costPrice}_${variant.sellingPrice}_${variant.mrp}_${variant.stockQty}_$isSelected',
+      ),
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color:
-            isSelected ? AppColors.warning.withOpacity(0.10) : AppColors.white,
+        color: isSelected
+            ? AppColors.warning.withOpacity(0.10)
+            : AppColors.white,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: isSelected ? AppColors.warning : AppColors.divider,
@@ -1697,14 +1840,17 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     color: isSelected ? AppColors.warning : AppColors.white,
                     borderRadius: BorderRadius.circular(4),
                     border: Border.all(
-                      color:
-                          isSelected ? AppColors.warning : AppColors.divider,
+                      color: isSelected ? AppColors.warning : AppColors.divider,
                       width: 2,
                     ),
                   ),
                   child: isSelected
-                    ? const Icon(Icons.check, size: 16, color: AppColors.white)
-                    : null,
+                      ? const Icon(
+                          Icons.check,
+                          size: 16,
+                          color: AppColors.white,
+                        )
+                      : null,
                 ),
               ),
               const SizedBox(width: 8),
@@ -1718,7 +1864,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   variant.shortDescription,
                   style: GoogleFonts.poppins(
                     color: Colors.white,
-                    fontSize: 12,
+                    fontSize: AppResponsive.smallFontSize(context),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1726,7 +1872,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
               if (variant.isDefault) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.green[100],
                     borderRadius: BorderRadius.circular(4),
@@ -1735,7 +1884,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     'Default',
                     style: GoogleFonts.poppins(
                       color: Colors.green,
-                      fontSize: 10,
+                      fontSize: AppResponsive.captionFontSize(context),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1745,7 +1894,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               Text(
                 'SKU: ${variant.sku ?? "Auto"}',
                 style: GoogleFonts.poppins(
-                  fontSize: 11,
+                  fontSize: AppResponsive.captionFontSize(context),
                   color: AppColors.textSecondary,
                 ),
               ),
@@ -1762,7 +1911,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   value: variant.costPrice?.toString() ?? '',
                   label: 'Cost Price',
                   onChanged: (value) {
-                    _updateGeneratedVariant(index, costPrice: double.tryParse(value));
+                    _updateGeneratedVariant(
+                      index,
+                      costPrice: double.tryParse(value),
+                    );
                   },
                 ),
               ),
@@ -1773,7 +1925,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   value: variant.sellingPrice?.toString() ?? '',
                   label: 'Selling Price',
                   onChanged: (value) {
-                    _updateGeneratedVariant(index, sellingPrice: double.tryParse(value));
+                    _updateGeneratedVariant(
+                      index,
+                      sellingPrice: double.tryParse(value),
+                    );
                   },
                 ),
               ),
@@ -1785,7 +1940,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   label: 'Stock',
                   inputFormatters: _qtyFormatters,
                   onChanged: (value) {
-                    _updateGeneratedVariant(index, stockQty: int.tryParse(value));
+                    _updateGeneratedVariant(
+                      index,
+                      stockQty: int.tryParse(value),
+                    );
                   },
                 ),
               ),
@@ -1800,13 +1958,17 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   initialValue: variant.barcode ?? '',
                   label: 'Barcode',
                   suffixIcon: IconButton(
-                    icon: const Icon(Icons.qr_code_scanner,
-                        color: AppColors.primary, size: 20),
+                    icon: const Icon(
+                      Icons.qr_code_scanner,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
                     onPressed: () async {
                       final barcode = await Navigator.push<String>(
                         context,
                         MaterialPageRoute(
-                            builder: (_) => const ScannerScreen()),
+                          builder: (_) => const ScannerScreen(),
+                        ),
                       );
                       if (barcode != null) {
                         _updateGeneratedVariant(index, barcode: barcode);

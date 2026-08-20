@@ -39,257 +39,301 @@ class ReportsScreen extends StatelessWidget {
       appBar: buildPrimaryAppBar(title: 'Reports'),
       body: AppResponsive.constrainedContent(
         context: context,
+        alignment: Alignment.topCenter,
         child: ListView(
           padding: AppResponsive.padding(context),
           children: [
-          _buildSectionHeader(context, 'Sales Reports'),
-          _buildReportCard(
-            context,
-            title: 'Daily Sales',
-            subtitle: 'View sales for a specific date',
-            icon: Icons.today,
-            color: const Color(0xFF2196F3),
-            onTap: () => Navigator.push(
+            _buildSectionHeader(context, 'Sales Reports'),
+            _buildReportCard(
               context,
-              MaterialPageRoute(builder: (context) => const DailySalesReportScreen()),
+              title: 'Daily Sales',
+              subtitle: 'View sales for a specific date',
+              icon: Icons.today,
+              color: const Color(0xFF2196F3),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const DailySalesReportScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsDailySales,
             ),
-            entitlementKey: RetailEntKeys.reportsDailySales,
-          ),
-          _buildReportCard(
-            context,
-            title: 'Monthly Sales',
-            subtitle: 'View monthly sales breakdown',
-            icon: Icons.calendar_month,
-            color: const Color(0xFF9C27B0),
-            onTap: () => Navigator.push(
+            _buildReportCard(
               context,
-              MaterialPageRoute(builder: (context) => const MonthlySalesReportScreen()),
+              title: 'Monthly Sales',
+              subtitle: 'View monthly sales breakdown',
+              icon: Icons.calendar_month,
+              color: const Color(0xFF9C27B0),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const MonthlySalesReportScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsMonthlySales,
             ),
-            entitlementKey: RetailEntKeys.reportsMonthlySales,
-          ),
-          _buildReportCard(
-            context,
-            title: 'Product-wise Sales',
-            subtitle: 'Sales grouped by products',
-            icon: Icons.shopping_bag,
-            color: const Color(0xFF4CAF50),
-            onTap: () => Navigator.push(
+            _buildReportCard(
               context,
-              MaterialPageRoute(builder: (context) => const ProductWiseSalesReportScreen()),
+              title: 'Product-wise Sales',
+              subtitle: 'Sales grouped by products',
+              icon: Icons.shopping_bag,
+              color: const Color(0xFF4CAF50),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ProductWiseSalesReportScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsSaleByProduct,
             ),
-            entitlementKey: RetailEntKeys.reportsSaleByProduct,
-          ),
-          _buildReportCard(
-            context,
-            title: 'Variant-wise Sales',
-            subtitle: 'Sales grouped by product variants',
-            icon: Icons.settings,
-            color: const Color(0xFFFF9800),
-            onTap: () => Navigator.push(
+            _buildReportCard(
               context,
-              MaterialPageRoute(builder: (context) => const VariantWiseSalesReportScreen()),
+              title: 'Variant-wise Sales',
+              subtitle: 'Sales grouped by product variants',
+              icon: Icons.settings,
+              color: const Color(0xFFFF9800),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const VariantWiseSalesReportScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsSaleByVariant,
             ),
-            entitlementKey: RetailEntKeys.reportsSaleByVariant,
-          ),
-          _buildReportCard(
-            context,
-            title: 'Category-wise Sales',
-            subtitle: 'Sales grouped by categories',
-            icon: Icons.category,
-            color: const Color(0xFF00BCD4),
-            onTap: () => Navigator.push(
+            _buildReportCard(
               context,
-              MaterialPageRoute(builder: (context) => const CategoryWiseSalesReportScreen()),
+              title: 'Category-wise Sales',
+              subtitle: 'Sales grouped by categories',
+              icon: Icons.category,
+              color: const Color(0xFF00BCD4),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CategoryWiseSalesReportScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsSaleByCategory,
             ),
-            entitlementKey: RetailEntKeys.reportsSaleByCategory,
-          ),
-          _buildReportCard(
-            context,
-            title: 'Top Selling Products',
-            subtitle: 'Best performing products',
-            icon: Icons.trending_up,
-            color: const Color(0xFFE91E63),
-            onTap: () => Navigator.push(
+            _buildReportCard(
               context,
-              MaterialPageRoute(builder: (context) => const TopSellingProductsReportScreen()),
+              title: 'Top Selling Products',
+              subtitle: 'Best performing products',
+              icon: Icons.trending_up,
+              color: const Color(0xFFE91E63),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TopSellingProductsReportScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsTopSelling,
             ),
-            entitlementKey: RetailEntKeys.reportsTopSelling,
-          ),
-          const SizedBox(height: 16),
-          _buildSectionHeader(context, 'Purchase Reports'),
-          _buildReportCard(
-            context,
-            title: 'Purchase Summary',
-            subtitle: 'Ordered vs received, and what it cost',
-            icon: Icons.assessment,
-            color: const Color(0xFF3F51B5),
-            onTap: () => Navigator.push(
+            const SizedBox(height: 16),
+            _buildSectionHeader(context, 'Purchase Reports'),
+            _buildReportCard(
               context,
-              MaterialPageRoute(builder: (context) => const PurchaseSummaryReportScreen()),
+              title: 'Purchase Summary',
+              subtitle: 'Ordered vs received, and what it cost',
+              icon: Icons.assessment,
+              color: const Color(0xFF3F51B5),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PurchaseSummaryReportScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsPurchaseSummary,
             ),
-            entitlementKey: RetailEntKeys.reportsPurchaseSummary,
-          ),
-          _buildReportCard(
-            context,
-            title: 'Supplier-wise Purchases',
-            subtitle: 'Spend per supplier, based on goods received',
-            icon: Icons.local_shipping,
-            color: const Color(0xFF673AB7),
-            onTap: () => Navigator.push(
+            _buildReportCard(
               context,
-              MaterialPageRoute(builder: (context) => const SupplierWisePurchaseReportScreen()),
+              title: 'Supplier-wise Purchases',
+              subtitle: 'Spend per supplier, based on goods received',
+              icon: Icons.local_shipping,
+              color: const Color(0xFF673AB7),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const SupplierWisePurchaseReportScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsSupplierPurchase,
             ),
-            entitlementKey: RetailEntKeys.reportsSupplierPurchase,
-          ),
-          _buildReportCard(
-            context,
-            title: 'Pending Purchase Orders',
-            subtitle: 'Sent to supplier, awaiting delivery',
-            icon: Icons.hourglass_top,
-            color: const Color(0xFFFF9800),
-            onTap: () => Navigator.push(
+            _buildReportCard(
               context,
-              MaterialPageRoute(builder: (context) => const PurchaseOrderStatusReportScreen.pending()),
+              title: 'Pending Purchase Orders',
+              subtitle: 'Sent to supplier, awaiting delivery',
+              icon: Icons.hourglass_top,
+              color: const Color(0xFFFF9800),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const PurchaseOrderStatusReportScreen.pending(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsPoStatus,
             ),
-            entitlementKey: RetailEntKeys.reportsPoStatus,
-          ),
-          _buildReportCard(
-            context,
-            title: 'Partially Received Orders',
-            subtitle: 'Some goods still outstanding',
-            icon: Icons.incomplete_circle,
-            color: const Color(0xFF00BCD4),
-            onTap: () => Navigator.push(
+            _buildReportCard(
               context,
-              MaterialPageRoute(builder: (context) => const PurchaseOrderStatusReportScreen.partiallyReceived()),
+              title: 'Partially Received Orders',
+              subtitle: 'Some goods still outstanding',
+              icon: Icons.incomplete_circle,
+              color: const Color(0xFF00BCD4),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const PurchaseOrderStatusReportScreen.partiallyReceived(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsPoStatus,
             ),
-            entitlementKey: RetailEntKeys.reportsPoStatus,
-          ),
-          _buildReportCard(
-            context,
-            title: 'Completed Orders',
-            subtitle: 'Fully received purchase orders',
-            icon: Icons.check_circle,
-            color: const Color(0xFF4CAF50),
-            onTap: () => Navigator.push(
+            _buildReportCard(
               context,
-              MaterialPageRoute(builder: (context) => const PurchaseOrderStatusReportScreen.completed()),
+              title: 'Completed Orders',
+              subtitle: 'Fully received purchase orders',
+              icon: Icons.check_circle,
+              color: const Color(0xFF4CAF50),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const PurchaseOrderStatusReportScreen.completed(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsPoStatus,
             ),
-            entitlementKey: RetailEntKeys.reportsPoStatus,
-          ),
-          _buildReportCard(
-            context,
-            title: 'GRN Report',
-            subtitle: 'Confirmed goods receipts',
-            icon: Icons.receipt_long,
-            color: const Color(0xFF009688),
-            onTap: () => Navigator.push(
+            _buildReportCard(
               context,
-              MaterialPageRoute(builder: (context) => const GRNReportScreen()),
+              title: 'GRN Report',
+              subtitle: 'Confirmed goods receipts',
+              icon: Icons.receipt_long,
+              color: const Color(0xFF009688),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const GRNReportScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsGrn,
             ),
-            entitlementKey: RetailEntKeys.reportsGrn,
-          ),
-          _buildReportCard(
-            context,
-            title: 'Damaged Items',
-            subtitle: 'Received damaged, grouped by outcome',
-            icon: Icons.report_gmailerrorred,
-            color: const Color(0xFFE53935),
-            onTap: () => Navigator.push(
+            _buildReportCard(
               context,
-              MaterialPageRoute(builder: (context) => const DamagedItemsReportScreen()),
+              title: 'Damaged Items',
+              subtitle: 'Received damaged, grouped by outcome',
+              icon: Icons.report_gmailerrorred,
+              color: const Color(0xFFE53935),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const DamagedItemsReportScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsDamagedItems,
             ),
-            entitlementKey: RetailEntKeys.reportsDamagedItems,
-          ),
-          _buildReportCard(
-            context,
-            title: 'Purchase Returns',
-            subtitle: 'Returned to supplier and credit note status',
-            icon: Icons.assignment_return,
-            color: const Color(0xFF795548),
-            onTap: () => Navigator.push(
+            _buildReportCard(
               context,
-              MaterialPageRoute(builder: (context) => const PurchaseReturnReportScreen()),
+              title: 'Purchase Returns',
+              subtitle: 'Returned to supplier and credit note status',
+              icon: Icons.assignment_return,
+              color: const Color(0xFF795548),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PurchaseReturnReportScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsPurchaseReturn,
             ),
-            entitlementKey: RetailEntKeys.reportsPurchaseReturn,
-          ),
-          const SizedBox(height: 16),
-          _buildSectionHeader(context, 'Inventory Reports'),
-          _buildReportCard(
-            context,
-            title: 'Low Stock Alert',
-            subtitle: 'Products running low on stock',
-            icon: Icons.warning_amber,
-            color: Colors.red,
-            onTap: () => Navigator.push(
+            const SizedBox(height: 16),
+            _buildSectionHeader(context, 'Inventory Reports'),
+            _buildReportCard(
               context,
-              MaterialPageRoute(builder: (context) => const LowStockReportScreen()),
+              title: 'Low Stock Alert',
+              subtitle: 'Products running low on stock',
+              icon: Icons.warning_amber,
+              color: Colors.red,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LowStockReportScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsLowStock,
             ),
-            entitlementKey: RetailEntKeys.reportsLowStock,
-          ),
-          const SizedBox(height: 16),
-          _buildSectionHeader(context, 'Financial Reports'),
-          _buildReportCard(
-            context,
-            title: 'Profit Report',
-            subtitle: 'Revenue vs Cost analysis',
-            icon: Icons.attach_money,
-            color: const Color(0xFF4CAF50),
-            onTap: () => Navigator.push(
+            const SizedBox(height: 16),
+            _buildSectionHeader(context, 'Financial Reports'),
+            _buildReportCard(
               context,
-              MaterialPageRoute(builder: (context) => const ProfitReportScreen()),
+              title: 'Profit Report',
+              subtitle: 'Revenue vs Cost analysis',
+              icon: Icons.attach_money,
+              color: const Color(0xFF4CAF50),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ProfitReportScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsProfit,
             ),
-            entitlementKey: RetailEntKeys.reportsProfit,
-          ),
-          _buildReportCard(
-            context,
-            title: 'GST Report',
-            subtitle: 'Output tax by rate, product and category',
-            icon: Icons.receipt,
-            color: const Color(0xFF00796B),
-            onTap: () => Navigator.push(
+            _buildReportCard(
               context,
-              MaterialPageRoute(builder: (context) => const GstReportScreen()),
+              title: 'GST Report',
+              subtitle: 'Output tax by rate, product and category',
+              icon: Icons.receipt,
+              color: const Color(0xFF00796B),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const GstReportScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsGst,
             ),
-            entitlementKey: RetailEntKeys.reportsGst,
-          ),
-          _buildReportCard(
-            context,
-            title: 'Credit Reports',
-            subtitle: 'Credit sales, collections and outstanding',
-            icon: Icons.account_balance_wallet,
-            color: const Color(0xFF5D4037),
-            onTap: () => Navigator.push(
+            _buildReportCard(
               context,
-              MaterialPageRoute(builder: (context) => const CreditReportsScreen()),
+              title: 'Credit Reports',
+              subtitle: 'Credit sales, collections and outstanding',
+              icon: Icons.account_balance_wallet,
+              color: const Color(0xFF5D4037),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CreditReportsScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.billingCredit,
             ),
-            entitlementKey: RetailEntKeys.billingCredit,
-          ),
-          _buildReportCard(
-            context,
-            title: 'Cash Drawer History',
-            subtitle: 'Cash in and out over time',
-            icon: Icons.account_balance_wallet,
-            color: const Color(0xFF00897B),
-            onTap: () => Navigator.push(
+            _buildReportCard(
               context,
-              MaterialPageRoute(
-                  builder: (context) => const CashDrawerHistoryReportScreen()),
+              title: 'Cash Drawer History',
+              subtitle: 'Cash in and out over time',
+              icon: Icons.account_balance_wallet,
+              color: const Color(0xFF00897B),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CashDrawerHistoryReportScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsCashDrawerHistory,
             ),
-            entitlementKey: RetailEntKeys.reportsCashDrawerHistory,
-          ),
-          _buildReportCard(
-            context,
-            title: 'End of Day History',
-            subtitle: 'Past day closes and cash reconciliation',
-            icon: Icons.event_available,
-            color: const Color(0xFF455A64),
-            onTap: () => Navigator.push(
+            _buildReportCard(
               context,
-              MaterialPageRoute(builder: (context) => const EODReportsListScreen()),
+              title: 'End of Day History',
+              subtitle: 'Past day closes and cash reconciliation',
+              icon: Icons.event_available,
+              color: const Color(0xFF455A64),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const EODReportsListScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsEodHistory,
             ),
-            entitlementKey: RetailEntKeys.reportsEodHistory,
-          ),
           ],
         ),
       ),
@@ -328,8 +372,9 @@ class ReportsScreen extends StatelessWidget {
       margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius:
-            BorderRadius.circular(AppResponsive.borderRadius(context)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider, width: 0.5),
       ),
       child: ListTile(
@@ -342,7 +387,11 @@ class ReportsScreen extends StatelessWidget {
             color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, color: color, size: AppResponsive.iconSize(context)),
+          child: Icon(
+            icon,
+            color: color,
+            size: AppResponsive.iconSize(context),
+          ),
         ),
         title: Text(
           title,
@@ -359,16 +408,21 @@ class ReportsScreen extends StatelessWidget {
             color: AppColors.textSecondary,
           ),
         ),
-        trailing: Icon(Icons.arrow_forward_ios,
-            size: AppResponsive.smallIconSize(context),
-            color: AppColors.textSecondary),
+        trailing: Icon(
+          Icons.arrow_forward_ios,
+          size: AppResponsive.smallIconSize(context),
+          color: AppColors.textSecondary,
+        ),
         // Show-and-block: the tile stays visible and the upgrade sheet explains
         // why, matching the restaurant hub. Tiles with no key are always open.
         onTap: entitlementKey == null
             ? onTap
             : () {
-                if (!PlanGuard.allowedOr(context, entitlementKey,
-                    featureName: title)) {
+                if (!PlanGuard.allowedOr(
+                  context,
+                  entitlementKey,
+                  featureName: title,
+                )) {
                   return;
                 }
                 onTap();

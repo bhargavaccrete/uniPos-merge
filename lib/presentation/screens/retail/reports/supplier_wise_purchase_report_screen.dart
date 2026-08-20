@@ -33,10 +33,14 @@ class SupplierWisePurchaseReportScreen extends StatelessWidget {
       loader: (start, end) =>
           service.getSupplierWisePurchaseReport(startDate: start, endDate: end),
       summaryCards: (rows) {
-        final total =
-            rows.fold<double>(0, (s, r) => s + (r['totalAmount'] as double));
-        final damaged =
-            rows.fold<double>(0, (s, r) => s + (r['damagedAmount'] as double));
+        final total = rows.fold<double>(
+          0,
+          (s, r) => s + (r['totalAmount'] as double),
+        );
+        final damaged = rows.fold<double>(
+          0,
+          (s, r) => s + (r['damagedAmount'] as double),
+        );
         return [
           ReportSummaryCard(
             title: 'Total Received',
@@ -61,36 +65,41 @@ class SupplierWisePurchaseReportScreen extends StatelessWidget {
         ReportTable.column(context, 'Damaged', numeric: true),
         ReportTable.column(context, 'Amount', numeric: true),
       ],
-      rowBuilder: (context, row) => DataRow(cells: [
-        DataCell(Text(row['supplierName'] as String)),
-        DataCell(Text('${row['receiptCount']}')),
-        DataCell(Text('${row['totalItems']}')),
-        DataCell(Text(formatMoney(row['damagedAmount'] as double))),
-        DataCell(Text(formatMoney(row['totalAmount'] as double))),
-      ]),
+      rowBuilder: (context, row) => DataRow(
+        cells: [
+          DataCell(Text(row['supplierName'] as String)),
+          DataCell(Text('${row['receiptCount']}')),
+          DataCell(Text('${row['totalItems']}')),
+          DataCell(Text(formatMoney(row['damagedAmount'] as double))),
+          DataCell(Text(formatMoney(row['totalAmount'] as double))),
+        ],
+      ),
       exportData: (rows) => ReportExportData(
         headers: const [
           'Supplier',
           'Receipts',
           'Units',
           'Damaged Value',
-          'Amount'
+          'Amount',
         ],
         rows: rows
-            .map((r) => [
-                  r['supplierName'],
-                  r['receiptCount'],
-                  r['totalItems'],
-                  ReportExportService.formatCurrency(
-                      r['damagedAmount'] as double),
-                  ReportExportService.formatCurrency(
-                      r['totalAmount'] as double),
-                ])
+            .map(
+              (r) => [
+                r['supplierName'],
+                r['receiptCount'],
+                r['totalItems'],
+                ReportExportService.formatCurrency(
+                  r['damagedAmount'] as double,
+                ),
+                ReportExportService.formatCurrency(r['totalAmount'] as double),
+              ],
+            )
             .toList(),
         summary: {
           'Suppliers': rows.length,
           'Total Received': ReportExportService.formatCurrency(
-              rows.fold<double>(0, (s, r) => s + (r['totalAmount'] as double))),
+            rows.fold<double>(0, (s, r) => s + (r['totalAmount'] as double)),
+          ),
         },
       ),
     );

@@ -89,22 +89,29 @@ class CashDrawerHistoryReportScreen extends StatelessWidget {
         final type = row['type'] as String;
         final isOut = amount < 0;
 
-        return DataRow(cells: [
-          DataCell(Text(
-              DateFormat('dd MMM, h:mm a').format(row['at'] as DateTime))),
-          DataCell(AppStatusPill(
-            label: type,
-            color: _typeColors[type] ?? AppColors.textSecondary,
-            dense: true,
-          )),
-          DataCell(Text(row['description'] as String)),
-          DataCell(Text(
-            formatMoney(amount.abs()),
-            style: TextStyle(
-              color: isOut ? AppColors.danger : AppColors.success,
+        return DataRow(
+          cells: [
+            DataCell(
+              Text(DateFormat('dd MMM, h:mm a').format(row['at'] as DateTime)),
             ),
-          )),
-        ]);
+            DataCell(
+              AppStatusPill(
+                label: type,
+                color: _typeColors[type] ?? AppColors.textSecondary,
+                dense: true,
+              ),
+            ),
+            DataCell(Text(row['description'] as String)),
+            DataCell(
+              Text(
+                formatMoney(amount.abs()),
+                style: TextStyle(
+                  color: isOut ? AppColors.danger : AppColors.success,
+                ),
+              ),
+            ),
+          ],
+        );
       },
       exportData: (rows) {
         final moneyIn = _sumOf(rows, (a) => a > 0);
@@ -115,21 +122,25 @@ class CashDrawerHistoryReportScreen extends StatelessWidget {
           // Signed in the export so a spreadsheet can total the column
           // directly, unlike the screen where direction is carried by colour.
           rows: rows
-              .map((r) => [
-                    ReportExportService.formatDateTime(r['at'] as DateTime),
-                    r['type'],
-                    r['description'],
-                    r['reference'],
-                    ReportExportService.formatCurrency(
-                        (r['amount'] as num).toDouble()),
-                  ])
+              .map(
+                (r) => [
+                  ReportExportService.formatDateTime(r['at'] as DateTime),
+                  r['type'],
+                  r['description'],
+                  r['reference'],
+                  ReportExportService.formatCurrency(
+                    (r['amount'] as num).toDouble(),
+                  ),
+                ],
+              )
               .toList(),
           summary: {
             'Movements': rows.length,
             'Cash In': ReportExportService.formatCurrency(moneyIn),
             'Cash Out': ReportExportService.formatCurrency(moneyOut),
-            'Net Movement':
-                ReportExportService.formatCurrency(moneyIn - moneyOut),
+            'Net Movement': ReportExportService.formatCurrency(
+              moneyIn - moneyOut,
+            ),
           },
         );
       },

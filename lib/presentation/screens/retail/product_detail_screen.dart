@@ -45,10 +45,7 @@ final _qtyFormatters = <TextInputFormatter>[
 class ProductDetailScreen extends StatefulWidget {
   final ProductModel product;
 
-  const ProductDetailScreen({
-    super.key,
-    required this.product,
-  });
+  const ProductDetailScreen({super.key, required this.product});
 
   @override
   State<ProductDetailScreen> createState() => _ProductDetailScreenState();
@@ -141,22 +138,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Future<void> _deleteVariant(VarianteModel variant) async {
-    if (!PlanGuard.allowedOr(context, RetailEntKeys.catalogVariantsDelete,
-        featureName: 'Delete Variants')) {
+    if (!PlanGuard.allowedOr(
+      context,
+      RetailEntKeys.catalogVariantsDelete,
+      featureName: 'Delete Variants',
+    )) {
       return;
     }
     // A product with no variants still shows in the list but the POS refuses
     // it ("No variants available"), so it would be invisible stock.
     if (productStore.variantCountFor(widget.product.productId) <= 1) {
       NotificationService.instance.showError(
-          'A product needs at least one variant. Delete the product instead.');
+        'A product needs at least one variant. Delete the product instead.',
+      );
       return;
     }
 
     final confirmed = await showAppConfirmDialog(
       context: context,
       title: 'Delete Variant?',
-      message: 'Delete "${variant.shortDescription}"? '
+      message:
+          'Delete "${variant.shortDescription}"? '
           'Its stock and pricing are removed with it.',
       confirmLabel: 'Delete',
       accent: AppColors.danger,
@@ -199,8 +201,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             tooltip: 'Actions',
             // M3 tints menu surfaces by default; keep them plain white.
             color: AppColors.white,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             onSelected: (value) {
               switch (value) {
                 case 'add':
@@ -216,7 +219,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             },
             itemBuilder: (context) => [
               _menuItem('add', Icons.add, 'Add Variant'),
-              _menuItem('bulk', Icons.library_add_outlined, 'Bulk Add Variants'),
+              _menuItem(
+                'bulk',
+                Icons.library_add_outlined,
+                'Bulk Add Variants',
+              ),
               const PopupMenuDivider(),
               _menuItem('edit', Icons.edit_outlined, 'Edit Details'),
             ],
@@ -228,10 +235,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         child: MoneyScope(
           child: AppResponsive.constrainedContent(
             context: context,
+            alignment: Alignment.topCenter,
             child: Observer(
               builder: (context) {
-                final variants =
-                    productStore.variantsFor(widget.product.productId);
+                final variants = productStore.variantsFor(
+                  widget.product.productId,
+                );
                 return Column(
                   children: [
                     // Product details stay visible whether or not any variants
@@ -264,9 +273,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         children: [
           Icon(icon, size: 20, color: color ?? AppColors.textSecondary),
           const SizedBox(width: 12),
-          Text(label,
-              style: GoogleFonts.poppins(
-                  fontSize: 14, color: color ?? AppColors.textPrimary)),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              color: color ?? AppColors.textPrimary,
+            ),
+          ),
         ],
       ),
     );
@@ -302,8 +315,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.sell_outlined,
-              size: 18, color: AppColors.textSecondary),
+          const Icon(
+            Icons.sell_outlined,
+            size: 18,
+            color: AppColors.textSecondary,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -340,7 +356,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final grouped = <String, List<VarianteModel>>{};
     for (final variant in variants) {
       final value = _groupValueFor(variant);
-      grouped.putIfAbsent(value.isEmpty ? _ungroupedKey : value, () => []).add(variant);
+      grouped
+          .putIfAbsent(value.isEmpty ? _ungroupedKey : value, () => [])
+          .add(variant);
     }
 
     return Column(
@@ -372,7 +390,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final avgPrice = variants.isEmpty
         ? 0.0
         : variants.fold<double>(0, (sum, v) => sum + v.effectivePrice) /
-            variants.length;
+              variants.length;
 
     return Container(
       // Top spacing comes from the info strip directly above.
@@ -389,7 +407,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         border: Border.all(color: AppColors.divider),
         boxShadow: const [
           BoxShadow(
-              color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2)),
+            color: Color(0x08000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
         ],
       ),
       child: Row(
@@ -514,17 +535,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final status = productStore.stockStatusForVariant(variant);
     final isLowStock = status != RetailStockStatus.inStock;
     final isSellable = productStore.isSellable(variant);
-    final description =
-        attributeStore.describeAttributes(attributeStore.attributesOf(variant));
+    final description = attributeStore.describeAttributes(
+      attributeStore.attributesOf(variant),
+    );
 
     return InkWell(
       onTap: () => _openEditVariant(variant),
       child: Container(
         padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
         decoration: const BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: AppColors.surfaceMedium),
-          ),
+          border: Border(bottom: BorderSide(color: AppColors.surfaceMedium)),
         ),
         child: Row(
           children: [
@@ -553,7 +573,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.surfaceMedium,
                             borderRadius: BorderRadius.circular(4),
@@ -561,7 +583,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           child: Text(
                             'Inactive',
                             style: GoogleFonts.poppins(
-                              fontSize: 10,
+                              fontSize: AppResponsive.captionFontSize(context),
                               fontWeight: FontWeight.w600,
                               color: AppColors.textSecondary,
                             ),
@@ -580,14 +602,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           color: isLowStock
                               ? AppColors.danger
                               : AppColors.textSecondary,
-                          fontWeight:
-                              isLowStock ? FontWeight.w700 : FontWeight.w400,
+                          fontWeight: isLowStock
+                              ? FontWeight.w700
+                              : FontWeight.w400,
                         ),
                       ),
                       if (isLowStock) ...[
                         const SizedBox(width: 4),
-                        const Icon(Icons.warning_rounded,
-                            color: AppColors.danger, size: 13),
+                        const Icon(
+                          Icons.warning_rounded,
+                          color: AppColors.danger,
+                          size: 13,
+                        ),
                       ],
                     ],
                   ),
@@ -637,12 +663,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
             // Edit/delete stay behind the overflow menu — never extra icons.
             PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert,
-                  color: AppColors.textSecondary, size: 20),
+              icon: const Icon(
+                Icons.more_vert,
+                color: AppColors.textSecondary,
+                size: 20,
+              ),
               // M3 tints menu surfaces by default; keep them plain white.
               color: AppColors.white,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(12),
+              ),
               onSelected: (value) {
                 if (value == 'edit') {
                   _openEditVariant(variant);
@@ -655,12 +685,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   value: 'edit',
                   child: Row(
                     children: [
-                      const Icon(Icons.edit_outlined,
-                          size: 20, color: AppColors.textSecondary),
+                      const Icon(
+                        Icons.edit_outlined,
+                        size: 20,
+                        color: AppColors.textSecondary,
+                      ),
                       const SizedBox(width: 12),
-                      Text('Edit',
-                          style: GoogleFonts.poppins(
-                              fontSize: 14, color: AppColors.textPrimary)),
+                      Text(
+                        'Edit',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -668,12 +705,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   value: 'delete',
                   child: Row(
                     children: [
-                      const Icon(Icons.delete_outline_rounded,
-                          size: 20, color: AppColors.danger),
+                      const Icon(
+                        Icons.delete_outline_rounded,
+                        size: 20,
+                        color: AppColors.danger,
+                      ),
                       const SizedBox(width: 12),
-                      Text('Delete',
-                          style: GoogleFonts.poppins(
-                              fontSize: 14, color: AppColors.danger)),
+                      Text(
+                        'Delete',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          color: AppColors.danger,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -722,10 +766,7 @@ class _AddVariantDialog extends StatefulWidget {
   final String productId;
   final String? categoryName;
 
-  const _AddVariantDialog({
-    required this.productId,
-    this.categoryName,
-  });
+  const _AddVariantDialog({required this.productId, this.categoryName});
 
   @override
   State<_AddVariantDialog> createState() => _AddVariantDialogState();
@@ -793,16 +834,20 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
   }
 
   Future<void> _save() async {
-    if (!PlanGuard.allowedOr(context, RetailEntKeys.catalogVariantsAdd,
-        featureName: 'Add Variants')) {
+    if (!PlanGuard.allowedOr(
+      context,
+      RetailEntKeys.catalogVariantsAdd,
+      featureName: 'Add Variants',
+    )) {
       return;
     }
     if (!_formKey.currentState!.validate() || _saving) return;
 
     final barcode = _barcodeController.text.trim();
     if (productStore.isBarcodeTaken(barcode)) {
-      NotificationService.instance
-          .showError('Barcode "$barcode" is already used by another variant');
+      NotificationService.instance.showError(
+        'Barcode "$barcode" is already used by another variant',
+      );
       return;
     }
 
@@ -1000,16 +1045,20 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
     super.initState();
     final v = widget.variant;
     _active = productStore.isSellable(v);
-    _sellingPriceController =
-        TextEditingController(text: v.sellingPrice?.toString() ?? '');
-    _costPriceController =
-        TextEditingController(text: v.costPrice?.toString() ?? '');
+    _sellingPriceController = TextEditingController(
+      text: v.sellingPrice?.toString() ?? '',
+    );
+    _costPriceController = TextEditingController(
+      text: v.costPrice?.toString() ?? '',
+    );
     _mrpController = TextEditingController(text: v.mrp?.toString() ?? '');
     _stockController = TextEditingController(text: v.stockQty.toString());
-    _minStockController =
-        TextEditingController(text: v.minStock?.toString() ?? '');
+    _minStockController = TextEditingController(
+      text: v.minStock?.toString() ?? '',
+    );
 
-    for (final entry in (v.customAttributes ?? const <String, String>{}).entries) {
+    for (final entry
+        in (v.customAttributes ?? const <String, String>{}).entries) {
       final attr = _CustomAttrData();
       attr.keyController.text = entry.key;
       attr.valueController.text = entry.value;
@@ -1031,8 +1080,11 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
   }
 
   Future<void> _save() async {
-    if (!PlanGuard.allowedOr(context, RetailEntKeys.catalogVariantsEdit,
-        featureName: 'Edit Variants')) {
+    if (!PlanGuard.allowedOr(
+      context,
+      RetailEntKeys.catalogVariantsEdit,
+      featureName: 'Edit Variants',
+    )) {
       return;
     }
     if (!_formKey.currentState!.validate()) return;
@@ -1180,10 +1232,7 @@ class _BulkAddVariantDialog extends StatefulWidget {
   final String productId;
   final String? categoryName;
 
-  const _BulkAddVariantDialog({
-    required this.productId,
-    this.categoryName,
-  });
+  const _BulkAddVariantDialog({required this.productId, this.categoryName});
 
   @override
   State<_BulkAddVariantDialog> createState() => _BulkAddVariantDialogState();
@@ -1271,9 +1320,9 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
   /// Everything that will become a variant, in a stable display order:
   /// preset values in their defined order, then anything typed in.
   List<String> get _chosenValues => [
-        ..._availableValues.where(_selectedValues.contains),
-        ..._customValues,
-      ];
+    ..._availableValues.where(_selectedValues.contains),
+    ..._customValues,
+  ];
 
   _BulkRow _rowFor(String value) => _rows.putIfAbsent(value, () => _BulkRow());
 
@@ -1316,8 +1365,11 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
   }
 
   Future<void> _save() async {
-    if (!PlanGuard.allowedOr(context, RetailEntKeys.catalogVariantsAdd,
-        featureName: 'Add Variants')) {
+    if (!PlanGuard.allowedOr(
+      context,
+      RetailEntKeys.catalogVariantsAdd,
+      featureName: 'Add Variants',
+    )) {
       return;
     }
     if (!_formKey.currentState!.validate() || _saving) return;
@@ -1326,9 +1378,11 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
     final varying = _varyingAttribute;
 
     if (varying == null || values.isEmpty) {
-      NotificationService.instance.showError(varying == null
-          ? 'Add a field in Settings → Simple Product Fields first'
-          : 'Select at least one ${varying.name.toLowerCase()}');
+      NotificationService.instance.showError(
+        varying == null
+            ? 'Add a field in Settings → Simple Product Fields first'
+            : 'Select at least one ${varying.name.toLowerCase()}',
+      );
       return;
     }
 
@@ -1340,7 +1394,8 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
         final candidate = '$baseBarcodeText${i.toString().padLeft(3, '0')}';
         if (productStore.isBarcodeTaken(candidate)) {
           NotificationService.instance.showError(
-              'Barcode "$candidate" is already used by another variant');
+            'Barcode "$candidate" is already used by another variant',
+          );
           return;
         }
       }
@@ -1384,25 +1439,27 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
       // auto-generated SKU (each call advances the shared global sequence).
       final sku = await skuGeneratorService.generate(widget.categoryName);
 
-      await productStore.addVariant(VarianteModel.create(
-        varianteId: variantId,
-        productId: widget.productId,
-        customAttributes: mergeVariantAttributes({
-          ...fixedValues,
-          varying.name: value,
-        }),
-        sku: sku,
-        barcode: barcode,
-        // sellingPrice is what the POS bills — see cart_store.dart.
-        sellingPrice:
-            double.tryParse(row?.priceController.text.trim() ?? '') ?? 0.0,
-        costPrice: costPrice,
-        mrp: mrp,
-        stockQty: int.tryParse(row?.stockController.text.trim() ?? '') ?? 0,
-        minStock: minStock,
-        taxRate: taxRate,
-        taxId: _selectedTaxId,
-      ));
+      await productStore.addVariant(
+        VarianteModel.create(
+          varianteId: variantId,
+          productId: widget.productId,
+          customAttributes: mergeVariantAttributes({
+            ...fixedValues,
+            varying.name: value,
+          }),
+          sku: sku,
+          barcode: barcode,
+          // sellingPrice is what the POS bills — see cart_store.dart.
+          sellingPrice:
+              double.tryParse(row?.priceController.text.trim() ?? '') ?? 0.0,
+          costPrice: costPrice,
+          mrp: mrp,
+          stockQty: int.tryParse(row?.stockController.text.trim() ?? '') ?? 0,
+          minStock: minStock,
+          taxRate: taxRate,
+          taxId: _selectedTaxId,
+        ),
+      );
       counter++;
 
       // Small delay to keep the timestamp-based ids unique.
@@ -1438,17 +1495,24 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
                 label: 'Create one variant per',
                 value: _varyingAttribute?.attributeId,
                 items: _fields
-                    .map((a) => DropdownMenuItem(
-                          value: a.attributeId,
-                          child: Text(a.name,
-                              style: GoogleFonts.poppins(fontSize: 14)),
-                        ))
+                    .map(
+                      (a) => DropdownMenuItem(
+                        value: a.attributeId,
+                        child: Text(
+                          a.name,
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                          ),
+                        ),
+                      ),
+                    )
                     .toList(),
                 onChanged: (id) {
                   if (id == null) return;
                   setState(() {
-                    _varyingAttribute =
-                        _fields.firstWhere((a) => a.attributeId == id);
+                    _varyingAttribute = _fields.firstWhere(
+                      (a) => a.attributeId == id,
+                    );
                     _selectedValues.clear();
                     _customValues.clear();
                     _clearRows();
@@ -1482,13 +1546,15 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
                 children: _availableValues.map((value) {
                   final isSelected = _selectedValues.contains(value);
                   return FilterChip(
-                    label: Text(value,
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          color: isSelected
-                              ? AppColors.white
-                              : AppColors.textPrimary,
-                        )),
+                    label: Text(
+                      value,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        color: isSelected
+                            ? AppColors.white
+                            : AppColors.textPrimary,
+                      ),
+                    ),
                     selected: isSelected,
                     onSelected: (selected) => setState(() {
                       if (selected) {
@@ -1515,21 +1581,30 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
                 spacing: 8,
                 runSpacing: 8,
                 children: _customValues
-                    .map((value) => Chip(
-                          label: Text(value,
-                              style: GoogleFonts.poppins(
-                                  fontSize: 12, color: AppColors.white)),
-                          deleteIcon: const Icon(Icons.close,
-                              size: 16, color: AppColors.white),
-                          onDeleted: () => setState(() {
-                            _customValues.remove(value);
-                            _dropRow(value);
-                          }),
-                          backgroundColor: AppColors.info,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                    .map(
+                      (value) => Chip(
+                        label: Text(
+                          value,
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            color: AppColors.white,
                           ),
-                        ))
+                        ),
+                        deleteIcon: const Icon(
+                          Icons.close,
+                          size: 16,
+                          color: AppColors.white,
+                        ),
+                        onDeleted: () => setState(() {
+                          _customValues.remove(value);
+                          _dropRow(value);
+                        }),
+                        backgroundColor: AppColors.info,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    )
                     .toList(),
               ),
             ],
@@ -1574,9 +1649,13 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
                     TextButton.icon(
                       onPressed: _fillDown,
                       icon: const Icon(Icons.south_rounded, size: 15),
-                      label: Text('Fill down',
-                          style: GoogleFonts.poppins(
-                              fontSize: 13, fontWeight: FontWeight.w600)),
+                      label: Text(
+                        'Fill down',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       style: TextButton.styleFrom(
                         foregroundColor: AppColors.info,
                         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -1595,7 +1674,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
               values.isEmpty
                   ? 'Applies to all variants'
                   : 'Applies to all ${values.length} variant'
-                      '${values.length == 1 ? '' : 's'}',
+                        '${values.length == 1 ? '' : 's'}',
             ),
             const SizedBox(height: 12),
             for (final attribute in _fields)
@@ -1676,8 +1755,11 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.playlist_add_check_rounded,
-              size: 18, color: AppColors.info),
+          const Icon(
+            Icons.playlist_add_check_rounded,
+            size: 18,
+            color: AppColors.info,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -1752,8 +1834,9 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
 /// Price and stock for one generated variant.
 class _BulkRow {
   final TextEditingController priceController = TextEditingController();
-  final TextEditingController stockController =
-      TextEditingController(text: '0');
+  final TextEditingController stockController = TextEditingController(
+    text: '0',
+  );
 
   void dispose() {
     priceController.dispose();
@@ -1793,9 +1876,13 @@ class _CustomAttributesSection extends StatelessWidget {
                 onChanged();
               },
               icon: const Icon(Icons.add, size: 16),
-              label: Text('Add',
-                  style: GoogleFonts.poppins(
-                      fontSize: 13, fontWeight: FontWeight.w600)),
+              label: Text(
+                'Add',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.primary,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -1836,16 +1923,21 @@ class _CustomAttributesSection extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.remove_circle_outline,
-                      color: AppColors.danger, size: 20),
+                  icon: const Icon(
+                    Icons.remove_circle_outline,
+                    color: AppColors.danger,
+                    size: 20,
+                  ),
                   onPressed: () {
                     attributes[index].dispose();
                     attributes.removeAt(index);
                     onChanged();
                   },
                   padding: EdgeInsets.zero,
-                  constraints:
-                      const BoxConstraints(minWidth: 36, minHeight: 36),
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
                 ),
               ],
             ),
@@ -1878,15 +1970,19 @@ Widget _styledDropdown<T>(
   return DropdownButtonFormField<T>(
     initialValue: value,
     isExpanded: true,
-    style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
+    style: GoogleFonts.poppins(
+      fontSize: AppResponsive.bodyFontSize(context),
+      color: AppColors.textPrimary,
+    ),
     decoration: InputDecoration(
       labelText: label,
       labelStyle: GoogleFonts.poppins(
-          fontSize: 14, color: AppColors.textSecondary),
+        fontSize: AppResponsive.smallFontSize(context),
+        color: AppColors.textSecondary,
+      ),
       filled: true,
       fillColor: AppColors.surfaceLight,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: AppColors.divider),
@@ -1920,13 +2016,25 @@ Widget _taxDropdown(
         value: taxes.any((t) => t.id == selectedTaxId) ? selectedTaxId : null,
         items: [
           DropdownMenuItem(
-              value: null,
-              child: Text('No tax', style: GoogleFonts.poppins(fontSize: 14))),
-          ...taxes.map((tax) => DropdownMenuItem(
-                value: tax.id,
-                child: Text('${tax.taxname} (${tax.taxperecentage ?? 0}%)',
-                    style: GoogleFonts.poppins(fontSize: 14)),
-              )),
+            value: null,
+            child: Text(
+              'No tax',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+              ),
+            ),
+          ),
+          ...taxes.map(
+            (tax) => DropdownMenuItem(
+              value: tax.id,
+              child: Text(
+                '${tax.taxname} (${tax.taxperecentage ?? 0}%)',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                ),
+              ),
+            ),
+          ),
         ],
         onChanged: onChanged,
       );

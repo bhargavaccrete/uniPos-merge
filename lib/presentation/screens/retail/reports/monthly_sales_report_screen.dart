@@ -43,9 +43,13 @@ class _MonthlySalesReportScreenState extends State<MonthlySalesReportScreen> {
     final end = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
 
     final totalsFuture = _reportService.getMonthlySalesReport(
-        _selectedMonth.year, _selectedMonth.month);
-    final itemsFuture =
-        _reportService.getVariantWiseSalesReport(startDate: start, endDate: end);
+      _selectedMonth.year,
+      _selectedMonth.month,
+    );
+    final itemsFuture = _reportService.getVariantWiseSalesReport(
+      startDate: start,
+      endDate: end,
+    );
 
     final data = await totalsFuture;
     final items = await itemsFuture;
@@ -75,8 +79,12 @@ class _MonthlySalesReportScreenState extends State<MonthlySalesReportScreen> {
   /// `DateTime(y, m + n)` normalises out-of-range months, so stepping past
   /// December or before January rolls the year without special-casing.
   Future<void> _step(int months) async {
-    setState(() => _selectedMonth =
-        DateTime(_selectedMonth.year, _selectedMonth.month + months));
+    setState(
+      () => _selectedMonth = DateTime(
+        _selectedMonth.year,
+        _selectedMonth.month + months,
+      ),
+    );
     await _loadReport();
   }
 
@@ -90,8 +98,10 @@ class _MonthlySalesReportScreenState extends State<MonthlySalesReportScreen> {
     final cutoff = ReportHistoryWindow.cutoff;
     if (cutoff == null) return true;
     // The previous month is reachable if any part of it is inside the window.
-    final previousMonthEnd =
-        DateTime(_selectedMonth.year, _selectedMonth.month);
+    final previousMonthEnd = DateTime(
+      _selectedMonth.year,
+      _selectedMonth.month,
+    );
     return previousMonthEnd.isAfter(cutoff);
   }
 

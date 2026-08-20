@@ -41,7 +41,9 @@ class PurchaseSummaryReportScreen extends StatelessWidget {
       // as a single-row list and everything below reads rows.first.
       loader: (start, end) async {
         final data = await service.getPurchaseSummaryReport(
-            startDate: start, endDate: end);
+          startDate: start,
+          endDate: end,
+        );
         if ((data['orderCount'] as int) == 0 &&
             (data['receiptCount'] as int) == 0) {
           return [];
@@ -88,20 +90,21 @@ class PurchaseSummaryReportScreen extends StatelessWidget {
             ['Units Received', d['receivedQty']],
             [
               'Ordered Value',
-              ReportExportService.formatCurrency(d['orderedValue'] as double)
+              ReportExportService.formatCurrency(d['orderedValue'] as double),
             ],
             [
               'Received Value',
-              ReportExportService.formatCurrency(d['receivedValue'] as double)
+              ReportExportService.formatCurrency(d['receivedValue'] as double),
             ],
             [
               'Damaged Value',
-              ReportExportService.formatCurrency(d['damagedValue'] as double)
+              ReportExportService.formatCurrency(d['damagedValue'] as double),
             ],
             [
               'Outstanding Value',
               ReportExportService.formatCurrency(
-                  d['outstandingValue'] as double)
+                d['outstandingValue'] as double,
+              ),
             ],
             for (final entry in counts.entries)
               ['${_statusLabels[entry.key] ?? entry.key} orders', entry.value],
@@ -129,8 +132,11 @@ class PurchaseSummaryReportScreen extends StatelessWidget {
           AppResponsive.verticalSpace(context, size: SpacingSize.small),
           for (final entry in counts.entries)
             if (entry.value > 0)
-              _statLine(context, _statusLabels[entry.key] ?? entry.key,
-                  '${entry.value}'),
+              _statLine(
+                context,
+                _statusLabels[entry.key] ?? entry.key,
+                '${entry.value}',
+              ),
           const Divider(height: 24),
           _statLine(context, 'Goods receipts', '${d['receiptCount']}'),
           _statLine(context, 'Suppliers', '${d['supplierCount']}'),
@@ -145,8 +151,12 @@ class PurchaseSummaryReportScreen extends StatelessWidget {
     );
   }
 
-  Widget _statLine(BuildContext context, String label, String value,
-      {Color? color}) {
+  Widget _statLine(
+    BuildContext context,
+    String label,
+    String value, {
+    Color? color,
+  }) {
     return Padding(
       padding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
       child: Row(
@@ -155,8 +165,9 @@ class PurchaseSummaryReportScreen extends StatelessWidget {
           Text(
             label,
             style: GoogleFonts.poppins(
-                fontSize: AppResponsive.smallFontSize(context),
-                color: AppColors.textSecondary),
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+            ),
           ),
           Text(
             value,

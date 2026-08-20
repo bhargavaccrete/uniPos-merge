@@ -15,6 +15,8 @@ import 'package:billberrylite/presentation/screens/retail/customer_selection_scr
 import 'package:billberrylite/presentation/widget/componets/common/split_payment_widget.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
@@ -35,7 +37,9 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
-  final TextEditingController _discountController = TextEditingController(text: '0');
+  final TextEditingController _discountController = TextEditingController(
+    text: '0',
+  );
   bool _isProcessing = false;
 
   // Split payment state
@@ -125,7 +129,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     super.dispose();
   }
 
-  void _onPaymentChanged(List<PaymentEntry> payments, double totalPaid, double change) {
+  void _onPaymentChanged(
+    List<PaymentEntry> payments,
+    double totalPaid,
+    double change,
+  ) {
     setState(() {
       _paymentEntries = payments;
       _totalPaid = totalPaid;
@@ -167,7 +175,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final max = PlanEnforce.limit(RetailEntKeys.billingPerDayMax);
     if (mounted) {
       NotificationService.instance.showError(
-          'Daily bill limit reached${max != null ? ' (max $max)' : ''}. Upgrade your plan to bill more today.');
+        'Daily bill limit reached${max != null ? ' (max $max)' : ''}. Upgrade your plan to bill more today.',
+      );
     }
     return false;
   }
@@ -178,20 +187,29 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     // Require customer for credit sales
     if (customerStore.selectedCustomer == null) {
-      NotificationService.instance.showError('Customer is required for Pay Later sales');
+      NotificationService.instance.showError(
+        'Customer is required for Pay Later sales',
+      );
       return;
     }
 
     // Check credit limit
     final customerId = customerStore.selectedCustomer!.customerId;
-    final canCredit = await customerStore.canMakeCreditPurchase(customerId, _grandTotal);
+    final canCredit = await customerStore.canMakeCreditPurchase(
+      customerId,
+      _grandTotal,
+    );
     if (!canCredit) {
-      final availableCredit = await customerStore.getAvailableCredit(customerId);
+      final availableCredit = await customerStore.getAvailableCredit(
+        customerId,
+      );
       if (mounted) {
         final symbol = CurrencyHelper.currentSymbol;
         final precision = DecimalSettings.precision;
         final formattedCredit = availableCredit.toStringAsFixed(precision);
-        NotificationService.instance.showError('Credit limit exceeded. Available credit: $symbol$formattedCredit');
+        NotificationService.instance.showError(
+          'Credit limit exceeded. Available credit: $symbol$formattedCredit',
+        );
       }
       return;
     }
@@ -211,10 +229,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _payLaterRow(dialogContext, 'Customer',
-                customerStore.selectedCustomer!.name ?? 'Unnamed'),
-            _payLaterRow(dialogContext, 'Amount', '$symbol$formattedTotal',
-                emphasise: true),
+            _payLaterRow(
+              dialogContext,
+              'Customer',
+              customerStore.selectedCustomer!.name ?? 'Unnamed',
+            ),
+            _payLaterRow(
+              dialogContext,
+              'Amount',
+              '$symbol$formattedTotal',
+              emphasise: true,
+            ),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
@@ -222,13 +247,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 color: AppColors.warning.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                    color: AppColors.warning.withValues(alpha: 0.25)),
+                  color: AppColors.warning.withValues(alpha: 0.25),
+                ),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.info_outline_rounded,
-                      size: 18, color: AppColors.warning),
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    size: 18,
+                    color: AppColors.warning,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -298,7 +327,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       // Save sale and items through the store, then adjust stock
       await saleStore.addSaleWithItems(
-          sale, await _buildSaleItems(saleId, bill));
+        sale,
+        await _buildSaleItems(saleId, bill),
+      );
       await _deductStock();
 
       // Store customer before clearing
@@ -311,10 +342,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       creditStore.loadData();
 
       if (mounted) {
-        await _showCreditSuccessDialog(
-          sale: sale,
-          customer: customer!,
-        );
+        await _showCreditSuccessDialog(sale: sale, customer: customer!);
       }
 
       // Closing the dialog only closed the DIALOG — the cart was cleared
@@ -324,7 +352,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) {
-        NotificationService.instance.showError('Error processing credit sale: $e');
+        NotificationService.instance.showError(
+          'Error processing credit sale: $e',
+        );
       }
     } finally {
       if (mounted) {
@@ -338,8 +368,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   /// One label/value line of the Pay Later confirmation — same shape the
   /// Settings day-info dialog uses, so confirmations read alike.
-  Widget _payLaterRow(BuildContext context, String label, String value,
-      {bool emphasise = false}) {
+  Widget _payLaterRow(
+    BuildContext context,
+    String label,
+    String value, {
+    bool emphasise = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -383,7 +417,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// used to look up the variant's live `costPrice` instead, so a supplier
   /// price change re-wrote the profit on sales that had already been settled.
   Future<List<SaleItemModel>> _buildSaleItems(
-      String saleId, RetailBill bill) async {
+    String saleId,
+    RetailBill bill,
+  ) async {
     // One lookup per distinct variant in the basket, not per report row.
     final costByVariantId = <String, double?>{};
     for (final line in bill.lines) {
@@ -532,156 +568,187 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text('Checkout', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: 'Checkout',
         centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.white,
+        titleFontSize: AppResponsive.subheadingFontSize(context),
       ),
-      body: Observer(
-        builder: (context) {
-          if (cartStore.itemCount == 0) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.shopping_cart_outlined, size: 64, color: Color(0xFFD0D0D0)),
-                  SizedBox(height: 16),
-                  Text(
-                    'Cart is empty',
-                    style: TextStyle(fontSize: 16, color: Color(0xFF6B6B6B)),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          return SingleChildScrollView(
-            physics: const ClampingScrollPhysics(),
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Customer Section
-                _buildSectionTitle('Customer'),
-                const SizedBox(height: 12),
-                _buildCustomerCard(),
-                const SizedBox(height: 12),
-                _buildLoyaltyCard(),
-                const SizedBox(height: 12),
-
-                // Order Summary Section
-                _buildSectionTitle('Order Summary'),
-                const SizedBox(height: 12),
-                _buildOrderSummaryCard(),
-                const SizedBox(height: 24),
-
-                // Billing Details Section
-                _buildSectionTitle('Billing Details'),
-                const SizedBox(height: 12),
-                _buildBillingDetailsCard(),
-                const SizedBox(height: 24),
-
-                // Per-rate GST slabs (hidden when tax is off or zero)
-                _buildGstBreakdownCard(),
-
-                // Total Summary Section
-                _buildTotalSummaryCard(),
-                const SizedBox(height: 24),
-
-                // Split Payment Section
-                _buildSectionTitle('Payment'),
-                const SizedBox(height: 12),
-                SplitPaymentWidget(
-                  billTotal: _grandTotal,
-                  onPaymentChanged: _onPaymentChanged,
-                  onValidationChanged: _onValidationChanged,
-                ),
-                const SizedBox(height: 12),
-                _buildPartialPaymentCard(),
-                const SizedBox(height: 24),
-
-                // Payment Action Buttons
-                Row(
+      body: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        // maxCardWidth, not maxFormWidth: this is mostly summary rows with the
+        // label left and the amount right, which read fine wider — 600 left a
+        // dead gap either side on a tablet.
+        maxWidth: AppResponsive.maxCardWidth(context),
+        child: Observer(
+          builder: (context) {
+            if (cartStore.itemCount == 0) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Pay Later Button
-                    Expanded(
-                      flex: 1,
-                      child: SizedBox(
-                        height: 54,
-                        child: ElevatedButton.icon(
-                          onPressed: _isProcessing ? null : _processCreditSale,
-                          icon: const Icon(Icons.schedule, size: 20),
-                          label: const Text(
-                            'Pay Later',
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFF9800),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            elevation: 0,
-                            disabledBackgroundColor: const Color(0xFFB0B0B0),
-                          ),
-                        ),
-                      ),
+                    Icon(
+                      Icons.shopping_cart_outlined,
+                      size: 64,
+                      color: Color(0xFFD0D0D0),
                     ),
-                    const SizedBox(width: 12),
-                    // Complete Payment Button
-                    Expanded(
-                      flex: 2,
-                      child: SizedBox(
-                        height: 54,
-                        child: ElevatedButton(
-                          onPressed: _canSubmitPayment ? _processCheckout : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF4CAF50),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            elevation: 0,
-                            disabledBackgroundColor: const Color(0xFFB0B0B0),
-                          ),
-                          child: _isProcessing && !_isCreditSale
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : ValueListenableBuilder<String>(
-                                  valueListenable: CurrencyHelper.currencyNotifier,
-                                  builder: (context, currencyCode, child) {
-                                    return ValueListenableBuilder<int>(
-                                      valueListenable: DecimalSettings.precisionNotifier,
-                                      builder: (context, precision, child) {
-                                        final symbol = CurrencyHelper.currentSymbol;
-                                        final formattedChange = _changeReturn.toStringAsFixed(precision);
-                                        return Text(
-                                          _changeReturn > 0
-                                            ? 'Pay ($symbol$formattedChange change)'
-                                            : 'Complete Payment',
-                                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                                        );
-                                      },
-                                    );
-                                  },
-                                ),
-                        ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Cart is empty',
+                      style: TextStyle(
+                        fontSize: AppResponsive.subheadingFontSize(context),
+                        color: Color(0xFF6B6B6B),
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
-          );
-        },
+              );
+            }
+
+            return SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Customer Section
+                  _buildSectionTitle('Customer'),
+                  const SizedBox(height: 12),
+                  _buildCustomerCard(),
+                  const SizedBox(height: 12),
+                  _buildLoyaltyCard(),
+                  const SizedBox(height: 12),
+
+                  // Order Summary Section
+                  _buildSectionTitle('Order Summary'),
+                  const SizedBox(height: 12),
+                  _buildOrderSummaryCard(),
+                  const SizedBox(height: 24),
+
+                  // Billing Details Section
+                  _buildSectionTitle('Billing Details'),
+                  const SizedBox(height: 12),
+                  _buildBillingDetailsCard(),
+                  const SizedBox(height: 24),
+
+                  // Per-rate GST slabs (hidden when tax is off or zero)
+                  _buildGstBreakdownCard(),
+
+                  // Total Summary Section
+                  _buildTotalSummaryCard(),
+                  const SizedBox(height: 24),
+
+                  // Split Payment Section
+                  _buildSectionTitle('Payment'),
+                  const SizedBox(height: 12),
+                  SplitPaymentWidget(
+                    billTotal: _grandTotal,
+                    onPaymentChanged: _onPaymentChanged,
+                    onValidationChanged: _onValidationChanged,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildPartialPaymentCard(),
+                  const SizedBox(height: 24),
+
+                  // Payment Action Buttons
+                  Row(
+                    children: [
+                      // Pay Later Button
+                      Expanded(
+                        flex: 1,
+                        child: SizedBox(
+                          height: 54,
+                          child: ElevatedButton.icon(
+                            onPressed: _isProcessing
+                                ? null
+                                : _processCreditSale,
+                            icon: const Icon(Icons.schedule, size: 20),
+                            label: Text(
+                              'Pay Later',
+                              style: TextStyle(
+                                fontSize: AppResponsive.bodyFontSize(context),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFFF9800),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              elevation: 0,
+                              disabledBackgroundColor: const Color(0xFFB0B0B0),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Complete Payment Button
+                      Expanded(
+                        flex: 2,
+                        child: SizedBox(
+                          height: 54,
+                          child: ElevatedButton(
+                            onPressed: _canSubmitPayment
+                                ? _processCheckout
+                                : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF4CAF50),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              elevation: 0,
+                              disabledBackgroundColor: const Color(0xFFB0B0B0),
+                            ),
+                            child: _isProcessing && !_isCreditSale
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : ValueListenableBuilder<String>(
+                                    valueListenable:
+                                        CurrencyHelper.currencyNotifier,
+                                    builder: (context, currencyCode, child) {
+                                      return ValueListenableBuilder<int>(
+                                        valueListenable:
+                                            DecimalSettings.precisionNotifier,
+                                        builder: (context, precision, child) {
+                                          final symbol =
+                                              CurrencyHelper.currentSymbol;
+                                          final formattedChange = _changeReturn
+                                              .toStringAsFixed(precision);
+                                          return Text(
+                                            _changeReturn > 0
+                                                ? 'Pay ($symbol$formattedChange change)'
+                                                : 'Complete Payment',
+                                            style: TextStyle(
+                                              fontSize:
+                                                  AppResponsive.bodyFontSize(
+                                                    context,
+                                                  ),
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          );
+                                        },
+                                      );
+                                    },
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -689,8 +756,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
-      style: const TextStyle(
-        fontSize: 16,
+      style: TextStyle(
+        fontSize: AppResponsive.subheadingFontSize(context),
         color: Color(0xFF1A1A1A),
         fontWeight: FontWeight.w600,
       ),
@@ -707,7 +774,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       ),
       child: Column(
         children: [
-          _buildSummaryRow('Total Items', '${cartStore.totalItems}', isBold: false),
+          _buildSummaryRow(
+            'Total Items',
+            '${cartStore.totalItems}',
+            isBold: false,
+          ),
           const SizedBox(height: 12),
           ValueListenableBuilder<String>(
             valueListenable: CurrencyHelper.currencyNotifier,
@@ -716,8 +787,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 valueListenable: DecimalSettings.precisionNotifier,
                 builder: (context, precision, child) {
                   final symbol = CurrencyHelper.currentSymbol;
-                  final formattedSubtotal = _subtotal.toStringAsFixed(precision);
-                  return _buildSummaryRow('Subtotal', '$symbol$formattedSubtotal', isBold: false);
+                  final formattedSubtotal = _subtotal.toStringAsFixed(
+                    precision,
+                  );
+                  return _buildSummaryRow(
+                    'Subtotal',
+                    '$symbol$formattedSubtotal',
+                    isBold: false,
+                  );
                 },
               );
             },
@@ -740,10 +817,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           // Discount type — flat amount or percentage of the item total
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Discount',
-                  style: TextStyle(fontSize: 14, color: Color(0xFF6B6B6B)),
+                  style: TextStyle(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    color: Color(0xFF6B6B6B),
+                  ),
                 ),
               ),
               _buildDiscountTypeToggle(),
@@ -754,9 +834,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           // Preset percentages — only meaningful in percentage mode
           if (retailCartStore.discountType == DiscountType.percentage) ...[
             Row(
-              children: [5, 10, 15, 20, 25]
-                  .map((p) => Expanded(child: _buildPercentPreset(p)))
-                  .toList(),
+              children: [
+                5,
+                10,
+                15,
+                20,
+                25,
+              ].map((p) => Expanded(child: _buildPercentPreset(p))).toList(),
             ),
             const SizedBox(height: 12),
           ],
@@ -768,37 +852,36 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   retailCartStore.discountType == DiscountType.percentage
                       ? 'Percentage off'
                       : 'Amount off',
-                  style: const TextStyle(fontSize: 13, color: Color(0xFF6B6B6B)),
+                  style: TextStyle(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: Color(0xFF6B6B6B),
+                  ),
                 ),
               ),
               SizedBox(
-                width: 120,
-                child: TextField(
+                width: AppResponsive.getValue(
+                  context,
+                  mobile: 120.0,
+                  tablet: 140.0,
+                  desktop: 160.0,
+                ),
+                child: AppTextField(
                   controller: _discountController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   // keyboardType alone is a hint, not a constraint — a hardware
                   // keyboard or paste can still enter '-50'. The engine clamps
                   // the value too; this just stops it being typed.
                   inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d*\.?\d{0,2}'),
+                    ),
                   ],
                   textAlign: TextAlign.right,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  decoration: InputDecoration(
-                    prefixText: '${CurrencyHelper.currentSymbol} ',
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: const BorderSide(color: Color(0xFFE8E8E8), width: 0.5),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: const BorderSide(color: Color(0xFFE8E8E8), width: 0.5),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: const BorderSide(color: Color(0xFF4CAF50), width: 1),
-                    ),
+                  prefixWidget: Padding(
+                    padding: const EdgeInsets.only(left: 12, right: 4),
+                    child: Text(CurrencyHelper.currentSymbol),
                   ),
                   onChanged: (value) {
                     setState(() {});
@@ -813,17 +896,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             const Divider(height: 24, thickness: 0.5, color: Color(0xFFE8E8E8)),
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Reason',
-                    style: TextStyle(fontSize: 14, color: Color(0xFF6B6B6B)),
+                    style: TextStyle(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      color: Color(0xFF6B6B6B),
+                    ),
                   ),
                 ),
                 DropdownButton<String>(
                   value: _selectedDiscountReason,
                   underline: const SizedBox.shrink(),
-                  style: const TextStyle(
-                    fontSize: 14,
+                  style: TextStyle(
+                    fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w500,
                   ),
                   items: _discountReasons
@@ -838,19 +924,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             if (_selectedDiscountReason == 'Other') ...[
               const SizedBox(height: 8),
-              TextField(
+              AppTextField(
                 controller: _otherReasonController,
-                style: const TextStyle(fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: 'Enter reason',
-                  hintStyle: const TextStyle(fontSize: 13, color: Color(0xFFB0B0B0)),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(6),
-                    borderSide: const BorderSide(color: Color(0xFFE8E8E8), width: 0.5),
-                  ),
-                ),
+                hint: 'Enter reason',
+                icon: Icons.notes_rounded,
                 onChanged: (_) => setState(() {}),
               ),
             ],
@@ -885,10 +962,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Partial Payment',
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: AppResponsive.bodyFontSize(context),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -897,8 +974,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           hasCustomer
                               ? 'Collect part now, balance on account'
                               : 'Select a customer to enable',
-                          style: const TextStyle(
-                            fontSize: 12,
+                          style: TextStyle(
+                            fontSize: AppResponsive.smallFontSize(context),
                           ),
                         ),
                       ],
@@ -912,7 +989,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     onChanged: (on) {
                       if (on && !hasCustomer) {
                         NotificationService.instance.showError(
-                            'Select a customer to use partial payment');
+                          'Select a customer to use partial payment',
+                        );
                         return;
                       }
                       setState(() => _allowPartialPayment = on);
@@ -923,33 +1001,51 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               // The customer can be cleared after switching this on — say so,
               // instead of just disabling the pay button with no reason.
               if (_allowPartialPayment && !hasCustomer) ...[
-                const Divider(height: 20, thickness: 0.5, color: Color(0xFFE8E8E8)),
+                const Divider(
+                  height: 20,
+                  thickness: 0.5,
+                  color: Color(0xFFE8E8E8),
+                ),
                 Row(
-                  children: const [
-                    Icon(Icons.info_outline, size: 16, color: Color(0xFFFF9800)),
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: Color(0xFFFF9800),
+                    ),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Select a customer — the balance is recorded on their account.',
-                        style: TextStyle(fontSize: 12, color: Color(0xFFFF9800)),
+                        style: TextStyle(
+                          fontSize: AppResponsive.smallFontSize(context),
+                          color: Color(0xFFFF9800),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ],
               if (_allowPartialPayment && hasCustomer && _balanceDue > 0) ...[
-                const Divider(height: 20, thickness: 0.5, color: Color(0xFFE8E8E8)),
+                const Divider(
+                  height: 20,
+                  thickness: 0.5,
+                  color: Color(0xFFE8E8E8),
+                ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Balance Due',
-                      style: TextStyle(fontSize: 14, color: Color(0xFF6B6B6B)),
+                      style: TextStyle(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        color: Color(0xFF6B6B6B),
+                      ),
                     ),
                     Text(
                       '$symbol${_balanceDue.toStringAsFixed(precision)}',
-                      style: const TextStyle(
-                        fontSize: 16,
+                      style: TextStyle(
+                        fontSize: AppResponsive.subheadingFontSize(context),
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -989,20 +1085,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFFF9800).withOpacity(0.25)),
+            border: Border.all(
+              color: const Color(0xFFFF9800).withOpacity(0.25),
+            ),
           ),
           child: Row(
             children: [
-              const Icon(Icons.card_giftcard, color: Color(0xFFFF9800), size: 22),
+              const Icon(
+                Icons.card_giftcard,
+                color: Color(0xFFFF9800),
+                size: 22,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Redeem Loyalty Points',
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1011,7 +1113,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       redeemable > 0
                           ? '$available pts available · redeem $redeemable = $symbol$redeemable'
                           : '$available pts available',
-                      style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
+                      style: TextStyle(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        color: Color(0xFF6B6B6B),
+                      ),
                     ),
                   ],
                 ),
@@ -1028,13 +1133,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         // a redemption already in the cart from breaking.
                         if (on &&
                             !PlanGuard.allowedOr(
-                                context, RetailEntKeys.loyalty,
-                                featureName: 'Loyalty Points')) {
+                              context,
+                              RetailEntKeys.loyalty,
+                              featureName: 'Loyalty Points',
+                            )) {
                           return;
                         }
                         setState(() => _pointsRedeemed = on ? redeemable : 0);
-                        retailCartStore
-                            .setLoyaltyRedemption(_pointsRedeemed.toDouble());
+                        retailCartStore.setLoyaltyRedemption(
+                          _pointsRedeemed.toDouble(),
+                        );
                       },
               ),
             ],
@@ -1066,7 +1174,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           child: Text(
             label,
             style: TextStyle(
-              fontSize: 13,
+              fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.w600,
               color: selected ? Colors.white : const Color(0xFF6B6B6B),
             ),
@@ -1111,7 +1219,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           child: Text(
             '$percent%',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: AppResponsive.smallFontSize(context),
               fontWeight: FontWeight.w600,
               color: selected
                   ? const Color(0xFF4CAF50)
@@ -1145,10 +1253,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'GST Breakdown',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: AppResponsive.bodyFontSize(context),
               color: Color(0xFF1A1A1A),
               fontWeight: FontWeight.w600,
             ),
@@ -1174,15 +1282,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             children: [
                               Text(
                                 'GST ${GstService.formatGstRate(rate)}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: Color(0xFF6B6B6B),
-                                  fontSize: 13,
+                                  fontSize: AppResponsive.smallFontSize(
+                                    context,
+                                  ),
                                 ),
                               ),
                               Text(
                                 '$symbol${data.totalGstAmount.toStringAsFixed(precision)}',
-                                style: const TextStyle(
-                                  fontSize: 13,
+                                style: TextStyle(
+                                  fontSize: AppResponsive.smallFontSize(
+                                    context,
+                                  ),
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -1194,16 +1306,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             children: [
                               Text(
                                 '  CGST ${GstService.formatGstRate(rate / 2)}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: Color(0xFF9E9E9E),
-                                  fontSize: 12,
+                                  fontSize: AppResponsive.smallFontSize(
+                                    context,
+                                  ),
                                 ),
                               ),
                               Text(
                                 '$symbol${data.cgstAmount.toStringAsFixed(precision)}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: Color(0xFF9E9E9E),
-                                  fontSize: 12,
+                                  fontSize: AppResponsive.smallFontSize(
+                                    context,
+                                  ),
                                 ),
                               ),
                             ],
@@ -1213,16 +1329,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             children: [
                               Text(
                                 '  SGST ${GstService.formatGstRate(rate / 2)}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: Color(0xFF9E9E9E),
-                                  fontSize: 12,
+                                  fontSize: AppResponsive.smallFontSize(
+                                    context,
+                                  ),
                                 ),
                               ),
                               Text(
                                 '$symbol${data.sgstAmount.toStringAsFixed(precision)}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: Color(0xFF9E9E9E),
-                                  fontSize: 12,
+                                  fontSize: AppResponsive.smallFontSize(
+                                    context,
+                                  ),
                                 ),
                               ),
                             ],
@@ -1253,52 +1373,89 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFF4CAF50).withOpacity(0.05),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF4CAF50).withOpacity(0.2), width: 1),
+                border: Border.all(
+                  color: const Color(0xFF4CAF50).withOpacity(0.2),
+                  width: 1,
+                ),
               ),
               child: Column(
                 children: [
                   // Gross before any discount — always shown so the customer
                   // can see what the discount came off.
                   _buildSummaryRow(
-                      _bill.isTaxInclusive ? 'Item Total (incl. tax)' : 'Item Total',
-                      '$symbol${_subtotal.toStringAsFixed(precision)}',
-                      isBold: false),
+                    _bill.isTaxInclusive
+                        ? 'Item Total (incl. tax)'
+                        : 'Item Total',
+                    '$symbol${_subtotal.toStringAsFixed(precision)}',
+                    isBold: false,
+                  ),
                   const SizedBox(height: 8),
                   if (_discountAmount > 0) ...[
-                    _buildSummaryRow('Discount', '- $symbol${_discountAmount.toStringAsFixed(precision)}', isBold: false, color: Colors.red),
+                    _buildSummaryRow(
+                      'Discount',
+                      '- $symbol${_discountAmount.toStringAsFixed(precision)}',
+                      isBold: false,
+                      color: Colors.red,
+                    ),
                     const SizedBox(height: 8),
-                    _buildSummaryRow('Taxable Amount', '$symbol${_totalTaxableAmount.toStringAsFixed(precision)}', isBold: false),
+                    _buildSummaryRow(
+                      'Taxable Amount',
+                      '$symbol${_totalTaxableAmount.toStringAsFixed(precision)}',
+                      isBold: false,
+                    ),
                     const SizedBox(height: 8),
                   ],
                   if (_totalGstAmount > 0) ...[
-                    _buildSummaryRow('CGST', '+ $symbol${_totalCgstAmount.toStringAsFixed(precision)}', isBold: false, color: const Color(0xFF4CAF50)),
+                    _buildSummaryRow(
+                      'CGST',
+                      '+ $symbol${_totalCgstAmount.toStringAsFixed(precision)}',
+                      isBold: false,
+                      color: const Color(0xFF4CAF50),
+                    ),
                     const SizedBox(height: 4),
-                    _buildSummaryRow('SGST', '+ $symbol${_totalSgstAmount.toStringAsFixed(precision)}', isBold: false, color: const Color(0xFF4CAF50)),
+                    _buildSummaryRow(
+                      'SGST',
+                      '+ $symbol${_totalSgstAmount.toStringAsFixed(precision)}',
+                      isBold: false,
+                      color: const Color(0xFF4CAF50),
+                    ),
                     const SizedBox(height: 8),
-                    _buildSummaryRow('Total GST', '+ $symbol${_totalGstAmount.toStringAsFixed(precision)}', isBold: false, color: const Color(0xFF4CAF50)),
-                    const Divider(height: 20, thickness: 0.5, color: Color(0xFFE8E8E8)),
+                    _buildSummaryRow(
+                      'Total GST',
+                      '+ $symbol${_totalGstAmount.toStringAsFixed(precision)}',
+                      isBold: false,
+                      color: const Color(0xFF4CAF50),
+                    ),
+                    const Divider(
+                      height: 20,
+                      thickness: 0.5,
+                      color: Color(0xFFE8E8E8),
+                    ),
                   ],
                   if (_bill.loyaltyRedemption > 0) ...[
                     _buildSummaryRow(
-                        'Points Redeemed',
-                        '- $symbol${_bill.loyaltyRedemption.toStringAsFixed(precision)}',
-                        isBold: false),
+                      'Points Redeemed',
+                      '- $symbol${_bill.loyaltyRedemption.toStringAsFixed(precision)}',
+                      isBold: false,
+                    ),
                     const SizedBox(height: 8),
                   ],
                   // Rounding adjustment baked into the grand total; signed so a
                   // downward rounding reads as a deduction.
                   if (_bill.roundOff.abs() > 0.009) ...[
                     _buildSummaryRow(
-                        'Round Off',
-                        '${_bill.roundOff >= 0 ? '+ ' : '- '}$symbol${_bill.roundOff.abs().toStringAsFixed(precision)}',
-                        isBold: false),
+                      'Round Off',
+                      '${_bill.roundOff >= 0 ? '+ ' : '- '}$symbol${_bill.roundOff.abs().toStringAsFixed(precision)}',
+                      isBold: false,
+                    ),
                     const SizedBox(height: 8),
                   ],
                   _buildSummaryRow(
-                      _bill.loyaltyRedemption > 0 ? 'Net Payable' : 'Grand Total',
-                      '$symbol${_grandTotal.toStringAsFixed(precision)}',
-                      isBold: true,
-                      fontSize: 20),
+                    _bill.loyaltyRedemption > 0 ? 'Net Payable' : 'Grand Total',
+                    '$symbol${_grandTotal.toStringAsFixed(precision)}',
+                    isBold: true,
+                    fontSize: AppResponsive.headingFontSize(context),
+                  ),
                 ],
               ),
             );
@@ -1308,7 +1465,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _buildSummaryRow(String label, String value, {bool isBold = true, double? fontSize, Color? color}) {
+  Widget _buildSummaryRow(
+    String label,
+    String value, {
+    bool isBold = true,
+    double? fontSize,
+    Color? color,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -1337,218 +1500,178 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     required List<SaleItemModel> saleItems,
     Customer? customer,
   }) async {
+    final isPartial = sale.dueAmount > 0;
+
     await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Success Icon
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF4CAF50).withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  size: 48,
-                  color: Color(0xFF4CAF50),
-                  Icons.check_circle,
-                ),
+      builder: (dialogContext) => AppDialogShell(
+        // A partly-settled bill is not "paid" — title and accent both say so.
+        title: isPartial ? 'Partial Payment Received' : 'Payment Successful!',
+        subtitle: 'Receipt #${shortRef(sale.saleId)}',
+        accent: isPartial ? AppColors.warning : AppColors.success,
+        icon: isPartial ? Icons.schedule_rounded : Icons.check_circle,
+        body: Column(
+          mainAxisSize: MainAxisSize.min,
+          // stretch, not the default centre: AppDialogShell's outer Column is
+          // start-aligned, so a shrink-wrapping body sizes to its widest child
+          // and hugs the left edge of the dialog.
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Amount
+            Container(
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F5F5),
+                borderRadius: BorderRadius.circular(8),
               ),
-              const SizedBox(height: 16),
-
-              // Success Message — a partly-settled bill is not "paid".
-              Text(
-                sale.dueAmount > 0
-                    ? 'Partial Payment Received'
-                    : 'Payment Successful!',
-                style: const TextStyle(
-                  fontSize: 20,
-                  color: Color(0xFF1A1A1A),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              // Sale ID
-              Text(
-                'Receipt #${shortRef(sale.saleId)}',
-                style: const TextStyle(
-                  color: Color(0xFF6B6B6B),
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Amount
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: ValueListenableBuilder<String>(
-                  valueListenable: CurrencyHelper.currencyNotifier,
-                  builder: (context, currencyCode, child) {
-                    return ValueListenableBuilder<int>(
-                      valueListenable: DecimalSettings.precisionNotifier,
-                      builder: (context, precision, child) {
-                        final symbol = CurrencyHelper.currentSymbol;
-                        // Show what was COLLECTED, not the bill total — on a
-                        // partial payment those differ, and showing the bill
-                        // reads as though the customer paid in full.
-                        final formattedAmount =
-                            sale.paidAmount.toStringAsFixed(precision);
-                        return Text(
-                          '$symbol$formattedAmount',
-                          style: const TextStyle(
-                            fontSize: 28,
-                            color: Color(0xFF4CAF50),
-                            fontWeight: FontWeight.w700,
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-
-              // Partial payment: spell out the bill and what is still owed,
-              // so a big green number can't be mistaken for a settled sale.
-              if (sale.dueAmount > 0) ...[
-                const SizedBox(height: 16),
-                ValueListenableBuilder<int>(
-                  valueListenable: DecimalSettings.precisionNotifier,
-                  builder: (context, precision, child) {
-                    final symbol = CurrencyHelper.currentSymbol;
-                    return Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFF9800).withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                            color: const Color(0xFFFF9800).withOpacity(0.25)),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('Bill Total',
-                                  style: TextStyle(
-                                      fontSize: 13, color: Color(0xFF6B6B6B))),
-                              Text(
-                                '$symbol${sale.totalAmount.toStringAsFixed(precision)}',
-                                style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF1A1A1A)),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('Balance Due',
-                                  style: TextStyle(
-                                      fontSize: 14, color: Color(0xFF6B6B6B))),
-                              Text(
-                                '$symbol${sale.dueAmount.toStringAsFixed(precision)}',
-                                style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFFFF9800)),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ],
-              const SizedBox(height: 24),
-
-              // Print Receipt Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    // Fetch store settings
-                    final storeSettings = StoreSettingsService();
-                    final storeName = await storeSettings.getStoreName();
-                    final storeAddress = await storeSettings.getFormattedAddress();
-                    final storePhone = await storeSettings.getStorePhone();
-                    final storeEmail = await storeSettings.getStoreEmail();
-                    final gstNumber = await storeSettings.getGSTNumber();
-
-                    if (mounted) {
-                      await printService.showPrintOptionsDialog(
-                        context: this.context,
-                        sale: sale,
-                        items: saleItems,
-                        customer: customer,
-                        storeName: storeName,
-                        storeAddress: storeAddress,
-                        storePhone: storePhone,
-                        storeEmail: storeEmail,
-                        gstNumber: gstNumber,
-                        // Bill composition read from the STORED sale, so a
-                        // reprint always matches the original receipt even if
-                        // settings changed since.
-                        itemTotal: sale.subtotal,
-                        loyaltyPointsDiscount: sale.loyaltyPointsUsed,
-                        roundOff: sale.roundOff,
-                        isTaxInclusive: sale.isTaxInclusive,
+              child: ValueListenableBuilder<String>(
+                valueListenable: CurrencyHelper.currencyNotifier,
+                builder: (context, currencyCode, child) {
+                  return ValueListenableBuilder<int>(
+                    valueListenable: DecimalSettings.precisionNotifier,
+                    builder: (context, precision, child) {
+                      final symbol = CurrencyHelper.currentSymbol;
+                      // Show what was COLLECTED, not the bill total — on a
+                      // partial payment those differ, and showing the bill
+                      // reads as though the customer paid in full.
+                      final formattedAmount = sale.paidAmount.toStringAsFixed(
+                        precision,
                       );
-                      // Navigate back after printing
-                      if (mounted) {
-                        Navigator.of(context).pop(true);
-                      }
-                    }
-                  },
-                  icon: const Icon(Icons.print_outlined),
-                  label: const Text('Print Receipt'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4CAF50),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
+                      return Text(
+                        '$symbol$formattedAmount',
+                        style: TextStyle(
+                          fontSize: AppResponsive.getValue(
+                            context,
+                            mobile: 28.0,
+                            tablet: 32.0,
+                            desktop: 36.0,
+                          ),
+                          color: Color(0xFF4CAF50),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      );
+                    },
+                  );
+                },
               ),
-              const SizedBox(height: 12),
+            ),
 
-              // Done Button (Skip printing)
-              SizedBox(
-                width: double.infinity,
-                child: TextButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  child: const Text(
-                    'Skip & Close',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Color(0xFF6B6B6B),
-                      fontWeight: FontWeight.w600,
+            // Partial payment: spell out the bill and what is still owed,
+            // so a big green number can't be mistaken for a settled sale.
+            if (isPartial) ...[
+              const SizedBox(height: 16),
+              ValueListenableBuilder<int>(
+                valueListenable: DecimalSettings.precisionNotifier,
+                builder: (context, precision, child) {
+                  final symbol = CurrencyHelper.currentSymbol;
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF9800).withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFFFF9800).withOpacity(0.25),
+                      ),
                     ),
-                  ),
-                ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Bill Total',
+                              style: TextStyle(
+                                fontSize: AppResponsive.smallFontSize(context),
+                                color: Color(0xFF6B6B6B),
+                              ),
+                            ),
+                            Text(
+                              '$symbol${sale.totalAmount.toStringAsFixed(precision)}',
+                              style: TextStyle(
+                                fontSize: AppResponsive.smallFontSize(context),
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1A1A1A),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Balance Due',
+                              style: TextStyle(
+                                fontSize: AppResponsive.bodyFontSize(context),
+                                color: Color(0xFF6B6B6B),
+                              ),
+                            ),
+                            Text(
+                              '$symbol${sale.dueAmount.toStringAsFixed(precision)}',
+                              style: TextStyle(
+                                fontSize: AppResponsive.subheadingFontSize(
+                                  context,
+                                ),
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFFF9800),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ],
-          ),
+          ],
         ),
+        actions: [
+          appDialogCancelButton(dialogContext, label: 'Skip & Close'),
+          const SizedBox(width: 12),
+          appDialogPrimaryButton(
+            label: 'Print Receipt',
+            color: AppColors.success,
+            onPressed: () async {
+              // Fetch store settings
+              final storeSettings = StoreSettingsService();
+              final storeName = await storeSettings.getStoreName();
+              final storeAddress = await storeSettings.getFormattedAddress();
+              final storePhone = await storeSettings.getStorePhone();
+              final storeEmail = await storeSettings.getStoreEmail();
+              final gstNumber = await storeSettings.getGSTNumber();
+
+              if (mounted) {
+                await printService.showPrintOptionsDialog(
+                  context: this.context,
+                  sale: sale,
+                  items: saleItems,
+                  customer: customer,
+                  storeName: storeName,
+                  storeAddress: storeAddress,
+                  storePhone: storePhone,
+                  storeEmail: storeEmail,
+                  gstNumber: gstNumber,
+                  // Bill composition read from the STORED sale, so a
+                  // reprint always matches the original receipt even if
+                  // settings changed since.
+                  itemTotal: sale.subtotal,
+                  loyaltyPointsDiscount: sale.loyaltyPointsUsed,
+                  roundOff: sale.roundOff,
+                  isTaxInclusive: sale.isTaxInclusive,
+                );
+                // Close the success dialog once printing is done. Guarded on
+                // the DIALOG's context — the print sheet is an await, so the
+                // dialog may already be gone by the time we get back.
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop(true);
+                }
+              }
+            },
+          ),
+        ],
       ),
     );
   }
@@ -1561,216 +1684,173 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Credit Sale Icon
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF9800).withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  size: 48,
-                  color: Color(0xFFFF9800),
-                  Icons.schedule,
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Success Message
-              const Text(
-                'Credit Sale Recorded!',
-                style: TextStyle(
-                  fontSize: 20,
-                  color: Color(0xFF1A1A1A),
-                  fontWeight: FontWeight.w700,
+      builder: (dialogContext) => AppDialogShell(
+        title: 'Credit Sale Recorded!',
+        subtitle: 'Invoice #${shortRef(sale.saleId)}',
+        accent: AppColors.warning,
+        icon: Icons.schedule,
+        body: Column(
+          mainAxisSize: MainAxisSize.min,
+          // See _showSuccessDialog — the shell is start-aligned, so the body
+          // must stretch or it hugs the left edge.
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Amount Info
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF3E0),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color(0xFFFF9800).withOpacity(0.3),
                 ),
               ),
-              const SizedBox(height: 8),
-
-              // Invoice ID
-              Text(
-                'Invoice #${shortRef(sale.saleId)}',
-                style: const TextStyle(
-                  color: Color(0xFF6B6B6B),
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Amount Info
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF3E0),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFFF9800).withOpacity(0.3)),
-                ),
-                child: ValueListenableBuilder<String>(
-                  valueListenable: CurrencyHelper.currencyNotifier,
-                  builder: (context, currencyCode, child) {
-                    return ValueListenableBuilder<int>(
-                      valueListenable: DecimalSettings.precisionNotifier,
-                      builder: (context, precision, child) {
-                        final symbol = CurrencyHelper.currentSymbol;
-                        final formattedTotal = sale.totalAmount.toStringAsFixed(precision);
-                        final formattedBalance = (customer.creditBalance + sale.totalAmount).toStringAsFixed(precision);
-                        return Column(
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  'Total Amount',
-                                  style: TextStyle(fontSize: 14, color: Color(0xFF6B6B6B)),
-                                ),
-                                Text(
-                                  '$symbol$formattedTotal',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    color: Color(0xFFFF9800),
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const Divider(height: 16),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  'Customer',
-                                  style: TextStyle(fontSize: 14, color: Color(0xFF6B6B6B)),
-                                ),
-                                Text(
-                                  customer.name ?? '',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Color(0xFF1A1A1A),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  'New Balance',
-                                  style: TextStyle(fontSize: 14, color: Color(0xFF6B6B6B)),
-                                ),
-                                Text(
-                                  '$symbol$formattedBalance',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.red,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Payment is pending. Stock has been deducted.',
-                style: TextStyle(fontSize: 12, color: Color(0xFF9E9E9E)),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-
-              // Print Receipt Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    final saleItems = await saleStore.getItemsForSale(sale.saleId);
-
-                    // Fetch store settings
-                    final storeSettings = StoreSettingsService();
-                    final storeName = await storeSettings.getStoreName();
-                    final storeAddress = await storeSettings.getFormattedAddress();
-                    final storePhone = await storeSettings.getStorePhone();
-                    final storeEmail = await storeSettings.getStoreEmail();
-                    final gstNumber = await storeSettings.getGSTNumber();
-
-                    if (mounted) {
-                      await printService.showPrintOptionsDialog(
-                        context: this.context,
-                        sale: sale,
-                        items: saleItems,
-                        customer: customer,
-                        storeName: storeName,
-                        storeAddress: storeAddress,
-                        storePhone: storePhone,
-                        storeEmail: storeEmail,
-                        gstNumber: gstNumber,
-                        // Bill composition read from the STORED sale, so a
-                        // reprint always matches the original receipt even if
-                        // settings changed since.
-                        itemTotal: sale.subtotal,
-                        loyaltyPointsDiscount: sale.loyaltyPointsUsed,
-                        roundOff: sale.roundOff,
-                        isTaxInclusive: sale.isTaxInclusive,
+              child: ValueListenableBuilder<String>(
+                valueListenable: CurrencyHelper.currencyNotifier,
+                builder: (context, currencyCode, child) {
+                  return ValueListenableBuilder<int>(
+                    valueListenable: DecimalSettings.precisionNotifier,
+                    builder: (context, precision, child) {
+                      final symbol = CurrencyHelper.currentSymbol;
+                      final formattedTotal = sale.totalAmount.toStringAsFixed(
+                        precision,
                       );
-                      // Navigate back after printing
-                      if (mounted) {
-                        Navigator.of(context).pop();
-                        Navigator.of(context).pop(); // Return to POS screen
-                      }
-                    }
-                  },
-                  icon: const Icon(Icons.print_outlined),
-                  label: const Text('Print Invoice'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF9800),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
+                      final formattedBalance =
+                          (customer.creditBalance + sale.totalAmount)
+                              .toStringAsFixed(precision);
+                      return Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Total Amount',
+                                style: TextStyle(
+                                  fontSize: AppResponsive.bodyFontSize(context),
+                                  color: Color(0xFF6B6B6B),
+                                ),
+                              ),
+                              Text(
+                                '$symbol$formattedTotal',
+                                style: TextStyle(
+                                  fontSize: AppResponsive.subheadingFontSize(
+                                    context,
+                                  ),
+                                  color: Color(0xFFFF9800),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Customer',
+                                style: TextStyle(
+                                  fontSize: AppResponsive.bodyFontSize(context),
+                                  color: Color(0xFF6B6B6B),
+                                ),
+                              ),
+                              Text(
+                                customer.name ?? '',
+                                style: TextStyle(
+                                  fontSize: AppResponsive.bodyFontSize(context),
+                                  color: Color(0xFF1A1A1A),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'New Balance',
+                                style: TextStyle(
+                                  fontSize: AppResponsive.bodyFontSize(context),
+                                  color: Color(0xFF6B6B6B),
+                                ),
+                              ),
+                              Text(
+                                '$symbol$formattedBalance',
+                                style: TextStyle(
+                                  fontSize: AppResponsive.bodyFontSize(context),
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
               ),
-              const SizedBox(height: 12),
-
-              // Done Button (Skip printing)
-              SizedBox(
-                width: double.infinity,
-                child: TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).pop(); // Return to POS screen
-                  },
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  child: const Text(
-                    'Skip & Close',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Color(0xFF6B6B6B),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Payment is pending. Stock has been deducted.',
+              style: TextStyle(
+                fontSize: AppResponsive.smallFontSize(context),
+                color: Color(0xFF9E9E9E),
               ),
-            ],
-          ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
+        // Both buttons pop the DIALOG only. `_processCreditSale` pops the
+        // Checkout screen itself once this future returns — the old code
+        // popped twice here as well, which only avoided over-popping because
+        // `mounted` had already gone false.
+        actions: [
+          appDialogCancelButton(dialogContext, label: 'Skip & Close'),
+          const SizedBox(width: 12),
+          appDialogPrimaryButton(
+            label: 'Print Invoice',
+            color: AppColors.warning,
+            onPressed: () async {
+              final saleItems = await saleStore.getItemsForSale(sale.saleId);
+
+              // Fetch store settings
+              final storeSettings = StoreSettingsService();
+              final storeName = await storeSettings.getStoreName();
+              final storeAddress = await storeSettings.getFormattedAddress();
+              final storePhone = await storeSettings.getStorePhone();
+              final storeEmail = await storeSettings.getStoreEmail();
+              final gstNumber = await storeSettings.getGSTNumber();
+
+              if (mounted) {
+                await printService.showPrintOptionsDialog(
+                  context: this.context,
+                  sale: sale,
+                  items: saleItems,
+                  customer: customer,
+                  storeName: storeName,
+                  storeAddress: storeAddress,
+                  storePhone: storePhone,
+                  storeEmail: storeEmail,
+                  gstNumber: gstNumber,
+                  // Bill composition read from the STORED sale, so a
+                  // reprint always matches the original receipt even if
+                  // settings changed since.
+                  itemTotal: sale.subtotal,
+                  loyaltyPointsDiscount: sale.loyaltyPointsUsed,
+                  roundOff: sale.roundOff,
+                  isTaxInclusive: sale.isTaxInclusive,
+                );
+                // The print sheet is an await, so the dialog may already be
+                // gone by the time we get back.
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop();
+                }
+              }
+            },
+          ),
+        ],
       ),
     );
   }
@@ -1812,7 +1892,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
-                    color: customer != null ? const Color(0xFF4CAF50) : const Color(0xFF6B6B6B),
+                    color: customer != null
+                        ? const Color(0xFF4CAF50)
+                        : const Color(0xFF6B6B6B),
                     size: 24,
                     customer != null ? Icons.person : Icons.person_add_outlined,
                   ),
@@ -1825,8 +1907,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           children: [
                             Text(
                               customer.name ?? '',
-                              style: const TextStyle(
-                                fontSize: 15,
+                              style: TextStyle(
+                                fontSize: AppResponsive.bodyFontSize(context),
                                 color: Color(0xFF1A1A1A),
                                 fontWeight: FontWeight.w600,
                               ),
@@ -1834,20 +1916,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             const SizedBox(height: 4),
                             Text(
                               customer.phone ?? '',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: Color(0xFF6B6B6B),
-                                fontSize: 13,
+                                fontSize: AppResponsive.smallFontSize(context),
                               ),
                             ),
                           ],
                         )
-                      : const Column(
+                      : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Add Customer',
                               style: TextStyle(
-                                fontSize: 15,
+                                fontSize: AppResponsive.bodyFontSize(context),
                                 color: Color(0xFF6B6B6B),
                                 fontWeight: FontWeight.w500,
                               ),
@@ -1857,7 +1939,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               'Optional - Tap to select',
                               style: TextStyle(
                                 color: Color(0xFFB0B0B0),
-                                fontSize: 12,
+                                fontSize: AppResponsive.smallFontSize(context),
                               ),
                             ),
                           ],
@@ -1866,7 +1948,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 Icon(
                   size: 18,
                   color: const Color(0xFFB0B0B0),
-                  customer != null ? Icons.edit_outlined : Icons.arrow_forward_ios,
+                  customer != null
+                      ? Icons.edit_outlined
+                      : Icons.arrow_forward_ios,
                 ),
               ],
             ),

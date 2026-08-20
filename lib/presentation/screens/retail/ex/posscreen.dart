@@ -70,25 +70,26 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
   }
 
   /// Resolve a product's category id to its display name.
-  String _categoryName(String categoryId) => _categoryNames[categoryId] ?? categoryId;
+  String _categoryName(String categoryId) =>
+      _categoryNames[categoryId] ?? categoryId;
 
   /// Money string honouring the store's currency + decimal-precision settings.
   /// The whole body sits under [_moneyScope], so these stay live.
   String _money(double amount) => CurrencyHelper.formatAmountWithSymbol(
-        amount,
-        CurrencyHelper.currentSymbol,
-        decimalPlaces: DecimalSettings.precision,
-      );
+    amount,
+    CurrencyHelper.currentSymbol,
+    decimalPlaces: DecimalSettings.precision,
+  );
 
   /// Rebuilds [child] when the currency or decimal precision changes — one
   /// subscription for the screen instead of a nested pair per price label.
   Widget _moneyScope(Widget child) => ValueListenableBuilder<String>(
-        valueListenable: CurrencyHelper.currencyNotifier,
-        builder: (context, _, _) => ValueListenableBuilder<int>(
-          valueListenable: DecimalSettings.precisionNotifier,
-          builder: (context, _, _) => child,
-        ),
-      );
+    valueListenable: CurrencyHelper.currencyNotifier,
+    builder: (context, _, _) => ValueListenableBuilder<int>(
+      valueListenable: DecimalSettings.precisionNotifier,
+      builder: (context, _, _) => child,
+    ),
+  );
 
   /// Shown when billing can't start and there's nowhere to go back to. No
   /// AppBar back arrow — there is no previous screen, and offering one here is
@@ -107,7 +108,8 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
           child: AppEmptyState(
             icon: Icons.wb_sunny_outlined,
             title: 'Start the day to begin billing',
-            message: 'Record your opening cash balance so the day\'s sales and '
+            message:
+                'Record your opening cash balance so the day\'s sales and '
                 'cash drawer reconcile at End of Day.',
             action: Column(
               children: [
@@ -120,26 +122,35 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                       await _initializeStores();
                     },
                     icon: const Icon(Icons.play_arrow),
-                    label: Text('Start Day',
-                        style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.buttonFontSize(context),
-                            fontWeight: FontWeight.w600)),
+                    label: Text(
+                      'Start Day',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.buttonFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: AppColors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                   ),
                 ),
                 TextButton(
                   onPressed: () => Navigator.pushReplacementNamed(
-                      context, RouteNames.retailMenu),
-                  child: Text('Go to Dashboard',
-                      style: GoogleFonts.poppins(
-                          fontSize: AppResponsive.bodyFontSize(context),
-                          color: AppColors.textSecondary)),
+                    context,
+                    RouteNames.retailMenu,
+                  ),
+                  child: Text(
+                    'Go to Dashboard',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -169,8 +180,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     // Plan gate — billing module must be included in the plan.
     if (!PlanEnforce.allows(RetailEntKeys.billing)) {
       if (mounted) {
-        NotificationService.instance
-            .showError('Billing isn’t included in your current plan.');
+        NotificationService.instance.showError(
+          'Billing isn’t included in your current plan.',
+        );
       }
       return false;
     }
@@ -178,8 +190,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     // End of Day pending → no new sales until it is completed.
     if (await DayManagementService.isEodStrictlyPending()) {
       if (mounted) {
-        NotificationService.instance
-            .showError('Day has ended. Complete End of Day to unlock.');
+        NotificationService.instance.showError(
+          'Day has ended. Complete End of Day to unlock.',
+        );
       }
       return false;
     }
@@ -192,8 +205,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
       final started = await promptStartDay(context);
       if (started != true) {
         if (mounted) {
-          NotificationService.instance
-              .showError('Start the day to begin billing');
+          NotificationService.instance.showError(
+            'Start the day to begin billing',
+          );
         }
         return false;
       }
@@ -267,16 +281,36 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildWelcomeStep(context, Icons.qr_code_scanner, 'Scan Barcodes',
-                'Use the scanner button to quickly add products'),
-            _buildWelcomeStep(context, Icons.search, 'Search Products',
-                'Type product names in the search bar'),
-            _buildWelcomeStep(context, Icons.add_shopping_cart, 'Add to Cart',
-                'Tap on products to add them to your cart'),
-            _buildWelcomeStep(context, Icons.pause_circle_outline, 'Hold Sales',
-                'Park incomplete sales and restore them later'),
-            _buildWelcomeStep(context, Icons.payment, 'Checkout',
-                'Process payments and complete transactions'),
+            _buildWelcomeStep(
+              context,
+              Icons.qr_code_scanner,
+              'Scan Barcodes',
+              'Use the scanner button to quickly add products',
+            ),
+            _buildWelcomeStep(
+              context,
+              Icons.search,
+              'Search Products',
+              'Type product names in the search bar',
+            ),
+            _buildWelcomeStep(
+              context,
+              Icons.add_shopping_cart,
+              'Add to Cart',
+              'Tap on products to add them to your cart',
+            ),
+            _buildWelcomeStep(
+              context,
+              Icons.pause_circle_outline,
+              'Hold Sales',
+              'Park incomplete sales and restore them later',
+            ),
+            _buildWelcomeStep(
+              context,
+              Icons.payment,
+              'Checkout',
+              'Process payments and complete transactions',
+            ),
           ],
         ),
         actions: [
@@ -290,7 +324,11 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
   }
 
   Widget _buildWelcomeStep(
-      BuildContext context, IconData icon, String title, String description) {
+    BuildContext context,
+    IconData icon,
+    String title,
+    String description,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -302,8 +340,11 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
               color: AppColors.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon,
-                size: AppResponsive.iconSize(context), color: AppColors.primary),
+            child: Icon(
+              icon,
+              size: AppResponsive.iconSize(context),
+              color: AppColors.primary,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -367,13 +408,15 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
 
   Future<void> _onProductSelected(ProductModel product) async {
     // Inactive variants stay in the catalogue but never reach a till.
-    final variants = (await productStore.getVariantsForProduct(product.productId))
-        .where(productStore.isSellable)
-        .toList();
+    final variants = (await productStore.getVariantsForProduct(
+      product.productId,
+    )).where(productStore.isSellable).toList();
 
     if (variants.isEmpty) {
       if (mounted) {
-        NotificationService.instance.showWarning('No variants available for this product');
+        NotificationService.instance.showWarning(
+          'No variants available for this product',
+        );
       }
       return;
     }
@@ -383,9 +426,13 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
       _clearSearch();
       if (mounted) {
         if (result.success) {
-          NotificationService.instance.showSuccess('${product.productName} added to cart');
+          NotificationService.instance.showSuccess(
+            '${product.productName} added to cart',
+          );
         } else {
-          NotificationService.instance.showWarning(result.errorMessage ?? 'Cannot add item');
+          NotificationService.instance.showWarning(
+            result.errorMessage ?? 'Cannot add item',
+          );
         }
       }
     } else {
@@ -412,8 +459,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
 
     if (variant != null && !productStore.isSellable(variant)) {
       if (mounted) {
-        NotificationService.instance
-            .showWarning('This variant is inactive and cannot be sold');
+        NotificationService.instance.showWarning(
+          'This variant is inactive and cannot be sold',
+        );
       }
       return;
     }
@@ -427,9 +475,13 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
         if (mounted) {
           _clearSearch();
           if (result.success) {
-            NotificationService.instance.showSuccess('${product.productName} ${_getVariantDisplayName(variant)} added to cart');
+            NotificationService.instance.showSuccess(
+              '${product.productName} ${_getVariantDisplayName(variant)} added to cart',
+            );
           } else {
-            NotificationService.instance.showWarning(result.errorMessage ?? 'Cannot add item');
+            NotificationService.instance.showWarning(
+              result.errorMessage ?? 'Cannot add item',
+            );
           }
         }
       }
@@ -440,12 +492,12 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
         _clearSearch();
       }
     }
-
-
   }
 
   void _showVariantSelectionDialog(
-      ProductModel product, List<VarianteModel> variants) async {
+    ProductModel product,
+    List<VarianteModel> variants,
+  ) async {
     final selectedVariant = await VariantPickerDialog.show(
       context: context,
       product: product,
@@ -455,22 +507,30 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     if (selectedVariant != null && mounted) {
       final result = await cartStore.addItem(product, selectedVariant);
       if (result.success) {
-        NotificationService.instance.showSuccess('${product.productName} ${selectedVariant.shortDescription} added to cart');
+        NotificationService.instance.showSuccess(
+          '${product.productName} ${selectedVariant.shortDescription} added to cart',
+        );
       } else {
-        NotificationService.instance.showWarning(result.errorMessage ?? 'Cannot add item');
+        NotificationService.instance.showWarning(
+          result.errorMessage ?? 'Cannot add item',
+        );
       }
     }
   }
 
   String _getVariantDisplayName(VarianteModel variant) {
-    final label = attributeStore
-        .describeAttributes(attributeStore.attributesOf(variant), separator: ' • ');
+    final label = attributeStore.describeAttributes(
+      attributeStore.attributesOf(variant),
+      separator: ' • ',
+    );
     return label.isEmpty ? 'Default' : label;
   }
 
   Future<void> _holdCurrentSale() async {
     if (cartStore.itemCount == 0) {
-      NotificationService.instance.showWarning('Cart is empty. Nothing to hold.');
+      NotificationService.instance.showWarning(
+        'Cart is empty. Nothing to hold.',
+      );
       return;
     }
 
@@ -669,9 +729,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
           if (_isScannerActive) _buildScannerContainer(),
           _buildHeaderRow(context),
           const Divider(height: 1, thickness: 0.5, color: AppColors.divider),
-          Expanded(
-            child: _buildSimpleCart(context),
-          ),
+          Expanded(child: _buildSimpleCart(context)),
         ],
         _buildSimpleSummary(context),
       ],
@@ -710,10 +768,12 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
               _buildTabBar(),
               if (_isScannerActive) _buildScannerContainer(),
               _buildHeaderRow(context),
-              const Divider(height: 1, thickness: 0.5, color: AppColors.divider),
-              Expanded(
-                child: _buildSimpleCart(context),
+              const Divider(
+                height: 1,
+                thickness: 0.5,
+                color: AppColors.divider,
               ),
+              Expanded(child: _buildSimpleCart(context)),
               _buildSimpleSummary(context),
             ],
           ),
@@ -754,7 +814,11 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                     ],
                   ),
                 ),
-                const Divider(height: 1, thickness: 0.5, color: AppColors.divider),
+                const Divider(
+                  height: 1,
+                  thickness: 0.5,
+                  color: AppColors.divider,
+                ),
                 if (_showSearchResults)
                   _buildSearchResults()
                 else
@@ -774,7 +838,10 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
           child: Column(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.white,
                   border: Border(
@@ -794,7 +861,10 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                     const SizedBox(width: 12),
                     Observer(
                       builder: (context) => Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
@@ -814,10 +884,12 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
               ),
               if (_isScannerActive) _buildScannerContainer(),
               _buildHeaderRow(context),
-              const Divider(height: 1, thickness: 0.5, color: AppColors.divider),
-              Expanded(
-                child: _buildSimpleCart(context),
+              const Divider(
+                height: 1,
+                thickness: 0.5,
+                color: AppColors.divider,
               ),
+              Expanded(child: _buildSimpleCart(context)),
               _buildSimpleSummary(context),
             ],
           ),
@@ -825,7 +897,6 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
       ],
     );
   }
-
 
   /*----------------------------------SCANNER CONTAINER ----------------------------------*/
 
@@ -878,7 +949,11 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                         final value = barcode.rawValue;
                         if (value == null) continue;
                         if (!_isInsideScanWindow(
-                            barcode, capture.size, scanWindow, previewSize)) {
+                          barcode,
+                          capture.size,
+                          scanWindow,
+                          previewSize,
+                        )) {
                           continue;
                         }
                         _handleBarcodeScanned(value);
@@ -907,14 +982,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                     textAlign: TextAlign.center,
                     style: GoogleFonts.poppins(
                       color: AppColors.white,
-                      fontSize: AppResponsive.smallFontSize(context) ,
+                      fontSize: AppResponsive.smallFontSize(context),
                       fontWeight: FontWeight.w500,
-                      shadows: [
-                        Shadow(
-                          color: Colors.black54,
-                          blurRadius: 4,
-                        ),
-                      ],
+                      shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
                     ),
                   ),
                 ),
@@ -922,7 +992,11 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                   top: 8,
                   right: 0,
                   child: IconButton(
-                    icon: const Icon(Icons.close, color: AppColors.white, size: 20),
+                    icon: const Icon(
+                      Icons.close,
+                      color: AppColors.white,
+                      size: 20,
+                    ),
                     onPressed: _toggleScanner,
                     style: IconButton.styleFrom(
                       backgroundColor: Colors.black45,
@@ -956,11 +1030,11 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     // texture — the widget and the texture are different sizes.
     final Rect window =
         ScanWindowUtils.calculateScanWindowRelativeToTextureInPercentage(
-      BoxFit.cover,
-      scanWindow,
-      textureSize: imageSize,
-      widgetSize: previewSize,
-    );
+          BoxFit.cover,
+          scanWindow,
+          textureSize: imageSize,
+          widgetSize: previewSize,
+        );
 
     double sumX = 0;
     double sumY = 0;
@@ -970,12 +1044,10 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     }
     final int count = barcode.corners.length;
 
-    return window.contains(Offset(
-      sumX / count / imageSize.width,
-      sumY / count / imageSize.height,
-    ));
+    return window.contains(
+      Offset(sumX / count / imageSize.width, sumY / count / imageSize.height),
+    );
   }
-
 
   /*----------------------------------SEARCH BAR----------------------------------*/
   Widget _buildSearchBarWithScanner(BuildContext context) {
@@ -983,8 +1055,8 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
       // color: AppColors.danger,
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
       child: Row(
-        mainAxisAlignment:MainAxisAlignment.center,
-        crossAxisAlignment:CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
             // AppTextField also routes through the on-screen VisualKeyboard
@@ -1002,9 +1074,11 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
               },
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
-                      icon: Icon(Icons.clear,
-                          color: AppColors.textSecondary,
-                          size: AppResponsive.smallIconSize(context)),
+                      icon: Icon(
+                        Icons.clear,
+                        color: AppColors.textSecondary,
+                        size: AppResponsive.smallIconSize(context),
+                      ),
                       onPressed: _clearSearch,
                     )
                   : null,
@@ -1046,7 +1120,6 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-
                   Text(
                     '${_searchResults.length} products found',
                     style: GoogleFonts.poppins(
@@ -1149,28 +1222,19 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Text(
-                              _categoryName(product.category),
-                              style: GoogleFonts.poppins(
-                                fontSize: AppResponsive.smallFontSize(context),
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                            if (variants.length > 1) ...[
-                              Text(' · ',
-                                  style: GoogleFonts.poppins(
-                                      color: AppColors.textSecondary)),
-                              Text(
-                                '${variants.length} variants',
-                                style: GoogleFonts.poppins(
-                                  fontSize: AppResponsive.smallFontSize(context),
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ],
+                        // One Text, not a Row of three — separate Texts can't
+                        // ellipsize, so this overflowed in the narrow search
+                        // pane of the tablet/desktop split.
+                        Text(
+                          variants.length > 1
+                              ? '${_categoryName(product.category)} · ${variants.length} variants'
+                              : _categoryName(product.category),
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            color: AppColors.textSecondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -1188,7 +1252,10 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                       ),
                       const SizedBox(height: 4),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: stock > 0
                               ? AppColors.primary.withValues(alpha: 0.1)
@@ -1200,7 +1267,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                           style: GoogleFonts.poppins(
                             fontSize: AppResponsive.captionFontSize(context),
                             fontWeight: FontWeight.w500,
-                            color: stock > 0 ? AppColors.primary : AppColors.danger,
+                            color: stock > 0
+                                ? AppColors.primary
+                                : AppColors.danger,
                           ),
                         ),
                       ),
@@ -1325,7 +1394,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                               Text(
                                 _money(item.price),
                                 style: GoogleFonts.poppins(
-                                  fontSize: AppResponsive.smallFontSize(context),
+                                  fontSize: AppResponsive.smallFontSize(
+                                    context,
+                                  ),
                                   color: AppColors.textSecondary,
                                 ),
                               ),
@@ -1355,7 +1426,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                                   item.qty.toString(),
                                   textAlign: TextAlign.center,
                                   style: GoogleFonts.poppins(
-                                    fontSize: AppResponsive.smallFontSize(context),
+                                    fontSize: AppResponsive.smallFontSize(
+                                      context,
+                                    ),
                                     fontWeight: FontWeight.w700,
                                     color: AppColors.textPrimary,
                                   ),
@@ -1369,8 +1442,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                                       .incrementQuantity(item.variantId);
                                   if (!result.success && mounted) {
                                     NotificationService.instance.showWarning(
-                                        result.errorMessage ??
-                                            'Cannot add more items');
+                                      result.errorMessage ??
+                                          'Cannot add more items',
+                                    );
                                   }
                                 },
                               ),
@@ -1393,12 +1467,19 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                         SizedBox(
                           width: 40,
                           child: IconButton(
-                            icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.danger),
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              size: 20,
+                              color: AppColors.danger,
+                            ),
                             onPressed: () {
                               cartStore.removeItem(item.variantId);
                             },
                             padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                            constraints: const BoxConstraints(
+                              minWidth: 40,
+                              minHeight: 40,
+                            ),
                           ),
                         ),
                       ],
@@ -1451,7 +1532,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: AppColors.white,
-            border: Border(top: BorderSide(color: AppColors.divider, width: 0.5)),
+            border: Border(
+              top: BorderSide(color: AppColors.divider, width: 0.5),
+            ),
             boxShadow: [
               BoxShadow(
                 color: Color(0x0A000000),
@@ -1465,7 +1548,10 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
               children: [
                 // Items count badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
@@ -1532,7 +1618,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                       );
 
                       if (result == true && mounted) {
-                        NotificationService.instance.showSuccess('Checkout completed successfully!');
+                        NotificationService.instance.showSuccess(
+                          'Checkout completed successfully!',
+                        );
                       }
                     },
                     style: ElevatedButton.styleFrom(
@@ -1568,7 +1656,6 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     );
   }
 
-
   /*----------------------------------TAB BAR ----------------------------------*/
   Widget _buildTabBar() {
     return Observer(
@@ -1591,7 +1678,10 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   shrinkWrap: true,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
                   itemCount: cartStore.tabs.length,
                   itemBuilder: (context, index) {
                     final tab = cartStore.tabs[index];
@@ -1611,9 +1701,14 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                             // "Tab 1" + count + close needs nowhere near 100px;
                             // the old floor padded every tab out and pushed the
                             // strip wide. A customer name still gets room to 160.
-                            constraints:
-                                const BoxConstraints(minWidth: 0, maxWidth: 160),
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            constraints: const BoxConstraints(
+                              minWidth: 0,
+                              maxWidth: 160,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               color: isActive
                                   ? AppColors.primary
@@ -1628,8 +1723,12 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                                     // Position-derived — see CartStore.tabLabel.
                                     cartStore.tabLabel(index),
                                     style: GoogleFonts.poppins(
-                                      fontSize: AppResponsive.smallFontSize(context),
-                                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                                      fontSize: AppResponsive.smallFontSize(
+                                        context,
+                                      ),
+                                      fontWeight: isActive
+                                          ? FontWeight.w600
+                                          : FontWeight.w500,
                                       color: isActive
                                           ? AppColors.white
                                           : AppColors.textPrimary,
@@ -1641,17 +1740,26 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                                 if (itemCount > 0) ...[
                                   const SizedBox(width: 6),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 5,
+                                      vertical: 2,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: isActive
-                                          ? AppColors.white.withValues(alpha: 0.25)
-                                          : AppColors.primary.withValues(alpha: 0.15),
+                                          ? AppColors.white.withValues(
+                                              alpha: 0.25,
+                                            )
+                                          : AppColors.primary.withValues(
+                                              alpha: 0.15,
+                                            ),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Text(
                                       '$itemCount',
                                       style: GoogleFonts.poppins(
-                                        fontSize: AppResponsive.captionFontSize(context),
+                                        fontSize: AppResponsive.captionFontSize(
+                                          context,
+                                        ),
                                         fontWeight: FontWeight.w700,
                                         color: isActive
                                             ? AppColors.white
@@ -1670,7 +1778,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                                       Icons.close,
                                       size: 16,
                                       color: isActive
-                                          ? AppColors.white.withValues(alpha: 0.8)
+                                          ? AppColors.white.withValues(
+                                              alpha: 0.8,
+                                            )
                                           : AppColors.textSecondary,
                                     ),
                                   ),
@@ -1695,7 +1805,10 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                     },
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         border: Border.all(
                           color: AppColors.primary.withValues(alpha: 0.3),
@@ -1706,11 +1819,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            Icons.add,
-                            size: 16,
-                            color: AppColors.primary,
-                          ),
+                          Icon(Icons.add, size: 16, color: AppColors.primary),
                           const SizedBox(width: 4),
                           Text(
                             'New',
@@ -1738,7 +1847,8 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     final addIt = await showAppConfirmDialog(
       context: context,
       title: 'Product Not Found',
-      message: 'No product found for barcode:\n$barcode\n\n'
+      message:
+          'No product found for barcode:\n$barcode\n\n'
           'Would you like to add this product?',
       confirmLabel: 'Add Product',
       accent: AppColors.warning,
@@ -1828,7 +1938,10 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                     ),
                     IconButton(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close, color: AppColors.textSecondary),
+                      icon: const Icon(
+                        Icons.close,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -1870,7 +1983,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                                 Text(
                                   'Scanned Barcode',
                                   style: GoogleFonts.poppins(
-                                    fontSize: AppResponsive.smallFontSize(context),
+                                    fontSize: AppResponsive.smallFontSize(
+                                      context,
+                                    ),
                                     color: AppColors.textSecondary,
                                   ),
                                 ),
@@ -1878,7 +1993,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                                 Text(
                                   barcode,
                                   style: GoogleFonts.poppins(
-                                    fontSize: AppResponsive.subheadingFontSize(context),
+                                    fontSize: AppResponsive.subheadingFontSize(
+                                      context,
+                                    ),
                                     fontWeight: FontWeight.w600,
                                     color: AppColors.primary,
                                   ),
@@ -1912,8 +2029,11 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.category_outlined,
-                                color: AppColors.primary, size: 20),
+                            const Icon(
+                              Icons.category_outlined,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: DropdownButtonHideUnderline(
@@ -1922,27 +2042,38 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                                       ? null
                                       : selectedCategory,
                                   isExpanded: true,
-                                  hint: Text('Category *',
-                                      style: GoogleFonts.poppins(
-                                          fontSize: 14,
-                                          color: AppColors.textSecondary)),
+                                  hint: Text(
+                                    'Category *',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: AppResponsive.bodyFontSize(
+                                        context,
+                                      ),
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
                                   icon: const Icon(
-                                      Icons.arrow_drop_down_rounded,
-                                      color: AppColors.textSecondary),
+                                    Icons.arrow_drop_down_rounded,
+                                    color: AppColors.textSecondary,
+                                  ),
                                   items: categories.map((Category category) {
                                     return DropdownMenuItem<String>(
                                       value: category.id,
                                       child: Text(
                                         category.name,
                                         style: GoogleFonts.poppins(
-                                            fontSize: 14,
-                                            color: AppColors.textPrimary),
+                                          fontSize: AppResponsive.bodyFontSize(
+                                            context,
+                                          ),
+                                          color: AppColors.textPrimary,
+                                        ),
                                       ),
                                     );
                                   }).toList(),
                                   onChanged: (String? newValue) {
                                     if (newValue != null) {
-                                      setState(() => selectedCategory = newValue);
+                                      setState(
+                                        () => selectedCategory = newValue,
+                                      );
                                     }
                                   },
                                 ),
@@ -1961,12 +2092,20 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                               label: 'Selling Price',
                               hint: '0.00',
                               required: true,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
                               inputFormatters: [
-                                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                                FilteringTextInputFormatter.allow(
+                                  RegExp(r'^\d*\.?\d{0,2}'),
+                                ),
                               ],
                               prefixWidget: Padding(
-                                padding: const EdgeInsets.only(left: 12, right: 4),
+                                padding: const EdgeInsets.only(
+                                  left: 12,
+                                  right: 4,
+                                ),
                                 child: Text(CurrencyHelper.currentSymbol),
                               ),
                             ),
@@ -1977,12 +2116,20 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                               controller: mrpController,
                               label: 'MRP',
                               hint: '0.00',
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
                               inputFormatters: [
-                                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                                FilteringTextInputFormatter.allow(
+                                  RegExp(r'^\d*\.?\d{0,2}'),
+                                ),
                               ],
                               prefixWidget: Padding(
-                                padding: const EdgeInsets.only(left: 12, right: 4),
+                                padding: const EdgeInsets.only(
+                                  left: 12,
+                                  right: 4,
+                                ),
                                 child: Text(CurrencyHelper.currentSymbol),
                               ),
                             ),
@@ -1996,7 +2143,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                         hint: '1',
                         required: true,
                         keyboardType: TextInputType.number,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
                       ),
                     ],
                   ),
@@ -2093,9 +2242,13 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
       // Show success message
       if (mounted) {
         if (result.success) {
-          NotificationService.instance.showSuccess('${product.productName} added to cart!');
+          NotificationService.instance.showSuccess(
+            '${product.productName} added to cart!',
+          );
         } else {
-          NotificationService.instance.showWarning(result.errorMessage ?? 'Product added but could not add to cart');
+          NotificationService.instance.showWarning(
+            result.errorMessage ?? 'Product added but could not add to cart',
+          );
         }
       }
     } catch (e) {

@@ -52,7 +52,10 @@ class ReportPageScaffold extends StatefulWidget {
 
   /// Resolved window; both null means "all time".
   final Future<List<Map<String, dynamic>>> Function(
-      DateTime? start, DateTime? end) loader;
+    DateTime? start,
+    DateTime? end,
+  )
+  loader;
 
   /// Metric cards shown above the table. Empty list hides the band.
   final List<Widget> Function(List<Map<String, dynamic>> rows) summaryCards;
@@ -60,14 +63,14 @@ class ReportPageScaffold extends StatefulWidget {
   /// Null renders a summary-only report with no table (Purchase Summary).
   final List<DataColumn> Function(BuildContext context)? columns;
   final DataRow Function(BuildContext context, Map<String, dynamic> row)?
-      rowBuilder;
+  rowBuilder;
 
   /// Extra content between the summary band and the table.
   ///
   /// Takes a context like [columns] and [rowBuilder] do, so a detail panel can
   /// size its own text off `AppResponsive` instead of hardcoding it.
   final Widget Function(BuildContext context, List<Map<String, dynamic>> rows)?
-      detail;
+  detail;
 
   final IconData emptyIcon;
   final String emptyTitle;
@@ -130,9 +133,15 @@ class _ReportPageScaffoldState extends State<ReportPageScaffold> {
     if (_period == ReportPeriod.custom) {
       if (_customStart == null || _customEnd == null) return (null, null);
       final start = DateTime(
-          _customStart!.year, _customStart!.month, _customStart!.day);
-      final end = DateTime(_customEnd!.year, _customEnd!.month, _customEnd!.day)
-          .add(const Duration(days: 1));
+        _customStart!.year,
+        _customStart!.month,
+        _customStart!.day,
+      );
+      final end = DateTime(
+        _customEnd!.year,
+        _customEnd!.month,
+        _customEnd!.day,
+      ).add(const Duration(days: 1));
       return (start, end);
     }
     final now = DateTime.now();
@@ -256,16 +265,19 @@ class _ReportPageScaffoldState extends State<ReportPageScaffold> {
   }
 
   Widget _emptyState() => ReportEmptyState(
-        icon: widget.emptyIcon,
-        title: widget.emptyTitle,
-        message: widget.emptyMessage,
-      );
+    icon: widget.emptyIcon,
+    title: widget.emptyTitle,
+    message: widget.emptyMessage,
+  );
 
   Widget _buildReport() {
     final cards = widget.summaryCards(_rows);
     final hasTable = widget.columns != null && widget.rowBuilder != null;
-    final pageRows =
-        ReportPagination.pageSlice(_rows, _currentPage, _rowsPerPage);
+    final pageRows = ReportPagination.pageSlice(
+      _rows,
+      _currentPage,
+      _rowsPerPage,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

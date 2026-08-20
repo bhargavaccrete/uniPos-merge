@@ -75,7 +75,7 @@ class ReportPagination extends StatelessWidget {
                 child: Text(
                   '${currentPage + 1} / $totalPages',
                   style: GoogleFonts.poppins(
-                    fontSize: 13,
+                    fontSize: AppResponsive.smallFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: AppColors.primary,
                   ),

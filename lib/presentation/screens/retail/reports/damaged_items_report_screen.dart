@@ -45,8 +45,10 @@ class DamagedItemsReportScreen extends StatelessWidget {
           service.getDamagedItemsReport(startDate: start, endDate: end),
       summaryCards: (rows) {
         final qty = rows.fold<int>(0, (s, r) => s + (r['damagedQty'] as int));
-        final value =
-            rows.fold<double>(0, (s, r) => s + (r['damagedAmount'] as double));
+        final value = rows.fold<double>(
+          0,
+          (s, r) => s + (r['damagedAmount'] as double),
+        );
 
         int qtyFor(String handling) => rows
             .where((r) => r['handling'] == handling)
@@ -89,23 +91,29 @@ class DamagedItemsReportScreen extends StatelessWidget {
         final variant = row['variantInfo'] as String?;
         final handling = row['handling'] as String?;
 
-        return DataRow(cells: [
-          DataCell(Text(
-            variant == null || variant.isEmpty
-                ? row['productName'] as String
-                : '${row['productName']} · $variant',
-          )),
-          DataCell(Text(row['supplierName'] as String)),
-          DataCell(Text(row['grnNumber'] as String)),
-          DataCell(Text(_date(row['receivedDate'] as String))),
-          DataCell(Text('${row['damagedQty']}')),
-          DataCell(Text(formatMoney(row['damagedAmount'] as double))),
-          DataCell(AppStatusPill(
-            dense: true,
-            label: row['handlingDisplay'] as String,
-            color: _handlingColors[handling] ?? AppColors.textSecondary,
-          )),
-        ]);
+        return DataRow(
+          cells: [
+            DataCell(
+              Text(
+                variant == null || variant.isEmpty
+                    ? row['productName'] as String
+                    : '${row['productName']} · $variant',
+              ),
+            ),
+            DataCell(Text(row['supplierName'] as String)),
+            DataCell(Text(row['grnNumber'] as String)),
+            DataCell(Text(_date(row['receivedDate'] as String))),
+            DataCell(Text('${row['damagedQty']}')),
+            DataCell(Text(formatMoney(row['damagedAmount'] as double))),
+            DataCell(
+              AppStatusPill(
+                dense: true,
+                label: row['handlingDisplay'] as String,
+                color: _handlingColors[handling] ?? AppColors.textSecondary,
+              ),
+            ),
+          ],
+        );
       },
       exportData: (rows) => ReportExportData(
         headers: const [
@@ -121,28 +129,35 @@ class DamagedItemsReportScreen extends StatelessWidget {
           'Outcome',
         ],
         rows: rows
-            .map((r) => [
-                  r['productName'],
-                  r['variantInfo'] ?? '',
-                  r['supplierName'],
-                  r['grnNumber'],
-                  r['poNumber'],
-                  _date(r['receivedDate'] as String),
-                  r['damagedQty'],
-                  r['costPrice'] == null
-                      ? ''
-                      : ReportExportService.formatCurrency(
-                          r['costPrice'] as double),
-                  ReportExportService.formatCurrency(
-                      r['damagedAmount'] as double),
-                  r['handlingDisplay'],
-                ])
+            .map(
+              (r) => [
+                r['productName'],
+                r['variantInfo'] ?? '',
+                r['supplierName'],
+                r['grnNumber'],
+                r['poNumber'],
+                _date(r['receivedDate'] as String),
+                r['damagedQty'],
+                r['costPrice'] == null
+                    ? ''
+                    : ReportExportService.formatCurrency(
+                        r['costPrice'] as double,
+                      ),
+                ReportExportService.formatCurrency(
+                  r['damagedAmount'] as double,
+                ),
+                r['handlingDisplay'],
+              ],
+            )
             .toList(),
         summary: {
-          'Damaged Units':
-              rows.fold<int>(0, (s, r) => s + (r['damagedQty'] as int)),
-          'Damaged Value': ReportExportService.formatCurrency(rows.fold<double>(
-              0, (s, r) => s + (r['damagedAmount'] as double))),
+          'Damaged Units': rows.fold<int>(
+            0,
+            (s, r) => s + (r['damagedQty'] as int),
+          ),
+          'Damaged Value': ReportExportService.formatCurrency(
+            rows.fold<double>(0, (s, r) => s + (r['damagedAmount'] as double)),
+          ),
         },
       ),
     );

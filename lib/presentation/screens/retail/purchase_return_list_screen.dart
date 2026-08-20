@@ -96,35 +96,61 @@ class _PurchaseReturnListScreenState extends State<PurchaseReturnListScreen> {
     );
   }
 
+  /// Caps content width on large screens. Backgrounds still span edge to edge —
+  /// only what you read is constrained.
+  Widget _capped(BuildContext context, Widget child) {
+    final maxWidth = AppResponsive.maxContentWidth(context);
+    if (maxWidth == double.infinity) return child;
+    return Align(
+      // topCenter, not Center: Center aligns on BOTH axes, so a
+      // shrink-wrapping child floats in the vertical middle.
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: child,
+      ),
+    );
+  }
+
   Widget _buildBody(BuildContext context) {
-    final isTablet = !AppResponsive.isMobile(context);
+    final side = AppResponsive.padding(context).left;
 
     return Column(
       children: [
         Container(
           color: AppColors.white,
           padding: EdgeInsets.fromLTRB(
-              isTablet ? 20 : 16, isTablet ? 16 : 12, isTablet ? 20 : 16, 12),
-          child: Column(
-            children: [
-              AppTextField(
-                controller: _searchController,
-                hint: 'Search by PR, GRN, PO or supplier...',
-                icon: Icons.search_rounded,
-                onChanged: (_) => setState(() {}),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear, size: 20),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {});
-                        },
-                      )
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              _buildStatusFilter(),
-            ],
+            side,
+            AppResponsive.mediumSpacing(context),
+            side,
+            12,
+          ),
+          child: _capped(
+            context,
+            Column(
+              children: [
+                AppTextField(
+                  controller: _searchController,
+                  hint: 'Search by PR, GRN, PO or supplier...',
+                  icon: Icons.search_rounded,
+                  onChanged: (_) => setState(() {}),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(
+                            Icons.clear,
+                            size: AppResponsive.smallIconSize(context),
+                          ),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {});
+                          },
+                        )
+                      : null,
+                ),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
+                _buildStatusFilter(),
+              ],
+            ),
           ),
         ),
         Expanded(
@@ -139,10 +165,13 @@ class _PurchaseReturnListScreenState extends State<PurchaseReturnListScreen> {
               final returns = _visibleReturns;
               if (returns.isEmpty) return _buildEmptyState();
 
-              return ListView.builder(
-                padding: EdgeInsets.all(isTablet ? 20 : 16),
-                itemCount: returns.length,
-                itemBuilder: (context, index) => _buildCard(returns[index]),
+              return _capped(
+                context,
+                ListView.builder(
+                  padding: AppResponsive.padding(context),
+                  itemCount: returns.length,
+                  itemBuilder: (context, index) => _buildCard(returns[index]),
+                ),
               );
             },
           ),
@@ -159,38 +188,76 @@ class _PurchaseReturnListScreenState extends State<PurchaseReturnListScreen> {
       ('Cancelled', PurchaseReturnStatus.cancelled),
     ];
 
+    final height = AppResponsive.getValue(
+      context,
+      mobile: 34.0,
+      tablet: 40.0,
+      desktop: 44.0,
+    );
+    final gap = AppResponsive.smallSpacing(context);
+
+    // Phones scroll — the labels can't all fit. From tablet up the row divides
+    // the width evenly, matching the PO tab bar and removing the dead space a
+    // left-packed scrolling row leaves on a wide screen.
+    if (!AppResponsive.isMobile(context)) {
+      return SizedBox(
+        height: height,
+        child: Row(
+          children: [
+            for (var i = 0; i < options.length; i++) ...[
+              if (i > 0) SizedBox(width: gap),
+              Expanded(child: _statusChip(options[i].$1, options[i].$2)),
+            ],
+          ],
+        ),
+      );
+    }
+
     return SizedBox(
-      height: 34,
+      height: height,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: options.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final (label, status) = options[index];
-          final selected = _statusFilter == status;
-          return GestureDetector(
-            onTap: () => setState(() => _statusFilter = status),
-            child: Container(
-              alignment: Alignment.center,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: selected ? AppColors.primary : AppColors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: selected ? AppColors.primary : AppColors.divider,
-                ),
-              ),
-              child: Text(
-                label,
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: selected ? AppColors.white : AppColors.textSecondary,
-                ),
-              ),
+        separatorBuilder: (_, _) => SizedBox(width: gap),
+        itemBuilder: (context, index) =>
+            _statusChip(options[index].$1, options[index].$2),
+      ),
+    );
+  }
+
+  Widget _statusChip(String label, PurchaseReturnStatus? status) {
+    final selected = _statusFilter == status;
+
+    return GestureDetector(
+      onTap: () => setState(() => _statusFilter = status),
+      child: Container(
+        alignment: Alignment.center,
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.mediumSpacing(context),
+        ),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : AppColors.white,
+          borderRadius: BorderRadius.circular(
+            AppResponsive.smallBorderRadius(context),
+          ),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.divider,
+          ),
+        ),
+        // An equal slice of a small tablet is tight for the longest label;
+        // scaleDown keeps it on one line instead of clipping to an ellipsis.
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            label,
+            maxLines: 1,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              fontWeight: FontWeight.w600,
+              color: selected ? AppColors.white : AppColors.textSecondary,
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
@@ -213,18 +280,20 @@ class _PurchaseReturnListScreenState extends State<PurchaseReturnListScreen> {
   Widget _buildCard(PurchaseReturnModel model) {
     final color = purchaseReturnStatusColor(model.statusEnum);
 
+    final radius = AppResponsive.smallBorderRadius(context);
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: AppColors.divider),
       ),
       child: InkWell(
         onTap: () => _openDetail(model),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(radius),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -233,8 +302,10 @@ class _PurchaseReturnListScreenState extends State<PurchaseReturnListScreen> {
                   Expanded(
                     child: Text(
                       model.returnNumber,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.poppins(
-                        fontSize: 14,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
                       ),
@@ -249,31 +320,43 @@ class _PurchaseReturnListScreenState extends State<PurchaseReturnListScreen> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.poppins(
-                  fontSize: 12.5,
+                  fontSize: AppResponsive.smallFontSize(context),
                   color: AppColors.textSecondary,
                 ),
               ),
-              const SizedBox(height: 10),
-              Row(
+              SizedBox(height: AppResponsive.smallSpacing(context)),
+              // Wrap so the qty/amount drops below the document numbers on a
+              // narrow card rather than squeezing them to an ellipsis.
+              Wrap(
+                spacing: AppResponsive.smallSpacing(context),
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Icon(Icons.receipt_long_outlined,
-                      size: 13, color: AppColors.textSecondary),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      '${model.grnNumber}  •  ${model.poNumber}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.poppins(
-                        fontSize: 11,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.receipt_long_outlined,
+                        size: AppResponsive.smallIconSize(context),
                         color: AppColors.textSecondary,
                       ),
-                    ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${model.grnNumber}  •  ${model.poNumber}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.captionFontSize(context),
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
                   Text(
                     '${model.totalQty} pcs  •  ${formatMoney(model.totalAmount)}',
+                    maxLines: 1,
                     style: GoogleFonts.poppins(
-                      fontSize: 12,
+                      fontSize: AppResponsive.smallFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
                     ),
@@ -284,7 +367,7 @@ class _PurchaseReturnListScreenState extends State<PurchaseReturnListScreen> {
               Text(
                 _formatDate(model.returnDate),
                 style: GoogleFonts.poppins(
-                  fontSize: 11,
+                  fontSize: AppResponsive.captionFontSize(context),
                   color: AppColors.textSecondary,
                 ),
               ),

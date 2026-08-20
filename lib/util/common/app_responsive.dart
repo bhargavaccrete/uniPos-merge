@@ -75,8 +75,7 @@ class AppResponsive {
 
   /// Responsive font size for captions
   static double captionFontSize(BuildContext context) =>
-      getValue
-        (context, mobile: 11.0, tablet: 12.0, desktop: 13.0);
+      getValue(context, mobile: 11.0, tablet: 12.0, desktop: 13.0);
 
   /// Responsive font size for buttons
   static double buttonFontSize(BuildContext context) =>
@@ -117,13 +116,19 @@ class AppResponsive {
   // ==================== PADDING ====================
 
   /// Responsive padding (all sides)
-  static EdgeInsets padding(BuildContext context) =>
-      EdgeInsets.all(getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0));
+  static EdgeInsets padding(BuildContext context) => EdgeInsets.all(
+    getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0),
+  );
 
   /// Responsive horizontal padding
   static EdgeInsets horizontalPadding(BuildContext context) =>
       EdgeInsets.symmetric(
-        horizontal: getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0),
+        horizontal: getValue(
+          context,
+          mobile: 16.0,
+          tablet: 20.0,
+          desktop: 24.0,
+        ),
       );
 
   /// Responsive vertical padding
@@ -133,12 +138,14 @@ class AppResponsive {
       );
 
   /// Responsive card padding
-  static EdgeInsets cardPadding(BuildContext context) =>
-      EdgeInsets.all(getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0));
+  static EdgeInsets cardPadding(BuildContext context) => EdgeInsets.all(
+    getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0),
+  );
 
   /// Responsive screen padding
-  static EdgeInsets screenPadding(BuildContext context) =>
-      EdgeInsets.all(getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0));
+  static EdgeInsets screenPadding(BuildContext context) => EdgeInsets.all(
+    getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0),
+  );
 
   // ==================== BORDER RADIUS ====================
 
@@ -175,16 +182,24 @@ class AppResponsive {
   // ==================== MAX CONTENT WIDTH ====================
 
   /// Get max content width for centering content on large screens
-  static double maxContentWidth(BuildContext context) =>
-      getValue(context, mobile: double.infinity, tablet: 1000.0, desktop: 1400.0);
+  static double maxContentWidth(BuildContext context) => getValue(
+    context,
+    mobile: double.infinity,
+    tablet: 1000.0,
+    desktop: 1400.0,
+  );
 
   /// Get max form width for forms and dialogs
   static double maxFormWidth(BuildContext context) =>
       getValue(context, mobile: double.infinity, tablet: 600.0, desktop: 800.0);
 
   /// Get max card width for cards in lists
-  static double maxCardWidth(BuildContext context) =>
-      getValue(context, mobile: double.infinity, tablet: 800.0, desktop: 1000.0);
+  static double maxCardWidth(BuildContext context) => getValue(
+    context,
+    mobile: double.infinity,
+    tablet: 800.0,
+    desktop: 1000.0,
+  );
 
   // ==================== DATA TABLE ====================
 
@@ -207,8 +222,12 @@ class AppResponsive {
   // ==================== GRID ====================
 
   /// Get number of grid columns based on screen size
-  static int gridColumns(BuildContext context, {int mobile = 2, int tablet = 3, int desktop = 4}) =>
-      getValue(context, mobile: mobile, tablet: tablet, desktop: desktop);
+  static int gridColumns(
+    BuildContext context, {
+    int mobile = 2,
+    int tablet = 3,
+    int desktop = 4,
+  }) => getValue(context, mobile: mobile, tablet: tablet, desktop: desktop);
 
   /// Responsive grid spacing
   static double gridSpacing(BuildContext context) =>
@@ -244,7 +263,8 @@ class AppResponsive {
 
   /// Responsive bottom sheet max height
   static double bottomSheetMaxHeight(BuildContext context) =>
-      getValue(context, mobile: 0.9, tablet: 0.8, desktop: 0.7) * screenHeight(context);
+      getValue(context, mobile: 0.9, tablet: 0.8, desktop: 0.7) *
+      screenHeight(context);
 
   // ==================== LIST & TILE ====================
 
@@ -255,7 +275,12 @@ class AppResponsive {
   /// Responsive list tile padding
   static EdgeInsets listTilePadding(BuildContext context) =>
       EdgeInsets.symmetric(
-        horizontal: getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0),
+        horizontal: getValue(
+          context,
+          mobile: 16.0,
+          tablet: 20.0,
+          desktop: 24.0,
+        ),
         vertical: getValue(context, mobile: 8.0, tablet: 10.0, desktop: 12.0),
       );
 
@@ -314,12 +339,21 @@ class AppResponsive {
   // ==================== UTILITIES ====================
 
   /// Constrain content to max width with centering
+  /// Centre [child] horizontally and cap its width.
+  ///
+  /// [alignment] defaults to [Alignment.center] for backwards compatibility,
+  /// but page bodies want [Alignment.topCenter]: this hands the child LOOSE
+  /// constraints, so a `SingleChildScrollView` or shrink-wrapping `Column`
+  /// sizes to its content and then floats in the vertical middle of the
+  /// viewport, leaving a large gap above and below.
   static Widget constrainedContent({
     required BuildContext context,
     required Widget child,
     double? maxWidth,
+    AlignmentGeometry alignment = Alignment.center,
   }) {
-    return Center(
+    return Align(
+      alignment: alignment,
       child: Container(
         constraints: BoxConstraints(
           maxWidth: maxWidth ?? maxContentWidth(context),
@@ -330,7 +364,10 @@ class AppResponsive {
   }
 
   /// Responsive SizedBox for spacing
-  static Widget verticalSpace(BuildContext context, {SpacingSize size = SpacingSize.medium}) {
+  static Widget verticalSpace(
+    BuildContext context, {
+    SpacingSize size = SpacingSize.medium,
+  }) {
     final spacing = switch (size) {
       SpacingSize.small => smallSpacing(context),
       SpacingSize.medium => mediumSpacing(context),
@@ -341,7 +378,10 @@ class AppResponsive {
   }
 
   /// Responsive horizontal SizedBox for spacing
-  static Widget horizontalSpace(BuildContext context, {SpacingSize size = SpacingSize.medium}) {
+  static Widget horizontalSpace(
+    BuildContext context, {
+    SpacingSize size = SpacingSize.medium,
+  }) {
     final spacing = switch (size) {
       SpacingSize.small => smallSpacing(context),
       SpacingSize.medium => mediumSpacing(context),
@@ -352,7 +392,8 @@ class AppResponsive {
   }
 
   /// Responsive box constraints for containers
-  static BoxConstraints boxConstraints(BuildContext context, {
+  static BoxConstraints boxConstraints(
+    BuildContext context, {
     double? minWidth,
     double? maxWidth,
     double? minHeight,
@@ -368,16 +409,7 @@ class AppResponsive {
 }
 
 /// Screen type enum
-enum ScreenType {
-  mobile,
-  tablet,
-  desktop,
-}
+enum ScreenType { mobile, tablet, desktop }
 
 /// Spacing size enum for consistent spacing
-enum SpacingSize {
-  small,
-  medium,
-  large,
-  extraLarge,
-}
+enum SpacingSize { small, medium, large, extraLarge }

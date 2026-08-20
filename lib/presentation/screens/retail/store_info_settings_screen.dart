@@ -13,7 +13,8 @@ class StoreInfoSettingsScreen extends StatefulWidget {
   const StoreInfoSettingsScreen({super.key});
 
   @override
-  State<StoreInfoSettingsScreen> createState() => _StoreInfoSettingsScreenState();
+  State<StoreInfoSettingsScreen> createState() =>
+      _StoreInfoSettingsScreenState();
 }
 
 class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
@@ -47,15 +48,20 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
   Future<void> _loadSettings() async {
     setState(() => _isLoading = true);
 
-    _storeNameController.text = await _storeSettingsService.getStoreName() ?? '';
-    _ownerNameController.text = await _storeSettingsService.getOwnerName() ?? '';
-    _addressController.text = await _storeSettingsService.getStoreAddress() ?? '';
+    _storeNameController.text =
+        await _storeSettingsService.getStoreName() ?? '';
+    _ownerNameController.text =
+        await _storeSettingsService.getOwnerName() ?? '';
+    _addressController.text =
+        await _storeSettingsService.getStoreAddress() ?? '';
     _cityController.text = await _storeSettingsService.getStoreCity() ?? '';
     _stateController.text = await _storeSettingsService.getStoreState() ?? '';
-    _pincodeController.text = await _storeSettingsService.getStorePincode() ?? '';
+    _pincodeController.text =
+        await _storeSettingsService.getStorePincode() ?? '';
     _phoneController.text = await _storeSettingsService.getStorePhone() ?? '';
     _emailController.text = await _storeSettingsService.getStoreEmail() ?? '';
-    _gstNumberController.text = await _storeSettingsService.getGSTNumber() ?? '';
+    _gstNumberController.text =
+        await _storeSettingsService.getGSTNumber() ?? '';
     _logoBytes = await _storeSettingsService.getStoreLogo();
 
     setState(() => _isLoading = false);
@@ -78,7 +84,8 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
         if (bytes.length > 2 * 1024 * 1024) {
           if (mounted) {
             NotificationService.instance.showError(
-                'Image is too large. Please select an image under 2MB.');
+              'Image is too large. Please select an image under 2MB.',
+            );
           }
           return;
         }
@@ -110,14 +117,22 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
     // Save text settings
     final success = await _storeSettingsService.saveAllSettings(
       storeName: _storeNameController.text,
-      ownerName: _ownerNameController.text.isNotEmpty ? _ownerNameController.text : null,
-      address: _addressController.text.isNotEmpty ? _addressController.text : null,
+      ownerName: _ownerNameController.text.isNotEmpty
+          ? _ownerNameController.text
+          : null,
+      address: _addressController.text.isNotEmpty
+          ? _addressController.text
+          : null,
       city: _cityController.text.isNotEmpty ? _cityController.text : null,
       state: _stateController.text.isNotEmpty ? _stateController.text : null,
-      pincode: _pincodeController.text.isNotEmpty ? _pincodeController.text : null,
+      pincode: _pincodeController.text.isNotEmpty
+          ? _pincodeController.text
+          : null,
       phone: _phoneController.text.isNotEmpty ? _phoneController.text : null,
       email: _emailController.text.isNotEmpty ? _emailController.text : null,
-      gstNumber: _gstNumberController.text.isNotEmpty ? _gstNumberController.text : null,
+      gstNumber: _gstNumberController.text.isNotEmpty
+          ? _gstNumberController.text
+          : null,
     );
 
     // Save logo if it was changed
@@ -135,8 +150,9 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
     if (mounted) {
       final bool allSuccess = success && logoSuccess;
       if (allSuccess) {
-        NotificationService.instance
-            .showSuccess('Store information saved successfully');
+        NotificationService.instance.showSuccess(
+          'Store information saved successfully',
+        );
       } else {
         NotificationService.instance.showError('Failed to save some settings');
       }
@@ -166,187 +182,198 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(title: 'Store Information'),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : SingleChildScrollView(
-              padding: AppResponsive.padding(context),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Info Card
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.info.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: AppColors.info.withValues(alpha: 0.3),
+      body: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxCardWidth(context),
+        child: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              )
+            : SingleChildScrollView(
+                padding: AppResponsive.padding(context),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Info Card
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.info.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.info.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline, color: AppColors.info),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'This information will appear on all receipts and invoices',
+                                style: TextStyle(
+                                  fontSize: AppResponsive.bodyFontSize(context),
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      child: Row(
+                      const SizedBox(height: 24),
+
+                      // Logo Section
+                      _buildSectionHeader('Store Logo'),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Your logo will appear on receipts and invoices',
+                        style: TextStyle(
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildLogoSection(),
+                      const SizedBox(height: 24),
+
+                      // Business Details Section
+                      _buildSectionHeader('Business Details'),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _storeNameController,
+                        label: 'Store Name',
+                        icon: Icons.store,
+                        hint: 'e.g., ABC Retail Store',
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Store name is required';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _ownerNameController,
+                        label: 'Owner Name',
+                        icon: Icons.person,
+                        hint: 'e.g., John Doe',
+                      ),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _gstNumberController,
+                        label: 'GST Number',
+                        icon: Icons.account_balance_wallet,
+                        hint: 'e.g., 22AAAAA0000A1Z5',
+                        textCapitalization: TextCapitalization.characters,
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Address Section
+                      _buildSectionHeader('Address'),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _addressController,
+                        label: 'Street Address',
+                        icon: Icons.location_on,
+                        hint: 'e.g., 123 Main Street',
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
                         children: [
-                          Icon(Icons.info_outline, color: AppColors.info),
-                          const SizedBox(width: 12),
                           Expanded(
-                            child: Text(
-                              'This information will appear on all receipts and invoices',
-                              style: TextStyle(
-                                fontSize: AppResponsive.bodyFontSize(context),
-                                color: AppColors.textSecondary,
-                              ),
+                            flex: 2,
+                            child: _buildTextField(
+                              controller: _cityController,
+                              label: 'City',
+                              icon: Icons.location_city,
+                              hint: 'e.g., Mumbai',
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _pincodeController,
+                              label: 'Pincode',
+                              icon: Icons.pin_drop,
+                              hint: '400001',
+                              keyboardType: TextInputType.number,
+                              maxLength: 6,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Logo Section
-                    _buildSectionHeader('Store Logo'),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Your logo will appear on receipts and invoices',
-                      style: TextStyle(
-                        fontSize: AppResponsive.bodyFontSize(context),
-                        color: Colors.grey[600],
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _stateController,
+                        label: 'State',
+                        icon: Icons.map,
+                        hint: 'e.g., Maharashtra',
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildLogoSection(),
-                    const SizedBox(height: 24),
+                      const SizedBox(height: 24),
 
-                    // Business Details Section
-                    _buildSectionHeader('Business Details'),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _storeNameController,
-                      label: 'Store Name',
-                      icon: Icons.store,
-                      hint: 'e.g., ABC Retail Store',
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Store name is required';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _ownerNameController,
-                      label: 'Owner Name',
-                      icon: Icons.person,
-                      hint: 'e.g., John Doe',
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _gstNumberController,
-                      label: 'GST Number',
-                      icon: Icons.account_balance_wallet,
-                      hint: 'e.g., 22AAAAA0000A1Z5',
-                      textCapitalization: TextCapitalization.characters,
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Address Section
-                    _buildSectionHeader('Address'),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _addressController,
-                      label: 'Street Address',
-                      icon: Icons.location_on,
-                      hint: 'e.g., 123 Main Street',
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: _buildTextField(
-                            controller: _cityController,
-                            label: 'City',
-                            icon: Icons.location_city,
-                            hint: 'e.g., Mumbai',
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _pincodeController,
-                            label: 'Pincode',
-                            icon: Icons.pin_drop,
-                            hint: '400001',
-                            keyboardType: TextInputType.number,
-                            maxLength: 6,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _stateController,
-                      label: 'State',
-                      icon: Icons.map,
-                      hint: 'e.g., Maharashtra',
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Contact Information Section
-                    _buildSectionHeader('Contact Information'),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _phoneController,
-                      label: 'Phone Number',
-                      icon: Icons.phone,
-                      hint: '+91 1234567890',
-                      keyboardType: TextInputType.phone,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _emailController,
-                      label: 'Email Address',
-                      icon: Icons.email,
-                      hint: 'store@example.com',
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Save Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _isSaving ? null : _saveSettings,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: _isSaving
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
-                              )
-                            : Text(
-                                'Save Information',
-                                style: TextStyle(
-                                  fontSize: AppResponsive.subheadingFontSize(context),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+                      // Contact Information Section
+                      _buildSectionHeader('Contact Information'),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _phoneController,
+                        label: 'Phone Number',
+                        icon: Icons.phone,
+                        hint: '+91 1234567890',
+                        keyboardType: TextInputType.phone,
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _emailController,
+                        label: 'Email Address',
+                        icon: Icons.email,
+                        hint: 'store@example.com',
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Save Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isSaving ? null : _saveSettings,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: _isSaving
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                              : Text(
+                                  'Save Information',
+                                  style: TextStyle(
+                                    fontSize: AppResponsive.subheadingFontSize(
+                                      context,
+                                    ),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
+      ),
     );
   }
 
@@ -411,16 +438,9 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
             child: _logoBytes != null
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.memory(
-                      _logoBytes!,
-                      fit: BoxFit.contain,
-                    ),
+                    child: Image.memory(_logoBytes!, fit: BoxFit.contain),
                   )
-                : Icon(
-                    Icons.image_outlined,
-                    size: 60,
-                    color: Colors.grey[400],
-                  ),
+                : Icon(Icons.image_outlined, size: 60, color: Colors.grey[400]),
           ),
           const SizedBox(height: 16),
 
@@ -430,7 +450,10 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
             children: [
               OutlinedButton.icon(
                 onPressed: _pickLogo,
-                icon: Icon(_logoBytes != null ? Icons.edit : Icons.upload, size: 18),
+                icon: Icon(
+                  _logoBytes != null ? Icons.edit : Icons.upload,
+                  size: 18,
+                ),
                 label: Text(_logoBytes != null ? 'Change Logo' : 'Upload Logo'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.primary,

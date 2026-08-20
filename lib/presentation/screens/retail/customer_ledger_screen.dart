@@ -9,15 +9,13 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 /// Customer Ledger Screen - Timeline view of customer transactions
 class CustomerLedgerScreen extends StatefulWidget {
   final Customer customer;
 
-  const CustomerLedgerScreen({
-    super.key,
-    required this.customer,
-  });
+  const CustomerLedgerScreen({super.key, required this.customer});
 
   @override
   State<CustomerLedgerScreen> createState() => _CustomerLedgerScreenState();
@@ -37,8 +35,9 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
   Future<void> _loadLedger() async {
     setState(() => _isLoading = true);
     try {
-      final entries =
-          await creditStore.getCustomerLedger(widget.customer.customerId);
+      final entries = await creditStore.getCustomerLedger(
+        widget.customer.customerId,
+      );
       if (mounted) setState(() => _entries = entries);
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -51,8 +50,9 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
     return _entries.where((entry) {
       final entryDate = DateTime.tryParse(entry.date);
       if (entryDate == null) return true;
-      return entryDate
-              .isAfter(_dateFilter!.start.subtract(const Duration(days: 1))) &&
+      return entryDate.isAfter(
+            _dateFilter!.start.subtract(const Duration(days: 1)),
+          ) &&
           entryDate.isBefore(_dateFilter!.end.add(const Duration(days: 1)));
     }).toList();
   }
@@ -106,62 +106,78 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
         ],
       ),
       body: MoneyScope(
-        child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(color: AppColors.primary))
-            : Column(
-                children: [
-                  _buildCustomerSummary(),
+        child: AppResponsive.constrainedContent(
+          context: context,
+          alignment: Alignment.topCenter,
+          maxWidth: AppResponsive.maxContentWidth(context),
+          child: _isLoading
+              ? const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                )
+              : Column(
+                  children: [
+                    _buildCustomerSummary(),
 
-                  if (_dateFilter != null)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      color: AppColors.info.withValues(alpha: 0.08),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.calendar_today_rounded,
-                              size: 14, color: AppColors.info),
-                          const SizedBox(width: 8),
-                          Text(
-                            '${DateFormat('dd/MM/yy').format(_dateFilter!.start)} — ${DateFormat('dd/MM/yy').format(_dateFilter!.end)}',
-                            style: GoogleFonts.poppins(
+                    if (_dateFilter != null)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        color: AppColors.info.withValues(alpha: 0.08),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.calendar_today_rounded,
+                              size: 14,
                               color: AppColors.info,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                  Expanded(
-                    child: entries.isEmpty
-                        ? AppEmptyState(
-                            icon: Icons.receipt_long_outlined,
-                            title: 'No transactions found',
-                            message: _dateFilter != null
-                                ? 'Nothing recorded in the selected date range.'
-                                : 'Credit sales and payments will appear here.',
-                          )
-                        : RefreshIndicator(
-                            color: AppColors.primary,
-                            onRefresh: _loadLedger,
-                            child: ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                              itemCount: entries.length,
-                              itemBuilder: (context, index) =>
-                                  _buildLedgerEntry(
-                                entries[index],
-                                dateFormat,
-                                isLast: index == entries.length - 1,
+                            const SizedBox(width: 8),
+                            Text(
+                              '${DateFormat('dd/MM/yy').format(_dateFilter!.start)} — ${DateFormat('dd/MM/yy').format(_dateFilter!.end)}',
+                              style: GoogleFonts.poppins(
+                                color: AppColors.info,
+                                fontSize: AppResponsive.smallFontSize(context),
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
-                          ),
-                  ),
-                ],
-              ),
+                          ],
+                        ),
+                      ),
+
+                    Expanded(
+                      child: entries.isEmpty
+                          ? AppEmptyState(
+                              icon: Icons.receipt_long_outlined,
+                              title: 'No transactions found',
+                              message: _dateFilter != null
+                                  ? 'Nothing recorded in the selected date range.'
+                                  : 'Credit sales and payments will appear here.',
+                            )
+                          : RefreshIndicator(
+                              color: AppColors.primary,
+                              onRefresh: _loadLedger,
+                              child: ListView.builder(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  4,
+                                  16,
+                                  16,
+                                ),
+                                itemCount: entries.length,
+                                itemBuilder: (context, index) =>
+                                    _buildLedgerEntry(
+                                      entries[index],
+                                      dateFormat,
+                                      isLast: index == entries.length - 1,
+                                    ),
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+        ),
       ),
     );
   }
@@ -189,7 +205,7 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                       ? widget.customer.name![0].toUpperCase()
                       : '?',
                   style: GoogleFonts.poppins(
-                    fontSize: 18,
+                    fontSize: AppResponsive.subheadingFontSize(context),
                     fontWeight: FontWeight.w700,
                     color: AppColors.primary,
                   ),
@@ -205,7 +221,7 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.poppins(
-                        fontSize: 15,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
@@ -213,7 +229,7 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                     Text(
                       widget.customer.phone ?? '—',
                       style: GoogleFonts.poppins(
-                        fontSize: 12,
+                        fontSize: AppResponsive.smallFontSize(context),
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -256,7 +272,7 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
         Text(
           value,
           style: GoogleFonts.poppins(
-            fontSize: 17,
+            fontSize: AppResponsive.subheadingFontSize(context),
             fontWeight: FontWeight.w700,
             color: color,
           ),
@@ -265,7 +281,7 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
         Text(
           label,
           style: GoogleFonts.poppins(
-            fontSize: 11,
+            fontSize: AppResponsive.captionFontSize(context),
             color: AppColors.textSecondary,
           ),
         ),
@@ -279,7 +295,9 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
     required bool isLast,
   }) {
     final entryDate = DateTime.tryParse(entry.date);
-    final dateStr = entryDate != null ? dateFormat.format(entryDate) : entry.date;
+    final dateStr = entryDate != null
+        ? dateFormat.format(entryDate)
+        : entry.date;
 
     // Semantic per entry type — a credit sale grows the debt (red, "+"),
     // a payment shrinks it (green), a write-off is neutral.
@@ -328,9 +346,7 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                 child: Icon(icon, color: iconColor, size: 18),
               ),
               if (!isLast)
-                Expanded(
-                  child: Container(width: 2, color: AppColors.divider),
-                ),
+                Expanded(child: Container(width: 2, color: AppColors.divider)),
             ],
           ),
           const SizedBox(width: 12),
@@ -350,7 +366,7 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                   Text(
                     dateStr,
                     style: GoogleFonts.poppins(
-                      fontSize: 11,
+                      fontSize: AppResponsive.captionFontSize(context),
                       color: AppColors.textSecondary,
                     ),
                   ),
@@ -358,7 +374,7 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                   Text(
                     entry.description,
                     style: GoogleFonts.poppins(
-                      fontSize: 13.5,
+                      fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w500,
                       color: AppColors.textPrimary,
                     ),
@@ -370,14 +386,16 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                       Text(
                         '$amountPrefix${formatMoney(entry.amount.abs())}',
                         style: GoogleFonts.poppins(
-                          fontSize: 15,
+                          fontSize: AppResponsive.subheadingFontSize(context),
                           fontWeight: FontWeight.w700,
                           color: amountColor,
                         ),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.surfaceMedium,
                           borderRadius: BorderRadius.circular(6),
@@ -385,7 +403,7 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                         child: Text(
                           'Bal: ${formatMoney(entry.runningBalance)}',
                           style: GoogleFonts.poppins(
-                            fontSize: 11.5,
+                            fontSize: AppResponsive.captionFontSize(context),
                             fontWeight: FontWeight.w500,
                             color: AppColors.textSecondary,
                           ),

@@ -38,12 +38,17 @@ class _DailySalesReportScreenState extends State<DailySalesReportScreen> {
 
     // Same window the totals cover: midnight to midnight, end exclusive.
     final start = DateTime(
-        _selectedDate.year, _selectedDate.month, _selectedDate.day);
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+    );
     final end = start.add(const Duration(days: 1));
 
     final totalsFuture = _reportService.getDailySalesReport(_selectedDate);
-    final itemsFuture =
-        _reportService.getVariantWiseSalesReport(startDate: start, endDate: end);
+    final itemsFuture = _reportService.getVariantWiseSalesReport(
+      startDate: start,
+      endDate: end,
+    );
 
     final data = await totalsFuture;
     final items = await itemsFuture;
@@ -69,8 +74,7 @@ class _DailySalesReportScreenState extends State<DailySalesReportScreen> {
   }
 
   Future<void> _step(int days) async {
-    setState(() =>
-        _selectedDate = _selectedDate.add(Duration(days: days)));
+    setState(() => _selectedDate = _selectedDate.add(Duration(days: days)));
     await _loadReport();
   }
 
@@ -79,8 +83,11 @@ class _DailySalesReportScreenState extends State<DailySalesReportScreen> {
   bool get _canStepForward {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final selected =
-        DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+    final selected = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+    );
     return selected.isBefore(today);
   }
 
@@ -112,8 +119,9 @@ class _DailySalesReportScreenState extends State<DailySalesReportScreen> {
               isLoading: _isLoading,
               data: _reportData,
               items: _items,
-              periodLabel:
-                  DateFormat('EEEE, dd MMMM yyyy').format(_selectedDate),
+              periodLabel: DateFormat(
+                'EEEE, dd MMMM yyyy',
+              ).format(_selectedDate),
               reportTitle: 'Daily Sales',
               exportFileName: 'daily_sales',
             ),

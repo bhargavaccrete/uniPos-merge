@@ -14,7 +14,6 @@ import 'package:billberrylite/domain/services/retail/stock_alert_service.dart';
 
 import '../../../core/di/service_locator.dart';
 
-
 class StockAlertsScreen extends StatefulWidget {
   const StockAlertsScreen({super.key});
 
@@ -45,7 +44,8 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
         title: 'Alert Threshold',
         // Worth saying: a variant with its own minStock ignores this number,
         // so changing it appears to do nothing for those rows.
-        subtitle: 'Flags variants at or below this stock level, unless the '
+        subtitle:
+            'Flags variants at or below this stock level, unless the '
             'variant sets its own minimum.',
         icon: Icons.tune_rounded,
         accent: AppColors.primary,
@@ -65,7 +65,9 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
                   onTap: () => Navigator.pop(dialogContext, value),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                     child: Row(
                       children: [
                         Icon(
@@ -81,10 +83,10 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
                         Text(
                           '$value units or fewer',
                           style: GoogleFonts.poppins(
-                            fontSize:
-                                AppResponsive.bodyFontSize(dialogContext),
-                            fontWeight:
-                                selected ? FontWeight.w600 : FontWeight.w400,
+                            fontSize: AppResponsive.bodyFontSize(dialogContext),
+                            fontWeight: selected
+                                ? FontWeight.w600
+                                : FontWeight.w400,
                             color: AppColors.textPrimary,
                           ),
                         ),
@@ -119,9 +121,11 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.tune,
-                        size: AppResponsive.smallIconSize(context),
-                        color: Colors.white),
+                    Icon(
+                      Icons.tune,
+                      size: AppResponsive.smallIconSize(context),
+                      color: Colors.white,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       '≤${_alertStore.threshold}',
@@ -137,46 +141,50 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
           ),
         ],
       ),
-      body: Observer(
-        builder: (_) {
-          if (_alertStore.isLoading) {
-            return const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            );
-          }
+      body: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        child: Observer(
+          builder: (_) {
+            if (_alertStore.isLoading) {
+              return const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              );
+            }
 
-          if (_alertStore.lowStockItems.isEmpty) {
-            // AppEmptyState, not ReportEmptyState — this is a dashboard
-            // destination, not a report.
-            return AppEmptyState(
-              icon: Icons.check_circle,
-              title: 'All products are well stocked!',
-              message:
-                  'No items below threshold of ${_alertStore.threshold}',
-            );
-          }
+            if (_alertStore.lowStockItems.isEmpty) {
+              // AppEmptyState, not ReportEmptyState — this is a dashboard
+              // destination, not a report.
+              return AppEmptyState(
+                icon: Icons.check_circle,
+                title: 'All products are well stocked!',
+                message: 'No items below threshold of ${_alertStore.threshold}',
+              );
+            }
 
-          return Column(
-            children: [
-              // Summary Cards
-              _buildSummarySection(context),
-              // Alert List
-              Expanded(
-                child: RefreshIndicator(
-                  onRefresh: () => _alertStore.refresh(),
-                  child: ListView.builder(
-                    padding: AppResponsive.padding(context),
-                    itemCount: _alertStore.lowStockItems.length,
-                    itemBuilder: (context, index) {
-                      final item = _alertStore.lowStockItems[index];
-                      return _buildAlertCard(context, item);
-                    },
+            return Column(
+              children: [
+                // Summary Cards
+                _buildSummarySection(context),
+                // Alert List
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: () => _alertStore.refresh(),
+                    child: ListView.builder(
+                      padding: AppResponsive.padding(context),
+                      itemCount: _alertStore.lowStockItems.length,
+                      itemBuilder: (context, index) {
+                        final item = _alertStore.lowStockItems[index];
+                        return _buildAlertCard(context, item);
+                      },
+                    ),
                   ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -252,7 +260,10 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: alertColor, width: isOutOfStock || isCritical ? 2 : 1),
+        border: Border.all(
+          color: alertColor,
+          width: isOutOfStock || isCritical ? 2 : 1,
+        ),
         boxShadow: [
           BoxShadow(
             color: alertColor.withValues(alpha: 0.1),
@@ -315,7 +326,10 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: alertColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
@@ -349,7 +363,8 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
     final parts = <String>[];
 
     // Every configured attribute, not just the three legacy columns.
-    final label = (item['variantLabel'] as String?) ??
+    final label =
+        (item['variantLabel'] as String?) ??
         attributeStore.describeAttributes(
           null,
           size: item['size']?.toString(),

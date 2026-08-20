@@ -33,10 +33,13 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
         titleFontSize: AppResponsive.headingFontSize(context),
       ),
       body: Observer(
-        builder: (_) => Center(
+        // topCenter, not Center: the Column shrink-wraps, so Center would
+        // float the whole page in the vertical middle.
+        builder: (_) => Align(
+          alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxWidth: AppResponsive.isMobile(context) ? double.infinity : 680,
+              maxWidth: AppResponsive.maxCardWidth(context),
             ),
             child: Padding(
               padding: AppResponsive.screenPadding(context),
@@ -47,7 +50,9 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                   Container(
                     decoration: BoxDecoration(
                       color: AppColors.white,
-                      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.borderRadius(context),
+                      ),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.05),
@@ -61,10 +66,14 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                       child: Row(
                         children: [
                           Container(
-                            padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
+                            padding: EdgeInsets.all(
+                              AppResponsive.mediumSpacing(context),
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+                              borderRadius: BorderRadius.circular(
+                                AppResponsive.smallBorderRadius(context),
+                              ),
                             ),
                             child: Icon(
                               Icons.upload_file_rounded,
@@ -80,16 +89,23 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                                 Text(
                                   'Import products from Excel',
                                   style: GoogleFonts.poppins(
-                                    fontSize: AppResponsive.subheadingFontSize(context),
+                                    fontSize: AppResponsive.subheadingFontSize(
+                                      context,
+                                    ),
                                     fontWeight: FontWeight.w600,
                                     color: AppColors.textPrimary,
                                   ),
                                 ),
-                                SizedBox(height: AppResponsive.smallSpacing(context) / 2),
+                                SizedBox(
+                                  height:
+                                      AppResponsive.smallSpacing(context) / 2,
+                                ),
                                 Text(
                                   'Add your whole catalog at once, including variants. Categories are created automatically as needed.',
                                   style: GoogleFonts.poppins(
-                                    fontSize: AppResponsive.smallFontSize(context),
+                                    fontSize: AppResponsive.smallFontSize(
+                                      context,
+                                    ),
                                     color: AppColors.textSecondary,
                                     height: 1.4,
                                   ),
@@ -109,7 +125,10 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                     height: AppResponsive.buttonHeight(context),
                     child: ElevatedButton.icon(
                       onPressed: _store.isLoading ? null : _downloadTemplate,
-                      icon: Icon(Icons.download, size: AppResponsive.iconSize(context)),
+                      icon: Icon(
+                        Icons.download,
+                        size: AppResponsive.iconSize(context),
+                      ),
                       label: Text(
                         'Download Template',
                         style: GoogleFonts.poppins(
@@ -122,12 +141,17 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                         foregroundColor: AppColors.primary,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.borderRadius(context),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                  AppResponsive.verticalSpace(context, size: SpacingSize.medium),
+                  AppResponsive.verticalSpace(
+                    context,
+                    size: SpacingSize.medium,
+                  ),
 
                   // Import Button
                   SizedBox(
@@ -135,7 +159,10 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                     height: AppResponsive.buttonHeight(context),
                     child: ElevatedButton.icon(
                       onPressed: _store.isLoading ? null : _startImport,
-                      icon: Icon(Icons.upload_file, size: AppResponsive.iconSize(context)),
+                      icon: Icon(
+                        Icons.upload_file,
+                        size: AppResponsive.iconSize(context),
+                      ),
                       label: Text(
                         'Pick Excel and Import',
                         style: GoogleFonts.poppins(
@@ -148,7 +175,9 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                         foregroundColor: Colors.white,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.borderRadius(context),
+                          ),
                         ),
                       ),
                     ),
@@ -160,7 +189,9 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                     Container(
                       decoration: BoxDecoration(
                         color: AppColors.white,
-                        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                        borderRadius: BorderRadius.circular(
+                          AppResponsive.borderRadius(context),
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withOpacity(0.05),
@@ -174,17 +205,27 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                         child: Column(
                           children: [
                             ClipRRect(
-                              borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+                              borderRadius: BorderRadius.circular(
+                                AppResponsive.smallBorderRadius(context),
+                              ),
                               child: LinearProgressIndicator(
                                 value: _store.progress,
-                                backgroundColor: AppColors.primary.withOpacity(0.1),
-                                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                                backgroundColor: AppColors.primary.withOpacity(
+                                  0.1,
+                                ),
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  AppColors.primary,
+                                ),
                                 minHeight: 8,
                               ),
                             ),
-                            SizedBox(height: AppResponsive.mediumSpacing(context)),
+                            SizedBox(
+                              height: AppResponsive.mediumSpacing(context),
+                            ),
                             Text(
-                              _store.logMessages.isNotEmpty ? _store.logMessages.last : 'Importing…',
+                              _store.logMessages.isNotEmpty
+                                  ? _store.logMessages.last
+                                  : 'Importing…',
                               style: GoogleFonts.poppins(
                                 fontSize: AppResponsive.bodyFontSize(context),
                                 fontWeight: FontWeight.w500,
@@ -194,7 +235,9 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            SizedBox(height: AppResponsive.smallSpacing(context)),
+                            SizedBox(
+                              height: AppResponsive.smallSpacing(context),
+                            ),
                             Text(
                               '${(_store.progress * 100).toStringAsFixed(0)}%',
                               style: GoogleFonts.poppins(
@@ -214,11 +257,15 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                       child: Container(
                         decoration: BoxDecoration(
                           color: AppColors.white,
-                          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.borderRadius(context),
+                          ),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.05),
-                              blurRadius: AppResponsive.shadowBlurRadius(context),
+                              blurRadius: AppResponsive.shadowBlurRadius(
+                                context,
+                              ),
                               offset: const Offset(0, 2),
                             ),
                           ],
@@ -231,23 +278,43 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                               Row(
                                 children: [
                                   Container(
-                                    padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
+                                    padding: EdgeInsets.all(
+                                      AppResponsive.smallSpacing(context),
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: (_failedCount == 0 ? AppColors.success : AppColors.danger)
-                                          .withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+                                      color:
+                                          (_failedCount == 0
+                                                  ? AppColors.success
+                                                  : AppColors.danger)
+                                              .withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(
+                                        AppResponsive.smallBorderRadius(
+                                          context,
+                                        ),
+                                      ),
                                     ),
                                     child: Icon(
-                                      _failedCount == 0 ? Icons.check_circle : Icons.error,
-                                      color: _failedCount == 0 ? AppColors.success : AppColors.danger,
-                                      size: AppResponsive.largeIconSize(context),
+                                      _failedCount == 0
+                                          ? Icons.check_circle
+                                          : Icons.error,
+                                      color: _failedCount == 0
+                                          ? AppColors.success
+                                          : AppColors.danger,
+                                      size: AppResponsive.largeIconSize(
+                                        context,
+                                      ),
                                     ),
                                   ),
-                                  SizedBox(width: AppResponsive.mediumSpacing(context)),
+                                  SizedBox(
+                                    width: AppResponsive.mediumSpacing(context),
+                                  ),
                                   Text(
                                     'Import Results',
                                     style: GoogleFonts.poppins(
-                                      fontSize: AppResponsive.subheadingFontSize(context),
+                                      fontSize:
+                                          AppResponsive.subheadingFontSize(
+                                            context,
+                                          ),
                                       fontWeight: FontWeight.w600,
                                       color: AppColors.textPrimary,
                                     ),
@@ -259,19 +326,36 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                                 thickness: 1,
                                 color: AppColors.divider,
                               ),
-                              _buildResultItem(context, Icons.inventory_2_rounded, 'Products Imported',
-                                  '$_successCount', AppColors.primary),
+                              _buildResultItem(
+                                context,
+                                Icons.inventory_2_rounded,
+                                'Products Imported',
+                                '$_successCount',
+                                AppColors.primary,
+                              ),
                               if (_failedCount > 0) ...[
-                                _buildResultItem(context, Icons.error_outline_rounded, 'Failed Rows',
-                                    '$_failedCount', AppColors.danger),
+                                _buildResultItem(
+                                  context,
+                                  Icons.error_outline_rounded,
+                                  'Failed Rows',
+                                  '$_failedCount',
+                                  AppColors.danger,
+                                ),
                                 _buildFailedRowsDetail(context),
                               ],
                               if (_notices.isNotEmpty) ...[
-                                _buildResultItem(context, Icons.info_outline_rounded, 'Notices',
-                                    '${_notices.length}', AppColors.warning),
+                                _buildResultItem(
+                                  context,
+                                  Icons.info_outline_rounded,
+                                  'Notices',
+                                  '${_notices.length}',
+                                  AppColors.warning,
+                                ),
                                 _buildNoticesDetail(context),
                               ],
-                              SizedBox(height: AppResponsive.largeSpacing(context)),
+                              SizedBox(
+                                height: AppResponsive.largeSpacing(context),
+                              ),
                               SizedBox(
                                 width: double.infinity,
                                 height: AppResponsive.buttonHeight(context),
@@ -282,12 +366,16 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                                     foregroundColor: Colors.white,
                                     elevation: 0,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                                      borderRadius: BorderRadius.circular(
+                                        AppResponsive.borderRadius(context),
+                                      ),
                                     ),
                                   ),
                                   child: Text(
                                     'Done',
-                                    style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                                    style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -300,12 +388,17 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
 
                   // Instructions
                   if (!_store.isProcessing) ...[
-                    AppResponsive.verticalSpace(context, size: SpacingSize.large),
+                    AppResponsive.verticalSpace(
+                      context,
+                      size: SpacingSize.large,
+                    ),
                     Expanded(
                       child: Container(
                         decoration: BoxDecoration(
                           color: AppColors.surfaceLight,
-                          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.borderRadius(context),
+                          ),
                           border: Border.all(color: AppColors.divider),
                         ),
                         child: Padding(
@@ -317,10 +410,16 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                                 Row(
                                   children: [
                                     Container(
-                                      padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
+                                      padding: EdgeInsets.all(
+                                        AppResponsive.smallSpacing(context),
+                                      ),
                                       decoration: BoxDecoration(
                                         color: AppColors.info.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+                                        borderRadius: BorderRadius.circular(
+                                          AppResponsive.smallBorderRadius(
+                                            context,
+                                          ),
+                                        ),
                                       ),
                                       child: Icon(
                                         Icons.info_outline,
@@ -328,18 +427,27 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                                         size: AppResponsive.iconSize(context),
                                       ),
                                     ),
-                                    SizedBox(width: AppResponsive.mediumSpacing(context)),
+                                    SizedBox(
+                                      width: AppResponsive.mediumSpacing(
+                                        context,
+                                      ),
+                                    ),
                                     Text(
                                       'How to Use',
                                       style: GoogleFonts.poppins(
-                                        fontSize: AppResponsive.subheadingFontSize(context),
+                                        fontSize:
+                                            AppResponsive.subheadingFontSize(
+                                              context,
+                                            ),
                                         fontWeight: FontWeight.w600,
                                         color: AppColors.textPrimary,
                                       ),
                                     ),
                                   ],
                                 ),
-                                SizedBox(height: AppResponsive.largeSpacing(context)),
+                                SizedBox(
+                                  height: AppResponsive.largeSpacing(context),
+                                ),
                                 _buildInstructionStep(
                                   context,
                                   '1',
@@ -351,23 +459,23 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                                   '2',
                                   'Fill in Products',
                                   'Give variants of the same product the same Handle (e.g. "tshirt") across multiple rows.\n'
-                                  'Use Option Name/Value pairs (e.g. Size/Medium) for each variant.\n'
-                                  'Tax Rate only needs to be set on a group\'s first row.',
+                                      'Use Option Name/Value pairs (e.g. Size/Medium) for each variant.\n'
+                                      'Tax Rate only needs to be set on a group\'s first row.',
                                 ),
                                 _buildInstructionStep(
                                   context,
                                   '3',
                                   'Import File',
                                   'Click import and select your filled Excel/CSV file.\n'
-                                  'Review the item/category counts before confirming.\n'
-                                  'Categories and attributes are auto-created if needed.',
+                                      'Review the item/category counts before confirming.\n'
+                                      'Categories and attributes are auto-created if needed.',
                                 ),
                                 _buildInstructionStep(
                                   context,
                                   '4',
                                   'Review Results',
                                   'Check the number of products imported.\n'
-                                  'Review any failed rows and their reasons.',
+                                      'Review any failed rows and their reasons.',
                                 ),
                               ],
                             ),
@@ -385,10 +493,13 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
     );
   }
 
-  int get _successCount => _store.logMessages.where((m) => m.startsWith('✓')).length;
-  int get _failedCount => _store.logMessages.where((m) => m.startsWith('✗')).length;
-  List<String> get _notices =>
-      _store.logMessages.where((m) => !m.startsWith('✓') && !m.startsWith('✗')).toList();
+  int get _successCount =>
+      _store.logMessages.where((m) => m.startsWith('✓')).length;
+  int get _failedCount =>
+      _store.logMessages.where((m) => m.startsWith('✗')).length;
+  List<String> get _notices => _store.logMessages
+      .where((m) => !m.startsWith('✓') && !m.startsWith('✗'))
+      .toList();
 
   Widget _buildInstructionStep(
     BuildContext context,
@@ -402,11 +513,23 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: AppResponsive.getValue(context, mobile: 32.0, tablet: 36.0, desktop: 40.0),
-            height: AppResponsive.getValue(context, mobile: 32.0, tablet: 36.0, desktop: 40.0),
+            width: AppResponsive.getValue(
+              context,
+              mobile: 32.0,
+              tablet: 36.0,
+              desktop: 40.0,
+            ),
+            height: AppResponsive.getValue(
+              context,
+              mobile: 32.0,
+              tablet: 36.0,
+              desktop: 40.0,
+            ),
             decoration: BoxDecoration(
               color: AppColors.primary,
-              borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
             ),
             child: Center(
               child: Text(
@@ -487,10 +610,20 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
               ),
             ),
             SizedBox(height: AppResponsive.mediumSpacing(context)),
-            _buildResultItem(context, Icons.inventory_2_rounded, 'Products',
-                '$productCount', AppColors.primary),
-            _buildResultItem(context, Icons.category_rounded, 'Categories',
-                '$categoryCount', AppColors.success),
+            _buildResultItem(
+              context,
+              Icons.inventory_2_rounded,
+              'Products',
+              '$productCount',
+              AppColors.primary,
+            ),
+            _buildResultItem(
+              context,
+              Icons.category_rounded,
+              'Categories',
+              '$categoryCount',
+              AppColors.success,
+            ),
             SizedBox(height: AppResponsive.smallSpacing(context)),
             Text(
               'New products, variants, and categories will be created. Continue?',
@@ -567,7 +700,9 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
       child: ExpansionTile(
         tilePadding: EdgeInsets.zero,
         expandedCrossAxisAlignment: CrossAxisAlignment.start,
-        childrenPadding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
+        childrenPadding: EdgeInsets.only(
+          bottom: AppResponsive.smallSpacing(context),
+        ),
         title: Text(
           'View failed rows',
           style: GoogleFonts.poppins(
@@ -578,11 +713,15 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
         ),
         children: failed.map((f) {
           return Container(
-            margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
+            margin: EdgeInsets.only(
+              bottom: AppResponsive.smallSpacing(context),
+            ),
             padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
             decoration: BoxDecoration(
               color: AppColors.danger.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
               border: Border.all(color: AppColors.danger.withOpacity(0.2)),
             ),
             child: Text(
@@ -606,7 +745,9 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
       child: ExpansionTile(
         tilePadding: EdgeInsets.zero,
         expandedCrossAxisAlignment: CrossAxisAlignment.start,
-        childrenPadding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
+        childrenPadding: EdgeInsets.only(
+          bottom: AppResponsive.smallSpacing(context),
+        ),
         title: Text(
           'View notices',
           style: GoogleFonts.poppins(
@@ -617,7 +758,9 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
         ),
         children: _notices.map((w) {
           return Padding(
-            padding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context) / 2),
+            padding: EdgeInsets.only(
+              bottom: AppResponsive.smallSpacing(context) / 2,
+            ),
             child: Text(
               w,
               style: GoogleFonts.poppins(

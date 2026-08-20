@@ -19,6 +19,7 @@ import 'package:billberrylite/presentation/widget/componets/common/primary_app_b
 import 'package:billberrylite/presentation/screens/retail/sale_detail_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/receive_payment_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/customer_ledger_screen.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 class CustomerDetailScreen extends StatefulWidget {
   final Customer customer;
@@ -96,17 +97,19 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
     }
   }
 
-
   // ==================== EDIT ====================
 
   Future<void> _showEditCustomerDialog() async {
     final nameController = TextEditingController(text: _customer.name);
     final phoneController = TextEditingController(text: _customer.phone);
     final emailController = TextEditingController(text: _customer.email ?? '');
-    final addressController =
-        TextEditingController(text: _customer.address ?? '');
+    final addressController = TextEditingController(
+      text: _customer.address ?? '',
+    );
     final notesController = TextEditingController(text: _customer.notes ?? '');
-    final gstController = TextEditingController(text: _customer.gstNumber ?? '');
+    final gstController = TextEditingController(
+      text: _customer.gstNumber ?? '',
+    );
     final creditLimitController = TextEditingController(
       text: _customer.creditLimit > 0
           ? _customer.creditLimit.toStringAsFixed(2)
@@ -182,8 +185,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                 label: 'Credit Limit',
                 hint: '0 = Unlimited',
                 icon: Icons.credit_card_outlined,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
                 ],
@@ -250,8 +254,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
     if (trimmedPhone != (_customer.phone ?? '')) {
       final existing = await customerStore.getCustomerByPhone(trimmedPhone);
       if (existing != null && existing.customerId != _customer.customerId) {
-        NotificationService.instance
-            .showError('A customer with this phone number already exists');
+        NotificationService.instance.showError(
+          'A customer with this phone number already exists',
+        );
         return;
       }
     }
@@ -282,8 +287,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
     if (!mounted || !dialogContext.mounted) return;
 
     if (!saved) {
-      NotificationService.instance
-          .showError(customerStore.errorMessage ?? 'Failed to update customer');
+      NotificationService.instance.showError(
+        customerStore.errorMessage ?? 'Failed to update customer',
+      );
       return;
     }
 
@@ -323,8 +329,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
               onPressed: () async {
                 final points = int.tryParse(pointsController.text.trim()) ?? 0;
                 if (points <= 0) {
-                  NotificationService.instance
-                      .showError('Please enter valid points');
+                  NotificationService.instance.showError(
+                    'Please enter valid points',
+                  );
                   return;
                 }
                 if (points > _customer.loyaltyPoints) {
@@ -333,13 +340,16 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                 }
 
                 await customerStore.redeemCustomerPoints(
-                    _customer.customerId, points);
+                  _customer.customerId,
+                  points,
+                );
                 await _refreshCustomer();
 
                 if (!dialogContext.mounted) return;
                 Navigator.pop(dialogContext);
-                NotificationService.instance
-                    .showSuccess('$points points redeemed successfully');
+                NotificationService.instance.showSuccess(
+                  '$points points redeemed successfully',
+                );
               },
             ),
           ],
@@ -370,10 +380,14 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
           unselectedLabelColor: AppColors.white.withValues(alpha: 0.7),
           indicatorColor: AppColors.white,
           indicatorWeight: 3,
-          labelStyle:
-              GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600),
-          unselectedLabelStyle:
-              GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500),
+          labelStyle: GoogleFonts.poppins(
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w600,
+          ),
+          unselectedLabelStyle: GoogleFonts.poppins(
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w500,
+          ),
           tabs: const [
             Tab(text: 'Details'),
             Tab(text: 'Bills'),
@@ -383,11 +397,24 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
       body: MoneyScope(
         child: TabBarView(
           controller: _tabController,
-          children: [
-            _buildDetailsTab(),
-            _buildBillsTab(),
-          ],
+          children: [_buildDetailsTab(), _buildBillsTab()],
         ),
+      ),
+    );
+  }
+
+  /// Caps content width on large screens so the detail cards don't stretch
+  /// across a laptop.
+  Widget _capped(BuildContext context, Widget child) {
+    final maxWidth = AppResponsive.maxCardWidth(context);
+    if (maxWidth == double.infinity) return child;
+    return Align(
+      // topCenter, not Center: Center aligns on BOTH axes, so a
+      // shrink-wrapping child floats in the vertical middle.
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: child,
       ),
     );
   }
@@ -398,110 +425,147 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
       onRefresh: _refreshCustomer,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeaderCard(),
-            const SizedBox(height: 16),
+        padding: EdgeInsets.fromLTRB(
+          AppResponsive.padding(context).left,
+          AppResponsive.mediumSpacing(context),
+          AppResponsive.padding(context).left,
+          AppResponsive.largeSpacing(context),
+        ),
+        child: _capped(
+          context,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeaderCard(),
+              const SizedBox(height: 16),
 
-            _buildSectionCard(
-              title: 'Contact Information',
-              icon: Icons.contact_phone_outlined,
-              children: [
-                _buildInfoRow('Phone', _customer.phone ?? '—'),
-                if (_customer.email?.isNotEmpty ?? false)
-                  _buildInfoRow('Email', _customer.email!),
-                if (_customer.address?.isNotEmpty ?? false)
-                  _buildInfoRow('Address', _customer.address!),
-                if (_customer.gstNumber?.isNotEmpty ?? false)
-                  _buildInfoRow('GST Number', _customer.gstNumber!),
-              ],
-            ),
-            const SizedBox(height: 16),
+              _buildSectionCard(
+                title: 'Contact Information',
+                icon: Icons.contact_phone_outlined,
+                children: [
+                  _buildInfoRow('Phone', _customer.phone ?? '—'),
+                  if (_customer.email?.isNotEmpty ?? false)
+                    _buildInfoRow('Email', _customer.email!),
+                  if (_customer.address?.isNotEmpty ?? false)
+                    _buildInfoRow('Address', _customer.address!),
+                  if (_customer.gstNumber?.isNotEmpty ?? false)
+                    _buildInfoRow('GST Number', _customer.gstNumber!),
+                ],
+              ),
+              const SizedBox(height: 16),
 
-            _buildSectionCard(
-              title: 'Purchase Summary',
-              icon: Icons.shopping_cart_outlined,
-              children: [
-                _buildInfoRow('Total Purchase',
-                    formatMoney(_customer.totalPurchaseAmount)),
-                _buildInfoRow('Visit Count', _customer.totalVisites.toString()),
-                _buildInfoRow(
-                  'Last Visited',
-                  _customer.lastVisitAt != null
-                      ? _formatShortDate(_customer.lastVisitAt!)
-                      : 'Never',
+              _buildSectionCard(
+                title: 'Purchase Summary',
+                icon: Icons.shopping_cart_outlined,
+                children: [
+                  _buildInfoRow(
+                    'Total Purchase',
+                    formatMoney(_customer.totalPurchaseAmount),
+                  ),
+                  _buildInfoRow(
+                    'Visit Count',
+                    _customer.totalVisites.toString(),
+                  ),
+                  _buildInfoRow(
+                    'Last Visited',
+                    _customer.lastVisitAt != null
+                        ? _formatShortDate(_customer.lastVisitAt!)
+                        : 'Never',
+                  ),
+                  _buildInfoRow(
+                    'Total Bills',
+                    _customerSales.length.toString(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              _buildSectionCard(
+                title: 'Loyalty Points',
+                icon: Icons.stars_rounded,
+                iconColor: AppColors.warning,
+                trailing: _customer.loyaltyPoints > 0
+                    ? TextButton(
+                        onPressed: _showRedeemPointsDialog,
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.warning,
+                        ),
+                        child: Text(
+                          'Redeem',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      )
+                    : null,
+                children: [
+                  _buildInfoRow(
+                    'Points Balance',
+                    _customer.loyaltyPoints.toString(),
+                    valueColor: AppColors.warning,
+                  ),
+                  _buildInfoRow(
+                    'Total Earned',
+                    _customer.totalPointEarned.toString(),
+                  ),
+                  _buildInfoRow(
+                    'Total Redeemed',
+                    _customer.totalPointRedeemed.toString(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              _buildCreditCard(),
+
+              if (_customer.notes?.isNotEmpty ?? false) ...[
+                const SizedBox(height: 16),
+                _buildSectionCard(
+                  title: 'Notes',
+                  icon: Icons.sticky_note_2_outlined,
+                  children: [
+                    Text(
+                      _customer.notes!,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        height: 1.5,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
-                _buildInfoRow('Total Bills', _customerSales.length.toString()),
               ],
-            ),
-            const SizedBox(height: 16),
 
-            _buildSectionCard(
-              title: 'Loyalty Points',
-              icon: Icons.stars_rounded,
-              iconColor: AppColors.warning,
-              trailing: _customer.loyaltyPoints > 0
-                  ? TextButton(
-                      onPressed: _showRedeemPointsDialog,
-                      style: TextButton.styleFrom(
-                          foregroundColor: AppColors.warning),
-                      child: Text('Redeem',
-                          style:
-                              GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-                    )
-                  : null,
-              children: [
-                _buildInfoRow(
-                    'Points Balance', _customer.loyaltyPoints.toString(),
-                    valueColor: AppColors.warning),
-                _buildInfoRow(
-                    'Total Earned', _customer.totalPointEarned.toString()),
-                _buildInfoRow(
-                    'Total Redeemed', _customer.totalPointRedeemed.toString()),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            _buildCreditCard(),
-
-            if (_customer.notes?.isNotEmpty ?? false) ...[
               const SizedBox(height: 16),
               _buildSectionCard(
-                title: 'Notes',
-                icon: Icons.sticky_note_2_outlined,
+                title: 'Account Info',
+                icon: Icons.info_outline_rounded,
                 children: [
-                  Text(
-                    _customer.notes!,
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      height: 1.5,
+                  _buildInfoRow(
+                    'Customer Since',
+                    _formatShortDate(_customer.createdAt),
+                  ),
+                  if (_customer.updatedAt != null)
+                    _buildInfoRow(
+                      'Last Updated',
+                      _formatShortDate(_customer.updatedAt!),
+                    ),
+                  _buildInfoRow(
+                    'Customer ID',
+                    shortRef(
+                      _customer.customerId,
+                      minLength: 16,
+                      ellipsis: true,
+                    ),
+                    valueStyle: GoogleFonts.robotoMono(
+                      fontSize: AppResponsive.smallFontSize(context),
                       color: AppColors.textSecondary,
                     ),
                   ),
                 ],
               ),
             ],
-
-            const SizedBox(height: 16),
-            _buildSectionCard(
-              title: 'Account Info',
-              icon: Icons.info_outline_rounded,
-              children: [
-                _buildInfoRow(
-                    'Customer Since', _formatShortDate(_customer.createdAt)),
-                if (_customer.updatedAt != null)
-                  _buildInfoRow(
-                      'Last Updated', _formatShortDate(_customer.updatedAt!)),
-                _buildInfoRow('Customer ID', shortRef(_customer.customerId, minLength: 16, ellipsis: true),
-                    valueStyle: GoogleFonts.robotoMono(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                    )),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -524,7 +588,12 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                   ? _customer.name![0].toUpperCase()
                   : '?',
               style: GoogleFonts.poppins(
-                fontSize: 26,
+                fontSize: AppResponsive.getValue(
+                  context,
+                  mobile: 26.0,
+                  tablet: 30.0,
+                  desktop: 34.0,
+                ),
                 fontWeight: FontWeight.w700,
                 color: AppColors.white,
               ),
@@ -540,7 +609,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
-                    fontSize: 19,
+                    fontSize: AppResponsive.headingFontSize(context),
                     fontWeight: FontWeight.w700,
                     color: AppColors.white,
                   ),
@@ -549,18 +618,22 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                 Text(
                   _customer.phone ?? '—',
                   style: GoogleFonts.poppins(
-                    fontSize: 13,
+                    fontSize: AppResponsive.smallFontSize(context),
                     color: AppColors.white.withValues(alpha: 0.85),
                   ),
                 ),
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    _buildHeaderBadge(Icons.shopping_bag_outlined,
-                        formatMoney(_customer.totalPurchaseAmount)),
+                    _buildHeaderBadge(
+                      Icons.shopping_bag_outlined,
+                      formatMoney(_customer.totalPurchaseAmount),
+                    ),
                     const SizedBox(width: 10),
                     _buildHeaderBadge(
-                        Icons.stars_rounded, '${_customer.loyaltyPoints} pts'),
+                      Icons.stars_rounded,
+                      '${_customer.loyaltyPoints} pts',
+                    ),
                   ],
                 ),
               ],
@@ -586,7 +659,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
           Text(
             text,
             style: GoogleFonts.poppins(
-              fontSize: 12,
+              fontSize: AppResponsive.smallFontSize(context),
               fontWeight: FontWeight.w600,
               color: AppColors.white,
             ),
@@ -621,15 +694,12 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                 Text(
                   title,
                   style: GoogleFonts.poppins(
-                    fontSize: 15,
+                    fontSize: AppResponsive.subheadingFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
                 ),
-                if (trailing != null) ...[
-                  const Spacer(),
-                  trailing,
-                ],
+                if (trailing != null) ...[const Spacer(), trailing],
               ],
             ),
           ),
@@ -646,19 +716,30 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
     );
   }
 
-  Widget _buildInfoRow(String label, String value,
-      {Color? valueColor, TextStyle? valueStyle}) {
+  Widget _buildInfoRow(
+    String label,
+    String value, {
+    Color? valueColor,
+    TextStyle? valueStyle,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Capped label column: wide enough for the longest label, but it stops
+          // growing on a laptop so every extra pixel goes to the value.
           SizedBox(
-            width: 120,
+            width: AppResponsive.getValue(
+              context,
+              mobile: 110.0,
+              tablet: 130.0,
+              desktop: 150.0,
+            ),
             child: Text(
               label,
               style: GoogleFonts.poppins(
-                fontSize: 13,
+                fontSize: AppResponsive.smallFontSize(context),
                 color: AppColors.textSecondary,
               ),
             ),
@@ -666,9 +747,10 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
           Expanded(
             child: Text(
               value,
-              style: valueStyle ??
+              style:
+                  valueStyle ??
                   GoogleFonts.poppins(
-                    fontSize: 13.5,
+                    fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w500,
                     color: valueColor ?? AppColors.textPrimary,
                   ),
@@ -708,7 +790,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                 Text(
                   'Credit Information',
                   style: GoogleFonts.poppins(
-                    fontSize: 15,
+                    fontSize: AppResponsive.subheadingFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
@@ -733,33 +815,51 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Outstanding Balance',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
+                      // Expanded + scaleDown: spaceBetween only shares out
+                      // SURPLUS space, so a large balance at 30px would have
+                      // pushed the DUE badge off the card.
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Outstanding Balance',
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.smallFontSize(context),
+                                color: AppColors.textSecondary,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            formatMoney(_customer.creditBalance),
-                            style: GoogleFonts.poppins(
-                              fontSize: 23,
-                              fontWeight: FontWeight.w700,
-                              color: hasCredit
-                                  ? AppColors.danger
-                                  : AppColors.success,
+                            const SizedBox(height: 4),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                formatMoney(_customer.creditBalance),
+                                maxLines: 1,
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.getValue(
+                                    context,
+                                    mobile: 23.0,
+                                    tablet: 26.0,
+                                    desktop: 30.0,
+                                  ),
+                                  fontWeight: FontWeight.w700,
+                                  color: hasCredit
+                                      ? AppColors.danger
+                                      : AppColors.success,
+                                ),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       if (hasCredit)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 5),
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.danger,
                             borderRadius: BorderRadius.circular(6),
@@ -767,7 +867,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                           child: Text(
                             'DUE',
                             style: GoogleFonts.poppins(
-                              fontSize: 11,
+                              fontSize: AppResponsive.captionFontSize(context),
                               fontWeight: FontWeight.w700,
                               color: AppColors.white,
                             ),
@@ -787,10 +887,11 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                 if (_customer.creditLimit > 0)
                   _buildInfoRow(
                     'Available Credit',
-                    formatMoney((_customer.creditLimit -
-                            _customer.creditBalance)
-                        .clamp(0, double.infinity)
-                        .toDouble()),
+                    formatMoney(
+                      (_customer.creditLimit - _customer.creditBalance)
+                          .clamp(0, double.infinity)
+                          .toDouble(),
+                    ),
                     valueColor: AppColors.success,
                   ),
 
@@ -813,15 +914,20 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                               }
                             : null,
                         icon: const Icon(Icons.payments_outlined, size: 18),
-                        label: Text('Receive Payment',
-                            style: GoogleFonts.poppins(
-                                fontSize: 13, fontWeight: FontWeight.w600)),
+                        label: Text(
+                          'Receive Payment',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: AppColors.white,
                           elevation: 0,
-                          disabledBackgroundColor:
-                              AppColors.divider.withValues(alpha: 0.6),
+                          disabledBackgroundColor: AppColors.divider.withValues(
+                            alpha: 0.6,
+                          ),
                           padding: const EdgeInsets.symmetric(vertical: 13),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -836,16 +942,19 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => CustomerLedgerScreen(
-                                customer: _customer,
-                              ),
+                              builder: (context) =>
+                                  CustomerLedgerScreen(customer: _customer),
                             ),
                           );
                         },
                         icon: const Icon(Icons.receipt_long_outlined, size: 18),
-                        label: Text('View Ledger',
-                            style: GoogleFonts.poppins(
-                                fontSize: 13, fontWeight: FontWeight.w600)),
+                        label: Text(
+                          'View Ledger',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.primary,
                           side: const BorderSide(color: AppColors.primary),
@@ -894,10 +1003,16 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildSummaryItem('Total Bills',
-                    _customerSales.length.toString(), Icons.receipt_outlined),
-                _buildSummaryItem('Net Amount', formatMoney(_netBilledAmount),
-                    Icons.payments_outlined),
+                _buildSummaryItem(
+                  'Total Bills',
+                  _customerSales.length.toString(),
+                  Icons.receipt_outlined,
+                ),
+                _buildSummaryItem(
+                  'Net Amount',
+                  formatMoney(_netBilledAmount),
+                  Icons.payments_outlined,
+                ),
               ],
             ),
           ),
@@ -923,7 +1038,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
         Text(
           value,
           style: GoogleFonts.poppins(
-            fontSize: 17,
+            fontSize: AppResponsive.subheadingFontSize(context),
             fontWeight: FontWeight.w700,
             color: AppColors.textPrimary,
           ),
@@ -931,7 +1046,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
         Text(
           label,
           style: GoogleFonts.poppins(
-              fontSize: 12, color: AppColors.textSecondary),
+            fontSize: AppResponsive.smallFontSize(context),
+            color: AppColors.textSecondary,
+          ),
         ),
       ],
     );
@@ -983,7 +1100,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                       Text(
                         isReturn ? 'Return' : 'Sale',
                         style: GoogleFonts.poppins(
-                          fontSize: 12,
+                          fontSize: AppResponsive.smallFontSize(context),
                           fontWeight: FontWeight.w600,
                           color: accent,
                         ),
@@ -992,16 +1109,19 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: _getPaymentColor(sale.paymentType)
-                          .withValues(alpha: 0.1),
+                      color: _getPaymentColor(
+                        sale.paymentType,
+                      ).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       sale.paymentType.toUpperCase(),
                       style: GoogleFonts.poppins(
-                        fontSize: 10,
+                        fontSize: AppResponsive.captionFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: _getPaymentColor(sale.paymentType),
                       ),
@@ -1019,7 +1139,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                       Text(
                         'Bill #${shortRef(sale.saleId)}',
                         style: GoogleFonts.poppins(
-                          fontSize: 14,
+                          fontSize: AppResponsive.bodyFontSize(context),
                           fontWeight: FontWeight.w600,
                           color: AppColors.textPrimary,
                         ),
@@ -1028,7 +1148,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                       Text(
                         _formatDate(sale.date),
                         style: GoogleFonts.poppins(
-                          fontSize: 12,
+                          fontSize: AppResponsive.smallFontSize(context),
                           color: AppColors.textSecondary,
                         ),
                       ),
@@ -1042,7 +1162,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                         // for returns — the sign is added once, here.
                         '${isReturn ? '-' : ''}${formatMoney(sale.totalAmount.abs())}',
                         style: GoogleFonts.poppins(
-                          fontSize: 16,
+                          fontSize: AppResponsive.subheadingFontSize(context),
                           fontWeight: FontWeight.w700,
                           color: isReturn
                               ? AppColors.danger
@@ -1052,7 +1172,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                       Text(
                         '${sale.totalItems} items',
                         style: GoogleFonts.poppins(
-                          fontSize: 12,
+                          fontSize: AppResponsive.smallFontSize(context),
                           color: AppColors.textSecondary,
                         ),
                       ),

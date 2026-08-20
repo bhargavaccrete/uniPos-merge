@@ -63,8 +63,9 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
 
   Future<void> _save() async {
     setState(() => _isSaving = true);
-    final ok = await _service
-        .setFieldIds(_fields.map((a) => a.attributeId).toList());
+    final ok = await _service.setFieldIds(
+      _fields.map((a) => a.attributeId).toList(),
+    );
     if (!mounted) return;
     setState(() => _isSaving = false);
 
@@ -95,8 +96,9 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
   }
 
   void _removeField(AttributeModel attribute) {
-    setState(() => _fields
-        .removeWhere((a) => a.attributeId == attribute.attributeId));
+    setState(
+      () => _fields.removeWhere((a) => a.attributeId == attribute.attributeId),
+    );
   }
 
   Future<void> _showAddFieldSheet() async {
@@ -135,9 +137,13 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
                       _showCreateFieldDialog();
                     },
                     icon: const Icon(Icons.add_circle_outline, size: 18),
-                    label: Text('Create New',
-                        style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.smallFontSize(context), fontWeight: FontWeight.w600)),
+                    label: Text(
+                      'Create New',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -149,7 +155,9 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
                 child: Text(
                   'All existing attributes are already added.',
                   style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.smallFontSize(context), color: AppColors.textSecondary),
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               )
             else
@@ -159,13 +167,21 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
                   itemCount: available.length,
                   itemBuilder: (_, i) {
                     final attribute = available[i];
-                    final values = attributeStore.getValues(attribute.attributeId);
+                    final values = attributeStore.getValues(
+                      attribute.attributeId,
+                    );
                     return ListTile(
-                      leading: const Icon(Icons.label_outline_rounded,
-                          color: AppColors.primary),
-                      title: Text(attribute.name,
-                          style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w500)),
+                      leading: const Icon(
+                        Icons.label_outline_rounded,
+                        color: AppColors.primary,
+                      ),
+                      title: Text(
+                        attribute.name,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                       subtitle: Text(
                         values.isEmpty
                             ? 'No preset values'
@@ -173,7 +189,9 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.captionFontSize(context), color: AppColors.textSecondary),
+                          fontSize: AppResponsive.captionFontSize(context),
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                       onTap: () {
                         Navigator.pop(sheetContext);
@@ -226,8 +244,9 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
     final ok = await attributeStore.addAttribute(name);
     if (!mounted) return;
     if (!ok) {
-      NotificationService.instance
-          .showError(attributeStore.errorMessage ?? 'Could not create field');
+      NotificationService.instance.showError(
+        attributeStore.errorMessage ?? 'Could not create field',
+      );
       return;
     }
 
@@ -235,7 +254,8 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
     if (attribute == null) return;
     setState(() => _fields.add(attribute));
     NotificationService.instance.showSuccess(
-        'Field created. Add its values in Settings → Product Attributes.');
+      'Field created. Add its values in Settings → Product Attributes.',
+    );
   }
 
   @override
@@ -254,15 +274,20 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
         ],
       ),
       body: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : Column(
-                children: [
-                  _buildExplainer(),
-                  Expanded(child: _buildFieldList()),
-                  _buildBottomBar(),
-                ],
-              ),
+        child: AppResponsive.constrainedContent(
+          context: context,
+          alignment: Alignment.topCenter,
+          maxWidth: AppResponsive.maxCardWidth(context),
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : Column(
+                  children: [
+                    _buildExplainer(),
+                    Expanded(child: _buildFieldList()),
+                    _buildBottomBar(),
+                  ],
+                ),
+        ),
       ),
     );
   }
@@ -280,8 +305,11 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline_rounded,
-              size: 18, color: AppColors.primary),
+          const Icon(
+            Icons.info_outline_rounded,
+            size: 18,
+            color: AppColors.primary,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -305,7 +333,8 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
       return AppEmptyState(
         icon: Icons.label_off_outlined,
         title: 'No fields',
-        message: 'Simple products will show only price, stock, barcode and SKU.',
+        message:
+            'Simple products will show only price, stock, barcode and SKU.',
         action: OutlinedButton.icon(
           onPressed: _showAddFieldSheet,
           icon: const Icon(Icons.add),
@@ -322,15 +351,20 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
         OutlinedButton.icon(
           onPressed: _showAddFieldSheet,
           icon: const Icon(Icons.add),
-          label: Text('Add Field',
-              style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600)),
+          label: Text(
+            'Add Field',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           style: OutlinedButton.styleFrom(
             foregroundColor: AppColors.primary,
             side: const BorderSide(color: AppColors.primary),
             padding: const EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10)),
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
         ),
       ],
@@ -370,14 +404,19 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.captionFontSize(context), color: AppColors.textSecondary),
+                    fontSize: AppResponsive.captionFontSize(context),
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.remove_circle_outline,
-                color: AppColors.danger, size: 20),
+            icon: const Icon(
+              Icons.remove_circle_outline,
+              color: AppColors.danger,
+              size: 20,
+            ),
             tooltip: 'Remove field',
             onPressed: () => _removeField(attribute),
           ),
@@ -402,15 +441,18 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
             backgroundColor: AppColors.primary,
             foregroundColor: AppColors.white,
             elevation: 0,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
           child: _isSaving
               ? const SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white),
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
                 )
               : Text(
                   'Save Fields',

@@ -86,33 +86,35 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
       ),
       body: _isLoading
           ? const Center(
-              child: CircularProgressIndicator(color: AppColors.primary))
+              child: CircularProgressIndicator(color: AppColors.primary),
+            )
           : AppResponsive.constrainedContent(
               context: context,
+              alignment: Alignment.topCenter,
               child: SingleChildScrollView(
-              padding: AppResponsive.padding(context),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSectionTitle('General Settings'),
-                  const SizedBox(height: 12),
-                  _buildGeneralSettingsCard(),
-                  const SizedBox(height: 24),
+                padding: AppResponsive.padding(context),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionTitle('General Settings'),
+                    const SizedBox(height: 12),
+                    _buildGeneralSettingsCard(),
+                    const SizedBox(height: 24),
 
-                  // Note: GST/HSN is set per product (and can be overridden per
-                  // variant) — not per category, since one category can hold
-                  // items with different tax classes.
-                  _buildSectionTitle('Tax Rates'),
-                  const SizedBox(height: 12),
-                  _buildTaxRatesCard(),
-                  const SizedBox(height: 24),
+                    // Note: GST/HSN is set per product (and can be overridden per
+                    // variant) — not per category, since one category can hold
+                    // items with different tax classes.
+                    _buildSectionTitle('Tax Rates'),
+                    const SizedBox(height: 12),
+                    _buildTaxRatesCard(),
+                    const SizedBox(height: 24),
 
-                  _buildSectionTitle('Common GST Rates (India)'),
-                  const SizedBox(height: 12),
-                  _buildGstRateReferenceCard(),
-                ],
+                    _buildSectionTitle('Common GST Rates (India)'),
+                    const SizedBox(height: 12),
+                    _buildGstRateReferenceCard(),
+                  ],
+                ),
               ),
-            ),
             ),
     );
   }
@@ -154,7 +156,10 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(fontSize: AppResponsive.smallFontSize(context), color: AppColors.warning),
+              style: TextStyle(
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.warning,
+              ),
             ),
           ),
         ],
@@ -174,7 +179,8 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
         children: [
           if (!enabled)
             _buildTaxDisabledNotice(
-                'Tax is currently disabled. This business is marked as not registered for tax during setup.'),
+              'Tax is currently disabled. This business is marked as not registered for tax during setup.',
+            ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -250,15 +256,18 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                         onTap: enabled ? _showDefaultGstRateDialog : null,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 8),
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
                                 '${_defaultGstRate.toInt()}%',
                                 style: TextStyle(
-                                  fontSize:
-                                      AppResponsive.subheadingFontSize(context),
+                                  fontSize: AppResponsive.subheadingFontSize(
+                                    context,
+                                  ),
                                   fontWeight: FontWeight.w600,
                                   color: enabled
                                       ? AppColors.primary
@@ -297,7 +306,8 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
           border: Border.all(color: AppColors.divider, width: 0.5),
         ),
         child: _buildTaxDisabledNotice(
-            'Tax rate management is unavailable while tax is disabled for this business.'),
+          'Tax rate management is unavailable while tax is disabled for this business.',
+        ),
       );
     }
     return Observer(
@@ -317,43 +327,57 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                   child: Text(
                     'No named tax rates yet. Add one to pick it on products/variants.',
                     style: TextStyle(
-                        fontSize: AppResponsive.smallFontSize(context),
-                        color: AppColors.textSecondary),
+                      fontSize: AppResponsive.smallFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 )
               else
-                ...taxes.map((tax) => Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  tax.taxname,
-                                  style: TextStyle(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w500),
+                ...taxes.map(
+                  (tax) => Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                tax.taxname,
+                                style: TextStyle(
+                                  fontSize: AppResponsive.bodyFontSize(context),
+                                  fontWeight: FontWeight.w500,
                                 ),
-                                Text(
-                                  '${tax.taxperecentage ?? 0}%',
-                                  style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: AppColors.textSecondary),
+                              ),
+                              Text(
+                                '${tax.taxperecentage ?? 0}%',
+                                style: TextStyle(
+                                  fontSize: AppResponsive.captionFontSize(
+                                    context,
+                                  ),
+                                  color: AppColors.textSecondary,
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                          IconButton(
-                            onPressed: () => _showTaxDialog(existingTax: tax),
-                            icon: const Icon(Icons.edit_outlined, size: 20),
-                            color: AppColors.success,
-                          ),
-                          IconButton(
-                            onPressed: () => _confirmDeleteTax(tax),
-                            icon: const Icon(Icons.delete_outline, size: 20),
-                            color: AppColors.danger,
-                          ),
-                        ],
-                      ),
-                    )),
+                        ),
+                        IconButton(
+                          onPressed: () => _showTaxDialog(existingTax: tax),
+                          icon: const Icon(Icons.edit_outlined, size: 20),
+                          color: AppColors.success,
+                        ),
+                        IconButton(
+                          onPressed: () => _confirmDeleteTax(tax),
+                          icon: const Icon(Icons.delete_outline, size: 20),
+                          color: AppColors.danger,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               const Divider(height: 1),
               Padding(
                 padding: const EdgeInsets.all(12),
@@ -362,7 +386,10 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                   child: TextButton.icon(
                     onPressed: () => _showTaxDialog(),
                     icon: const Icon(Icons.add, color: AppColors.success),
-                    label: Text('Add Tax Rate', style: TextStyle(color: AppColors.success)),
+                    label: Text(
+                      'Add Tax Rate',
+                      style: TextStyle(color: AppColors.success),
+                    ),
                   ),
                 ),
               ),
@@ -377,7 +404,8 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
     final confirmed = await showAppConfirmDialog(
       context: context,
       title: 'Delete Tax Rate?',
-      message: 'Delete "${tax.taxname}" (${tax.taxperecentage ?? 0}%)? '
+      message:
+          'Delete "${tax.taxname}" (${tax.taxperecentage ?? 0}%)? '
           'Products already using it keep their stored rate.',
       confirmLabel: 'Delete',
       accent: AppColors.danger,
@@ -390,8 +418,9 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
 
   Future<void> _showTaxDialog({Tax? existingTax}) async {
     final isEdit = existingTax != null;
-    final nameController =
-        TextEditingController(text: existingTax?.taxname ?? '');
+    final nameController = TextEditingController(
+      text: existingTax?.taxname ?? '',
+    );
     final rateController = TextEditingController(
       text: existingTax?.taxperecentage != null
           ? existingTax!.taxperecentage.toString()
@@ -424,10 +453,11 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                 label: 'Rate %',
                 hint: 'e.g. 18',
                 icon: Icons.percent_rounded,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                 ],
                 textInputAction: TextInputAction.done,
               ),
@@ -451,17 +481,20 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
     final name = nameController.text.trim();
     final rate = double.tryParse(rateController.text.trim());
     if (name.isEmpty || rate == null || rate < 0 || rate > 100) {
-      NotificationService.instance
-          .showError('Enter a valid name and rate (0-100)');
+      NotificationService.instance.showError(
+        'Enter a valid name and rate (0-100)',
+      );
       return;
     }
 
     if (isEdit) {
-      await taxStore
-          .updateTax(existingTax.copyWith(taxname: name, taxperecentage: rate));
+      await taxStore.updateTax(
+        existingTax.copyWith(taxname: name, taxperecentage: rate),
+      );
     } else {
       await taxStore.addTax(
-          Tax(id: const Uuid().v4(), taxname: name, taxperecentage: rate));
+        Tax(id: const Uuid().v4(), taxname: name, taxperecentage: rate),
+      );
     }
   }
 
@@ -552,7 +585,9 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                   onTap: () => Navigator.pop(dialogContext, rate),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                     child: Row(
                       children: [
                         Icon(
@@ -568,10 +603,10 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                         Text(
                           '${rate.toInt()}%',
                           style: GoogleFonts.poppins(
-                            fontSize:
-                                AppResponsive.bodyFontSize(dialogContext),
-                            fontWeight:
-                                selected ? FontWeight.w600 : FontWeight.w400,
+                            fontSize: AppResponsive.bodyFontSize(dialogContext),
+                            fontWeight: selected
+                                ? FontWeight.w600
+                                : FontWeight.w400,
                             color: AppColors.textPrimary,
                           ),
                         ),

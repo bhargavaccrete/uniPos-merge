@@ -36,8 +36,10 @@ class _ScannerScreenState extends State<ScannerScreen> {
 
     final code = capture.barcodes
         .map((b) => b.rawValue)
-        .firstWhere((value) => value != null && value.trim().isNotEmpty,
-            orElse: () => null);
+        .firstWhere(
+          (value) => value != null && value.trim().isNotEmpty,
+          orElse: () => null,
+        );
     if (code == null) return;
 
     _handled = true;

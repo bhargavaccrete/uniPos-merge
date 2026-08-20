@@ -89,11 +89,20 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
               onSelected: _onThresholdChanged,
               options: const [
                 ReportFilterOption(
-                    value: 5, label: '≤ 5', icon: Icons.priority_high_rounded),
+                  value: 5,
+                  label: '≤ 5',
+                  icon: Icons.priority_high_rounded,
+                ),
                 ReportFilterOption(
-                    value: 10, label: '≤ 10', icon: Icons.tune_rounded),
+                  value: 10,
+                  label: '≤ 10',
+                  icon: Icons.tune_rounded,
+                ),
                 ReportFilterOption(
-                    value: 20, label: '≤ 20', icon: Icons.inventory_2_outlined),
+                  value: 20,
+                  label: '≤ 20',
+                  icon: Icons.inventory_2_outlined,
+                ),
               ],
             ),
             AppResponsive.verticalSpace(context, size: SpacingSize.small),
@@ -115,44 +124,56 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
       );
     }
 
-    final outOfStock =
-        _reportData.where((r) => (r['currentStock'] as int) <= 0).length;
+    final outOfStock = _reportData
+        .where((r) => (r['currentStock'] as int) <= 0)
+        .length;
     final critical = _reportData
-        .where((r) =>
-            (r['currentStock'] as int) > 0 &&
-            (r['currentStock'] as int) <= _criticalAt)
+        .where(
+          (r) =>
+              (r['currentStock'] as int) > 0 &&
+              (r['currentStock'] as int) <= _criticalAt,
+        )
         .length;
 
-    final pageRows =
-        ReportPagination.pageSlice(_reportData, _currentPage, _rowsPerPage);
+    final pageRows = ReportPagination.pageSlice(
+      _reportData,
+      _currentPage,
+      _rowsPerPage,
+    );
 
     return ReportBody(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          ReportSummaryRow(cards: [
-            ReportSummaryCard(
-              title: 'Low Stock',
-              value: '${_reportData.length}',
-              subtitle: 'variants flagged',
-              icon: Icons.warning_amber_rounded,
-              color: AppColors.warning,
-            ),
-            ReportSummaryCard(
-              title: 'Out of Stock',
-              value: '$outOfStock',
-              subtitle: 'nothing left',
-              icon: Icons.remove_shopping_cart_rounded,
-              color: outOfStock > 0 ? AppColors.danger : AppColors.textSecondary,
-            ),
-            ReportSummaryCard(
-              title: 'Critical',
-              value: '$critical',
-              subtitle: '≤ $_criticalAt left',
-              icon: Icons.priority_high_rounded,
-              color: critical > 0 ? AppColors.danger : AppColors.textSecondary,
-            ),
-          ]),
+          ReportSummaryRow(
+            cards: [
+              ReportSummaryCard(
+                title: 'Low Stock',
+                value: '${_reportData.length}',
+                subtitle: 'variants flagged',
+                icon: Icons.warning_amber_rounded,
+                color: AppColors.warning,
+              ),
+              ReportSummaryCard(
+                title: 'Out of Stock',
+                value: '$outOfStock',
+                subtitle: 'nothing left',
+                icon: Icons.remove_shopping_cart_rounded,
+                color: outOfStock > 0
+                    ? AppColors.danger
+                    : AppColors.textSecondary,
+              ),
+              ReportSummaryCard(
+                title: 'Critical',
+                value: '$critical',
+                subtitle: '≤ $_criticalAt left',
+                icon: Icons.priority_high_rounded,
+                color: critical > 0
+                    ? AppColors.danger
+                    : AppColors.textSecondary,
+              ),
+            ],
+          ),
           AppResponsive.verticalSpace(context),
           ReportExportButton(onPressed: _export),
           AppResponsive.verticalSpace(context),
@@ -184,18 +205,26 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
     final costPrice = (item['costPrice'] as num?)?.toDouble();
     final color = _severityColor(stock);
 
-    return DataRow(cells: [
-      DataCell(Text(item['productName'] as String? ?? 'Unknown Product')),
-      DataCell(Text((item['variantLabel'] as String?)?.isNotEmpty == true
-          ? item['variantLabel'] as String
-          : '—')),
-      DataCell(Text(
-        '$stock',
-        style: TextStyle(fontWeight: FontWeight.w700, color: color),
-      )),
-      DataCell(Text('${item['reorderPoint']}')),
-      DataCell(Text(costPrice == null ? '—' : formatMoney(costPrice))),
-    ]);
+    return DataRow(
+      cells: [
+        DataCell(Text(item['productName'] as String? ?? 'Unknown Product')),
+        DataCell(
+          Text(
+            (item['variantLabel'] as String?)?.isNotEmpty == true
+                ? item['variantLabel'] as String
+                : '—',
+          ),
+        ),
+        DataCell(
+          Text(
+            '$stock',
+            style: TextStyle(fontWeight: FontWeight.w700, color: color),
+          ),
+        ),
+        DataCell(Text('${item['reorderPoint']}')),
+        DataCell(Text(costPrice == null ? '—' : formatMoney(costPrice))),
+      ],
+    );
   }
 
   Future<void> _export() async {
@@ -213,27 +242,32 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
         'MRP',
       ],
       data: _reportData
-          .map((r) => [
-                r['productName'],
-                r['variantLabel'] ?? '',
-                r['barcode'] ?? '',
-                r['currentStock'],
-                r['reorderPoint'],
-                r['costPrice'] == null
-                    ? ''
-                    : ReportExportService.formatCurrency(
-                        (r['costPrice'] as num).toDouble()),
-                r['mrp'] == null
-                    ? ''
-                    : ReportExportService.formatCurrency(
-                        (r['mrp'] as num).toDouble()),
-              ])
+          .map(
+            (r) => [
+              r['productName'],
+              r['variantLabel'] ?? '',
+              r['barcode'] ?? '',
+              r['currentStock'],
+              r['reorderPoint'],
+              r['costPrice'] == null
+                  ? ''
+                  : ReportExportService.formatCurrency(
+                      (r['costPrice'] as num).toDouble(),
+                    ),
+              r['mrp'] == null
+                  ? ''
+                  : ReportExportService.formatCurrency(
+                      (r['mrp'] as num).toDouble(),
+                    ),
+            ],
+          )
           .toList(),
       summary: {
         'Threshold': '≤ $_threshold',
         'Variants Flagged': _reportData.length,
-        'Out of Stock':
-            _reportData.where((r) => (r['currentStock'] as int) <= 0).length,
+        'Out of Stock': _reportData
+            .where((r) => (r['currentStock'] as int) <= 0)
+            .length,
         'Generated': ReportExportService.formatDateTime(DateTime.now()),
       },
     );

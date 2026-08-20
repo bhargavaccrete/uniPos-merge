@@ -37,10 +37,18 @@ class GRNReportScreen extends StatelessWidget {
       loader: (start, end) =>
           service.getGRNReport(startDate: start, endDate: end),
       summaryCards: (rows) {
-        final value =
-            rows.fold<double>(0, (s, r) => s + (r['totalAmount'] as double));
-        final accepted = rows.fold<int>(0, (s, r) => s + (r['acceptedQty'] as int));
-        final damaged = rows.fold<int>(0, (s, r) => s + (r['damagedQty'] as int));
+        final value = rows.fold<double>(
+          0,
+          (s, r) => s + (r['totalAmount'] as double),
+        );
+        final accepted = rows.fold<int>(
+          0,
+          (s, r) => s + (r['acceptedQty'] as int),
+        );
+        final damaged = rows.fold<int>(
+          0,
+          (s, r) => s + (r['damagedQty'] as int),
+        );
 
         return [
           ReportSummaryCard(
@@ -79,23 +87,27 @@ class GRNReportScreen extends StatelessWidget {
       ],
       rowBuilder: (context, row) {
         final damaged = row['damagedQty'] as int;
-        return DataRow(cells: [
-          DataCell(Text(row['grnNumber'] as String)),
-          DataCell(Text(row['poNumber'] as String)),
-          DataCell(Text(row['supplierName'] as String)),
-          DataCell(Text(_date(row['receivedDate'] as String))),
-          DataCell(Text('${row['orderedQty']}')),
-          DataCell(Text('${row['receivedQty']}')),
-          DataCell(Text('${row['acceptedQty']}')),
-          DataCell(Text(
-            '$damaged',
-            style: TextStyle(
-              color: damaged > 0 ? AppColors.danger : null,
-              fontWeight: damaged > 0 ? FontWeight.w600 : null,
+        return DataRow(
+          cells: [
+            DataCell(Text(row['grnNumber'] as String)),
+            DataCell(Text(row['poNumber'] as String)),
+            DataCell(Text(row['supplierName'] as String)),
+            DataCell(Text(_date(row['receivedDate'] as String))),
+            DataCell(Text('${row['orderedQty']}')),
+            DataCell(Text('${row['receivedQty']}')),
+            DataCell(Text('${row['acceptedQty']}')),
+            DataCell(
+              Text(
+                '$damaged',
+                style: TextStyle(
+                  color: damaged > 0 ? AppColors.danger : null,
+                  fontWeight: damaged > 0 ? FontWeight.w600 : null,
+                ),
+              ),
             ),
-          )),
-          DataCell(Text(formatMoney(row['totalAmount'] as double))),
-        ]);
+            DataCell(Text(formatMoney(row['totalAmount'] as double))),
+          ],
+        );
       },
       exportData: (rows) => ReportExportData(
         headers: const [
@@ -111,24 +123,26 @@ class GRNReportScreen extends StatelessWidget {
           'Value',
         ],
         rows: rows
-            .map((r) => [
-                  r['grnNumber'],
-                  r['poNumber'],
-                  r['supplierName'],
-                  _date(r['receivedDate'] as String),
-                  r['invoiceNumber'] ?? '',
-                  r['orderedQty'],
-                  r['receivedQty'],
-                  r['acceptedQty'],
-                  r['damagedQty'],
-                  ReportExportService.formatCurrency(
-                      r['totalAmount'] as double),
-                ])
+            .map(
+              (r) => [
+                r['grnNumber'],
+                r['poNumber'],
+                r['supplierName'],
+                _date(r['receivedDate'] as String),
+                r['invoiceNumber'] ?? '',
+                r['orderedQty'],
+                r['receivedQty'],
+                r['acceptedQty'],
+                r['damagedQty'],
+                ReportExportService.formatCurrency(r['totalAmount'] as double),
+              ],
+            )
             .toList(),
         summary: {
           'Receipts': rows.length,
           'Accepted Value': ReportExportService.formatCurrency(
-              rows.fold<double>(0, (s, r) => s + (r['totalAmount'] as double))),
+            rows.fold<double>(0, (s, r) => s + (r['totalAmount'] as double)),
+          ),
         },
       ),
     );

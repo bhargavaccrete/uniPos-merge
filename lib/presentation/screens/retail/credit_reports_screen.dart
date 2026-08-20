@@ -11,7 +11,7 @@ import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 
 import 'customer_detail_screen.dart';
-
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 
 /// Credit Reports Screen - Credit Sales, Collection, Outstanding reports
 class CreditReportsScreen extends StatefulWidget {
@@ -30,8 +30,11 @@ class CreditReportsScreen extends StatefulWidget {
 /// filter chip displays.
 (DateTime, DateTime) _queryBounds(DateTimeRange range) {
   final start = DateTime(range.start.year, range.start.month, range.start.day);
-  final end = DateTime(range.end.year, range.end.month, range.end.day)
-      .add(const Duration(days: 1));
+  final end = DateTime(
+    range.end.year,
+    range.end.month,
+    range.end.day,
+  ).add(const Duration(days: 1));
   return (start, end);
 }
 
@@ -109,40 +112,58 @@ class _CreditReportsScreenState extends State<CreditReportsScreen>
           ],
         ),
       ),
-      body: Column(
-        children: [
-          // Date Filter Info
-          if (_dateFilter != null)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: const Color(0xFFE3F2FD),
-              child: Row(
-                children: [
-                  Icon(Icons.calendar_today, size: 16, color: Color(0xFF1976D2)),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${DateFormat('dd/MM/yy').format(_dateFilter!.start)} - ${DateFormat('dd/MM/yy').format(_dateFilter!.end)}',
-                    style: TextStyle(
-                        color: const Color(0xFF1976D2),
-                        fontSize: AppResponsive.smallFontSize(context)),
+      // Every amount here goes through formatMoney; MoneyScope is the single
+      // subscription that re-renders them when the store's currency or decimal
+      // precision changes.
+      body: MoneyScope(
+        child: AppResponsive.constrainedContent(
+          context: context,
+          alignment: Alignment.topCenter,
+          maxWidth: AppResponsive.maxContentWidth(context),
+          child: Column(
+            children: [
+              // Date Filter Info
+              if (_dateFilter != null)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
                   ),
-                ],
-              ),
-            ),
+                  color: const Color(0xFFE3F2FD),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_today,
+                        size: 16,
+                        color: Color(0xFF1976D2),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${DateFormat('dd/MM/yy').format(_dateFilter!.start)} - ${DateFormat('dd/MM/yy').format(_dateFilter!.end)}',
+                        style: TextStyle(
+                          color: const Color(0xFF1976D2),
+                          fontSize: AppResponsive.smallFontSize(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
 
-          // Tab Content
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _CreditSalesTab(dateFilter: _dateFilter),
-                _CollectionsTab(dateFilter: _dateFilter),
-                _OutstandingTab(dateFilter: _dateFilter),
-              ],
-            ),
+              // Tab Content
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _CreditSalesTab(dateFilter: _dateFilter),
+                    _CollectionsTab(dateFilter: _dateFilter),
+                    _OutstandingTab(dateFilter: _dateFilter),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -216,7 +237,7 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
             children: [
               _buildSummaryItem(
                 'Total Credit Sales',
-                '₹${_totalCreditSales.toStringAsFixed(2)}',
+                formatMoney(_totalCreditSales),
                 Icons.credit_card,
                 Colors.orange,
               ),
@@ -251,7 +272,12 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
     );
   }
 
-  Widget _buildSummaryItem(String label, String value, IconData icon, Color color) {
+  Widget _buildSummaryItem(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Column(
       children: [
         Icon(icon, size: 28, color: color),
@@ -266,7 +292,10 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
         ),
         Text(
           label,
-          style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: Color(0xFF6B6B6B)),
+          style: TextStyle(
+            fontSize: AppResponsive.captionFontSize(context),
+            color: Color(0xFF6B6B6B),
+          ),
         ),
       ],
     );
@@ -274,7 +303,9 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
 
   Widget _buildCreditSaleCard(SaleModel sale) {
     final date = DateTime.tryParse(sale.date);
-    final dateStr = date != null ? DateFormat('dd MMM yyyy, hh:mm a').format(date) : sale.date;
+    final dateStr = date != null
+        ? DateFormat('dd MMM yyyy, hh:mm a').format(date)
+        : sale.date;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -317,7 +348,10 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
           const SizedBox(height: 8),
           Text(
             dateStr,
-            style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: Color(0xFF9E9E9E)),
+            style: TextStyle(
+              fontSize: AppResponsive.captionFontSize(context),
+              color: Color(0xFF9E9E9E),
+            ),
           ),
           const SizedBox(height: 8),
           Row(
@@ -328,10 +362,13 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
                 children: [
                   Text(
                     'Total',
-                    style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: Color(0xFF9E9E9E)),
+                    style: TextStyle(
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: Color(0xFF9E9E9E),
+                    ),
                   ),
                   Text(
-                    '₹${sale.totalAmount.toStringAsFixed(2)}',
+                    formatMoney(sale.totalAmount),
                     style: TextStyle(
                       fontSize: AppResponsive.subheadingFontSize(context),
                       fontWeight: FontWeight.w600,
@@ -344,10 +381,13 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
                 children: [
                   Text(
                     'Due',
-                    style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: Color(0xFF9E9E9E)),
+                    style: TextStyle(
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: Color(0xFF9E9E9E),
+                    ),
                   ),
                   Text(
-                    '₹${sale.dueAmount.toStringAsFixed(2)}',
+                    formatMoney(sale.dueAmount),
                     style: TextStyle(
                       fontSize: AppResponsive.subheadingFontSize(context),
                       fontWeight: FontWeight.w600,
@@ -414,10 +454,14 @@ class _CollectionsTabState extends State<_CollectionsTab> {
 
       if (widget.dateFilter != null) {
         final (start, end) = _queryBounds(widget.dateFilter!);
-        payments =
-            await creditPaymentRepository.getPaymentsByDateRange(start, end);
+        payments = await creditPaymentRepository.getPaymentsByDateRange(
+          start,
+          end,
+        );
         collections = await creditPaymentRepository.getCollectionByModeInRange(
-            start, end);
+          start,
+          end,
+        );
       } else {
         payments = await creditPaymentRepository.getAllPayments();
         collections = {'cash': 0, 'card': 0, 'upi': 0, 'total': 0};
@@ -455,11 +499,29 @@ class _CollectionsTabState extends State<_CollectionsTab> {
             children: [
               Row(
                 children: [
-                  Expanded(child: _buildModeCard('Cash', _collectionByMode['cash'] ?? 0, const Color(0xFF4CAF50))),
+                  Expanded(
+                    child: _buildModeCard(
+                      'Cash',
+                      _collectionByMode['cash'] ?? 0,
+                      const Color(0xFF4CAF50),
+                    ),
+                  ),
                   const SizedBox(width: 12),
-                  Expanded(child: _buildModeCard('UPI', _collectionByMode['upi'] ?? 0, const Color(0xFF9C27B0))),
+                  Expanded(
+                    child: _buildModeCard(
+                      'UPI',
+                      _collectionByMode['upi'] ?? 0,
+                      const Color(0xFF9C27B0),
+                    ),
+                  ),
                   const SizedBox(width: 12),
-                  Expanded(child: _buildModeCard('Card', _collectionByMode['card'] ?? 0, const Color(0xFF2196F3))),
+                  Expanded(
+                    child: _buildModeCard(
+                      'Card',
+                      _collectionByMode['card'] ?? 0,
+                      const Color(0xFF2196F3),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -474,10 +536,13 @@ class _CollectionsTabState extends State<_CollectionsTab> {
                   children: [
                     Text(
                       'Total Collections',
-                      style: TextStyle(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     Text(
-                      '₹${(_collectionByMode['total'] ?? 0).toStringAsFixed(2)}',
+                      formatMoney((_collectionByMode['total'] ?? 0)),
                       style: TextStyle(
                         fontSize: AppResponsive.subheadingFontSize(context),
                         fontWeight: FontWeight.w700,
@@ -523,11 +588,14 @@ class _CollectionsTabState extends State<_CollectionsTab> {
         children: [
           Text(
             label,
-            style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: color),
+            style: TextStyle(
+              fontSize: AppResponsive.captionFontSize(context),
+              color: color,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
-            '₹${amount.toStringAsFixed(0)}',
+            formatMoney(amount),
             style: TextStyle(
               fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.w700,
@@ -541,7 +609,9 @@ class _CollectionsTabState extends State<_CollectionsTab> {
 
   Widget _buildPaymentCard(CreditPaymentModel payment) {
     final date = DateTime.tryParse(payment.date);
-    final dateStr = date != null ? DateFormat('dd MMM yyyy, hh:mm a').format(date) : payment.date;
+    final dateStr = date != null
+        ? DateFormat('dd MMM yyyy, hh:mm a').format(date)
+        : payment.date;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -564,7 +634,9 @@ class _CollectionsTabState extends State<_CollectionsTab> {
             ),
             child: Icon(
               payment.isDebtWriteOff ? Icons.delete_outline : Icons.payment,
-              color: payment.isDebtWriteOff ? Colors.grey : const Color(0xFF4CAF50),
+              color: payment.isDebtWriteOff
+                  ? Colors.grey
+                  : const Color(0xFF4CAF50),
               size: 20,
             ),
           ),
@@ -574,7 +646,9 @@ class _CollectionsTabState extends State<_CollectionsTab> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  payment.isDebtWriteOff ? 'Write-Off' : payment.paymentModeDisplayText,
+                  payment.isDebtWriteOff
+                      ? 'Write-Off'
+                      : payment.paymentModeDisplayText,
                   style: TextStyle(
                     fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w500,
@@ -583,17 +657,22 @@ class _CollectionsTabState extends State<_CollectionsTab> {
                 const SizedBox(height: 2),
                 Text(
                   dateStr,
-                  style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: Color(0xFF9E9E9E)),
+                  style: TextStyle(
+                    fontSize: AppResponsive.captionFontSize(context),
+                    color: Color(0xFF9E9E9E),
+                  ),
                 ),
               ],
             ),
           ),
           Text(
-            '₹${payment.amount.toStringAsFixed(2)}',
+            formatMoney(payment.amount),
             style: TextStyle(
               fontSize: AppResponsive.subheadingFontSize(context),
               fontWeight: FontWeight.w600,
-              color: payment.isDebtWriteOff ? Colors.grey : const Color(0xFF4CAF50),
+              color: payment.isDebtWriteOff
+                  ? Colors.grey
+                  : const Color(0xFF4CAF50),
             ),
           ),
         ],
@@ -627,7 +706,10 @@ class _OutstandingTabState extends State<_OutstandingTab> {
     setState(() => _isLoading = true);
     try {
       final customers = await customerStore.getCustomersWithCredit();
-      final total = customers.fold<double>(0, (sum, c) => sum + c.creditBalance);
+      final total = customers.fold<double>(
+        0,
+        (sum, c) => sum + c.creditBalance,
+      );
 
       // Sort by credit balance descending
       customers.sort((a, b) => b.creditBalance.compareTo(a.creditBalance));
@@ -661,11 +743,14 @@ class _OutstandingTabState extends State<_OutstandingTab> {
                 children: [
                   Text(
                     'Total Outstanding',
-                    style: TextStyle(fontSize: AppResponsive.bodyFontSize(context), color: Color(0xFF6B6B6B)),
+                    style: TextStyle(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      color: Color(0xFF6B6B6B),
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '₹${_totalOutstanding.toStringAsFixed(2)}',
+                    formatMoney(_totalOutstanding),
                     style: TextStyle(
                       fontSize: AppResponsive.headingFontSize(context),
                       fontWeight: FontWeight.w700,
@@ -692,7 +777,10 @@ class _OutstandingTabState extends State<_OutstandingTab> {
                     ),
                     Text(
                       'Customers',
-                      style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: Colors.red),
+                      style: TextStyle(
+                        fontSize: AppResponsive.captionFontSize(context),
+                        color: Colors.red,
+                      ),
                     ),
                   ],
                 ),
@@ -708,12 +796,18 @@ class _OutstandingTabState extends State<_OutstandingTab> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.check_circle,
-                          size: 64, color: Color(0xFF4CAF50)),
+                      const Icon(
+                        Icons.check_circle,
+                        size: 64,
+                        color: Color(0xFF4CAF50),
+                      ),
                       SizedBox(height: 16),
                       Text(
                         'No outstanding balance!',
-                        style: TextStyle(fontSize: AppResponsive.subheadingFontSize(context), color: Color(0xFF6B6B6B)),
+                        style: TextStyle(
+                          fontSize: AppResponsive.subheadingFontSize(context),
+                          color: Color(0xFF6B6B6B),
+                        ),
                       ),
                     ],
                   ),
@@ -767,7 +861,9 @@ class _OutstandingTabState extends State<_OutstandingTab> {
                     radius: 20,
                     backgroundColor: Colors.red.withOpacity(0.1),
                     child: Text(
-                      (customer.name?.isNotEmpty ?? false) ? customer.name![0].toUpperCase() : '?',
+                      (customer.name?.isNotEmpty ?? false)
+                          ? customer.name![0].toUpperCase()
+                          : '?',
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         color: Colors.red,
@@ -800,7 +896,7 @@ class _OutstandingTabState extends State<_OutstandingTab> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        '₹${customer.creditBalance.toStringAsFixed(2)}',
+                        formatMoney(customer.creditBalance),
                         style: TextStyle(
                           fontSize: AppResponsive.subheadingFontSize(context),
                           fontWeight: FontWeight.w700,

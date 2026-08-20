@@ -5,6 +5,7 @@ import 'package:billberrylite/presentation/widget/componets/common/app_dialog.da
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
@@ -16,10 +17,7 @@ import '../../../domain/services/retail/return_service.dart';
 class SaleReturnScreen extends StatefulWidget {
   final String saleId;
 
-  const SaleReturnScreen({
-    super.key,
-    required this.saleId,
-  });
+  const SaleReturnScreen({super.key, required this.saleId});
 
   @override
   State<SaleReturnScreen> createState() => _SaleReturnScreenState();
@@ -71,19 +69,22 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
     // Plan gate — returns/refunds must be included in the plan (mirrors
     // restaurant `billing.returns`). No-op until a retail manifest is present.
     if (!PlanEnforce.allows(RetailEntKeys.billingReturns)) {
-      NotificationService.instance
-          .showError('Returns aren’t included in your current plan.');
+      NotificationService.instance.showError(
+        'Returns aren’t included in your current plan.',
+      );
       return;
     }
 
     final isFull = _returnType == 'full';
-    final refundAmount =
-        isFull ? _sale!.totalAmount : _calculatePartialReturnAmount();
+    final refundAmount = isFull
+        ? _sale!.totalAmount
+        : _calculatePartialReturnAmount();
 
     final confirmed = await showAppConfirmDialog(
       context: context,
       title: isFull ? 'Return whole sale?' : 'Return selected items?',
-      message: 'Refund ${formatMoney(refundAmount)} via '
+      message:
+          'Refund ${formatMoney(refundAmount)} via '
           '${_refundMethod.toUpperCase()}. Stock goes back in and the sale is '
           'marked returned. This cannot be undone.',
       confirmLabel: 'Confirm Return',
@@ -117,8 +118,9 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
 
       if (mounted) {
         Navigator.pop(context, true); // Return to previous screen
-        NotificationService.instance
-            .showSuccess('Return processed • ${shortRef(returnSaleId, length: 13)}');
+        NotificationService.instance.showSuccess(
+          'Return processed • ${shortRef(returnSaleId, length: 13)}',
+        );
       }
     } catch (e) {
       if (!mounted) return;
@@ -126,7 +128,6 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
       NotificationService.instance.showError('Error processing return: $e');
     }
   }
-
 
   double _calculatePartialReturnAmount() {
     double total = 0;
@@ -150,60 +151,101 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Process Return',
-        titleFontSize: 18,
+        titleFontSize: AppResponsive.subheadingFontSize(context),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _sale == null
-              ? _buildErrorView()
-              : SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      _buildOriginalSaleCard(),
-                      _buildReturnTypeSelector(),
-                      _buildRefundMethodSelector(),
-                      if (_returnType == 'partial') _buildItemsList(),
-                      _buildSummaryCard(),
-                      const SizedBox(height: 100),
-                    ],
-                  ),
+          ? _buildErrorView()
+          : SingleChildScrollView(
+              child: _capped(
+                context,
+                Column(
+                  children: [
+                    _buildOriginalSaleCard(),
+                    _buildReturnTypeSelector(),
+                    _buildRefundMethodSelector(),
+                    if (_returnType == 'partial') _buildItemsList(),
+                    _buildSummaryCard(),
+                    SizedBox(height: AppResponsive.largeSpacing(context)),
+                  ],
                 ),
+              ),
+            ),
       bottomNavigationBar: _sale != null && !_isLoading
           ? _buildProcessButton()
           : null,
     );
   }
 
+  /// Caps content width on large screens so this form doesn't stretch across a
+  /// laptop. Applied once around the scrolling column.
+  Widget _capped(BuildContext context, Widget child) {
+    final maxWidth = AppResponsive.maxCardWidth(context);
+    if (maxWidth == double.infinity) return child;
+    return Align(
+      // topCenter + heightFactor: without both, Align fills its constraints —
+      // which made this eat the whole screen when used as a bottom bar.
+      alignment: Alignment.topCenter,
+      heightFactor: 1,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: child,
+      ),
+    );
+  }
+
   Widget _buildErrorView() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.error_outline, size: 64, color: Colors.red),
-          SizedBox(height: 16),
-          Text('Sale not found or cannot be returned'),
-        ],
+    return Center(
+      child: Padding(
+        padding: AppResponsive.padding(context),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: AppResponsive.getValue(
+                context,
+                mobile: 64.0,
+                tablet: 76.0,
+                desktop: 88.0,
+              ),
+              color: Colors.red,
+            ),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
+            Text(
+              'Sale not found or cannot be returned',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: AppResponsive.bodyFontSize(context)),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildOriginalSaleCard() {
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
+      margin: AppResponsive.padding(context),
+      padding: AppResponsive.padding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Original Sale',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontSize: AppResponsive.subheadingFontSize(context),
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
           _buildInfoRow('Sale ID', shortRef(_sale!.saleId, length: 13)),
           _buildInfoRow('Total Items', '${_sale!.totalItems}'),
           _buildInfoRow('Total Amount', formatMoney(_sale!.totalAmount)),
@@ -215,12 +257,30 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: AppColors.textSecondary)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: AppResponsive.bodyFontSize(context),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: AppResponsive.bodyFontSize(context),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -228,21 +288,28 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
 
   Widget _buildReturnTypeSelector() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.symmetric(
+        horizontal: AppResponsive.padding(context).left,
+      ),
+      padding: AppResponsive.padding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Return Type',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
           // Selectable tiles rather than RadioListTile — Flutter deprecated
           // Radio's groupValue/onChanged in favour of a RadioGroup ancestor,
           // and these match the tiles used in Material Receiving.
@@ -313,17 +380,22 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                 children: [
                   Text(
                     label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
-                      color:
-                          selected ? AppColors.primary : AppColors.textPrimary,
+                      color: selected
+                          ? AppColors.primary
+                          : AppColors.textPrimary,
                     ),
                   ),
                   Text(
                     caption,
-                    style: const TextStyle(
-                      fontSize: 10.5,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: AppResponsive.captionFontSize(context),
                       color: AppColors.textSecondary,
                     ),
                   ),
@@ -338,36 +410,52 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
 
   Widget _buildRefundMethodSelector() {
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
+      margin: AppResponsive.padding(context),
+      padding: AppResponsive.padding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Refund Method',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
           Wrap(
             spacing: 8,
             children: [
               ChoiceChip(
                 label: const Text('💵 Cash'),
+                labelStyle: TextStyle(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                ),
                 selected: _refundMethod == 'cash',
-                onSelected: (selected) => setState(() => _refundMethod = 'cash'),
+                onSelected: (selected) =>
+                    setState(() => _refundMethod = 'cash'),
               ),
               ChoiceChip(
                 label: const Text('💳 Card'),
+                labelStyle: TextStyle(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                ),
                 selected: _refundMethod == 'card',
-                onSelected: (selected) => setState(() => _refundMethod = 'card'),
+                onSelected: (selected) =>
+                    setState(() => _refundMethod = 'card'),
               ),
               ChoiceChip(
                 label: const Text('📱 UPI'),
+                labelStyle: TextStyle(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                ),
                 selected: _refundMethod == 'upi',
                 onSelected: (selected) => setState(() => _refundMethod = 'upi'),
               ),
@@ -380,21 +468,28 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
 
   Widget _buildItemsList() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.symmetric(
+        horizontal: AppResponsive.padding(context).left,
+      ),
+      padding: AppResponsive.padding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Select Items to Return',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
           ..._saleItems.map((item) => _buildItemTile(item)),
         ],
       ),
@@ -406,10 +501,12 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
     final returnQty = _selectedItems[item.varianteId] ?? 1;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
+      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
-        color: isSelected ? AppColors.warning.withValues(alpha: 0.1) : AppColors.surfaceMedium,
+        color: isSelected
+            ? AppColors.warning.withValues(alpha: 0.1)
+            : AppColors.surfaceMedium,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: isSelected ? Colors.orange : AppColors.divider,
@@ -439,23 +536,44 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                   children: [
                     Text(
                       item.productName ?? 'Unknown',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     if (attributeStore
-                        .describeAttributes(item.attributes,
-                            size: item.size, color: item.color, labelled: false)
+                        .describeAttributes(
+                          item.attributes,
+                          size: item.size,
+                          color: item.color,
+                          labelled: false,
+                        )
                         .isNotEmpty)
                       Text(
-                        attributeStore.describeAttributes(item.attributes,
-                            size: item.size, color: item.color, labelled: false),
-                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        attributeStore.describeAttributes(
+                          item.attributes,
+                          size: item.size,
+                          color: item.color,
+                          labelled: false,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: AppResponsive.smallFontSize(context),
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                   ],
                 ),
               ),
               Text(
                 formatMoney(item.total),
-                style: const TextStyle(fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
@@ -463,26 +581,44 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
             const Divider(height: 16),
             Row(
               children: [
-                const Text('Quantity: '),
+                Text(
+                  'Quantity: ',
+                  style: TextStyle(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                  ),
+                ),
                 IconButton(
                   icon: const Icon(Icons.remove_circle_outline),
                   onPressed: returnQty > 1
-                      ? () => setState(() => _selectedItems[item.varianteId] = returnQty - 1)
+                      ? () => setState(
+                          () => _selectedItems[item.varianteId] = returnQty - 1,
+                        )
                       : null,
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
                 ),
                 Text(
                   '$returnQty / ${item.qty}',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.add_circle_outline),
                   onPressed: returnQty < item.qty
-                      ? () => setState(() => _selectedItems[item.varianteId] = returnQty + 1)
+                      ? () => setState(
+                          () => _selectedItems[item.varianteId] = returnQty + 1,
+                        )
                       : null,
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
                 ),
               ],
             ),
@@ -498,36 +634,55 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
         : _calculatePartialReturnAmount();
 
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
+      margin: AppResponsive.padding(context),
+      padding: AppResponsive.padding(context),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Colors.red, AppColors.danger],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
       ),
       child: Column(
         children: [
-          const Text(
-            'Refund Amount',
-            style: TextStyle(color: Colors.white70, fontSize: 14),
-          ),
-          const SizedBox(height: 8),
           Text(
-            formatMoney(returnAmount),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 32,
-              fontWeight: FontWeight.w700,
+            'Refund Amount',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: AppResponsive.bodyFontSize(context),
+            ),
+          ),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+          // scaleDown so a large refund keeps one line at the display size.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              formatMoney(returnAmount),
+              maxLines: 1,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: AppResponsive.getValue(
+                  context,
+                  mobile: 32.0,
+                  tablet: 36.0,
+                  desktop: 40.0,
+                ),
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           if (_returnType == 'partial') ...[
-            const SizedBox(height: 8),
+            SizedBox(height: AppResponsive.smallSpacing(context)),
             Text(
               '${_selectedItems.values.fold(0, (sum, qty) => sum + qty)} items selected',
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
+              maxLines: 1,
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: AppResponsive.smallFontSize(context),
+              ),
             ),
           ],
         ],
@@ -537,7 +692,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
 
   Widget _buildProcessButton() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.padding(context),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -548,24 +703,38 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
           ),
         ],
       ),
-      child: ElevatedButton(
-        onPressed: _isProcessing ? null : _processReturn,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          minimumSize: const Size(double.infinity, 50),
+      child: _capped(
+        context,
+        ElevatedButton(
+          onPressed: _isProcessing ? null : _processReturn,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.white,
+            padding: EdgeInsets.symmetric(
+              vertical: AppResponsive.largeSpacing(context),
+            ),
+            minimumSize: Size(
+              double.infinity,
+              AppResponsive.buttonHeight(context) + 2,
+            ),
+          ),
+          child: _isProcessing
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+              : Text(
+                  'Process Return',
+                  style: TextStyle(
+                    fontSize: AppResponsive.subheadingFontSize(context),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
         ),
-        child: _isProcessing
-            ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-              )
-            : const Text(
-                'Process Return',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
       ),
     );
   }

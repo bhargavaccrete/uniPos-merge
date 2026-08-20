@@ -65,59 +65,64 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _reports.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.receipt_long, size: 80, color: Colors.grey[300]),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No EOD Reports Yet',
-                        style: GoogleFonts.poppins(
-                          fontSize: AppResponsive.subheadingFontSize(context),
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey[600],
-                        ),
+      body: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _reports.isEmpty
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.receipt_long, size: 80, color: Colors.grey[300]),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No EOD Reports Yet',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.subheadingFontSize(context),
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey[600],
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Complete your first End of Day to see reports here',
-                        style: GoogleFonts.poppins(
-                          fontSize: AppResponsive.bodyFontSize(context),
-                          color: Colors.grey[500],
-                        ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Complete your first End of Day to see reports here',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        color: Colors.grey[500],
                       ),
-                    ],
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _loadReports,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _reports.length,
-                    itemBuilder: (context, index) {
-                      final report = _reports[index];
-                      return _buildReportCard(report);
-                    },
-                  ),
+                    ),
+                  ],
                 ),
+              )
+            : RefreshIndicator(
+                onRefresh: _loadReports,
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _reports.length,
+                  itemBuilder: (context, index) {
+                    final report = _reports[index];
+                    return _buildReportCard(report);
+                  },
+                ),
+              ),
+      ),
     );
   }
 
   Widget _buildReportCard(EndOfDayReport report) {
     final dateFormat = DateFormat('dd MMM yyyy, EEEE');
-    final isBalanced = report.cashReconciliation.reconciliationStatus == 'Balanced';
-    final isOverage = report.cashReconciliation.reconciliationStatus == 'Overage';
+    final isBalanced =
+        report.cashReconciliation.reconciliationStatus == 'Balanced';
+    final isOverage =
+        report.cashReconciliation.reconciliationStatus == 'Overage';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: () {
           Navigator.push(
@@ -139,7 +144,11 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
+                      Icon(
+                        Icons.calendar_today,
+                        size: 16,
+                        color: Colors.grey[600],
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         dateFormat.format(report.date),
@@ -151,13 +160,16 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                     ],
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: isBalanced
                           ? Colors.green[50]
                           : isOverage
-                              ? Colors.blue[50]
-                              : Colors.orange[50],
+                          ? Colors.blue[50]
+                          : Colors.orange[50],
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -168,8 +180,8 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                         color: isBalanced
                             ? Colors.green[700]
                             : isOverage
-                                ? Colors.blue[700]
-                                : Colors.orange[700],
+                            ? Colors.blue[700]
+                            : Colors.orange[700],
                       ),
                     ),
                   ),
@@ -224,8 +236,8 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                     color: isBalanced
                         ? Colors.green[50]
                         : isOverage
-                            ? Colors.blue[50]
-                            : Colors.orange[50],
+                        ? Colors.blue[50]
+                        : Colors.orange[50],
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -234,7 +246,9 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                       Icon(
                         isOverage ? Icons.arrow_upward : Icons.arrow_downward,
                         size: 16,
-                        color: isOverage ? Colors.blue[700] : Colors.orange[700],
+                        color: isOverage
+                            ? Colors.blue[700]
+                            : Colors.orange[700],
                       ),
                       const SizedBox(width: 4),
                       Text(
@@ -242,7 +256,9 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                         style: GoogleFonts.poppins(
                           fontSize: AppResponsive.captionFontSize(context),
                           fontWeight: FontWeight.w600,
-                          color: isOverage ? Colors.blue[700] : Colors.orange[700],
+                          color: isOverage
+                              ? Colors.blue[700]
+                              : Colors.orange[700],
                         ),
                       ),
                     ],
@@ -261,14 +277,17 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => EODReportDetailScreen(report: report),
+                          builder: (context) =>
+                              EODReportDetailScreen(report: report),
                         ),
                       );
                     },
                     icon: const Icon(Icons.arrow_forward, size: 16),
                     label: Text(
                       'View Details',
-                      style: GoogleFonts.poppins(fontSize: AppResponsive.captionFontSize(context)),
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.captionFontSize(context),
+                      ),
                     ),
                   ),
                 ],

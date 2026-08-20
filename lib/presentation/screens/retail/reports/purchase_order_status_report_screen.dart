@@ -30,28 +30,28 @@ class PurchaseOrderStatusReportScreen extends StatelessWidget {
 
   /// POs sent to the supplier with nothing received yet.
   const PurchaseOrderStatusReportScreen.pending({Key? key})
-      : this(
-          key: key,
-          status: POStatus.sent,
-          title: 'Pending Purchase Orders',
-          subtitle: 'Sent, awaiting delivery',
-        );
+    : this(
+        key: key,
+        status: POStatus.sent,
+        title: 'Pending Purchase Orders',
+        subtitle: 'Sent, awaiting delivery',
+      );
 
   const PurchaseOrderStatusReportScreen.partiallyReceived({Key? key})
-      : this(
-          key: key,
-          status: POStatus.partiallyCompleted,
-          title: 'Partially Received Orders',
-          subtitle: 'Some goods still outstanding',
-        );
+    : this(
+        key: key,
+        status: POStatus.partiallyCompleted,
+        title: 'Partially Received Orders',
+        subtitle: 'Some goods still outstanding',
+      );
 
   const PurchaseOrderStatusReportScreen.completed({Key? key})
-      : this(
-          key: key,
-          status: POStatus.fullyCompleted,
-          title: 'Completed Orders',
-          subtitle: 'Fully received',
-        );
+    : this(
+        key: key,
+        status: POStatus.fullyCompleted,
+        title: 'Completed Orders',
+        subtitle: 'Fully received',
+      );
 
   String _date(String iso) {
     final d = DateTime.tryParse(iso);
@@ -78,12 +78,18 @@ class PurchaseOrderStatusReportScreen extends StatelessWidget {
         endDate: end,
       ),
       summaryCards: (rows) {
-        final ordered =
-            rows.fold<double>(0, (s, r) => s + (r['estimatedTotal'] as double));
-        final received =
-            rows.fold<double>(0, (s, r) => s + (r['receivedValue'] as double));
-        final remainingQty =
-            rows.fold<int>(0, (s, r) => s + (r['remainingQty'] as int));
+        final ordered = rows.fold<double>(
+          0,
+          (s, r) => s + (r['estimatedTotal'] as double),
+        );
+        final received = rows.fold<double>(
+          0,
+          (s, r) => s + (r['receivedValue'] as double),
+        );
+        final remainingQty = rows.fold<int>(
+          0,
+          (s, r) => s + (r['remainingQty'] as int),
+        );
 
         return [
           ReportSummaryCard(
@@ -117,15 +123,23 @@ class PurchaseOrderStatusReportScreen extends StatelessWidget {
         ReportTable.column(context, 'Received', numeric: true),
         ReportTable.column(context, 'Value', numeric: true),
       ],
-      rowBuilder: (context, row) => DataRow(cells: [
-        DataCell(Text(row['poNumber'] as String)),
-        DataCell(Text(row['supplierName'] as String)),
-        DataCell(Text(_date(row['expectedDeliveryDate'] as String))),
-        DataCell(Text('${row['receivedQty']}/${row['orderedQty']}')),
-        DataCell(Text(formatMoney(showsProgress
-            ? row['estimatedTotal'] as double
-            : row['receivedValue'] as double))),
-      ]),
+      rowBuilder: (context, row) => DataRow(
+        cells: [
+          DataCell(Text(row['poNumber'] as String)),
+          DataCell(Text(row['supplierName'] as String)),
+          DataCell(Text(_date(row['expectedDeliveryDate'] as String))),
+          DataCell(Text('${row['receivedQty']}/${row['orderedQty']}')),
+          DataCell(
+            Text(
+              formatMoney(
+                showsProgress
+                    ? row['estimatedTotal'] as double
+                    : row['receivedValue'] as double,
+              ),
+            ),
+          ),
+        ],
+      ),
       exportData: (rows) => ReportExportData(
         headers: const [
           'PO Number',
@@ -139,19 +153,23 @@ class PurchaseOrderStatusReportScreen extends StatelessWidget {
           'Received Value',
         ],
         rows: rows
-            .map((r) => [
-                  r['poNumber'],
-                  r['supplierName'],
-                  _date(r['createdAt'] as String),
-                  _date(r['expectedDeliveryDate'] as String),
-                  r['orderedQty'],
-                  r['receivedQty'],
-                  r['remainingQty'],
-                  ReportExportService.formatCurrency(
-                      r['estimatedTotal'] as double),
-                  ReportExportService.formatCurrency(
-                      r['receivedValue'] as double),
-                ])
+            .map(
+              (r) => [
+                r['poNumber'],
+                r['supplierName'],
+                _date(r['createdAt'] as String),
+                _date(r['expectedDeliveryDate'] as String),
+                r['orderedQty'],
+                r['receivedQty'],
+                r['remainingQty'],
+                ReportExportService.formatCurrency(
+                  r['estimatedTotal'] as double,
+                ),
+                ReportExportService.formatCurrency(
+                  r['receivedValue'] as double,
+                ),
+              ],
+            )
             .toList(),
         summary: {'Orders': rows.length},
       ),

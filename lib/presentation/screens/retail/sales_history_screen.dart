@@ -122,12 +122,17 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             final saleDate = DateTime.tryParse(sale.date);
             if (saleDate == null) return false;
             // Compared on calendar days, so both ends are inclusive.
-            final day =
-                DateTime(saleDate.year, saleDate.month, saleDate.day);
-            final start =
-                DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
-            final end =
-                DateTime(_endDate!.year, _endDate!.month, _endDate!.day);
+            final day = DateTime(saleDate.year, saleDate.month, saleDate.day);
+            final start = DateTime(
+              _startDate!.year,
+              _startDate!.month,
+              _startDate!.day,
+            );
+            final end = DateTime(
+              _endDate!.year,
+              _endDate!.month,
+              _endDate!.day,
+            );
             return !day.isBefore(start) && !day.isAfter(end);
           }).toList();
         }
@@ -199,13 +204,13 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     final yesterday = today.subtract(const Duration(days: 1));
     final saleDate = DateTime(date.year, date.month, date.day);
 
-    if (saleDate == today) return 'Today, ${DateFormat('hh:mm a').format(date)}';
+    if (saleDate == today)
+      return 'Today, ${DateFormat('hh:mm a').format(date)}';
     if (saleDate == yesterday) {
       return 'Yesterday, ${DateFormat('hh:mm a').format(date)}';
     }
     return DateFormat('dd MMM yyyy, hh:mm a').format(date);
   }
-
 
   Color _getPaymentColor(String paymentType) {
     switch (paymentType.toLowerCase()) {
@@ -246,10 +251,24 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
 
   // ==================== BUILD ====================
 
+  /// Caps content width on large screens. Backgrounds still span edge to edge —
+  /// only what you read is constrained.
+  Widget _capped(BuildContext context, Widget child) {
+    final maxWidth = AppResponsive.maxContentWidth(context);
+    if (maxWidth == double.infinity) return child;
+    return Align(
+      // topCenter, not Center: Center aligns on BOTH axes, so a
+      // shrink-wrapping child floats in the vertical middle.
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: child,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isTablet = !AppResponsive.isMobile(context);
-
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
@@ -266,36 +285,51 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       body: MoneyScope(
         child: _isLoading
             ? const Center(
-                child: CircularProgressIndicator(color: AppColors.primary))
+                child: CircularProgressIndicator(color: AppColors.primary),
+              )
             : Column(
                 children: [
                   Container(
                     color: AppColors.white,
-                    padding: EdgeInsets.fromLTRB(isTablet ? 20 : 16,
-                        isTablet ? 16 : 12, isTablet ? 20 : 16, 12),
-                    child: Column(
-                      children: [
-                        AppTextField(
-                          controller: _searchController,
-                          hint: 'Search by Sale ID or amount...',
-                          icon: Icons.search_rounded,
-                          onChanged: _onSearchChanged,
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear, size: 20),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    _onSearchChanged('');
-                                  },
-                                )
-                              : null,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildFilterChips(),
-                      ],
+                    padding: EdgeInsets.fromLTRB(
+                      AppResponsive.padding(context).left,
+                      AppResponsive.mediumSpacing(context),
+                      AppResponsive.padding(context).left,
+                      12,
+                    ),
+                    child: _capped(
+                      context,
+                      Column(
+                        children: [
+                          AppTextField(
+                            controller: _searchController,
+                            hint: 'Search by Sale ID or amount...',
+                            icon: Icons.search_rounded,
+                            onChanged: _onSearchChanged,
+                            suffixIcon: _searchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: Icon(
+                                      Icons.clear,
+                                      size: AppResponsive.smallIconSize(
+                                        context,
+                                      ),
+                                    ),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      _onSearchChanged('');
+                                    },
+                                  )
+                                : null,
+                          ),
+                          SizedBox(
+                            height: AppResponsive.mediumSpacing(context),
+                          ),
+                          _buildFilterChips(),
+                        ],
+                      ),
                     ),
                   ),
-                  _buildSummaryCard(isTablet),
+                  _buildSummaryCard(context),
                   if (_selectedFilter == 'dateRange' &&
                       _startDate != null &&
                       _endDate != null)
@@ -303,11 +337,14 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   Expanded(
                     child: _visibleSales.isEmpty
                         ? _buildEmptyState()
-                        : ListView.builder(
-                            padding: EdgeInsets.all(isTablet ? 20 : 16),
-                            itemCount: _visibleSales.length,
-                            itemBuilder: (context, index) =>
-                                _buildSaleCard(_visibleSales[index]),
+                        : _capped(
+                            context,
+                            ListView.builder(
+                              padding: AppResponsive.padding(context),
+                              itemCount: _visibleSales.length,
+                              itemBuilder: (context, index) =>
+                                  _buildSaleCard(_visibleSales[index]),
+                            ),
                           ),
                   ),
                 ],
@@ -316,42 +353,58 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     );
   }
 
-  Widget _buildSummaryCard(bool isTablet) {
+  Widget _buildSummaryCard(BuildContext context) {
     final hasReturns = _returnCount > 0;
+    final side = AppResponsive.padding(context).left;
 
     return Container(
-      margin: EdgeInsets.fromLTRB(isTablet ? 20 : 16, 12, isTablet ? 20 : 16, 4),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          _summaryStat('Sales', '${_visibleSales.length}'),
-          _summaryDivider(),
-          _summaryStat('Net Revenue', formatMoney(_totalRevenue)),
-          // Only shown when there is something to show — otherwise the
-          // returns column is dead space on every screen.
-          if (hasReturns) ...[
-            _summaryDivider(),
-            _summaryStat(
-              'Returned',
-              formatMoney(_returnedValue),
-              caption: '$_returnCount refund${_returnCount == 1 ? '' : 's'}',
+      margin: EdgeInsets.fromLTRB(side, 12, side, 4),
+      child: _capped(
+        context,
+        Container(
+          padding: AppResponsive.cardPadding(context),
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(
+              AppResponsive.borderRadius(context),
             ),
-          ],
-        ],
+          ),
+          child: Row(
+            children: [
+              _summaryStat('Sales', '${_visibleSales.length}'),
+              _summaryDivider(),
+              _summaryStat('Net Revenue', formatMoney(_totalRevenue)),
+              // Only shown when there is something to show — otherwise the
+              // returns column is dead space on every screen.
+              if (hasReturns) ...[
+                _summaryDivider(),
+                _summaryStat(
+                  'Returned',
+                  formatMoney(_returnedValue),
+                  caption:
+                      '$_returnCount refund${_returnCount == 1 ? '' : 's'}',
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
 
   Widget _summaryDivider() => Container(
-        height: 40,
-        width: 1,
-        margin: const EdgeInsets.symmetric(horizontal: 14),
-        color: AppColors.white.withValues(alpha: 0.25),
-      );
+    height: AppResponsive.getValue(
+      context,
+      mobile: 40.0,
+      tablet: 46.0,
+      desktop: 52.0,
+    ),
+    width: 1,
+    margin: EdgeInsets.symmetric(
+      horizontal: AppResponsive.mediumSpacing(context),
+    ),
+    color: AppColors.white.withValues(alpha: 0.25),
+  );
 
   Widget _summaryStat(String label, String value, {String? caption}) {
     return Expanded(
@@ -361,8 +414,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
         children: [
           Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.poppins(
-              fontSize: 11.5,
+              fontSize: AppResponsive.captionFontSize(context),
               color: AppColors.white.withValues(alpha: 0.75),
             ),
           ),
@@ -372,8 +427,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             alignment: Alignment.centerLeft,
             child: Text(
               value,
+              maxLines: 1,
               style: GoogleFonts.poppins(
-                fontSize: 20,
+                fontSize: AppResponsive.headingFontSize(context),
                 fontWeight: FontWeight.w700,
                 color: AppColors.white,
               ),
@@ -382,8 +438,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           if (caption != null)
             Text(
               caption,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: GoogleFonts.poppins(
-                fontSize: 10.5,
+                fontSize: AppResponsive.captionFontSize(context),
                 color: AppColors.white.withValues(alpha: 0.7),
               ),
             ),
@@ -393,34 +451,60 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   }
 
   Widget _buildDateRangeBar() {
+    final side = AppResponsive.padding(context).left;
+
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.info.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
+      margin: EdgeInsets.fromLTRB(
+        side,
+        AppResponsive.smallSpacing(context),
+        side,
+        0,
       ),
-      child: Row(
-        children: [
-          const Icon(Icons.date_range_rounded, size: 15, color: AppColors.info),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '${DateFormat('dd MMM yyyy').format(_startDate!)} — ${DateFormat('dd MMM yyyy').format(_endDate!)}',
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: AppColors.info,
-              ),
+      child: _capped(
+        context,
+        Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: AppResponsive.mediumSpacing(context),
+            vertical: AppResponsive.smallSpacing(context),
+          ),
+          decoration: BoxDecoration(
+            color: AppColors.info.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.smallBorderRadius(context),
             ),
           ),
-          InkWell(
-            onTap: _clearDateRange,
-            child: const Icon(Icons.close_rounded,
-                size: 16, color: AppColors.info),
+          child: Row(
+            children: [
+              Icon(
+                Icons.date_range_rounded,
+                size: AppResponsive.smallIconSize(context),
+                color: AppColors.info,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${DateFormat('dd MMM yyyy').format(_startDate!)} — ${DateFormat('dd MMM yyyy').format(_endDate!)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.info,
+                  ),
+                ),
+              ),
+              InkWell(
+                onTap: _clearDateRange,
+                child: Icon(
+                  Icons.close_rounded,
+                  size: AppResponsive.smallIconSize(context),
+                  color: AppColors.info,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -435,7 +519,12 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     ];
 
     return SizedBox(
-      height: 34,
+      height: AppResponsive.getValue(
+        context,
+        mobile: 34.0,
+        tablet: 40.0,
+        desktop: 44.0,
+      ),
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: [
@@ -445,7 +534,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               selected: _selectedFilter == value,
               onTap: () => _applyFilter(value),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
           ],
           _filterPill(
             label: 'Date Range',
@@ -468,10 +557,14 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       onTap: onTap,
       child: Container(
         alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.mediumSpacing(context),
+        ),
         decoration: BoxDecoration(
           color: selected ? AppColors.primary : AppColors.white,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.smallBorderRadius(context),
+          ),
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.divider,
           ),
@@ -480,15 +573,18 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
-              Icon(icon,
-                  size: 14,
-                  color: selected ? AppColors.white : AppColors.textSecondary),
+              Icon(
+                icon,
+                size: AppResponsive.smallIconSize(context),
+                color: selected ? AppColors.white : AppColors.textSecondary,
+              ),
               const SizedBox(width: 5),
             ],
             Text(
               label,
+              maxLines: 1,
               style: GoogleFonts.poppins(
-                fontSize: 12,
+                fontSize: AppResponsive.smallFontSize(context),
                 fontWeight: FontWeight.w600,
                 color: selected ? AppColors.white : AppColors.textSecondary,
               ),
@@ -503,13 +599,37 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     final filtering = _selectedFilter != 'all' || _searchQuery.isNotEmpty;
 
     return AppEmptyState(
-      icon: filtering
-          ? Icons.search_off_rounded
-          : Icons.receipt_long_outlined,
+      icon: filtering ? Icons.search_off_rounded : Icons.receipt_long_outlined,
       title: filtering ? 'No sales match' : 'No sales yet',
       message: filtering
           ? 'Try a different filter or search term.'
           : 'Sales will appear here after checkout.',
+    );
+  }
+
+  /// One icon+label pair of the sale card's footer. Sized to its content so it
+  /// can sit in a Wrap and drop to the next line instead of overflowing.
+  Widget _saleMeta(
+    IconData icon,
+    String label,
+    Color color, {
+    bool bold = false,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: AppResponsive.smallIconSize(context), color: color),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          maxLines: 1,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.captionFontSize(context),
+            fontWeight: bold ? FontWeight.w500 : FontWeight.normal,
+            color: color,
+          ),
+        ),
+      ],
     );
   }
 
@@ -521,11 +641,13 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       builder: (context, snapshot) {
         final isReturned = snapshot.data ?? false;
 
+        final radius = AppResponsive.smallBorderRadius(context);
+
         return Container(
-          margin: const EdgeInsets.only(bottom: 8),
+          margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
           decoration: BoxDecoration(
             color: AppColors.white,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(radius),
             border: Border.all(
               color: isReturned
                   ? AppColors.danger.withValues(alpha: 0.35)
@@ -533,7 +655,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             ),
           ),
           child: InkWell(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(radius),
             onTap: () async {
               await Navigator.push(
                 context,
@@ -545,22 +667,25 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               if (mounted) _loadSales();
             },
             child: Padding(
-              padding: const EdgeInsets.all(14),
+              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
               child: Column(
                 children: [
                   Row(
                     children: [
                       Container(
-                        width: 38,
-                        height: 38,
+                        width: AppResponsive.smallAvatarSize(context),
+                        height: AppResponsive.smallAvatarSize(context),
                         decoration: BoxDecoration(
                           color: paymentColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(9),
                         ),
-                        child: Icon(_getPaymentIcon(sale.paymentType),
-                            size: 19, color: paymentColor),
+                        child: Icon(
+                          _getPaymentIcon(sale.paymentType),
+                          size: AppResponsive.iconSize(context),
+                          color: paymentColor,
+                        ),
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: AppResponsive.mediumSpacing(context)),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -573,7 +698,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: GoogleFonts.poppins(
-                                      fontSize: 14,
+                                      fontSize: AppResponsive.bodyFontSize(
+                                        context,
+                                      ),
                                       fontWeight: FontWeight.w600,
                                       color: AppColors.textPrimary,
                                     ),
@@ -592,21 +719,29 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                             const SizedBox(height: 2),
                             Text(
                               _formatDate(sale.date),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.poppins(
-                                fontSize: 11.5,
+                                fontSize: AppResponsive.captionFontSize(
+                                  context,
+                                ),
                                 color: AppColors.textSecondary,
                               ),
                             ),
                           ],
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
                             formatMoney(sale.totalAmount),
+                            maxLines: 1,
                             style: GoogleFonts.poppins(
-                              fontSize: 16,
+                              fontSize: AppResponsive.subheadingFontSize(
+                                context,
+                              ),
                               fontWeight: FontWeight.w700,
                               color: AppColors.textPrimary,
                             ),
@@ -621,38 +756,41 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
                   const Divider(height: 1, color: AppColors.divider),
-                  const SizedBox(height: 8),
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
                   Row(
                     children: [
-                      Icon(Icons.shopping_bag_outlined,
-                          size: 14, color: AppColors.textSecondary),
-                      const SizedBox(width: 5),
-                      Text(
-                        '${sale.totalItems} items',
-                        style: GoogleFonts.poppins(
-                          fontSize: 11.5,
-                          color: AppColors.textSecondary,
+                      // Wrap inside the Expanded so a long discount amount
+                      // drops to a second line instead of pushing the chevron
+                      // off the card — a Spacer gives back nothing when the
+                      // fixed content already exceeds the width.
+                      Expanded(
+                        child: Wrap(
+                          spacing: AppResponsive.mediumSpacing(context),
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            _saleMeta(
+                              Icons.shopping_bag_outlined,
+                              '${sale.totalItems} items',
+                              AppColors.textSecondary,
+                            ),
+                            if (sale.discountAmount > 0)
+                              _saleMeta(
+                                Icons.local_offer_outlined,
+                                '${formatMoney(sale.discountAmount)} off',
+                                AppColors.danger,
+                                bold: true,
+                              ),
+                          ],
                         ),
                       ),
-                      if (sale.discountAmount > 0) ...[
-                        const SizedBox(width: 14),
-                        Icon(Icons.local_offer_outlined,
-                            size: 14, color: AppColors.danger),
-                        const SizedBox(width: 5),
-                        Text(
-                          '${formatMoney(sale.discountAmount)} off',
-                          style: GoogleFonts.poppins(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.danger,
-                          ),
-                        ),
-                      ],
-                      const Spacer(),
-                      Icon(Icons.chevron_right_rounded,
-                          size: 18, color: AppColors.textSecondary),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: AppResponsive.smallIconSize(context),
+                        color: AppColors.textSecondary,
+                      ),
                     ],
                   ),
                 ],

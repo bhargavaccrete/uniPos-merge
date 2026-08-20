@@ -11,7 +11,11 @@ import '../../../../core/di/service_locator.dart';
 /// yellow instruction (row 2), data (row 3+). xlsio is 1-based.
 class RetailImportTemplateBuilder {
   static const List<String> _fallbackCategories = [
-    'Clothing', 'Electronics', 'Grocery', 'Footwear', 'General',
+    'Clothing',
+    'Electronics',
+    'Grocery',
+    'Footwear',
+    'General',
   ];
 
   /// Last data row dropdowns/validation are applied to.
@@ -106,7 +110,8 @@ class RetailImportTemplateBuilder {
     dv.showPromptBox = true;
     dv.errorStyle = ExcelDataValidationErrorStyle.warning;
     dv.errorBoxTitle = 'Not in list';
-    dv.errorBoxText = 'Pick from the list, or add it to the $addSheet sheet first.';
+    dv.errorBoxText =
+        'Pick from the list, or add it to the $addSheet sheet first.';
   }
 
   // ── Instructions ───────────────────────────────────────────────────────────
@@ -123,16 +128,26 @@ class RetailImportTemplateBuilder {
     }
 
     line('QUICK START', style: section);
-    line('1. Check the "Categories" and "Taxes" sheets — add more rows there if you need new ones.');
-    line('2. Fill the "Products" sheet — use the dropdowns for Category and Tax Rate.');
-    line('3. One row per variant. Give every variant of the same product the same Handle.');
+    line(
+      '1. Check the "Categories" and "Taxes" sheets — add more rows there if you need new ones.',
+    );
+    line(
+      '2. Fill the "Products" sheet — use the dropdowns for Category and Tax Rate.',
+    );
+    line(
+      '3. One row per variant. Give every variant of the same product the same Handle.',
+    );
     line('4. Save this file and import it back into Bill Berry Lite.');
     r++;
     line('TIPS', style: section);
-    line('• Cells with a dropdown show a small arrow — click it to pick a value.');
+    line(
+      '• Cells with a dropdown show a small arrow — click it to pick a value.',
+    );
     line('• Click any header cell to read its tooltip (what to enter).');
     line('• Required columns are marked with * in the header row.');
-    line('• You can still type a value that isn\'t in the dropdown — it will be added automatically.');
+    line(
+      '• You can still type a value that isn\'t in the dropdown — it will be added automatically.',
+    );
     line('• Price must be a number only (no currency symbols).');
 
     s.getRangeByIndex(1, 1).columnWidth = 90;
@@ -142,7 +157,10 @@ class RetailImportTemplateBuilder {
 
   List<String> _buildCategories(Worksheet s, Style header, Style instr) {
     _setHeaders(s, ['id', 'name*'], header);
-    _setInstruction(s, ['Leave blank — filled in automatically', 'Category name (e.g., Clothing)'], instr);
+    _setInstruction(s, [
+      'Leave blank — filled in automatically',
+      'Category name (e.g., Clothing)',
+    ], instr);
 
     final existing = categoryStore.categories.map((c) => c.name).toList();
     final names = existing.isNotEmpty ? existing : _fallbackCategories;
@@ -158,7 +176,10 @@ class RetailImportTemplateBuilder {
 
   List<String> _buildTaxes(Worksheet s, Style header, Style instr) {
     _setHeaders(s, ['name*', 'rate%*'], header);
-    _setInstruction(s, ['Tax name (e.g., GST)', 'Rate as a number, e.g. 5'], instr);
+    _setInstruction(s, [
+      'Tax name (e.g., GST)',
+      'Rate as a number, e.g. 5',
+    ], instr);
 
     final existingTaxes = taxStore.taxes;
     final labels = <String>[];
@@ -188,54 +209,247 @@ class RetailImportTemplateBuilder {
 
   // ── Products (the actual data-entry sheet) ─────────────────────────────────
 
-  void _buildProducts(Worksheet s, Style header, Style instr, Worksheet categorySource,
-      Worksheet taxSource, List<String> taxLabels) {
+  void _buildProducts(
+    Worksheet s,
+    Style header,
+    Style instr,
+    Worksheet categorySource,
+    Worksheet taxSource,
+    List<String> taxLabels,
+  ) {
     _setHeaders(s, [
-      'Handle*', 'Name*', 'Category*', 'Description',
-      'Option1 Name', 'Option1 Value', 'Option2 Name', 'Option2 Value',
-      'Option3 Name', 'Option3 Value',
-      'Cost Price', 'Selling Price*', 'MRP', 'Stock', 'Barcode', 'Min Stock',
-      'Tax Rate', 'HSN Code',
+      'Handle*',
+      'Name*',
+      'Category*',
+      'Description',
+      'Option1 Name',
+      'Option1 Value',
+      'Option2 Name',
+      'Option2 Value',
+      'Option3 Name',
+      'Option3 Value',
+      'Cost Price',
+      'Selling Price*',
+      'MRP',
+      'Stock',
+      'Barcode',
+      'Min Stock',
+      'Tax Rate',
+      'HSN Code',
     ], header);
     _setInstruction(s, [
-      'Groups variants — same Handle = same product', 'Product name (on the first row of each group)',
-      'Pick a category', 'Optional, first row only',
-      'e.g. Size', 'e.g. Small', 'e.g. Color', 'e.g. Red', '', '',
-      'Optional', 'Required: number only', 'Optional', 'Optional, defaults to 0',
-      'Optional, must be unique', 'Optional, defaults to 5',
-      'Pick a tax rate (first row of each group only)', 'Optional, first row only',
+      'Groups variants — same Handle = same product',
+      'Product name (on the first row of each group)',
+      'Pick a category',
+      'Optional, first row only',
+      'e.g. Size',
+      'e.g. Small',
+      'e.g. Color',
+      'e.g. Red',
+      '',
+      '',
+      'Optional',
+      'Required: number only',
+      'Optional',
+      'Optional, defaults to 0',
+      'Optional, must be unique',
+      'Optional, defaults to 5',
+      'Pick a tax rate (first row of each group only)',
+      'Optional, first row only',
     ], instr);
 
     final sampleTax = taxLabels.isNotEmpty ? taxLabels.first : '';
 
     // Sample 1: Simple product, no variants, no tax.
-    _setRow(s, 3, ['coke_can', 'Coca Cola 330ml', 'Grocery', 'Refreshing drink',
-      '', '', '', '', '', '', 0.50, 1.00, 1.20, 100, '1234567890', 10, '', '']);
+    _setRow(s, 3, [
+      'coke_can',
+      'Coca Cola 330ml',
+      'Grocery',
+      'Refreshing drink',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      0.50,
+      1.00,
+      1.20,
+      100,
+      '1234567890',
+      10,
+      '',
+      '',
+    ]);
 
     // Sample 2: Simple product, no variants, WITH tax and HSN Code.
-    _setRow(s, 4, ['bt_earbuds', 'Bluetooth Earbuds', 'Electronics', 'Wireless earbuds with charging case',
-      '', '', '', '', '', '', 15.00, 25.00, 30.00, 40, 'BT-EARBUDS-01', 5, sampleTax, '85183000']);
+    _setRow(s, 4, [
+      'bt_earbuds',
+      'Bluetooth Earbuds',
+      'Electronics',
+      'Wireless earbuds with charging case',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      15.00,
+      25.00,
+      30.00,
+      40,
+      'BT-EARBUDS-01',
+      5,
+      sampleTax,
+      '85183000',
+    ]);
 
     // Sample 3: Single-option variant product (Size only), no tax.
-    _setRow(s, 5, ['cotton_socks', 'Cotton Socks', 'Clothing', 'Comfortable cotton socks',
-      'Size', 'S', '', '', '', '', 2.00, 6.00, 7.00, 30, 'SOCK-S', 5, '', '']);
-    _setRow(s, 6, ['cotton_socks', 'Cotton Socks', 'Clothing', 'Comfortable cotton socks',
-      'Size', 'M', '', '', '', '', 2.00, 6.00, 7.00, 25, 'SOCK-M', 5, '', '']);
-    _setRow(s, 7, ['cotton_socks', 'Cotton Socks', 'Clothing', 'Comfortable cotton socks',
-      'Size', 'L', '', '', '', '', 2.20, 6.50, 7.50, 20, 'SOCK-L', 5, '', '']);
+    _setRow(s, 5, [
+      'cotton_socks',
+      'Cotton Socks',
+      'Clothing',
+      'Comfortable cotton socks',
+      'Size',
+      'S',
+      '',
+      '',
+      '',
+      '',
+      2.00,
+      6.00,
+      7.00,
+      30,
+      'SOCK-S',
+      5,
+      '',
+      '',
+    ]);
+    _setRow(s, 6, [
+      'cotton_socks',
+      'Cotton Socks',
+      'Clothing',
+      'Comfortable cotton socks',
+      'Size',
+      'M',
+      '',
+      '',
+      '',
+      '',
+      2.00,
+      6.00,
+      7.00,
+      25,
+      'SOCK-M',
+      5,
+      '',
+      '',
+    ]);
+    _setRow(s, 7, [
+      'cotton_socks',
+      'Cotton Socks',
+      'Clothing',
+      'Comfortable cotton socks',
+      'Size',
+      'L',
+      '',
+      '',
+      '',
+      '',
+      2.20,
+      6.50,
+      7.50,
+      20,
+      'SOCK-L',
+      5,
+      '',
+      '',
+    ]);
 
     // Sample 4: Two-option variant product (Size + Color), tax + HSN Code set
     // on the first/parent row only. Note Size "S" repeats on rows 8 and 9 with
     // a different Color each time — more values for an option means more
     // ROWS, never a new column. Columns are the option *types* (Size, Color).
-    _setRow(s, 8, ['tshirt_vneck', 'V-Neck T-Shirt', 'Clothing', 'Cotton T-Shirt',
-      'Size', 'S', 'Color', 'Red', '', '', 5.00, 15.00, 18.00, 20, 'TS-RED-S', 5, sampleTax, '6109']);
-    _setRow(s, 9, ['tshirt_vneck', 'V-Neck T-Shirt', 'Clothing', 'Cotton T-Shirt',
-      'Size', 'S', 'Color', 'Blue', '', '', 5.00, 15.00, 18.00, 12, 'TS-BLU-S', 5, '', '']);
-    _setRow(s, 10, ['tshirt_vneck', 'V-Neck T-Shirt', 'Clothing', 'Cotton T-Shirt',
-      'Size', 'M', 'Color', 'Red', '', '', 5.00, 15.00, 18.00, 15, 'TS-RED-M', 5, '', '']);
-    _setRow(s, 11, ['tshirt_vneck', 'V-Neck T-Shirt', 'Clothing', 'Cotton T-Shirt',
-      'Size', 'L', 'Color', 'Blue', '', '', 6.00, 16.00, 19.00, 10, 'TS-BLU-L', 5, '', '']);
+    _setRow(s, 8, [
+      'tshirt_vneck',
+      'V-Neck T-Shirt',
+      'Clothing',
+      'Cotton T-Shirt',
+      'Size',
+      'S',
+      'Color',
+      'Red',
+      '',
+      '',
+      5.00,
+      15.00,
+      18.00,
+      20,
+      'TS-RED-S',
+      5,
+      sampleTax,
+      '6109',
+    ]);
+    _setRow(s, 9, [
+      'tshirt_vneck',
+      'V-Neck T-Shirt',
+      'Clothing',
+      'Cotton T-Shirt',
+      'Size',
+      'S',
+      'Color',
+      'Blue',
+      '',
+      '',
+      5.00,
+      15.00,
+      18.00,
+      12,
+      'TS-BLU-S',
+      5,
+      '',
+      '',
+    ]);
+    _setRow(s, 10, [
+      'tshirt_vneck',
+      'V-Neck T-Shirt',
+      'Clothing',
+      'Cotton T-Shirt',
+      'Size',
+      'M',
+      'Color',
+      'Red',
+      '',
+      '',
+      5.00,
+      15.00,
+      18.00,
+      15,
+      'TS-RED-M',
+      5,
+      '',
+      '',
+    ]);
+    _setRow(s, 11, [
+      'tshirt_vneck',
+      'V-Neck T-Shirt',
+      'Clothing',
+      'Cotton T-Shirt',
+      'Size',
+      'L',
+      'Color',
+      'Blue',
+      '',
+      '',
+      6.00,
+      16.00,
+      19.00,
+      10,
+      'TS-BLU-L',
+      5,
+      '',
+      '',
+    ]);
 
     // Category dropdown — live from the Categories sheet (column B, data row 3+).
     _dropdownFromRange(
@@ -256,9 +470,9 @@ class RetailImportTemplateBuilder {
     taxSource.getRangeByIndex(2, 3).setText('Auto-generated — do not edit');
     taxSource.getRangeByIndex(2, 3).cellStyle = instr;
     for (int row = 3; row <= _listSourceLastRow; row++) {
-      taxSource.getRangeByIndex(row, 3).setFormula(
-        '=IF(A$row="","",A$row&" ("&B$row&"%)")',
-      );
+      taxSource
+          .getRangeByIndex(row, 3)
+          .setFormula('=IF(A$row="","",A$row&" ("&B$row&"%)")');
     }
     taxSource.getRangeByIndex(1, 3).columnWidth = 20;
     _dropdownFromRange(

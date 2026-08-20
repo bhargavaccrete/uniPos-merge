@@ -62,14 +62,12 @@ class _DamagedGoodsHubScreenState extends State<DamagedGoodsHubScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isTablet = !AppResponsive.isMobile(context);
-
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(title: 'Returns & Claims'),
       body: Column(
         children: [
-          _buildTabBar(isTablet),
+          _buildTabBar(context),
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -85,10 +83,10 @@ class _DamagedGoodsHubScreenState extends State<DamagedGoodsHubScreen>
     );
   }
 
-  Widget _buildTabBar(bool isTablet) {
+  Widget _buildTabBar(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(isTablet ? 16 : 12),
+      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: const BoxDecoration(
         color: AppColors.white,
         border: Border(bottom: BorderSide(color: AppColors.divider)),
@@ -99,14 +97,28 @@ class _DamagedGoodsHubScreenState extends State<DamagedGoodsHubScreen>
       child: AnimatedBuilder(
         animation: _tabController.animation!,
         builder: (_, _) => Observer(
-          builder: (_) => Row(
-            children: [
-              for (var i = 0; i < _titles.length; i++) ...[
-                if (i > 0) const SizedBox(width: 8),
-                Expanded(child: _buildTabButton(i, _titles[i], _countFor(i))),
+          builder: (_) {
+            final row = Row(
+              children: [
+                for (var i = 0; i < _titles.length; i++) ...[
+                  if (i > 0)
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
+                  Expanded(child: _buildTabButton(i, _titles[i], _countFor(i))),
+                ],
               ],
-            ],
-          ),
+            );
+
+            // Same cap the content below uses, so three pills don't stretch
+            // across an ultrawide monitor.
+            final maxWidth = AppResponsive.maxContentWidth(context);
+            if (maxWidth == double.infinity) return row;
+            return Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxWidth),
+                child: row,
+              ),
+            );
+          },
         ),
       ),
     );
@@ -120,10 +132,20 @@ class _DamagedGoodsHubScreenState extends State<DamagedGoodsHubScreen>
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.smallSpacing(context),
+          vertical: AppResponsive.getValue(
+            context,
+            mobile: 11.0,
+            tablet: 13.0,
+            desktop: 15.0,
+          ),
+        ),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary : AppColors.white,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.smallBorderRadius(context),
+          ),
           border: Border.all(
             color: isSelected ? AppColors.primary : AppColors.divider,
           ),
@@ -133,7 +155,7 @@ class _DamagedGoodsHubScreenState extends State<DamagedGoodsHubScreen>
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: GoogleFonts.poppins(
-            fontSize: 13,
+            fontSize: AppResponsive.bodyFontSize(context),
             fontWeight: FontWeight.w600,
             color: isSelected ? AppColors.white : AppColors.textSecondary,
           ),

@@ -124,292 +124,326 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: buildPrimaryAppBar(title: 'Settings'),
       body: AppResponsive.constrainedContent(
         context: context,
+        alignment: Alignment.topCenter,
         child: ListView(
-        padding: AppResponsive.padding(context),
-        children: [
-          // Store Information Section
-          _sectionHeader(context, 'BUSINESS INFORMATION'),
-          _buildSettingsCard(
-            context,
-            icon: Icons.store,
-            title: 'Store Information',
-            subtitle: 'Configure store name, address, and contact details',
-            iconColor: AppColors.success,
-            onTap: () {
-              if (!PlanGuard.allowedOr(context, RetailEntKeys.settings,
-                  featureName: 'Store Information')) {
-                return;
-              }
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const StoreInfoSettingsScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-
-          // Data Management Section
-          _sectionHeader(context, 'DATA MANAGEMENT'),
-          _buildSettingsCard(
-            context,
-            icon: Icons.backup,
-            title: 'Backup & Restore',
-            subtitle: 'Manage your data backups',
-            iconColor: Colors.blue,
-            onTap: () {
-              if (!PlanGuard.allowedOr(context, RetailEntKeys.dataBackup,
-                  featureName: 'Backup & Restore')) {
-                return;
-              }
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const BackupScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-
-          // Day Management Section
-          _sectionHeader(context, 'DAY MANAGEMENT'),
-          FutureBuilder<bool>(
-            key: ValueKey(_refreshKey), // Rebuild when _refreshKey changes
-            future: DayManagementService.isDayStarted(),
-            builder: (context, snapshot) {
-              final isDayStarted = snapshot.data ?? false;
-
-              return Column(
-                children: [
-                  _buildSettingsCard(
-                    context,
-                    icon: isDayStarted
-                        ? Icons.wb_sunny_outlined
-                        : Icons.wb_sunny,
-                    title: isDayStarted ? 'Day In Progress' : 'Start Day',
-                    subtitle: isDayStarted
-                        ? 'View session start time and opening balance'
-                        : 'Set opening balance to begin operations',
-                    iconColor: AppColors.success,
-                    onTap: () async {
-                      if (isDayStarted) {
-                        // Read-only. Re-running the start flow here used to
-                        // begin a SECOND session and lose the day's takings
-                        // from the EOD.
-                        await _showDayInfo(context);
-                        return;
-                      }
-                      // Same opening-balance dialog restaurant uses — one
-                      // amount, no denomination counting.
-                      await promptStartDay(context);
-                      // Refresh the day status after returning
-                      _refreshDayStatus();
-                    },
-                  ),
-                  if (isDayStarted)
-                    _buildSettingsCard(
-                      context,
-                      icon: Icons.nights_stay,
-                      title: 'End of Day',
-                      subtitle: 'Close day and reconcile cash',
-                      iconColor: AppColors.info,
-                      onTap: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const RetailEODScreen()),
-                        );
-                        // Refresh the day status after returning
-                        _refreshDayStatus();
-                      },
-                    ),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-
-          // Printing Section — device connection first, then what goes on the
-          // paper. Both use the same shared printer stack the restaurant side
-          // uses (PrinterStore / ThermalPrinterService).
-          _sectionHeader(context, 'PRINTING'),
-          _buildSettingsCard(
-            context,
-            icon: Icons.print_outlined,
-            title: 'Connect Printer',
-            subtitle: 'Pair a thermal printer — Bluetooth · WiFi · USB',
-            iconColor: AppColors.info,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) =>
-                        const RetailPrinterConnectionScreen()),
-              );
-            },
-          ),
-          _buildSettingsCard(
-            context,
-            icon: Icons.print,
-            title: 'Printer Settings',
-            subtitle: 'Configure invoice layout, paper size, and print options',
-            iconColor: const Color(0xFF673AB7),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const PrinterSettingsScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-
-          // Product Settings Section
-          _sectionHeader(context, 'PRODUCT SETTINGS'),
-          _buildSettingsCard(
-            context,
-            icon: Icons.tune,
-            title: 'Product Attributes',
-            subtitle: 'Manage global attributes (Color, Size, etc.)',
-            iconColor: const Color(0xFF9C27B0),
-            onTap: () {
-              if (!PlanGuard.allowedOr(context, RetailEntKeys.catalog,
-                  featureName: 'Product Attributes')) {
-                return;
-              }
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AttributesScreen()),
-              );
-            },
-          ),
-          _buildSettingsCard(
-            context,
-            icon: Icons.checklist_rtl,
-            title: 'Simple Product Fields',
-            subtitle: 'Choose the fields shown on simple products',
-            iconColor: const Color(0xFF3F51B5),
-            onTap: () {
-              if (!PlanGuard.allowedOr(context, RetailEntKeys.catalog,
-                  featureName: 'Simple Product Fields')) {
-                return;
-              }
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const SimpleProductFieldsScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: 16),
-
-          // Stock Alerts Section
-          _sectionHeader(context, 'NOTIFICATIONS'),
-          _buildStockAlertThresholdCard(context),
-
-          const SizedBox(height: 16),
-
-          // Display & Format Section
-          _sectionHeader(context, 'DISPLAY & FORMAT'),
-          _buildCurrencyCard(context),
-          _buildDecimalPrecisionCard(context),
-
-          const SizedBox(height: 16),
-
-          // Billing Preferences — settings that already governed retail bills
-          // but were only reachable from the RESTAURANT Personalization screen
-          // (`customization_drawer.dart`), which a retail user never sees.
-          // These write the same AppSettings keys, so it is one setting shown
-          // in two places, not a retail copy that could drift.
-          _sectionHeader(context, 'BILLING PREFERENCES'),
-          _buildRoundOffCard(context),
-          _buildVisualKeyboardCard(context),
-
-          const SizedBox(height: 16),
-
-          // Payment Settings Section
-          _sectionHeader(context, 'PAYMENT SETTINGS'),
-          _buildSettingsCard(
-            context,
-            icon: Icons.payment,
-            title: 'Payment Methods',
-            subtitle: 'Configure available payment options',
-            iconColor: AppColors.success,
-            onTap: () {
-              if (!PlanGuard.allowedOr(context, RetailEntKeys.settings,
-                  featureName: 'Payment Methods')) {
-                return;
-              }
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const PaymentMethodsScreen()),
-              );
-            },
-          ),
-
-          const SizedBox(height: 16),
-
-          // Tax Section — hidden entirely for a business that answered
-          // "Not Registered" on Store Details. Same `taxEnabled` flag the setup
-          // wizard uses to skip its Tax Setup step
-          // (`setupWizardScreen.dart`), so a shop that never registered is not
-          // offered tax configuration in either place.
-          if (TaxFeature.enabled) ...[
-            _sectionHeader(context, 'TAX SETTINGS'),
+          padding: AppResponsive.padding(context),
+          children: [
+            // Store Information Section
+            _sectionHeader(context, 'BUSINESS INFORMATION'),
             _buildSettingsCard(
               context,
-              icon: Icons.receipt_long,
-              title: 'Tax Settings',
-              subtitle: 'Tax rates, defaults and inclusive pricing',
+              icon: Icons.store,
+              title: 'Store Information',
+              subtitle: 'Configure store name, address, and contact details',
               iconColor: AppColors.success,
               onTap: () {
-                if (!PlanGuard.allowedOr(context, RetailEntKeys.settings,
-                    featureName: 'Tax Settings')) {
+                if (!PlanGuard.allowedOr(
+                  context,
+                  RetailEntKeys.settings,
+                  featureName: 'Store Information',
+                )) {
                   return;
                 }
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => const TaxSettingsScreen()),
+                    builder: (context) => const StoreInfoSettingsScreen(),
+                  ),
                 );
               },
             ),
-            // GST Reports and EOD Reports used to live here — a reports section
-            // filed under TAX SETTINGS. Both now sit in the Reports hub, which
-            // is where someone looks for a report. Settings stays config only.
             const SizedBox(height: 16),
-          ],
 
-          // App Information Section
-          _sectionHeader(context, 'ABOUT'),
-          _buildSettingsCard(
-            context,
-            icon: Icons.info_outline,
-            title: 'App Information',
-            subtitle: 'Version $_appVersion',
-            iconColor: AppColors.textSecondary,
-            onTap: () {
-              showAboutDialog(
-                context: context,
-                // Was 'rPOS' — the app is Bill Berry Lite, and this dialog was
-                // the one place still showing the pre-rename name to users.
-                applicationName: _appName,
-                applicationVersion: _appVersion,
-                applicationIcon: const Icon(Icons.point_of_sale, size: 48),
-                children: [
-                  const Text(
-                      'A modern Point of Sale system built with Flutter'),
-                ],
-              );
-            },
-          ),
-        ],
+            // Data Management Section
+            _sectionHeader(context, 'DATA MANAGEMENT'),
+            _buildSettingsCard(
+              context,
+              icon: Icons.backup,
+              title: 'Backup & Restore',
+              subtitle: 'Manage your data backups',
+              iconColor: Colors.blue,
+              onTap: () {
+                if (!PlanGuard.allowedOr(
+                  context,
+                  RetailEntKeys.dataBackup,
+                  featureName: 'Backup & Restore',
+                )) {
+                  return;
+                }
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const BackupScreen()),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Day Management Section
+            _sectionHeader(context, 'DAY MANAGEMENT'),
+            FutureBuilder<bool>(
+              key: ValueKey(_refreshKey), // Rebuild when _refreshKey changes
+              future: DayManagementService.isDayStarted(),
+              builder: (context, snapshot) {
+                final isDayStarted = snapshot.data ?? false;
+
+                return Column(
+                  children: [
+                    _buildSettingsCard(
+                      context,
+                      icon: isDayStarted
+                          ? Icons.wb_sunny_outlined
+                          : Icons.wb_sunny,
+                      title: isDayStarted ? 'Day In Progress' : 'Start Day',
+                      subtitle: isDayStarted
+                          ? 'View session start time and opening balance'
+                          : 'Set opening balance to begin operations',
+                      iconColor: AppColors.success,
+                      onTap: () async {
+                        if (isDayStarted) {
+                          // Read-only. Re-running the start flow here used to
+                          // begin a SECOND session and lose the day's takings
+                          // from the EOD.
+                          await _showDayInfo(context);
+                          return;
+                        }
+                        // Same opening-balance dialog restaurant uses — one
+                        // amount, no denomination counting.
+                        await promptStartDay(context);
+                        // Refresh the day status after returning
+                        _refreshDayStatus();
+                      },
+                    ),
+                    if (isDayStarted)
+                      _buildSettingsCard(
+                        context,
+                        icon: Icons.nights_stay,
+                        title: 'End of Day',
+                        subtitle: 'Close day and reconcile cash',
+                        iconColor: AppColors.info,
+                        onTap: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const RetailEODScreen(),
+                            ),
+                          );
+                          // Refresh the day status after returning
+                          _refreshDayStatus();
+                        },
+                      ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Printing Section — device connection first, then what goes on the
+            // paper. Both use the same shared printer stack the restaurant side
+            // uses (PrinterStore / ThermalPrinterService).
+            _sectionHeader(context, 'PRINTING'),
+            _buildSettingsCard(
+              context,
+              icon: Icons.print_outlined,
+              title: 'Connect Printer',
+              subtitle: 'Pair a thermal printer — Bluetooth · WiFi · USB',
+              iconColor: AppColors.info,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const RetailPrinterConnectionScreen(),
+                  ),
+                );
+              },
+            ),
+            _buildSettingsCard(
+              context,
+              icon: Icons.print,
+              title: 'Printer Settings',
+              subtitle:
+                  'Configure invoice layout, paper size, and print options',
+              iconColor: const Color(0xFF673AB7),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PrinterSettingsScreen(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Product Settings Section
+            _sectionHeader(context, 'PRODUCT SETTINGS'),
+            _buildSettingsCard(
+              context,
+              icon: Icons.tune,
+              title: 'Product Attributes',
+              subtitle: 'Manage global attributes (Color, Size, etc.)',
+              iconColor: const Color(0xFF9C27B0),
+              onTap: () {
+                if (!PlanGuard.allowedOr(
+                  context,
+                  RetailEntKeys.catalog,
+                  featureName: 'Product Attributes',
+                )) {
+                  return;
+                }
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AttributesScreen(),
+                  ),
+                );
+              },
+            ),
+            _buildSettingsCard(
+              context,
+              icon: Icons.checklist_rtl,
+              title: 'Simple Product Fields',
+              subtitle: 'Choose the fields shown on simple products',
+              iconColor: const Color(0xFF3F51B5),
+              onTap: () {
+                if (!PlanGuard.allowedOr(
+                  context,
+                  RetailEntKeys.catalog,
+                  featureName: 'Simple Product Fields',
+                )) {
+                  return;
+                }
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SimpleProductFieldsScreen(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Stock Alerts Section
+            _sectionHeader(context, 'NOTIFICATIONS'),
+            _buildStockAlertThresholdCard(context),
+
+            const SizedBox(height: 16),
+
+            // Display & Format Section
+            _sectionHeader(context, 'DISPLAY & FORMAT'),
+            _buildCurrencyCard(context),
+            _buildDecimalPrecisionCard(context),
+
+            const SizedBox(height: 16),
+
+            // Billing Preferences — settings that already governed retail bills
+            // but were only reachable from the RESTAURANT Personalization screen
+            // (`customization_drawer.dart`), which a retail user never sees.
+            // These write the same AppSettings keys, so it is one setting shown
+            // in two places, not a retail copy that could drift.
+            _sectionHeader(context, 'BILLING PREFERENCES'),
+            _buildRoundOffCard(context),
+            _buildVisualKeyboardCard(context),
+
+            const SizedBox(height: 16),
+
+            // Payment Settings Section
+            _sectionHeader(context, 'PAYMENT SETTINGS'),
+            _buildSettingsCard(
+              context,
+              icon: Icons.payment,
+              title: 'Payment Methods',
+              subtitle: 'Configure available payment options',
+              iconColor: AppColors.success,
+              onTap: () {
+                if (!PlanGuard.allowedOr(
+                  context,
+                  RetailEntKeys.settings,
+                  featureName: 'Payment Methods',
+                )) {
+                  return;
+                }
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PaymentMethodsScreen(),
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 16),
+
+            // Tax Section — hidden entirely for a business that answered
+            // "Not Registered" on Store Details. Same `taxEnabled` flag the setup
+            // wizard uses to skip its Tax Setup step
+            // (`setupWizardScreen.dart`), so a shop that never registered is not
+            // offered tax configuration in either place.
+            if (TaxFeature.enabled) ...[
+              _sectionHeader(context, 'TAX SETTINGS'),
+              _buildSettingsCard(
+                context,
+                icon: Icons.receipt_long,
+                title: 'Tax Settings',
+                subtitle: 'Tax rates, defaults and inclusive pricing',
+                iconColor: AppColors.success,
+                onTap: () {
+                  if (!PlanGuard.allowedOr(
+                    context,
+                    RetailEntKeys.settings,
+                    featureName: 'Tax Settings',
+                  )) {
+                    return;
+                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const TaxSettingsScreen(),
+                    ),
+                  );
+                },
+              ),
+              // GST Reports and EOD Reports used to live here — a reports section
+              // filed under TAX SETTINGS. Both now sit in the Reports hub, which
+              // is where someone looks for a report. Settings stays config only.
+              const SizedBox(height: 16),
+            ],
+
+            // App Information Section
+            _sectionHeader(context, 'ABOUT'),
+            _buildSettingsCard(
+              context,
+              icon: Icons.info_outline,
+              title: 'App Information',
+              subtitle: 'Version $_appVersion',
+              iconColor: AppColors.textSecondary,
+              onTap: () {
+                showAboutDialog(
+                  context: context,
+                  // Was 'rPOS' — the app is Bill Berry Lite, and this dialog was
+                  // the one place still showing the pre-rename name to users.
+                  applicationName: _appName,
+                  applicationVersion: _appVersion,
+                  applicationIcon: const Icon(Icons.point_of_sale, size: 48),
+                  children: [
+                    const Text(
+                      'A modern Point of Sale system built with Flutter',
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
         ),
       ),
     );
   }
 
-
   Widget _sectionHeader(BuildContext context, String title) {
     return Padding(
       padding: EdgeInsets.symmetric(
-          horizontal: 4, vertical: AppResponsive.smallSpacing(context)),
+        horizontal: 4,
+        vertical: AppResponsive.smallSpacing(context),
+      ),
       child: Text(
         title,
         style: GoogleFonts.poppins(
@@ -578,10 +612,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onTap: () => AppSettings.updateRoundOffValue(value),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 8),
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
-                    color:
-                        selected ? AppColors.info : AppColors.surfaceLight,
+                    color: selected ? AppColors.info : AppColors.surfaceLight,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: selected ? AppColors.info : AppColors.divider,
@@ -638,7 +673,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: AppColors.warning.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(Icons.notifications_active, color: AppColors.warning, size: 24),
+          child: const Icon(
+            Icons.notifications_active,
+            color: AppColors.warning,
+            size: 24,
+          ),
         ),
         title: Text(
           'Stock Alert Threshold',
@@ -708,8 +747,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ? Icons.radio_button_checked
                       : Icons.radio_button_unchecked,
                   size: AppResponsive.smallIconSize(context),
-                  color:
-                      selected ? AppColors.primary : AppColors.textSecondary,
+                  color: selected ? AppColors.primary : AppColors.textSecondary,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -721,8 +759,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         label,
                         style: GoogleFonts.poppins(
                           fontSize: AppResponsive.bodyFontSize(context),
-                          fontWeight:
-                              selected ? FontWeight.w600 : FontWeight.w400,
+                          fontWeight: selected
+                              ? FontWeight.w600
+                              : FontWeight.w400,
                           color: AppColors.textPrimary,
                         ),
                       ),
@@ -751,7 +790,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (dialogContext) => AppDialogShell(
         title: 'Stock Alert Threshold',
-        subtitle: 'Alerts when stock reaches this level, unless the variant '
+        subtitle:
+            'Alerts when stock reaches this level, unless the variant '
             'sets its own minimum.',
         icon: Icons.notifications_active_rounded,
         accent: AppColors.warning,
@@ -760,12 +800,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Shared list — Settings and the Stock Alerts screen used to offer
           // different options for the same stored value.
           children: StockAlertService.thresholdOptions
-              .map((value) => _optionRow(
-                    dialogContext,
-                    label: '$value units or fewer',
-                    selected: value == current,
-                    onTap: () => Navigator.pop(dialogContext, value),
-                  ))
+              .map(
+                (value) => _optionRow(
+                  dialogContext,
+                  label: '$value units or fewer',
+                  selected: value == current,
+                  onTap: () => Navigator.pop(dialogContext, value),
+                ),
+              )
               .toList(),
         ),
         actions: [appDialogCancelButton(dialogContext)],
@@ -792,7 +834,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: AppColors.success.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(Icons.attach_money, color: AppColors.success, size: 24),
+          child: const Icon(
+            Icons.attach_money,
+            color: AppColors.success,
+            size: 24,
+          ),
         ),
         title: Text(
           'Currency',
@@ -817,7 +863,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         trailing: ValueListenableBuilder<String>(
           valueListenable: CurrencyHelper.currencyNotifier,
           builder: (context, currencyCode, child) {
-            final symbol = CurrencyHelper.currencies[currencyCode]?.symbol ?? '₹';
+            final symbol =
+                CurrencyHelper.currencies[currencyCode]?.symbol ?? '₹';
             return Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
@@ -853,17 +900,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
         // The full currency list needs its own scroll — the shell sizes to its
         // body, so an unbounded Column here would overflow the dialog.
         body: SizedBox(
-          height: AppResponsive.getValue(context,
-              mobile: 320.0, tablet: 400.0, desktop: 440.0),
+          height: AppResponsive.getValue(
+            context,
+            mobile: 320.0,
+            tablet: 400.0,
+            desktop: 440.0,
+          ),
           child: ListView(
             children: currencies
-                .map((currency) => _optionRow(
-                      dialogContext,
-                      label: currency.name,
-                      sublabel: '${currency.code} · ${currency.symbol}',
-                      selected: currency.code == current,
-                      onTap: () => Navigator.pop(dialogContext, currency.code),
-                    ))
+                .map(
+                  (currency) => _optionRow(
+                    dialogContext,
+                    label: currency.name,
+                    sublabel: '${currency.code} · ${currency.symbol}',
+                    selected: currency.code == current,
+                    onTap: () => Navigator.pop(dialogContext, currency.code),
+                  ),
+                )
                 .toList(),
           ),
         ),
@@ -891,7 +944,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: AppColors.info.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(Icons.format_list_numbered, color: AppColors.info, size: 24),
+          child: const Icon(
+            Icons.format_list_numbered,
+            color: AppColors.info,
+            size: 24,
+          ),
         ),
         title: Text(
           'Decimal Precision',
@@ -949,12 +1006,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         body: Column(
           mainAxisSize: MainAxisSize.min,
           children: [0, 1, 2, 3]
-              .map((precision) => _optionRow(
-                    dialogContext,
-                    label: DecimalSettings.getPrecisionLabel(precision),
-                    selected: precision == current,
-                    onTap: () => Navigator.pop(dialogContext, precision),
-                  ))
+              .map(
+                (precision) => _optionRow(
+                  dialogContext,
+                  label: DecimalSettings.getPrecisionLabel(precision),
+                  selected: precision == current,
+                  onTap: () => Navigator.pop(dialogContext, precision),
+                ),
+              )
               .toList(),
         ),
         actions: [appDialogCancelButton(dialogContext)],

@@ -7,7 +7,6 @@ import 'package:billberrylite/util/common/app_responsive.dart';
 
 import 'package:billberrylite/domain/services/retail/report_service.dart';
 
-
 class GstReportScreen extends StatefulWidget {
   const GstReportScreen({super.key});
 
@@ -15,7 +14,8 @@ class GstReportScreen extends StatefulWidget {
   State<GstReportScreen> createState() => _GstReportScreenState();
 }
 
-class _GstReportScreenState extends State<GstReportScreen> with SingleTickerProviderStateMixin {
+class _GstReportScreenState extends State<GstReportScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   DateTimeRange _dateRange = DateTimeRange(
     start: DateTime.now().subtract(const Duration(days: 30)),
@@ -56,10 +56,15 @@ class _GstReportScreenState extends State<GstReportScreen> with SingleTickerProv
       // Exclusive end — the service's window rule. The old `±1 day` fudge on
       // both sides silently pulled in neighbouring days.
       final start = DateTime(
-          _dateRange.start.year, _dateRange.start.month, _dateRange.start.day);
-      final end =
-          DateTime(_dateRange.end.year, _dateRange.end.month, _dateRange.end.day)
-              .add(const Duration(days: 1));
+        _dateRange.start.year,
+        _dateRange.start.month,
+        _dateRange.start.day,
+      );
+      final end = DateTime(
+        _dateRange.end.year,
+        _dateRange.end.month,
+        _dateRange.end.day,
+      ).add(const Duration(days: 1));
 
       final data = await _reportService.getGstSummaryReport(
         startDate: start,
@@ -104,9 +109,7 @@ class _GstReportScreenState extends State<GstReportScreen> with SingleTickerProv
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFF4CAF50),
-            ),
+            colorScheme: const ColorScheme.light(primary: Color(0xFF4CAF50)),
           ),
           child: child!,
         );
@@ -141,78 +144,102 @@ class _GstReportScreenState extends State<GstReportScreen> with SingleTickerProv
           ],
         ),
       ),
-      body: Column(
-        children: [
-          if (!TaxFeature.enabled)
+      body: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        child: Column(
+          children: [
+            if (!TaxFeature.enabled)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                color: const Color(0xFFFFF8E1),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.info_outline,
+                      size: 18,
+                      color: Color(0xFFB28900),
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Tax is currently disabled for new sales. This report reflects '
+                        'historical data collected while tax was active.',
+                        style: TextStyle(
+                          fontSize: AppResponsive.captionFontSize(context),
+                          color: Color(0xFF7A5C00),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            // Date Range Selector
             Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              color: const Color(0xFFFFF8E1),
+              color: Colors.white,
+              padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline,
-                      size: 18, color: Color(0xFFB28900)),
-                  SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      'Tax is currently disabled for new sales. This report reflects '
-                      'historical data collected while tax was active.',
-                      style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: Color(0xFF7A5C00)),
+                    child: InkWell(
+                      onTap: _selectDateRange,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: const Color(0xFFE8E8E8)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today,
+                              size: 18,
+                              color: Color(0xFF4CAF50),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              '${dateFormat.format(_dateRange.start)} - ${dateFormat.format(_dateRange.end)}',
+                              style: TextStyle(
+                                fontSize: AppResponsive.bodyFontSize(context),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const Spacer(),
+                            Icon(
+                              Icons.arrow_drop_down,
+                              color: Color(0xFF6B6B6B),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-          // Date Range Selector
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: _selectDateRange,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFFE8E8E8)),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.calendar_today, size: 18, color: Color(0xFF4CAF50)),
-                          const SizedBox(width: 12),
-                          Text(
-                            '${dateFormat.format(_dateRange.start)} - ${dateFormat.format(_dateRange.end)}',
-                            style: TextStyle(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w500),
-                          ),
-                          const Spacer(),
-                          Icon(Icons.arrow_drop_down, color: Color(0xFF6B6B6B)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
+            const Divider(height: 1),
 
-          // Tab Content
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildSummaryTab(),
-                      _buildByRateTab(),
-                      _buildByProductTab(),
-                      _buildByCategoryTab(),
-                    ],
-                  ),
-          ),
-        ],
+            // Tab Content
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildSummaryTab(),
+                        _buildByRateTab(),
+                        _buildByProductTab(),
+                        _buildByCategoryTab(),
+                      ],
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -236,11 +263,20 @@ class _GstReportScreenState extends State<GstReportScreen> with SingleTickerProv
                 const SizedBox(height: 12),
                 _buildSummaryRow('Total Items Sold', '$_lineCount'),
                 const Divider(height: 24),
-                _buildSummaryRow('Total Taxable Amount', 'Rs. ${_totalTaxableAmount.toStringAsFixed(2)}'),
+                _buildSummaryRow(
+                  'Total Taxable Amount',
+                  'Rs. ${_totalTaxableAmount.toStringAsFixed(2)}',
+                ),
                 const SizedBox(height: 12),
-                _buildSummaryRow('Total CGST', 'Rs. ${_totalCgstAmount.toStringAsFixed(2)}'),
+                _buildSummaryRow(
+                  'Total CGST',
+                  'Rs. ${_totalCgstAmount.toStringAsFixed(2)}',
+                ),
                 const SizedBox(height: 8),
-                _buildSummaryRow('Total SGST', 'Rs. ${_totalSgstAmount.toStringAsFixed(2)}'),
+                _buildSummaryRow(
+                  'Total SGST',
+                  'Rs. ${_totalSgstAmount.toStringAsFixed(2)}',
+                ),
                 const Divider(height: 24),
                 _buildSummaryRow(
                   'Total GST Collected',
@@ -256,7 +292,10 @@ class _GstReportScreenState extends State<GstReportScreen> with SingleTickerProv
           // GST Rate Distribution
           Text(
             'GST Distribution by Rate',
-            style: TextStyle(fontSize: AppResponsive.subheadingFontSize(context), fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontSize: AppResponsive.subheadingFontSize(context),
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 12),
           Container(
@@ -297,11 +336,18 @@ class _GstReportScreenState extends State<GstReportScreen> with SingleTickerProv
                           children: [
                             Text(
                               'Rs. ${summary.totalGst.toStringAsFixed(2)}',
-                              style: const TextStyle(fontWeight: FontWeight.w500),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                             Text(
                               '${summary.itemCount} items',
-                              style: TextStyle(fontSize: AppResponsive.captionFontSize(context), color: Colors.grey[600]),
+                              style: TextStyle(
+                                fontSize: AppResponsive.captionFontSize(
+                                  context,
+                                ),
+                                color: Colors.grey[600],
+                              ),
                             ),
                           ],
                         ),
@@ -341,7 +387,10 @@ class _GstReportScreenState extends State<GstReportScreen> with SingleTickerProv
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF4CAF50).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4),
@@ -363,13 +412,26 @@ class _GstReportScreenState extends State<GstReportScreen> with SingleTickerProv
                 ],
               ),
               const Divider(height: 24),
-              _buildDetailRow('Taxable Amount', 'Rs. ${summary.taxableAmount.toStringAsFixed(2)}'),
+              _buildDetailRow(
+                'Taxable Amount',
+                'Rs. ${summary.taxableAmount.toStringAsFixed(2)}',
+              ),
               const SizedBox(height: 8),
-              _buildDetailRow('CGST (${(entry.key / 2).toStringAsFixed(1)}%)', 'Rs. ${summary.cgst.toStringAsFixed(2)}'),
+              _buildDetailRow(
+                'CGST (${(entry.key / 2).toStringAsFixed(1)}%)',
+                'Rs. ${summary.cgst.toStringAsFixed(2)}',
+              ),
               const SizedBox(height: 8),
-              _buildDetailRow('SGST (${(entry.key / 2).toStringAsFixed(1)}%)', 'Rs. ${summary.sgst.toStringAsFixed(2)}'),
+              _buildDetailRow(
+                'SGST (${(entry.key / 2).toStringAsFixed(1)}%)',
+                'Rs. ${summary.sgst.toStringAsFixed(2)}',
+              ),
               const Divider(height: 16),
-              _buildDetailRow('Total GST', 'Rs. ${summary.totalGst.toStringAsFixed(2)}', isBold: true),
+              _buildDetailRow(
+                'Total GST',
+                'Rs. ${summary.totalGst.toStringAsFixed(2)}',
+                isBold: true,
+              ),
             ],
           ),
         );
@@ -423,17 +485,26 @@ class _GstReportScreenState extends State<GstReportScreen> with SingleTickerProv
                     children: [
                       Text(
                         'Taxable: Rs. ${summary.taxableAmount.toStringAsFixed(2)}',
-                        style: TextStyle(fontSize: AppResponsive.smallFontSize(context), color: Colors.grey[600]),
+                        style: TextStyle(
+                          fontSize: AppResponsive.smallFontSize(context),
+                          color: Colors.grey[600],
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'GST Rate: ${summary.avgGstRate.toStringAsFixed(1)}%',
-                        style: TextStyle(fontSize: AppResponsive.smallFontSize(context), color: Colors.grey[600]),
+                        style: TextStyle(
+                          fontSize: AppResponsive.smallFontSize(context),
+                          color: Colors.grey[600],
+                        ),
                       ),
                     ],
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF4CAF50).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4),
@@ -487,7 +558,10 @@ class _GstReportScreenState extends State<GstReportScreen> with SingleTickerProv
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF4CAF50).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4),
@@ -506,13 +580,20 @@ class _GstReportScreenState extends State<GstReportScreen> with SingleTickerProv
               const Divider(height: 20),
               _buildDetailRow('Items Sold', '${summary.itemCount}'),
               const SizedBox(height: 8),
-              _buildDetailRow('Taxable Amount', 'Rs. ${summary.taxableAmount.toStringAsFixed(2)}'),
+              _buildDetailRow(
+                'Taxable Amount',
+                'Rs. ${summary.taxableAmount.toStringAsFixed(2)}',
+              ),
               const SizedBox(height: 8),
               _buildDetailRow('CGST', 'Rs. ${summary.cgst.toStringAsFixed(2)}'),
               const SizedBox(height: 8),
               _buildDetailRow('SGST', 'Rs. ${summary.sgst.toStringAsFixed(2)}'),
               const Divider(height: 16),
-              _buildDetailRow('Total GST', 'Rs. ${summary.totalGst.toStringAsFixed(2)}', isBold: true),
+              _buildDetailRow(
+                'Total GST',
+                'Rs. ${summary.totalGst.toStringAsFixed(2)}',
+                isBold: true,
+              ),
             ],
           ),
         );
@@ -520,7 +601,12 @@ class _GstReportScreenState extends State<GstReportScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildSummaryRow(String label, String value, {bool isBold = false, double? fontSize}) {
+  Widget _buildSummaryRow(
+    String label,
+    String value, {
+    bool isBold = false,
+    double? fontSize,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -591,13 +677,13 @@ class _GstRateSummary {
   });
 
   factory _GstRateSummary.fromMap(Map<String, dynamic> map) => _GstRateSummary(
-        rate: (map['rate'] as num).toDouble(),
-        itemCount: (map['itemCount'] as num).toInt(),
-        taxableAmount: (map['taxableAmount'] as num).toDouble(),
-        cgst: (map['cgst'] as num).toDouble(),
-        sgst: (map['sgst'] as num).toDouble(),
-        totalGst: (map['totalGst'] as num).toDouble(),
-      );
+    rate: (map['rate'] as num).toDouble(),
+    itemCount: (map['itemCount'] as num).toInt(),
+    taxableAmount: (map['taxableAmount'] as num).toDouble(),
+    cgst: (map['cgst'] as num).toDouble(),
+    sgst: (map['sgst'] as num).toDouble(),
+    totalGst: (map['totalGst'] as num).toDouble(),
+  );
 }
 
 class _ProductGstSummary {

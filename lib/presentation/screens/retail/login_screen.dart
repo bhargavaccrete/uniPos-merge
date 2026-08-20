@@ -6,6 +6,7 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 
 import 'home_screen.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 /// PIN-only login — same mechanism as restaurant's login (see
 /// `restaurant_login.dart`): the entered PIN identifies whoever it is,
@@ -86,7 +87,16 @@ class _LoginScreenState extends State<LoginScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
+              // Login card stays narrow on every device — maxFormWidth is
+              // unbounded on mobile, which would stretch it edge to edge.
+              constraints: BoxConstraints(
+                maxWidth: AppResponsive.getValue(
+                  context,
+                  mobile: 400.0,
+                  tablet: 480.0,
+                  desktop: 560.0,
+                ),
+              ),
               child: Form(
                 key: _formKey,
                 child: Column(
@@ -121,7 +131,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       'Bill Berry Lite',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.poppins(
-                        fontSize: 28,
+                        fontSize: AppResponsive.getValue(
+                          context,
+                          mobile: 28.0,
+                          tablet: 32.0,
+                          desktop: 36.0,
+                        ),
                         fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
                       ),
@@ -131,7 +146,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       'Login to Continue',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.poppins(
-                        fontSize: 16,
+                        fontSize: AppResponsive.subheadingFontSize(context),
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -161,7 +176,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 _errorMessage!,
                                 style: GoogleFonts.poppins(
                                   color: AppColors.danger,
-                                  fontSize: 14,
+                                  fontSize: AppResponsive.bodyFontSize(context),
                                 ),
                               ),
                             ),
@@ -190,11 +205,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       },
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePin ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                          _obscurePin
+                              ? Icons.visibility_off_rounded
+                              : Icons.visibility_rounded,
                           size: 20,
                           color: AppColors.textSecondary,
                         ),
-                        onPressed: () => setState(() => _obscurePin = !_obscurePin),
+                        onPressed: () =>
+                            setState(() => _obscurePin = !_obscurePin),
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
@@ -234,7 +252,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             : Text(
                                 'Login',
                                 style: GoogleFonts.poppins(
-                                  fontSize: 16,
+                                  fontSize: AppResponsive.subheadingFontSize(
+                                    context,
+                                  ),
                                   fontWeight: FontWeight.w600,
                                   color: Colors.white,
                                 ),
@@ -266,7 +286,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                 'Default PIN: 123456',
                                 style: GoogleFonts.poppins(
                                   color: AppColors.info,
-                                  fontSize: 13,
+                                  fontSize: AppResponsive.smallFontSize(
+                                    context,
+                                  ),
                                 ),
                               ),
                             ),

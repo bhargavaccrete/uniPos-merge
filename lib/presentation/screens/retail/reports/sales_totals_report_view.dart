@@ -107,22 +107,24 @@ class _SalesTotalsReportViewState extends State<SalesTotalsReportView> {
                 message: 'Nothing was sold in this period.',
               )
             else ...[
-              ReportSummaryRow(cards: [
-                ReportSummaryCard(
-                  title: 'Sales',
-                  value: '${_count('totalSales')}',
-                  subtitle: '${_count('totalItems')} items',
-                  icon: Icons.receipt_long_rounded,
-                  color: AppColors.primary,
-                ),
-                ReportSummaryCard(
-                  title: 'Net Revenue',
-                  value: formatMoney(_amount('netRevenue')),
-                  subtitle: 'after returns',
-                  icon: Icons.payments_rounded,
-                  color: AppColors.success,
-                ),
-              ]),
+              ReportSummaryRow(
+                cards: [
+                  ReportSummaryCard(
+                    title: 'Sales',
+                    value: '${_count('totalSales')}',
+                    subtitle: '${_count('totalItems')} items',
+                    icon: Icons.receipt_long_rounded,
+                    color: AppColors.primary,
+                  ),
+                  ReportSummaryCard(
+                    title: 'Net Revenue',
+                    value: formatMoney(_amount('netRevenue')),
+                    subtitle: 'after returns',
+                    icon: Icons.payments_rounded,
+                    color: AppColors.success,
+                  ),
+                ],
+              ),
               AppResponsive.verticalSpace(context),
               ReportExportButton(onPressed: () => _export(context)),
               AppResponsive.verticalSpace(context),
@@ -173,12 +175,17 @@ class _SalesTotalsReportViewState extends State<SalesTotalsReportView> {
             _row('Discount', formatMoney(_amount('totalDiscount'))),
             _row('Tax', formatMoney(_amount('totalTax'))),
             _row('Returns', '${_count('totalReturns')}'),
-            _row('Return Amount', formatMoney(_amount('totalReturnAmount')),
-                color:
-                    _amount('totalReturnAmount') > 0 ? AppColors.danger : null),
+            _row(
+              'Return Amount',
+              formatMoney(_amount('totalReturnAmount')),
+              color: _amount('totalReturnAmount') > 0 ? AppColors.danger : null,
+            ),
             const Divider(height: 24, color: AppColors.divider),
-            _row('Net Revenue', formatMoney(_amount('netRevenue')),
-                highlighted: true),
+            _row(
+              'Net Revenue',
+              formatMoney(_amount('netRevenue')),
+              highlighted: true,
+            ),
             _row('Avg Sale Value', formatMoney(_amount('averageSaleValue'))),
           ],
         ),
@@ -188,15 +195,17 @@ class _SalesTotalsReportViewState extends State<SalesTotalsReportView> {
 
   /// What actually sold in the period, one row per variant.
   Widget _itemsSold(BuildContext context) {
-    final pageRows =
-        ReportPagination.pageSlice(widget.items, _page, _rowsPerPage);
+    final pageRows = ReportPagination.pageSlice(
+      widget.items,
+      _page,
+      _rowsPerPage,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding:
-              EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
+          padding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
           child: Text(
             'Items Sold',
             style: GoogleFonts.poppins(
@@ -223,21 +232,27 @@ class _SalesTotalsReportViewState extends State<SalesTotalsReportView> {
             // data error.
             final isNegative = qty < 0 || revenue < 0;
 
-            return DataRow(cells: [
-              DataCell(Text(_itemLabel(row))),
-              DataCell(Text(
-                '$qty',
-                style: isNegative
-                    ? const TextStyle(color: AppColors.danger)
-                    : null,
-              )),
-              DataCell(Text(
-                formatMoney(revenue),
-                style: isNegative
-                    ? const TextStyle(color: AppColors.danger)
-                    : null,
-              )),
-            ]);
+            return DataRow(
+              cells: [
+                DataCell(Text(_itemLabel(row))),
+                DataCell(
+                  Text(
+                    '$qty',
+                    style: isNegative
+                        ? const TextStyle(color: AppColors.danger)
+                        : null,
+                  ),
+                ),
+                DataCell(
+                  Text(
+                    formatMoney(revenue),
+                    style: isNegative
+                        ? const TextStyle(color: AppColors.danger)
+                        : null,
+                  ),
+                ),
+              ],
+            );
           }).toList(),
         ),
         ReportPagination(
@@ -259,8 +274,12 @@ class _SalesTotalsReportViewState extends State<SalesTotalsReportView> {
     return variant.isEmpty ? product : '$product • $variant';
   }
 
-  Widget _row(String label, String value,
-      {bool highlighted = false, Color? color}) {
+  Widget _row(
+    String label,
+    String value, {
+    bool highlighted = false,
+    Color? color,
+  }) {
     return Padding(
       padding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
       child: Row(
@@ -271,8 +290,9 @@ class _SalesTotalsReportViewState extends State<SalesTotalsReportView> {
             style: GoogleFonts.poppins(
               fontSize: AppResponsive.smallFontSize(context),
               fontWeight: highlighted ? FontWeight.w600 : FontWeight.w400,
-              color:
-                  highlighted ? AppColors.textPrimary : AppColors.textSecondary,
+              color: highlighted
+                  ? AppColors.textPrimary
+                  : AppColors.textSecondary,
             ),
           ),
           Text(
@@ -282,7 +302,8 @@ class _SalesTotalsReportViewState extends State<SalesTotalsReportView> {
               // value from its name, not half a point of size.
               fontSize: AppResponsive.smallFontSize(context),
               fontWeight: FontWeight.w600,
-              color: color ??
+              color:
+                  color ??
                   (highlighted ? AppColors.success : AppColors.textPrimary),
             ),
           ),
@@ -293,21 +314,22 @@ class _SalesTotalsReportViewState extends State<SalesTotalsReportView> {
 
   /// The nine headline figures, as a summary block.
   Map<String, dynamic> get _metrics => {
-        'Sales': _count('totalSales'),
-        'Items Sold': _count('totalItems'),
-        'Gross Revenue':
-            ReportExportService.formatCurrency(_amount('totalRevenue')),
-        'Discount':
-            ReportExportService.formatCurrency(_amount('totalDiscount')),
-        'Tax': ReportExportService.formatCurrency(_amount('totalTax')),
-        'Returns': _count('totalReturns'),
-        'Return Amount':
-            ReportExportService.formatCurrency(_amount('totalReturnAmount')),
-        'Net Revenue':
-            ReportExportService.formatCurrency(_amount('netRevenue')),
-        'Avg Sale Value':
-            ReportExportService.formatCurrency(_amount('averageSaleValue')),
-      };
+    'Sales': _count('totalSales'),
+    'Items Sold': _count('totalItems'),
+    'Gross Revenue': ReportExportService.formatCurrency(
+      _amount('totalRevenue'),
+    ),
+    'Discount': ReportExportService.formatCurrency(_amount('totalDiscount')),
+    'Tax': ReportExportService.formatCurrency(_amount('totalTax')),
+    'Returns': _count('totalReturns'),
+    'Return Amount': ReportExportService.formatCurrency(
+      _amount('totalReturnAmount'),
+    ),
+    'Net Revenue': ReportExportService.formatCurrency(_amount('netRevenue')),
+    'Avg Sale Value': ReportExportService.formatCurrency(
+      _amount('averageSaleValue'),
+    ),
+  };
 
   Future<void> _export(BuildContext context) async {
     // With a breakdown, the sheet carries the ITEMS as rows and the totals as
@@ -321,17 +343,21 @@ class _SalesTotalsReportViewState extends State<SalesTotalsReportView> {
       fileName:
           '${widget.exportFileName}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
       reportTitle: widget.reportTitle,
-      headers:
-          hasItems ? const ['Item', 'Qty', 'Revenue'] : const ['Metric', 'Value'],
+      headers: hasItems
+          ? const ['Item', 'Qty', 'Revenue']
+          : const ['Metric', 'Value'],
       data: hasItems
           ? widget.items
-              .map((row) => [
+                .map(
+                  (row) => [
                     _itemLabel(row),
                     (row['totalQuantity'] as num).toInt(),
                     ReportExportService.formatCurrency(
-                        (row['totalRevenue'] as num).toDouble()),
-                  ])
-              .toList()
+                      (row['totalRevenue'] as num).toDouble(),
+                    ),
+                  ],
+                )
+                .toList()
           : _metrics.entries.map((e) => [e.key, e.value]).toList(),
       summary: {
         'Report Period': periodLabel,

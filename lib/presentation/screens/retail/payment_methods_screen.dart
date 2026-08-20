@@ -101,8 +101,10 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
   void _refreshUpiPreview() {
     _upiQrData.value = _upiIdController.text.trim().isEmpty
         ? ''
-        : UpiQrHelper.buildUpiUri(_upiIdController.text,
-            payee: _upiPayeeController.text);
+        : UpiQrHelper.buildUpiUri(
+            _upiIdController.text,
+            payee: _upiPayeeController.text,
+          );
   }
 
   /// Debounced preview update fired from field onChanged callbacks.
@@ -179,8 +181,9 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
       context: context,
       builder: (dialogContext) => AppDialogShell(
         title: isUpi ? 'UPI Setup' : 'Edit Payment Method',
-        subtitle:
-            isUpi ? 'Set your merchant UPI ID & QR' : 'Update payment details',
+        subtitle: isUpi
+            ? 'Set your merchant UPI ID & QR'
+            : 'Update payment details',
         icon: isUpi ? Icons.qr_code_2_rounded : Icons.edit_rounded,
         accent: AppColors.primary,
         body: Column(
@@ -194,8 +197,9 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
               hint: 'Enter method name',
               icon: Icons.payment_rounded,
               required: true,
-              textInputAction:
-                  isUpi ? TextInputAction.next : TextInputAction.done,
+              textInputAction: isUpi
+                  ? TextInputAction.next
+                  : TextInputAction.done,
               onFieldSubmitted: (_) {
                 if (isUpi) {
                   _upiIdFocus.requestFocus();
@@ -272,7 +276,8 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
 
     if (mounted) {
       NotificationService.instance.showSuccess(
-          isUpi ? 'UPI details saved' : 'Payment method updated successfully');
+        isUpi ? 'UPI details saved' : 'Payment method updated successfully',
+      );
     }
   }
 
@@ -302,10 +307,11 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
             child: qrData.isEmpty
                 ? Column(
                     children: [
-                      Icon(Icons.qr_code_2,
-                          size: 48,
-                          color:
-                              AppColors.textSecondary.withValues(alpha: 0.5)),
+                      Icon(
+                        Icons.qr_code_2,
+                        size: 48,
+                        color: AppColors.textSecondary.withValues(alpha: 0.5),
+                      ),
                       const SizedBox(height: 8),
                       Text(
                         'Enter a UPI ID to generate the QR code',
@@ -359,7 +365,8 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
     final confirm = await showAppConfirmDialog(
       context: context,
       title: 'Delete Payment Method?',
-      message: 'Delete "${method.name}"? It will no longer be offered at '
+      message:
+          'Delete "${method.name}"? It will no longer be offered at '
           'checkout.',
       confirmLabel: 'Delete',
       accent: AppColors.danger,
@@ -392,11 +399,13 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
       ),
       body: AppResponsive.constrainedContent(
         context: context,
+        alignment: Alignment.topCenter,
         child: Observer(
           builder: (_) {
             if (_paymentStore.isLoading) {
               return const Center(
-                  child: CircularProgressIndicator(color: AppColors.primary));
+                child: CircularProgressIndicator(color: AppColors.primary),
+              );
             }
 
             if (_paymentStore.paymentMethods.isEmpty) {
@@ -412,9 +421,12 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               );
@@ -423,8 +435,10 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
             return ListView.builder(
               padding: AppResponsive.padding(context),
               itemCount: _paymentStore.paymentMethods.length,
-              itemBuilder: (context, index) =>
-                  _buildMethodCard(context, _paymentStore.paymentMethods[index]),
+              itemBuilder: (context, index) => _buildMethodCard(
+                context,
+                _paymentStore.paymentMethods[index],
+              ),
             );
           },
         ),
@@ -486,7 +500,9 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 1),
+                            horizontal: 6,
+                            vertical: 1,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.info.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
@@ -526,9 +542,11 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                       ),
                       if (isUpi) ...[
                         const SizedBox(width: 10),
-                        Icon(Icons.qr_code_2,
-                            size: AppResponsive.captionFontSize(context) + 3,
-                            color: AppColors.textSecondary),
+                        Icon(
+                          Icons.qr_code_2,
+                          size: AppResponsive.captionFontSize(context) + 3,
+                          color: AppColors.textSecondary,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           'QR on receipt',
@@ -550,14 +568,17 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                 await _paymentStore.togglePaymentMethod(method.id);
                 if (mounted) {
                   NotificationService.instance.showSuccess(
-                      '${method.name} ${value ? 'enabled' : 'disabled'}');
+                    '${method.name} ${value ? 'enabled' : 'disabled'}',
+                  );
                 }
               },
             ),
             PopupMenuButton<String>(
-              icon: Icon(Icons.more_vert_rounded,
-                  color: AppColors.textSecondary,
-                  size: AppResponsive.iconSize(context)),
+              icon: Icon(
+                Icons.more_vert_rounded,
+                color: AppColors.textSecondary,
+                size: AppResponsive.iconSize(context),
+              ),
               // White sheet — kills the Material 3 elevation tint.
               color: AppColors.white,
               surfaceTintColor: Colors.transparent,
@@ -625,7 +646,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
           Text(
             label,
             style: GoogleFonts.poppins(
-              fontSize: 14,
+              fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.w500,
               color: color == AppColors.danger
                   ? AppColors.danger

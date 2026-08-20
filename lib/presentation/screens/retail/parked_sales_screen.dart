@@ -35,10 +35,10 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
 
   /// Money string honouring the store's currency + decimal-precision settings.
   String _money(double amount) => CurrencyHelper.formatAmountWithSymbol(
-        amount,
-        CurrencyHelper.currentSymbol,
-        decimalPlaces: DecimalSettings.precision,
-      );
+    amount,
+    CurrencyHelper.currentSymbol,
+    decimalPlaces: DecimalSettings.precision,
+  );
 
   String _formatDate(String isoDate) {
     final date = DateTime.parse(isoDate);
@@ -67,10 +67,12 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
       }
       if (skipped > 0) {
         NotificationService.instance.showWarning(
-            'Restored to cart — $skipped item(s) skipped (no longer available)');
+          'Restored to cart — $skipped item(s) skipped (no longer available)',
+        );
       } else {
-        NotificationService.instance
-            .showSuccess('Parked sale restored to cart');
+        NotificationService.instance.showSuccess(
+          'Parked sale restored to cart',
+        );
       }
     } catch (e) {
       NotificationService.instance.showError('Error restoring sale: $e');
@@ -121,7 +123,9 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                 // Totals block — the two numbers that decide whether to restore
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 12),
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.surfaceLight,
                     borderRadius: BorderRadius.circular(12),
@@ -129,10 +133,13 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                   ),
                   child: Column(
                     children: [
-                      _buildDetailRow(
-                          'Total Items', '${holdSale.totalItems}'),
+                      _buildDetailRow('Total Items', '${holdSale.totalItems}'),
                       const SizedBox(height: 8),
-                      Divider(height: 1, thickness: 1, color: AppColors.divider),
+                      Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: AppColors.divider,
+                      ),
                       const SizedBox(height: 8),
                       _buildDetailRow(
                         'Subtotal',
@@ -146,7 +153,7 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                 Text(
                   'ITEMS (${items.length})',
                   style: GoogleFonts.poppins(
-                    fontSize: 10.5,
+                    fontSize: AppResponsive.captionFontSize(context),
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.7,
                     color: AppColors.textSecondary,
@@ -198,7 +205,7 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
             child: Text(
               '${item.qty}',
               style: GoogleFonts.poppins(
-                fontSize: 12.5,
+                fontSize: AppResponsive.smallFontSize(context),
                 fontWeight: FontWeight.w700,
                 color: AppColors.primary,
               ),
@@ -214,7 +221,7 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
-                    fontSize: 13,
+                    fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
@@ -223,7 +230,7 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                 Text(
                   '@ ${_money(item.price)}',
                   style: GoogleFonts.poppins(
-                    fontSize: 11,
+                    fontSize: AppResponsive.captionFontSize(context),
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -234,7 +241,7 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
           Text(
             _money(item.total),
             style: GoogleFonts.poppins(
-              fontSize: 13,
+              fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
             ),
@@ -250,7 +257,7 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
         Text(
           label,
           style: GoogleFonts.poppins(
-            fontSize: 12.5,
+            fontSize: AppResponsive.smallFontSize(context),
             fontWeight: FontWeight.w500,
             color: AppColors.textSecondary,
           ),
@@ -274,33 +281,39 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(title: 'Parked Sales'),
       // Currency/precision changes rebuild every money label on this screen.
-      body: ValueListenableBuilder<String>(
-        valueListenable: CurrencyHelper.currencyNotifier,
-        builder: (context, _, _) => ValueListenableBuilder<int>(
-          valueListenable: DecimalSettings.precisionNotifier,
-          builder: (context, _, _) => Observer(
-            builder: (context) {
-              if (holdSaleStore.isLoading) {
-                return const Center(
-                    child: CircularProgressIndicator(color: AppColors.primary));
-              }
+      body: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        child: ValueListenableBuilder<String>(
+          valueListenable: CurrencyHelper.currencyNotifier,
+          builder: (context, _, _) => ValueListenableBuilder<int>(
+            valueListenable: DecimalSettings.precisionNotifier,
+            builder: (context, _, _) => Observer(
+              builder: (context) {
+                if (holdSaleStore.isLoading) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: AppColors.primary),
+                  );
+                }
 
-              if (holdSaleStore.holdSaleCount == 0) {
-                return const AppEmptyState(
-                  icon: Icons.pause_circle_outline,
-                  title: 'No parked sales',
-                  message:
-                      'Sales you hold from the billing screen will appear here.',
+                if (holdSaleStore.holdSaleCount == 0) {
+                  return const AppEmptyState(
+                    icon: Icons.pause_circle_outline,
+                    title: 'No parked sales',
+                    message:
+                        'Sales you hold from the billing screen will appear here.',
+                  );
+                }
+
+                return Column(
+                  children: [
+                    _buildSummaryCard(context),
+                    Expanded(child: _buildHoldSalesList()),
+                  ],
                 );
-              }
-
-              return Column(
-                children: [
-                  _buildSummaryCard(context),
-                  Expanded(child: _buildHoldSalesList()),
-                ],
-              );
-            },
+              },
+            ),
           ),
         ),
       ),
@@ -340,7 +353,7 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                     Text(
                       'Waiting to be settled',
                       style: GoogleFonts.poppins(
-                        fontSize: 11.5,
+                        fontSize: AppResponsive.captionFontSize(context),
                         color: AppColors.white.withValues(alpha: 0.75),
                       ),
                     ),
@@ -355,7 +368,7 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                   Text(
                     'TOTAL VALUE',
                     style: GoogleFonts.poppins(
-                      fontSize: 9.5,
+                      fontSize: AppResponsive.captionFontSize(context),
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.7,
                       color: AppColors.white.withValues(alpha: 0.7),
@@ -426,8 +439,11 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                         color: AppColors.warning.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(11),
                       ),
-                      child: const Icon(Icons.pause_circle_outline,
-                          color: AppColors.warning, size: 21),
+                      child: const Icon(
+                        Icons.pause_circle_outline,
+                        color: AppColors.warning,
+                        size: 21,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -450,7 +466,7 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.poppins(
-                              fontSize: 11.5,
+                              fontSize: AppResponsive.captionFontSize(context),
                               color: AppColors.textSecondary,
                             ),
                           ),
@@ -483,7 +499,7 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                       label: Text(
                         'Restore to Cart',
                         style: GoogleFonts.poppins(
-                          fontSize: 13,
+                          fontSize: AppResponsive.bodyFontSize(context),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -499,8 +515,11 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                     ),
                     const Spacer(),
                     PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_vert,
-                          color: AppColors.textSecondary, size: 20),
+                      icon: const Icon(
+                        Icons.more_vert,
+                        color: AppColors.textSecondary,
+                        size: 20,
+                      ),
                       tooltip: 'Options',
                       // M3 tints menu surfaces lavender by default — pin it
                       // to white so it matches the cards.
@@ -519,10 +538,18 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                         }
                       },
                       itemBuilder: (context) => [
-                        _menuItem('details', Icons.info_outline, 'View Details',
-                            AppColors.info),
-                        _menuItem('delete', Icons.delete_outline, 'Delete',
-                            AppColors.danger),
+                        _menuItem(
+                          'details',
+                          Icons.info_outline,
+                          'View Details',
+                          AppColors.info,
+                        ),
+                        _menuItem(
+                          'delete',
+                          Icons.delete_outline,
+                          'Delete',
+                          AppColors.danger,
+                        ),
                       ],
                     ),
                   ],
@@ -536,7 +563,11 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
   }
 
   PopupMenuItem<String> _menuItem(
-      String value, IconData icon, String label, Color color) {
+    String value,
+    IconData icon,
+    String label,
+    Color color,
+  ) {
     return PopupMenuItem<String>(
       value: value,
       height: 44,
@@ -547,7 +578,7 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
           Text(
             label,
             style: GoogleFonts.poppins(
-              fontSize: 13.5,
+              fontSize: AppResponsive.bodyFontSize(context),
               color: AppColors.textPrimary,
             ),
           ),

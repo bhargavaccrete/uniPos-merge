@@ -58,45 +58,51 @@ class _AttributesScreenState extends State<AttributesScreen> {
         ],
       ),
       body: SafeArea(
-        child: Observer(
-          builder: (_) {
-            if (_attributeStore.isLoading) {
-              return const Center(child: CircularProgressIndicator());
-            }
+        child: AppResponsive.constrainedContent(
+          context: context,
+          alignment: Alignment.topCenter,
+          maxWidth: AppResponsive.maxContentWidth(context),
+          child: Observer(
+            builder: (_) {
+              if (_attributeStore.isLoading) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-            if (_attributeStore.attributes.isEmpty) {
-              return AppEmptyState(
-                icon: Icons.category_outlined,
-                title: 'No attributes yet',
-                message: 'Create attributes like Color, Size or Material to '
-                    'build variable products and describe simple ones.',
-                action: appEmptyStateAction(
-                  label: 'Add First Attribute',
-                  onPressed: () => showAddAttributeDialog(context),
-                ),
-              );
-            }
-
-            return ListView(
-              padding: AppResponsive.screenPadding(context),
-              children: [
-                _buildExplainer(),
-                SizedBox(height: AppResponsive.mediumSpacing(context)),
-                ..._attributeStore.attributes.map(
-                  (attribute) => _AttributeCard(
-                    attribute: attribute,
-                    values: _attributeStore.getValues(attribute.attributeId),
-                    onEdit: () => _showEditAttributeDialog(attribute),
-                    onDelete: () => _confirmDeleteAttribute(attribute),
-                    onAddValue: () => _showAddValueDialog(attribute),
-                    onEditValue: (value) =>
-                        _showEditValueDialog(attribute, value),
-                    onDeleteValue: _confirmDeleteValue,
+              if (_attributeStore.attributes.isEmpty) {
+                return AppEmptyState(
+                  icon: Icons.category_outlined,
+                  title: 'No attributes yet',
+                  message:
+                      'Create attributes like Color, Size or Material to '
+                      'build variable products and describe simple ones.',
+                  action: appEmptyStateAction(
+                    label: 'Add First Attribute',
+                    onPressed: () => showAddAttributeDialog(context),
                   ),
-                ),
-              ],
-            );
-          },
+                );
+              }
+
+              return ListView(
+                padding: AppResponsive.screenPadding(context),
+                children: [
+                  _buildExplainer(),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
+                  ..._attributeStore.attributes.map(
+                    (attribute) => _AttributeCard(
+                      attribute: attribute,
+                      values: _attributeStore.getValues(attribute.attributeId),
+                      onEdit: () => _showEditAttributeDialog(attribute),
+                      onDelete: () => _confirmDeleteAttribute(attribute),
+                      onAddValue: () => _showAddValueDialog(attribute),
+                      onEditValue: (value) =>
+                          _showEditValueDialog(attribute, value),
+                      onDeleteValue: _confirmDeleteValue,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -114,8 +120,11 @@ class _AttributesScreenState extends State<AttributesScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline_rounded,
-              size: 18, color: AppColors.primary),
+          const Icon(
+            Icons.info_outline_rounded,
+            size: 18,
+            color: AppColors.primary,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -145,15 +154,18 @@ class _AttributesScreenState extends State<AttributesScreen> {
     );
     if (name == null || name.isEmpty) return;
 
-    final success = await _attributeStore
-        .updateAttribute(attribute.attributeId, name: name);
+    final success = await _attributeStore.updateAttribute(
+      attribute.attributeId,
+      name: name,
+    );
     if (!mounted) return;
     if (success) {
       await _attributeStore.loadAttributes();
       NotificationService.instance.showSuccess('Attribute "$name" updated');
     } else {
-      NotificationService.instance
-          .showError(_attributeStore.errorMessage ?? 'Failed to update');
+      NotificationService.instance.showError(
+        _attributeStore.errorMessage ?? 'Failed to update',
+      );
     }
   }
 
@@ -161,7 +173,8 @@ class _AttributesScreenState extends State<AttributesScreen> {
     final confirmed = await showAppConfirmDialog(
       context: context,
       title: 'Delete Attribute?',
-      message: 'Delete "${attribute.name}" and all of its values? '
+      message:
+          'Delete "${attribute.name}" and all of its values? '
           'Products already using it will keep what they saved.',
       confirmLabel: 'Delete',
       accent: AppColors.danger,
@@ -169,16 +182,19 @@ class _AttributesScreenState extends State<AttributesScreen> {
     );
     if (!confirmed || !mounted) return;
 
-    final success =
-        await _attributeStore.deleteAttribute(attribute.attributeId);
+    final success = await _attributeStore.deleteAttribute(
+      attribute.attributeId,
+    );
     if (!mounted) return;
     if (success) {
       await _attributeStore.loadAttributes();
-      NotificationService.instance
-          .showSuccess('Attribute "${attribute.name}" deleted');
+      NotificationService.instance.showSuccess(
+        'Attribute "${attribute.name}" deleted',
+      );
     } else {
-      NotificationService.instance
-          .showError(_attributeStore.errorMessage ?? 'Cannot delete');
+      NotificationService.instance.showError(
+        _attributeStore.errorMessage ?? 'Cannot delete',
+      );
     }
   }
 
@@ -213,16 +229,20 @@ class _AttributesScreenState extends State<AttributesScreen> {
     if (!mounted) return;
     if (success) {
       await _attributeStore.loadAttributes();
-      NotificationService.instance
-          .showSuccess('Added ${values.length} value(s)');
+      NotificationService.instance.showSuccess(
+        'Added ${values.length} value(s)',
+      );
     } else {
-      NotificationService.instance
-          .showError(_attributeStore.errorMessage ?? 'Failed to add');
+      NotificationService.instance.showError(
+        _attributeStore.errorMessage ?? 'Failed to add',
+      );
     }
   }
 
   Future<void> _showEditValueDialog(
-      AttributeModel attribute, AttributeValueModel value) async {
+    AttributeModel attribute,
+    AttributeValueModel value,
+  ) async {
     final input = await _promptForValue(
       attribute: attribute,
       title: 'Edit ${attribute.name} Value',
@@ -240,11 +260,13 @@ class _AttributesScreenState extends State<AttributesScreen> {
     if (!mounted) return;
     if (success) {
       await _attributeStore.loadAttributes();
-      NotificationService.instance
-          .showSuccess('Value "${input.value}" updated');
+      NotificationService.instance.showSuccess(
+        'Value "${input.value}" updated',
+      );
     } else {
-      NotificationService.instance
-          .showError(_attributeStore.errorMessage ?? 'Failed to update');
+      NotificationService.instance.showError(
+        _attributeStore.errorMessage ?? 'Failed to update',
+      );
     }
   }
 
@@ -263,11 +285,11 @@ class _AttributesScreenState extends State<AttributesScreen> {
     final isColor = _isColorAttribute(attribute.name);
 
     _ValueInput read() => _ValueInput(
-          value: valueController.text.trim(),
-          colorCode: colorController.text.trim().isEmpty
-              ? null
-              : colorController.text.trim(),
-        );
+      value: valueController.text.trim(),
+      colorCode: colorController.text.trim().isEmpty
+          ? null
+          : colorController.text.trim(),
+    );
 
     return showDialog<_ValueInput>(
       context: context,
@@ -287,8 +309,9 @@ class _AttributesScreenState extends State<AttributesScreen> {
                 hint: _getValueHint(attribute.name),
                 required: true,
                 autofocus: true,
-                textInputAction:
-                    isColor ? TextInputAction.next : TextInputAction.done,
+                textInputAction: isColor
+                    ? TextInputAction.next
+                    : TextInputAction.done,
                 onFieldSubmitted: isColor
                     ? null
                     : (_) => Navigator.pop(dialogContext, read()),
@@ -301,8 +324,7 @@ class _AttributesScreenState extends State<AttributesScreen> {
                   hint: '#FF0000',
                   icon: Icons.palette_outlined,
                   textInputAction: TextInputAction.done,
-                  onFieldSubmitted: (_) =>
-                      Navigator.pop(dialogContext, read()),
+                  onFieldSubmitted: (_) => Navigator.pop(dialogContext, read()),
                 ),
               ],
               if (helper != null) ...[
@@ -310,7 +332,9 @@ class _AttributesScreenState extends State<AttributesScreen> {
                 Text(
                   helper,
                   style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.captionFontSize(context), color: AppColors.textSecondary),
+                    fontSize: AppResponsive.captionFontSize(context),
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ],
@@ -343,11 +367,13 @@ class _AttributesScreenState extends State<AttributesScreen> {
     if (!mounted) return;
     if (success) {
       await _attributeStore.loadAttributes();
-      NotificationService.instance
-          .showSuccess('Value "${value.value}" deleted');
+      NotificationService.instance.showSuccess(
+        'Value "${value.value}" deleted',
+      );
     } else {
-      NotificationService.instance
-          .showError(_attributeStore.errorMessage ?? 'Cannot delete');
+      NotificationService.instance.showError(
+        _attributeStore.errorMessage ?? 'Cannot delete',
+      );
     }
   }
 
@@ -408,7 +434,10 @@ class _AttributeCard extends StatelessWidget {
         // Same soft lift the POS and report cards use.
         boxShadow: const [
           BoxShadow(
-              color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2)),
+            color: Color(0x08000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
         ],
       ),
       child: Column(
@@ -444,24 +473,36 @@ class _AttributeCard extends StatelessWidget {
               // Edit/Delete sit behind an overflow menu rather than two more
               // icons competing with the values below.
               PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert,
-                    size: 20, color: AppColors.textSecondary),
+                icon: const Icon(
+                  Icons.more_vert,
+                  size: 20,
+                  color: AppColors.textSecondary,
+                ),
                 tooltip: 'Attribute options',
                 color: AppColors.white,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 onSelected: (action) =>
                     action == 'edit' ? onEdit() : onDelete(),
                 itemBuilder: (_) => [
                   PopupMenuItem<String>(
                     value: 'edit',
-                    child: _menuRow(context, Icons.edit_outlined, 'Rename',
-                        AppColors.textPrimary),
+                    child: _menuRow(
+                      context,
+                      Icons.edit_outlined,
+                      'Rename',
+                      AppColors.textPrimary,
+                    ),
                   ),
                   PopupMenuItem<String>(
                     value: 'delete',
-                    child: _menuRow(context, Icons.delete_outline, 'Delete',
-                        AppColors.danger),
+                    child: _menuRow(
+                      context,
+                      Icons.delete_outline,
+                      'Delete',
+                      AppColors.danger,
+                    ),
                   ),
                 ],
               ),
@@ -478,18 +519,22 @@ class _AttributeCard extends StatelessWidget {
                     'Add values like ${_placeholderFor(attribute.name)} so this '
                     'attribute can be used.',
                     style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.captionFontSize(context), color: AppColors.textSecondary),
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
                   )
                 : Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: values
-                        .map((value) => _ValueChip(
-                              value: value,
-                              isColor: isColor,
-                              onEdit: () => onEditValue(value),
-                              onDelete: () => onDeleteValue(value),
-                            ))
+                        .map(
+                          (value) => _ValueChip(
+                            value: value,
+                            isColor: isColor,
+                            onEdit: () => onEditValue(value),
+                            onDelete: () => onDeleteValue(value),
+                          ),
+                        )
                         .toList(),
                   ),
           ),
@@ -500,16 +545,21 @@ class _AttributeCard extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: onAddValue,
               icon: const Icon(Icons.add, size: 18),
-              label: Text('Add Value',
-                  style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.smallFontSize(context), fontWeight: FontWeight.w600)),
+              label: Text(
+                'Add Value',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primary,
                 side: const BorderSide(color: AppColors.primary),
                 padding: const EdgeInsets.symmetric(vertical: 11),
                 minimumSize: const Size(double.infinity, 0),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
           ),
@@ -519,17 +569,23 @@ class _AttributeCard extends StatelessWidget {
   }
 
   Widget _menuRow(
-          BuildContext context, IconData icon, String label, Color color) =>
-      Row(
-        children: [
-          Icon(icon, size: AppResponsive.smallIconSize(context), color: color),
-          const SizedBox(width: 10),
-          Text(label,
-              style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.bodyFontSize(context),
-                  color: color)),
-        ],
-      );
+    BuildContext context,
+    IconData icon,
+    String label,
+    Color color,
+  ) => Row(
+    children: [
+      Icon(icon, size: AppResponsive.smallIconSize(context), color: color),
+      const SizedBox(width: 10),
+      Text(
+        label,
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.bodyFontSize(context),
+          color: color,
+        ),
+      ),
+    ],
+  );
 
   String _placeholderFor(String attributeName) {
     final name = attributeName.toLowerCase();
@@ -585,22 +641,42 @@ class _ValueChip extends StatelessWidget {
       items: [
         PopupMenuItem<String>(
           value: 'edit',
-          child: Row(children: [
-            const Icon(Icons.edit_outlined,
-                size: 18, color: AppColors.textPrimary),
-            const SizedBox(width: 10),
-            Text('Edit', style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context))),
-          ]),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.edit_outlined,
+                size: 18,
+                color: AppColors.textPrimary,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Edit',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                ),
+              ),
+            ],
+          ),
         ),
         PopupMenuItem<String>(
           value: 'delete',
-          child: Row(children: [
-            const Icon(Icons.delete_outline, size: 18, color: AppColors.danger),
-            const SizedBox(width: 10),
-            Text('Delete',
+          child: Row(
+            children: [
+              const Icon(
+                Icons.delete_outline,
+                size: 18,
+                color: AppColors.danger,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Delete',
                 style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.bodyFontSize(context), color: AppColors.danger)),
-          ]),
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  color: AppColors.danger,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -682,7 +758,8 @@ Future<void> showAddAttributeDialog(BuildContext context) async {
     NotificationService.instance.showSuccess('Attribute "$name" created');
   } else {
     NotificationService.instance.showError(
-        attributeStore.errorMessage ?? 'Failed to create attribute');
+      attributeStore.errorMessage ?? 'Failed to create attribute',
+    );
   }
 }
 
