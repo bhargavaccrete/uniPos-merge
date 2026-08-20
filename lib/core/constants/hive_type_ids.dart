@@ -114,6 +114,10 @@ class HiveTypeIds {
   static const int retailSupplierClaimItem = 177;
   static const int retailInventoryLoss = 178;
 
+  /// Journal behind SupplierModel.currentBalance. One row per movement so the
+  /// balance can be explained, not just stated.
+  static const int retailSupplierLedgerEntry = 179;
+
   // ==================== HELPER METHODS ====================
 
   /// Check if a typeId belongs to retail models
@@ -144,6 +148,7 @@ class HiveTypeIds {
     retailSupplierClaim,
     retailSupplierClaimItem,
     retailInventoryLoss,
+    retailSupplierLedgerEntry,
     retailHoldSale,
     retailHoldSaleItem,
     retailPurchaseOrder,

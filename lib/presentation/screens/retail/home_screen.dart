@@ -489,8 +489,11 @@ class _HomeScreenState extends State<HomeScreen> {
   // ==================== USER MENU ====================
   Widget _buildUserMenuButton(BuildContext context, Color iconColor) {
     return PopupMenuButton<String>(
-      icon: Icon(Icons.account_circle, color: iconColor, size: 28),
+      icon: Icon(Icons.account_circle_rounded, color: iconColor, size: 28),
       offset: const Offset(0, 50),
+      // M3 tints menu surfaces by default; keep them plain white.
+      color: AppColors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       onSelected: (value) async {
         switch (value) {
           case 'change_password':

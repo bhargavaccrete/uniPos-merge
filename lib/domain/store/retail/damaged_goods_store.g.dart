@@ -180,6 +180,15 @@ mixin _$DamagedGoodsStore on _DamagedGoodsStore, Store {
         claimId: claimId, status: status, resolutionNote: resolutionNote));
   }
 
+  late final _$writeOffRejectedClaimAsyncAction =
+      AsyncAction('_DamagedGoodsStore.writeOffRejectedClaim', context: context);
+
+  @override
+  Future<List<String>> writeOffRejectedClaim(String claimId) {
+    return _$writeOffRejectedClaimAsyncAction
+        .run(() => super.writeOffRejectedClaim(claimId));
+  }
+
   @override
   String toString() {
     return '''

@@ -12,6 +12,10 @@ const _uuid = Uuid();
 class InventoryLossSource {
   InventoryLossSource._();
   static const String grnDamage = 'grn_damage';
+
+  /// Raised by hand after a supplier rejected the claim for these goods, so
+  /// the already-billed damage becomes the business's cost.
+  static const String claimRejected = 'claim_rejected';
 }
 
 /// Inventory Loss — damaged goods written off at receipt

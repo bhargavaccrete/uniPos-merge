@@ -124,7 +124,9 @@ class GRNRepository {
     return _grnBox.values.where((grn) => grn.status == status.name).length;
   }
 
-  // Get Total Received Amount (from confirmed GRNs)
+  /// Total billed across confirmed GRNs — the supplier's invoice value,
+  /// damaged units included. Credits from returns and settled claims live on
+  /// the supplier balance and are not netted off here.
   double getTotalReceivedAmount() {
     return _grnBox.values
         .where((grn) => grn.statusEnum == GRNStatus.confirmed)

@@ -16,6 +16,15 @@ enum DamagedHandling {
 
 /// GRN Item - Records what was ordered vs what was actually received
 /// This is where we compare: Ordered 50, Received 45
+///
+/// **Two quantities, two jobs.** [acceptedQty] is what enters inventory;
+/// [billableQty] is what the supplier invoices. They differ whenever units
+/// arrive damaged, because the supplier delivered them either way.
+///
+/// The receipt accrues the FULL received value. [damagedHandling] does not
+/// change what is owed — it only decides which document is raised, and each of
+/// those carries its own later credit (a return's credit note, a settled
+/// claim). A write-off carries none, so that damage stays a real cost.
 @HiveType(typeId: HiveTypeIds.retailGrnItem)
 class GRNItemModel extends HiveObject {
   @HiveField(0)
@@ -57,8 +66,10 @@ class GRNItemModel extends HiveObject {
   @HiveField(12)
   final double? costPrice; // Actual cost price per unit
 
+  /// Inventory value: acceptedQty * costPrice. **Not** what the supplier is
+  /// owed for this line — see [billableAmount].
   @HiveField(13)
-  final double? totalAmount; // acceptedQty * costPrice (only for good items)
+  final double? totalAmount;
 
   @HiveField(14)
   final String? remarks; // Notes about this item
@@ -142,6 +153,18 @@ class GRNItemModel extends HiveObject {
 
   /// Good quantity (received minus damaged)
   int get goodQty => receivedQty - (damagedQty ?? 0);
+
+  /// Units the supplier invoices — everything delivered, damaged included.
+  ///
+  /// Derived, not stored: the receipt always accrues the full delivery, so this
+  /// is `receivedQty` unconditionally. Damaged units are recovered later
+  /// through a return credit note or a settled claim, never by shrinking the
+  /// original bill.
+  int get billableQty => receivedQty;
+
+  /// What the supplier is owed for this line.
+  double? get billableAmount =>
+      costPrice != null ? receivedQty * costPrice! : null;
 
   Map<String, dynamic> toMap() {
     return {

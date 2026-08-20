@@ -34,13 +34,15 @@ class SupplierClaimModelAdapter extends TypeAdapter<SupplierClaimModel> {
       notes: fields[14] as String?,
       createdAt: fields[15] as String,
       updatedAt: fields[16] as String,
+      creditApplied: fields[17] as bool?,
+      lossRecorded: fields[18] as bool?,
     );
   }
 
   @override
   void write(BinaryWriter writer, SupplierClaimModel obj) {
     writer
-      ..writeByte(17)
+      ..writeByte(19)
       ..writeByte(0)
       ..write(obj.claimId)
       ..writeByte(1)
@@ -74,7 +76,11 @@ class SupplierClaimModelAdapter extends TypeAdapter<SupplierClaimModel> {
       ..writeByte(15)
       ..write(obj.createdAt)
       ..writeByte(16)
-      ..write(obj.updatedAt);
+      ..write(obj.updatedAt)
+      ..writeByte(17)
+      ..write(obj.creditApplied)
+      ..writeByte(18)
+      ..write(obj.lossRecorded);
   }
 
   @override

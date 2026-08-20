@@ -97,8 +97,16 @@ class PurchaseSummaryReportScreen extends StatelessWidget {
               ReportExportService.formatCurrency(d['receivedValue'] as double),
             ],
             [
-              'Damaged Value',
-              ReportExportService.formatCurrency(d['damagedValue'] as double),
+              'Damaged Recoverable',
+              ReportExportService.formatCurrency(
+                d['damagedRecoverable'] as double,
+              ),
+            ],
+            [
+              'Damaged Absorbed',
+              ReportExportService.formatCurrency(
+                d['damagedAbsorbed'] as double,
+              ),
             ],
             [
               'Outstanding Value',
@@ -140,11 +148,20 @@ class PurchaseSummaryReportScreen extends StatelessWidget {
           const Divider(height: 24),
           _statLine(context, 'Goods receipts', '${d['receiptCount']}'),
           _statLine(context, 'Suppliers', '${d['supplierCount']}'),
+          // Split by outcome: a live return or claim can still be credited
+          // back, a write-off or refused claim cannot.
           _statLine(
             context,
-            'Damaged value',
-            formatMoney(d['damagedValue'] as double),
-            color: (d['damagedValue'] as double) > 0 ? AppColors.danger : null,
+            'Damaged — recoverable',
+            formatMoney(d['damagedRecoverable'] as double),
+          ),
+          _statLine(
+            context,
+            'Damaged — absorbed',
+            formatMoney(d['damagedAbsorbed'] as double),
+            color: (d['damagedAbsorbed'] as double) > 0
+                ? AppColors.danger
+                : null,
           ),
         ],
       ),

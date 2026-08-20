@@ -66,6 +66,10 @@ class HiveBoxNames {
   /// Supplier records box
   static const String suppliers = 'suppliers';
 
+  /// Journal of every supplier balance movement. Written only by
+  /// SupplierStore.recordBalanceMovement.
+  static const String supplierLedger = 'supplierLedger';
+
   // RETIRED: 'purchases' and 'purchaseItems' belonged to the standalone
   // Purchase feature, removed in favour of Purchase Orders + GRN. Don't reuse
   // these names — an old install may still have those box files on disk.
@@ -247,6 +251,7 @@ class HiveBoxNames {
     saleItems,
     customer,
     suppliers,
+    supplierLedger,
     purchaseOrders,
     purchaseReturns,
     purchaseReturnItems,

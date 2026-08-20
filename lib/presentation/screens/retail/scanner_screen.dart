@@ -64,21 +64,47 @@ class _ScannerScreenState extends State<ScannerScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: Stack(
-        children: [
-          MobileScanner(controller: _controller, onDetect: _onDetect),
-          // Aiming frame, same treatment as the POS scanner overlay.
-          Center(
-            child: Container(
-              width: 260,
-              height: 130,
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.success, width: 3),
-                borderRadius: BorderRadius.circular(12),
+      // The scan window is a Rect in the scanner's own layout space, so it has
+      // to be measured rather than guessed — and the old fixed 260px frame
+      // overflowed narrow phones.
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final Size previewSize = constraints.biggest;
+          final double windowWidth =
+              (previewSize.width * 0.75).clamp(200.0, 320.0);
+          final Rect scanWindow = Rect.fromCenter(
+            center: previewSize.center(Offset.zero),
+            width: windowWidth,
+            // Landscape ratio — retail barcodes (EAN/UPC/Code128) are wide.
+            height: windowWidth * 0.5,
+          );
+
+          return Stack(
+            children: [
+              MobileScanner(
+                controller: _controller,
+                // Without this the detector reads the FULL camera frame and the
+                // green frame is decoration only — a barcode anywhere in view
+                // was captured. Same guard the POS scanner already has
+                // (posscreen.dart `_buildScannerContainer`).
+                scanWindow: scanWindow,
+                scanWindowUpdateThreshold: 10,
+                onDetect: _onDetect,
               ),
-            ),
-          ),
-        ],
+              // Draws the border at EXACTLY the rect the detector filters on and
+              // dims the rest, so what the user aims at is what actually scans.
+              Positioned.fill(
+                child: ScanWindowOverlay(
+                  controller: _controller,
+                  scanWindow: scanWindow,
+                  borderColor: AppColors.success,
+                  borderWidth: 3,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

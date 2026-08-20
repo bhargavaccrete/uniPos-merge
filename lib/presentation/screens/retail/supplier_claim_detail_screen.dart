@@ -177,13 +177,16 @@ class _SupplierClaimDetailScreenState extends State<SupplierClaimDetailScreen> {
   String _transitionExplanation(SupplierClaimStatus target) {
     switch (target) {
       case SupplierClaimStatus.approved:
-        return 'The supplier accepted the claim. Settlement is still outstanding — '
-            'mark it Settled once compensation is agreed.';
+        return 'The supplier accepted the claim but has not compensated yet, so '
+            'the balance does not change. Mark it Settled once compensation is '
+            'agreed.';
       case SupplierClaimStatus.rejected:
-        return 'The supplier refused the claim, so the damaged goods stay a loss '
-            'for the business. This closes the claim.';
+        return 'The supplier refused the claim. The goods were billed on the '
+            'receipt, so that amount stays payable and the damage becomes a cost '
+            'the business absorbs. This closes the claim.';
       case SupplierClaimStatus.settled:
-        return 'Compensation has been received or written down. This closes the claim.';
+        return 'Compensation has been received or written down. This credits the '
+            'supplier balance by the claim value and closes the claim.';
       case SupplierClaimStatus.pending:
         return '';
     }
@@ -538,8 +541,115 @@ class _SupplierClaimDetailScreenState extends State<SupplierClaimDetailScreen> {
     );
   }
 
+  /// Turn a rejected claim into inventory losses.
+  ///
+  /// Deliberately a separate act rather than a side effect of rejection: the
+  /// supplier saying no is not the same as the business deciding to absorb the
+  /// cost. Neither stock nor the supplier balance moves — the goods never
+  /// entered inventory and the receipt already billed them.
+  Future<void> _writeOffRejected() async {
+    final confirmed = await showAppConfirmDialog(
+      context: context,
+      title: 'Write off as loss?',
+      message:
+          'Records ${_model.totalQty} units as an inventory loss worth '
+          '${formatMoney(_model.totalAmount)}. The supplier balance does not '
+          'change — these goods were billed on the receipt and the claim was '
+          'refused.',
+      confirmLabel: 'Write Off',
+      accent: AppColors.danger,
+      icon: Icons.money_off_rounded,
+    );
+    if (!confirmed || !mounted) return;
+
+    final numbers = await damagedGoodsStore.writeOffRejectedClaim(
+      _model.claimId,
+    );
+    if (!mounted) return;
+
+    if (numbers.isEmpty) {
+      NotificationService.instance.showError(
+        damagedGoodsStore.errorMessage ?? 'Write-off could not be recorded',
+      );
+      return;
+    }
+
+    final updated = damagedGoodsStore.supplierClaims
+        .where((c) => c.claimId == _model.claimId)
+        .firstOrNull;
+    if (updated != null) setState(() => _model = updated);
+
+    NotificationService.instance.showSuccess(
+      numbers.length == 1
+          ? 'Written off as ${numbers.first}'
+          : 'Written off as ${numbers.length} loss records',
+    );
+  }
+
   Widget _buildActions() {
     final transitions = _availableTransitions;
+
+    // A rejected claim is closed, but the cost still needs somewhere to land.
+    if (_model.statusEnum == SupplierClaimStatus.rejected &&
+        !_model.isLossRecorded) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
+            decoration: BoxDecoration(
+              color: AppColors.danger.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
+            ),
+            child: Text(
+              'The supplier refused this claim, so '
+              '${formatMoney(_model.totalAmount)} stays payable. Record it as a '
+              'business loss to close the paper trail.',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                height: 1.4,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
+          ElevatedButton.icon(
+            onPressed: _writeOffRejected,
+            icon: Icon(
+              Icons.money_off_rounded,
+              size: AppResponsive.smallIconSize(context),
+            ),
+            label: Text(
+              'Write Off as Loss',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              foregroundColor: AppColors.white,
+              elevation: 0,
+              padding: EdgeInsets.symmetric(
+                vertical: AppResponsive.getValue(
+                  context,
+                  mobile: 13.0,
+                  tablet: 15.0,
+                  desktop: 17.0,
+                ),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
 
     if (transitions.isEmpty) {
       return Container(
@@ -552,7 +662,9 @@ class _SupplierClaimDetailScreenState extends State<SupplierClaimDetailScreen> {
           ),
         ),
         child: Text(
-          'This claim is ${_model.statusDisplay.toLowerCase()} and closed — no further action available.',
+          _model.isLossRecorded
+              ? 'This claim was rejected and written off as an inventory loss — no further action available.'
+              : 'This claim is ${_model.statusDisplay.toLowerCase()} and closed — no further action available.',
           textAlign: TextAlign.center,
           style: GoogleFonts.poppins(
             fontSize: AppResponsive.smallFontSize(context),

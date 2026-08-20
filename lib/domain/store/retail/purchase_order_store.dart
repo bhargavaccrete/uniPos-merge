@@ -273,7 +273,10 @@ abstract class _PurchaseOrderStore with Store {
     // Calculate totals
     final totalOrderedQty = items.fold<int>(0, (sum, item) => sum + item.orderedQty);
     final totalReceivedQty = items.fold<int>(0, (sum, item) => sum + item.receivedQty);
-    final totalAmount = items.fold<double>(0.0, (sum, item) => sum + (item.totalAmount ?? 0));
+    // Billable, not accepted: the receipt accrues the full delivered value so
+    // it matches the supplier's invoice.
+    final totalAmount =
+        items.fold<double>(0.0, (sum, item) => sum + (item.billableAmount ?? 0));
 
     final updatedGRN = grn.copyWith(
       totalOrderedQty: totalOrderedQty,
@@ -293,7 +296,10 @@ abstract class _PurchaseOrderStore with Store {
     // Calculate totals
     final totalOrderedQty = items.fold<int>(0, (sum, item) => sum + item.orderedQty);
     final totalReceivedQty = items.fold<int>(0, (sum, item) => sum + item.receivedQty);
-    final totalAmount = items.fold<double>(0.0, (sum, item) => sum + (item.totalAmount ?? 0));
+    // Billable, not accepted: the receipt accrues the full delivered value so
+    // it matches the supplier's invoice.
+    final totalAmount =
+        items.fold<double>(0.0, (sum, item) => sum + (item.billableAmount ?? 0));
 
     final updatedGRN = grn.copyWith(
       totalOrderedQty: totalOrderedQty,
@@ -468,21 +474,22 @@ abstract class _PurchaseOrderStore with Store {
   /// money, exactly as [confirmGRN] treats it.
   POReceiptProgress progressFor(PurchaseOrderModel po) {
     var received = 0;
-    var acceptedAmount = 0.0;
+    var billedAmount = 0.0;
 
     for (final grn in grns) {
       if (grn.poId != po.poId) continue;
       if (grn.statusEnum != GRNStatus.confirmed) continue;
       received += grn.totalReceivedQty;
-      // GRN.totalAmount is built from acceptedQty * costPrice, so it is
-      // already the accepted value — damaged units are excluded.
-      acceptedAmount += grn.totalAmount ?? 0;
+      // GRN.totalAmount is the supplier's invoice value for that receipt —
+      // everything delivered, damaged included. Credits raised afterwards live
+      // on the supplier ledger, not on the order.
+      billedAmount += grn.totalAmount ?? 0;
     }
 
     return POReceiptProgress(
       ordered: po.totalItems,
       received: received,
-      acceptedAmount: acceptedAmount,
+      billedAmount: billedAmount,
     );
   }
 
@@ -550,19 +557,22 @@ abstract class _PurchaseOrderStore with Store {
 
 /// Header-level receiving progress for one PO.
 ///
-/// [remaining] deliberately tracks [received], not [accepted] — that mirrors
-/// the existing completion rule (a PO closes on what physically arrived, while
-/// stock only takes what was accepted). Damaged units therefore reduce
-/// [accepted] without leaving anything outstanding on the order.
+/// [remaining] deliberately tracks [received] — a PO closes on what physically
+/// arrived, while stock only takes what was accepted. Damaged units therefore
+/// leave nothing outstanding on the order.
+///
+/// [billedAmount] is what the supplier invoiced across the confirmed receipts.
+/// Credits from returns and settled claims are NOT netted off here; they are
+/// supplier-ledger events, not order events.
 class POReceiptProgress {
   final int ordered;
   final int received;
-  final double acceptedAmount;
+  final double billedAmount;
 
   const POReceiptProgress({
     required this.ordered,
     required this.received,
-    required this.acceptedAmount,
+    required this.billedAmount,
   });
 
   int get remaining => (ordered - received).clamp(0, ordered);

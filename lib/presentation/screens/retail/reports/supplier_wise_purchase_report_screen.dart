@@ -62,7 +62,11 @@ class SupplierWisePurchaseReportScreen extends StatelessWidget {
         ReportTable.column(context, 'Supplier'),
         ReportTable.column(context, 'Receipts', numeric: true),
         ReportTable.column(context, 'Units', numeric: true),
-        ReportTable.column(context, 'Damaged', numeric: true),
+        // Damaged value splits by whether the supplier can still credit it
+        // back: an open/credited return or a live claim is recoverable, a
+        // write-off or a refused claim is not.
+        ReportTable.column(context, 'Recoverable', numeric: true),
+        ReportTable.column(context, 'Absorbed', numeric: true),
         ReportTable.column(context, 'Amount', numeric: true),
       ],
       rowBuilder: (context, row) => DataRow(
@@ -70,7 +74,15 @@ class SupplierWisePurchaseReportScreen extends StatelessWidget {
           DataCell(Text(row['supplierName'] as String)),
           DataCell(Text('${row['receiptCount']}')),
           DataCell(Text('${row['totalItems']}')),
-          DataCell(Text(formatMoney(row['damagedAmount'] as double))),
+          DataCell(Text(formatMoney(row['damagedRecoverable'] as double))),
+          DataCell(
+            Text(
+              formatMoney(row['damagedAbsorbed'] as double),
+              style: (row['damagedAbsorbed'] as double) > 0
+                  ? const TextStyle(color: AppColors.danger)
+                  : null,
+            ),
+          ),
           DataCell(Text(formatMoney(row['totalAmount'] as double))),
         ],
       ),
@@ -79,7 +91,8 @@ class SupplierWisePurchaseReportScreen extends StatelessWidget {
           'Supplier',
           'Receipts',
           'Units',
-          'Damaged Value',
+          'Damaged Recoverable',
+          'Damaged Absorbed',
           'Amount',
         ],
         rows: rows
@@ -89,7 +102,10 @@ class SupplierWisePurchaseReportScreen extends StatelessWidget {
                 r['receiptCount'],
                 r['totalItems'],
                 ReportExportService.formatCurrency(
-                  r['damagedAmount'] as double,
+                  r['damagedRecoverable'] as double,
+                ),
+                ReportExportService.formatCurrency(
+                  r['damagedAbsorbed'] as double,
                 ),
                 ReportExportService.formatCurrency(r['totalAmount'] as double),
               ],

@@ -23,6 +23,7 @@ import 'package:billberrylite/data/models/retail/hive_model/purchase_return_item
 import 'package:billberrylite/data/models/retail/hive_model/supplier_claim_model_176.dart';
 import 'package:billberrylite/data/models/retail/hive_model/supplier_claim_item_model_177.dart';
 import 'package:billberrylite/data/models/retail/hive_model/inventory_loss_model_178.dart';
+import 'package:billberrylite/data/models/retail/hive_model/supplier_ledger_entry_model_179.dart';
 import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/retail/hive_model/hold_sale_model_209.dart';
 import 'package:billberrylite/data/models/retail/hive_model/hold_sale_item_model_210.dart';
@@ -248,6 +249,9 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailInventoryLoss)) {
       Hive.registerAdapter(InventoryLossModelAdapter());
     }
+    if (!Hive.isAdapterRegistered(HiveTypeIds.retailSupplierLedgerEntry)) {
+      Hive.registerAdapter(SupplierLedgerEntryModelAdapter());
+    }
     // Customer - shared with restaurant (typeId 125, see restaurant section
     // below) — same adapter, retail's own box.
     if (!Hive.isAdapterRegistered(HiveTypeIds.customer)) {
@@ -407,6 +411,7 @@ class HiveInit {
     await Hive.openBox<SaleModel>(HiveBoxNames.sales);
     await Hive.openBox<SaleItemModel>(HiveBoxNames.saleItems);
     await Hive.openBox<SupplierModel>(HiveBoxNames.suppliers);
+    await Hive.openBox<SupplierLedgerEntryModel>(HiveBoxNames.supplierLedger);
     await Hive.openBox<PurchaseReturnModel>(HiveBoxNames.purchaseReturns);
     await Hive.openBox<PurchaseReturnItemModel>(HiveBoxNames.purchaseReturnItems);
     await Hive.openBox<SupplierClaimModel>(HiveBoxNames.supplierClaims);

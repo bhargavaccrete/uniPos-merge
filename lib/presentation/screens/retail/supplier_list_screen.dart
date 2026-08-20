@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 
 import 'package:billberrylite/core/config/phone_rule.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
@@ -10,6 +9,7 @@ import 'package:billberrylite/data/models/retail/hive_model/supplier_model_205.d
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/presentation/screens/retail/supplier_detail_screen.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -45,12 +45,6 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
   void _onSearchChanged(String query) {
     supplierStore.setSearchQuery(query);
     setState(() {});
-  }
-
-  String _formatDate(String isoDate) {
-    final date = DateTime.tryParse(isoDate);
-    if (date == null) return isoDate;
-    return DateFormat('dd MMM yyyy, hh:mm a').format(date);
   }
 
   /// Avatar initial. Guarded because a name could be blank in older data —
@@ -306,256 +300,6 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
     }
   }
 
-  // ==================== DETAILS ====================
-
-  void _showSupplierDetails(SupplierModel supplier) {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => MoneyScope(
-        child: AppDialogShell(
-          title: supplier.name,
-          subtitle: supplier.phone,
-          accent: AppColors.primary,
-          icon: Icons.storefront_rounded,
-          body: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (supplier.address?.isNotEmpty ?? false)
-                _buildDetailRow('Address', supplier.address!),
-              if (supplier.gstNumber?.isNotEmpty ?? false)
-                _buildDetailRow('GST Number', supplier.gstNumber!),
-              _buildDetailRow(
-                'Opening Balance',
-                formatMoney(supplier.openingBalance),
-              ),
-              _buildDetailRow(
-                'Current Balance',
-                formatMoney(supplier.currentBalance.abs()) +
-                    (supplier.currentBalance < 0 ? ' advance' : ''),
-                valueColor: supplier.currentBalance > 0
-                    ? AppColors.danger
-                    : AppColors.success,
-              ),
-              const Divider(height: 20, color: AppColors.divider),
-              _buildDetailRow('Created', _formatDate(supplier.createdAt)),
-              _buildDetailRow('Last Updated', _formatDate(supplier.updatedAt)),
-            ],
-          ),
-          actions: [
-            appDialogCancelButton(dialogContext, label: 'Close'),
-            const SizedBox(width: 12),
-            appDialogPrimaryButton(
-              label: 'Update Balance',
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                _showUpdateBalanceDialog(supplier);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value, {Color? valueColor}) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Capped label column: wide enough for the longest label, but it stops
-          // growing on a laptop so every extra pixel goes to the value.
-          SizedBox(
-            width: AppResponsive.getValue(
-              context,
-              mobile: 110.0,
-              tablet: 130.0,
-              desktop: 150.0,
-            ),
-            child: Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.smallFontSize(context),
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.smallFontSize(context),
-                fontWeight: FontWeight.w500,
-                color: valueColor ?? AppColors.textPrimary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==================== BALANCE ====================
-
-  Future<void> _showUpdateBalanceDialog(SupplierModel supplier) async {
-    final amountController = TextEditingController();
-    bool isDebit = true;
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => DialogDisposeScope(
-        disposables: [amountController],
-        child: MoneyScope(
-          child: StatefulBuilder(
-            builder: (context, setLocalState) => AppDialogShell(
-              title: 'Update Balance',
-              subtitle: 'Current: ${formatMoney(supplier.currentBalance)}',
-              accent: AppColors.primary,
-              icon: Icons.account_balance_wallet_outlined,
-              body: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildBalanceModeTile(
-                    label: 'Purchase (Debit)',
-                    caption: 'Increases what you owe',
-                    selected: isDebit,
-                    onTap: () => setLocalState(() => isDebit = true),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildBalanceModeTile(
-                    label: 'Payment (Credit)',
-                    caption: 'Reduces what you owe',
-                    selected: !isDebit,
-                    onTap: () => setLocalState(() => isDebit = false),
-                  ),
-                  const SizedBox(height: 16),
-                  AppTextField(
-                    controller: amountController,
-                    label: 'Amount',
-                    icon: Icons.currency_rupee_rounded,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(
-                        RegExp(r'^\d*\.?\d{0,2}'),
-                      ),
-                    ],
-                    autofocus: true,
-                  ),
-                ],
-              ),
-              actions: [
-                appDialogCancelButton(dialogContext),
-                const SizedBox(width: 12),
-                appDialogPrimaryButton(
-                  label: 'Update',
-                  onPressed: () async {
-                    final amount = double.tryParse(
-                      amountController.text.trim(),
-                    );
-                    if (amount == null || amount <= 0) {
-                      NotificationService.instance.showError(
-                        'Please enter a valid amount',
-                      );
-                      return;
-                    }
-
-                    try {
-                      await supplierStore.updateSupplierBalance(
-                        supplier.supplierId,
-                        isDebit ? amount : -amount,
-                      );
-                    } catch (e) {
-                      if (!mounted) return;
-                      NotificationService.instance.showError(
-                        'Failed to update balance: $e',
-                      );
-                      return;
-                    }
-
-                    if (!dialogContext.mounted) return;
-                    Navigator.pop(dialogContext);
-                    NotificationService.instance.showSuccess(
-                      'Balance updated successfully',
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBalanceModeTile({
-    required String label,
-    required String caption,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    final radius = AppResponsive.smallBorderRadius(context);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(radius),
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: AppResponsive.mediumSpacing(context),
-          vertical: AppResponsive.smallSpacing(context),
-        ),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppColors.primary.withValues(alpha: 0.06)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(radius),
-          border: Border.all(
-            color: selected ? AppColors.primary : AppColors.divider,
-            width: selected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              selected
-                  ? Icons.radio_button_checked_rounded
-                  : Icons.radio_button_unchecked_rounded,
-              size: AppResponsive.iconSize(context),
-              color: selected ? AppColors.primary : AppColors.textSecondary,
-            ),
-            SizedBox(width: AppResponsive.smallSpacing(context)),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.smallFontSize(context),
-                      fontWeight: FontWeight.w600,
-                      color: selected
-                          ? AppColors.primary
-                          : AppColors.textPrimary,
-                    ),
-                  ),
-                  Text(
-                    caption,
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.captionFontSize(context),
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // ==================== BUILD ====================
 
   /// Caps content width on large screens. Backgrounds still span edge to edge —
@@ -768,7 +512,12 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
         ),
       ),
       child: InkWell(
-        onTap: () => _showSupplierDetails(supplier),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SupplierDetailScreen(supplier: supplier),
+          ),
+        ),
         borderRadius: BorderRadius.circular(radius),
         child: Padding(
           // Right stays tight — the popup menu carries its own tap padding.

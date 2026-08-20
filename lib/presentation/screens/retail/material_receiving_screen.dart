@@ -13,6 +13,7 @@ import '../../../core/di/service_locator.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model_211.dart';
 import 'package:billberrylite/data/models/retail/hive_model/grn_model_213.dart';
 import 'package:billberrylite/data/models/retail/hive_model/grn_item_model_214.dart';
+import 'package:billberrylite/data/models/retail/hive_model/supplier_ledger_entry_model_179.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 
@@ -468,6 +469,13 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
       0.0,
       (sum, item) => sum + item.acceptedAmount,
     );
+    // What the supplier is owed for this receipt. Accrued in full so the GRN
+    // matches their invoice; damaged units come back later as a credit note or
+    // a settled claim, if at all.
+    final totalBillableAmount = _receivingItems.fold<double>(
+      0.0,
+      (sum, item) => sum + item.billableAmount,
+    );
     final totalDamagedAmount = _receivingItems.fold<double>(
       0.0,
       (sum, item) => sum + item.damagedAmount,
@@ -496,8 +504,9 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
       receivedDate: _receivedDate.toIso8601String(),
       totalOrderedQty: totalOrdered,
       totalReceivedQty: totalReceived,
-      totalAmount:
-          totalAcceptedAmount, // Only accepted amount goes to stock value
+      // The supplier's invoice value, not the stock value — damaged units are
+      // billed too.
+      totalAmount: totalBillableAmount,
       invoiceNumber: _invoiceController.text.isEmpty
           ? null
           : _invoiceController.text.trim(),
@@ -549,9 +558,21 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
               _buildConfirmItem(
                 'Stock value ${formatMoney(totalAcceptedAmount)}',
               ),
-              _buildConfirmItem(
-                'Supplier billed ${formatMoney(totalAcceptedAmount)}',
+
+              const SizedBox(height: 14),
+              _confirmSection(
+                'Supplier is billed',
+                Icons.request_quote_outlined,
+                AppColors.primary,
               ),
+              _buildConfirmItem(
+                '${formatMoney(totalBillableAmount)} for all $totalReceived items received',
+              ),
+              if (totalDamaged > 0)
+                _buildConfirmItem(
+                  'Damaged units are billed too — this matches the supplier invoice',
+                  color: AppColors.textSecondary,
+                ),
 
               if (totalDamaged > 0) ...[
                 const SizedBox(height: 14),
@@ -561,22 +582,22 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                   AppColors.danger,
                 ),
                 _buildConfirmItem(
-                  '$totalDamaged damaged (${formatMoney(totalDamagedAmount)}), not billed',
+                  '$totalDamaged damaged, worth ${formatMoney(totalDamagedAmount)}',
                   color: AppColors.danger,
                 ),
                 if (returnToSupplierItems.isNotEmpty)
                   _buildConfirmItem(
-                    '${returnToSupplierItems.fold<int>(0, (s, i) => s + i.damagedQty)} → purchase return raised',
+                    '${returnToSupplierItems.fold<int>(0, (s, i) => s + i.damagedQty)} → purchase return raised, credited when the credit note arrives',
                     color: AppColors.info,
                   ),
                 if (keepForClaimItems.isNotEmpty)
                   _buildConfirmItem(
-                    '${keepForClaimItems.fold<int>(0, (s, i) => s + i.damagedQty)} → supplier claim opened',
+                    '${keepForClaimItems.fold<int>(0, (s, i) => s + i.damagedQty)} → supplier claim opened, credited only if it is settled',
                     color: AppColors.warning,
                   ),
                 if (writeOffItems.isNotEmpty)
                   _buildConfirmItem(
-                    '${writeOffItems.fold<int>(0, (s, i) => s + i.damagedQty)} → written off as loss',
+                    '${writeOffItems.fold<int>(0, (s, i) => s + i.damagedQty)} → written off, a cost the business absorbs',
                     color: AppColors.textSecondary,
                   ),
               ],
@@ -654,10 +675,18 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
       }
     }
 
-    // Update supplier balance - only for accepted items value
-    await supplierStore.updateSupplierBalance(
-      widget.purchaseOrder.supplierId,
-      totalAcceptedAmount,
+    // Accrue the full delivered value against the supplier. Damaged units are
+    // recovered afterwards by the documents created below — a return's credit
+    // note or a settled claim — and a write-off recovers nothing, which is what
+    // makes it a genuine cost.
+    await supplierStore.recordBalanceMovement(
+      supplierId: widget.purchaseOrder.supplierId,
+      amount: totalBillableAmount,
+      type: SupplierLedgerType.purchase,
+      description: 'Goods received against ${widget.purchaseOrder.poNumber}',
+      docNumber: grn.grnNumber,
+      docId: grn.grnId,
+      date: _receivedDate.toIso8601String(),
     );
 
     // Turn the damaged-handling choices into real documents. Runs last and
@@ -1439,8 +1468,14 @@ class ReceivingItemData {
   /// Accepted quantity = received - damaged (only good items go to stock)
   int get acceptedQty => receivedQty - damagedQty;
 
-  /// Amount for accepted items only
+  /// Amount for accepted items only — this is inventory value, NOT what the
+  /// supplier is owed. See [billableAmount].
   double get acceptedAmount => acceptedQty * costPrice;
+
+  /// What the supplier invoices for this line: everything delivered, damaged
+  /// included. Damaged units are recovered later through a return credit note
+  /// or a settled claim, never by shrinking the original bill.
+  double get billableAmount => receivedQty * costPrice;
 
   /// Amount for damaged items (for claims/returns)
   double get damagedAmount => damagedQty * costPrice;

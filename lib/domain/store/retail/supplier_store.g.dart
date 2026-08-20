@@ -144,13 +144,33 @@ mixin _$SupplierStore on _SupplierStore, Store {
     return _$searchSuppliersAsyncAction.run(() => super.searchSuppliers(query));
   }
 
-  late final _$updateSupplierBalanceAsyncAction =
-      AsyncAction('_SupplierStore.updateSupplierBalance', context: context);
+  late final _$recordBalanceMovementAsyncAction =
+      AsyncAction('_SupplierStore.recordBalanceMovement', context: context);
 
   @override
-  Future<void> updateSupplierBalance(String supplierId, double amount) {
-    return _$updateSupplierBalanceAsyncAction
-        .run(() => super.updateSupplierBalance(supplierId, amount));
+  Future<void> recordBalanceMovement(
+      {required String supplierId,
+      required double amount,
+      required SupplierLedgerType type,
+      required String description,
+      String? docNumber,
+      String? docId,
+      String? paymentMode,
+      String? referenceNo,
+      String? note,
+      String? date}) {
+    return _$recordBalanceMovementAsyncAction.run(() => super
+        .recordBalanceMovement(
+            supplierId: supplierId,
+            amount: amount,
+            type: type,
+            description: description,
+            docNumber: docNumber,
+            docId: docId,
+            paymentMode: paymentMode,
+            referenceNo: referenceNo,
+            note: note,
+            date: date));
   }
 
   late final _$_SupplierStoreActionController =

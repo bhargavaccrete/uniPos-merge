@@ -35,13 +35,14 @@ class PurchaseReturnModelAdapter extends TypeAdapter<PurchaseReturnModel> {
       notes: fields[15] as String?,
       createdAt: fields[16] as String,
       updatedAt: fields[17] as String,
+      creditApplied: fields[18] as bool?,
     );
   }
 
   @override
   void write(BinaryWriter writer, PurchaseReturnModel obj) {
     writer
-      ..writeByte(18)
+      ..writeByte(19)
       ..writeByte(0)
       ..write(obj.returnId)
       ..writeByte(1)
@@ -77,7 +78,9 @@ class PurchaseReturnModelAdapter extends TypeAdapter<PurchaseReturnModel> {
       ..writeByte(16)
       ..write(obj.createdAt)
       ..writeByte(17)
-      ..write(obj.updatedAt);
+      ..write(obj.updatedAt)
+      ..writeByte(18)
+      ..write(obj.creditApplied);
   }
 
   @override

@@ -4,6 +4,8 @@
 
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/retail/hive_model/grn_model_213.dart';
+import 'package:billberrylite/data/models/retail/hive_model/purchase_return_model_174.dart';
+import 'package:billberrylite/data/models/retail/hive_model/supplier_claim_model_176.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model_211.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
@@ -470,12 +472,14 @@ class ReportService {
   /// Reads confirmed GRNs, not purchase orders. The previous version summed
   /// `po.estimatedTotal` across every PO regardless of status, so drafts and
   /// cancelled orders inflated it and the figure was an estimate rather than
-  /// spend. `GRNModel.totalAmount` is already accepted-only value.
+  /// spend. `GRNModel.totalAmount` is the supplier's invoice value for that
+  /// receipt. Credits from returns and settled claims are supplier-ledger
+  /// events and are deliberately NOT netted off here — see the damaged columns.
   Future<List<Map<String, dynamic>>> getSupplierWisePurchaseReport(
       {DateTime? startDate, DateTime? endDate}) async {
     final receipts = _confirmedGRNs(startDate: startDate, endDate: endDate);
     final suppliers = supplierStore.suppliers;
-    final damagedByGRN = await _damagedValueByGRN();
+    final damagedByGRN = _damagedRecoveryByGRN();
 
     final stats = <String, Map<String, dynamic>>{};
 
@@ -494,15 +498,24 @@ class ReportService {
           'totalItems': 0,
           'totalAmount': 0.0,
           'damagedAmount': 0.0,
+          'damagedRecoverable': 0.0,
+          'damagedAbsorbed': 0.0,
         },
       );
+
+      final damaged = damagedByGRN[grn.grnId];
 
       entry['receiptCount'] = (entry['receiptCount'] as int) + 1;
       entry['totalItems'] = (entry['totalItems'] as int) + grn.totalReceivedQty;
       entry['totalAmount'] =
           (entry['totalAmount'] as double) + (grn.totalAmount ?? 0);
-      entry['damagedAmount'] = (entry['damagedAmount'] as double) +
-          (damagedByGRN[grn.grnId] ?? 0);
+      entry['damagedRecoverable'] =
+          (entry['damagedRecoverable'] as double) + (damaged?.recoverable ?? 0);
+      entry['damagedAbsorbed'] =
+          (entry['damagedAbsorbed'] as double) + (damaged?.absorbed ?? 0);
+      // Kept as the combined figure for any reader that only wants one number.
+      entry['damagedAmount'] =
+          (entry['damagedAmount'] as double) + (damaged?.total ?? 0);
     }
 
     return stats.values.toList()
@@ -1024,13 +1037,46 @@ class ReportService {
 
   /// Damaged value per GRN. GRN headers only carry accepted value, so the
   /// damaged side has to come from the line items.
-  Future<Map<String, double>> _damagedValueByGRN() async {
-    final items = await GRNItemRepository().getAllGRNItems();
-    final byGRN = <String, double>{};
-    for (final item in items) {
-      if ((item.damagedQty ?? 0) <= 0) continue;
-      byGRN[item.grnId] = (byGRN[item.grnId] ?? 0) + (item.damagedAmount ?? 0);
+  /// Damaged value per GRN, split by whether it can still come back.
+  ///
+  /// Derived from the damaged-goods DOCUMENTS, not from the GRN line's
+  /// `damagedHandling`. Handling is chosen once at receipt, but the outcome is
+  /// decided later — a claim can be rejected weeks on. Reading the documents
+  /// makes the report self-correct as statuses change; reading the line would
+  /// freeze a rejected claim as recoverable forever.
+  ///
+  /// A rejected claim that has already been written off is counted through its
+  /// loss records instead, so the same value never lands in `absorbed` twice.
+  Map<String, _DamagedRecovery> _damagedRecoveryByGRN() {
+    final byGRN = <String, _DamagedRecovery>{};
+    _DamagedRecovery entry(String grnId) =>
+        byGRN.putIfAbsent(grnId, () => _DamagedRecovery());
+
+    for (final r in damagedGoodsStore.purchaseReturns) {
+      // A cancelled return means the goods never went back, so the value the
+      // receipt billed stays with the business.
+      if (r.statusEnum == PurchaseReturnStatus.cancelled) {
+        entry(r.grnId).absorbed += r.totalAmount;
+      } else {
+        entry(r.grnId).recoverable += r.totalAmount;
+      }
     }
+
+    for (final c in damagedGoodsStore.supplierClaims) {
+      if (c.statusEnum != SupplierClaimStatus.rejected) {
+        entry(c.grnId).recoverable += c.totalAmount;
+      } else if (!c.isLossRecorded) {
+        // Written-off rejections are counted via their loss rows below.
+        entry(c.grnId).absorbed += c.totalAmount;
+      }
+    }
+
+    for (final l in damagedGoodsStore.inventoryLosses) {
+      final grnId = l.grnId;
+      if (grnId == null) continue;
+      entry(grnId).absorbed += l.lossValue;
+    }
+
     return byGRN;
   }
 
@@ -1041,7 +1087,8 @@ class ReportService {
         .fold<int>(0, (sum, g) => sum + g.totalReceivedQty);
   }
 
-  /// Accepted value received against a PO across its confirmed GRNs.
+  /// Value billed against a PO across its confirmed GRNs — the supplier's
+  /// invoice value, damaged units included.
   double _receivedValueForPO(String poId) {
     return purchaseOrderStore.grns
         .where((g) => g.poId == poId && g.statusEnum == GRNStatus.confirmed)
@@ -1059,7 +1106,7 @@ class ReportService {
         .toList();
 
     final receipts = _confirmedGRNs(startDate: startDate, endDate: endDate);
-    final damagedByGRN = await _damagedValueByGRN();
+    final damagedByGRN = _damagedRecoveryByGRN();
 
     // Every status, including draft and cancelled — this breakdown is meant to
     // account for all of them.
@@ -1078,8 +1125,10 @@ class ReportService {
             po.statusEnum != POStatus.cancelled)
         .toList();
 
-    final damagedValue = receipts.fold<double>(
-        0, (sum, g) => sum + (damagedByGRN[g.grnId] ?? 0));
+    final damagedRecoverable = receipts.fold<double>(
+        0, (sum, g) => sum + (damagedByGRN[g.grnId]?.recoverable ?? 0));
+    final damagedAbsorbed = receipts.fold<double>(
+        0, (sum, g) => sum + (damagedByGRN[g.grnId]?.absorbed ?? 0));
 
     // Value still expected on orders that are placed but not fully received.
     final outstandingValue = orders
@@ -1105,7 +1154,9 @@ class ReportService {
           placedOrders.fold<double>(0, (sum, po) => sum + po.estimatedTotal),
       'receivedValue':
           receipts.fold<double>(0, (sum, g) => sum + (g.totalAmount ?? 0)),
-      'damagedValue': damagedValue,
+      'damagedValue': damagedRecoverable + damagedAbsorbed,
+      'damagedRecoverable': damagedRecoverable,
+      'damagedAbsorbed': damagedAbsorbed,
       'outstandingValue': outstandingValue,
       'supplierCount': receipts.map((g) => g.supplierId).toSet().length,
     };
@@ -1249,4 +1300,19 @@ class ReportService {
             })
         .toList();
   }
+}
+
+/// Damaged value for one GRN, split by whether the business can still get it
+/// back from the supplier.
+///
+/// Mutable on purpose — it is accumulated in a single pass over three document
+/// lists and never escapes [ReportService].
+class _DamagedRecovery {
+  /// Open or credited returns, plus claims not yet refused.
+  double recoverable = 0;
+
+  /// Write-offs, refused claims and cancelled returns — cost the business keeps.
+  double absorbed = 0;
+
+  double get total => recoverable + absorbed;
 }

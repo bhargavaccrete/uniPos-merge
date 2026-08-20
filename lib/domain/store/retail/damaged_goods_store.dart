@@ -7,9 +7,11 @@ import '../../../data/models/retail/hive_model/purchase_return_item_model_175.da
 import '../../../data/models/retail/hive_model/purchase_return_model_174.dart';
 import '../../../data/models/retail/hive_model/supplier_claim_item_model_177.dart';
 import '../../../data/models/retail/hive_model/supplier_claim_model_176.dart';
+import '../../../data/models/retail/hive_model/supplier_ledger_entry_model_179.dart';
 import '../../../data/repositories/retail/inventory_loss_repository.dart';
 import '../../../data/repositories/retail/purchase_return_repository.dart';
 import '../../../data/repositories/retail/supplier_claim_repository.dart';
+import '../../../core/di/service_locator.dart';
 import '../../services/retail/document_number_service.dart';
 
 part 'damaged_goods_store.g.dart';
@@ -22,11 +24,21 @@ class DamagedGoodsStore = _DamagedGoodsStore with _$DamagedGoodsStore;
 /// One store for all three follows `PurchaseOrderStore`, which already owns
 /// both PO and GRN. Three near-identical stores would be duplication.
 ///
-/// **Neither stock nor supplier balance is touched anywhere in here, by
-/// design.** Damaged units are excluded from `acceptedQty` at GRN confirm, so
-/// they never entered inventory, and the GRN bills `totalAcceptedAmount`, so
-/// they were never charged. These records describe what happens to goods that
-/// sit outside both ledgers.
+/// **Stock is never touched here; the supplier balance is — on credit events
+/// only.** Damaged units are excluded from `acceptedQty` at GRN confirm, so
+/// they never entered inventory and nothing in here may add or remove any.
+///
+/// They WERE billed, though: a GRN accrues the full received value so it
+/// matches the supplier's invoice. Recovering that value is what these
+/// documents are for, and each recovers it at a different moment:
+///
+/// | Document | Credit event | Amount |
+/// |---|---|---|
+/// | Purchase return | credit note recorded | the note's face value |
+/// | Supplier claim | status reaches `settled` | the claim total |
+/// | Inventory loss | none — the business absorbs it | — |
+///
+/// Every credit is guarded by a persisted flag so it applies exactly once.
 abstract class _DamagedGoodsStore with Store {
   late final PurchaseReturnRepository _returnRepository;
   late final SupplierClaimRepository _claimRepository;
@@ -39,6 +51,9 @@ abstract class _DamagedGoodsStore with Store {
 
   /// Default reason stamped on a write-off raised from receiving.
   static const String damagedOnReceiptReason = 'Damaged on receipt';
+
+  /// Reason stamped on a write-off raised after a claim was rejected.
+  static const String claimRejectedReason = 'Supplier claim rejected';
 
   @observable
   ObservableList<PurchaseReturnModel> purchaseReturns =
@@ -251,8 +266,14 @@ abstract class _DamagedGoodsStore with Store {
 
   /// Record the supplier's credit note against a return.
   ///
-  /// Still no balance movement — the damaged units were never billed, so there
-  /// is nothing to credit back. This closes the paper trail only.
+  /// **This is the return's credit event.** The GRN billed these units when the
+  /// goods arrived, so the supplier balance drops here — by the note's face
+  /// value, which may be less than the return total when the supplier only
+  /// credits part of it.
+  ///
+  /// [PurchaseReturnModel.creditAdjustment] owns the decision and returns `0`
+  /// once [PurchaseReturnModel.creditApplied] is set, so recording a note twice
+  /// cannot credit twice.
   @action
   Future<bool> recordCreditNote({
     required String returnId,
@@ -263,18 +284,44 @@ abstract class _DamagedGoodsStore with Store {
     final existing = _returnRepository.getById(returnId);
     if (existing == null) return false;
 
+    final creditAmount = amount ?? existing.totalAmount;
+    final adjustment =
+        PurchaseReturnModel.creditAdjustment(existing, creditAmount);
+
     final updated = existing.copyWith(
       status: PurchaseReturnStatus.creditReceived.name,
       creditNoteNumber: creditNoteNumber,
       creditNoteDate: date ?? DateTime.now().toIso8601String(),
-      creditNoteAmount: amount ?? existing.totalAmount,
+      creditNoteAmount: creditAmount,
+      creditApplied: adjustment != 0 ? true : null,
     );
 
     await _returnRepository.save(updated);
+
+    // Balance last: the return is already persisted as credited, so a failure
+    // here can't leave a flag claiming a credit that never landed.
+    if (adjustment != 0) {
+      await supplierStore.recordBalanceMovement(
+        supplierId: existing.supplierId,
+        amount: adjustment,
+        type: SupplierLedgerType.returnCredit,
+        description: 'Credit note $creditNoteNumber',
+        docNumber: existing.returnNumber,
+        docId: existing.returnId,
+        referenceNo: creditNoteNumber,
+        date: updated.creditNoteDate,
+      );
+    }
+
     _replaceReturn(updated);
     return true;
   }
 
+  /// Withdraw a return that is no longer expected.
+  ///
+  /// **No balance movement, deliberately.** The goods never went back, so the
+  /// liability the GRN accrued for them still stands. Cancelling only stops the
+  /// business waiting for a credit note that isn't coming.
   @action
   Future<bool> cancelPurchaseReturn(String returnId, {String? reason}) async {
     final existing = _returnRepository.getById(returnId);
@@ -308,6 +355,15 @@ abstract class _DamagedGoodsStore with Store {
   /// Move a claim through its lifecycle. Only a pending claim can be approved
   /// or rejected; only an approved claim can be settled — so a rejected claim
   /// can't quietly become settled later.
+  ///
+  /// **Settlement is the claim's credit event.** The GRN billed these units, so
+  /// reaching `settled` reduces the supplier balance by the claim total.
+  /// Approval moves nothing (the supplier has agreed, not paid) and rejection
+  /// leaves the full amount payable.
+  ///
+  /// [SupplierClaimModel.claimBalanceAdjustment] owns that decision and returns
+  /// `0` once `creditApplied` is set, so the credit lands exactly once even if
+  /// the lifecycle guard is ever loosened.
   @action
   Future<bool> updateClaimStatus({
     required String claimId,
@@ -333,16 +389,100 @@ abstract class _DamagedGoodsStore with Store {
     final closes = status == SupplierClaimStatus.rejected ||
         status == SupplierClaimStatus.settled;
 
+    final adjustment =
+        SupplierClaimModel.claimBalanceAdjustment(existing, status);
+
     final updated = existing.copyWith(
       status: status.name,
       resolutionNote: resolutionNote,
       resolvedAt: closes ? DateTime.now().toIso8601String() : null,
+      creditApplied: adjustment != 0 ? true : null,
     );
 
     await _claimRepository.save(updated);
+
+    if (adjustment != 0) {
+      await supplierStore.recordBalanceMovement(
+        supplierId: existing.supplierId,
+        amount: adjustment,
+        type: SupplierLedgerType.claimCredit,
+        description: 'Claim ${existing.claimNumber} settled',
+        docNumber: existing.claimNumber,
+        docId: existing.claimId,
+        date: updated.resolvedAt,
+      );
+    }
+
     final index = supplierClaims.indexWhere((c) => c.claimId == claimId);
     if (index != -1) supplierClaims[index] = updated;
     return true;
+  }
+
+  /// Write a rejected claim off as an inventory loss.
+  ///
+  /// Deliberately manual: the supplier refusing a claim is not by itself a
+  /// decision to absorb the cost, so this stays a separate act the user takes
+  /// from the claim screen rather than a side effect of rejection.
+  ///
+  /// **Touches neither stock nor the supplier balance.** The units never
+  /// entered inventory, and the liability the GRN accrued for them is exactly
+  /// what makes this a real loss — so it stays.
+  ///
+  /// Returns the loss numbers created, or an empty list when the claim isn't
+  /// rejected or was already written off.
+  @action
+  Future<List<String>> writeOffRejectedClaim(String claimId) async {
+    final claim = _claimRepository.getById(claimId);
+    if (claim == null ||
+        claim.statusEnum != SupplierClaimStatus.rejected ||
+        claim.isLossRecorded) {
+      return [];
+    }
+
+    try {
+      final lines = await _claimRepository.getItems(claimId);
+      if (lines.isEmpty) return [];
+
+      final created = <InventoryLossModel>[];
+      for (final line in lines) {
+        final number = await _numbers.next(
+          _lossPrefix,
+          isTaken: (n) => inventoryLosses.any((l) => l.lossNumber == n),
+        );
+
+        created.add(InventoryLossModel.create(
+          lossNumber: number,
+          source: InventoryLossSource.claimRejected,
+          grnId: claim.grnId,
+          grnNumber: claim.grnNumber,
+          grnItemId: line.grnItemId,
+          poId: claim.poId,
+          supplierId: claim.supplierId,
+          supplierName: claim.supplierName,
+          variantId: line.variantId,
+          productId: line.productId,
+          productName: line.productName,
+          variantInfo: line.variantInfo,
+          quantity: line.claimedQty,
+          costPrice: line.costPrice,
+          reason: claimRejectedReason,
+          note: 'Claim ${claim.claimNumber} rejected by supplier',
+        ));
+      }
+
+      await _lossRepository.saveAll(created);
+      inventoryLosses.insertAll(0, created);
+
+      final updated = claim.copyWith(lossRecorded: true);
+      await _claimRepository.save(updated);
+      final index = supplierClaims.indexWhere((c) => c.claimId == claimId);
+      if (index != -1) supplierClaims[index] = updated;
+
+      return created.map((l) => l.lossNumber).toList();
+    } catch (e) {
+      errorMessage = 'Write-off could not be recorded: $e';
+      return [];
+    }
   }
 
   Future<List<SupplierClaimItemModel>> getClaimItems(String claimId) =>

@@ -113,8 +113,13 @@ class _PurchaseReturnDetailScreenState
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Recording a credit note closes the return. It does not change '
-                  'the supplier balance — damaged units were never billed.',
+                  _model.isCreditApplied
+                      ? 'This return was already credited. Saving again updates '
+                        'the note details only — the supplier balance will not '
+                        'move a second time.'
+                      : 'Recording a credit note closes the return and reduces '
+                        'the supplier balance by the credit amount. The receipt '
+                        'billed these units, so this is what claws that back.',
                   style: GoogleFonts.poppins(
                     fontSize: AppResponsive.captionFontSize(context),
                     height: 1.4,
@@ -152,10 +157,13 @@ class _PurchaseReturnDetailScreenState
                     return;
                   }
 
+                  final credited = !_model.isCreditApplied;
                   Navigator.pop(dialogContext);
                   _refreshFromStore();
                   NotificationService.instance.showSuccess(
-                    'Credit note recorded',
+                    credited
+                        ? 'Credit note recorded — supplier balance reduced'
+                        : 'Credit note details updated',
                   );
                 },
               ),

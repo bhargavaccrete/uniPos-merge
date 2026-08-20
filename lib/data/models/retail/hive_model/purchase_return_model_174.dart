@@ -19,11 +19,14 @@ enum PurchaseReturnStatus {
 /// Purchase Return — goods going back to the supplier because they arrived
 /// damaged and were marked `DamagedHandling.returnToSupplier` on a GRN.
 ///
-/// **This document moves no money and no stock, by design.** Damaged units are
-/// excluded from `acceptedQty`, so they never entered inventory, and the GRN
-/// only bills `totalAcceptedAmount`, so they were never charged. The return is
-/// the audit trail of what is going back plus a place to record the supplier's
-/// credit note when it arrives.
+/// **No stock movement, but it does move money — later.** Damaged units are
+/// excluded from `acceptedQty`, so they never entered inventory and nothing
+/// here touches it. The receipt DID bill them though: a GRN accrues the full
+/// received value, matching the supplier's invoice. This return is the claim to
+/// get that value back, and the supplier balance drops when the credit note is
+/// recorded — not when the return is raised.
+///
+/// [creditApplied] makes that credit exactly-once. See [creditAdjustment].
 ///
 /// One GRN can raise several returns (partial returns), so the link is
 /// many-to-one on [grnId].
@@ -88,6 +91,14 @@ class PurchaseReturnModel extends HiveObject {
   @HiveField(17)
   final String updatedAt;
 
+  /// True once the credit note reduced the supplier balance. Guards against a
+  /// second `recordCreditNote` crediting the same return twice.
+  ///
+  /// Nullable so returns written before credits existed deserialize as `false`
+  /// instead of failing the adapter's cast. Read through [isCreditApplied].
+  @HiveField(18)
+  final bool? creditApplied;
+
   PurchaseReturnModel({
     required this.returnId,
     required this.returnNumber,
@@ -107,6 +118,7 @@ class PurchaseReturnModel extends HiveObject {
     this.notes,
     required this.createdAt,
     required this.updatedAt,
+    this.creditApplied,
   });
 
   factory PurchaseReturnModel.create({
@@ -148,6 +160,24 @@ class PurchaseReturnModel extends HiveObject {
 
   bool get isOpen => statusEnum == PurchaseReturnStatus.pending;
 
+  /// Whether the supplier balance has already been credited for this return.
+  bool get isCreditApplied => creditApplied == true;
+
+  /// Signed supplier-balance adjustment that recording a credit note should
+  /// apply — negative because a credit reduces what is owed. `0` means make no
+  /// balance change at all.
+  ///
+  /// Pure and static so the money decision can be tested without Hive or the
+  /// service locator; [_DamagedGoodsStore.recordCreditNote] is the only caller
+  /// that turns a non-zero result into an actual write.
+  ///
+  /// [noteAmount] is the credit note's face value, which may be less than
+  /// [totalAmount] when the supplier only credits part of the return.
+  static double creditAdjustment(PurchaseReturnModel r, double? noteAmount) {
+    if (r.isCreditApplied) return 0;
+    return -(noteAmount ?? r.totalAmount);
+  }
+
   String get statusDisplay {
     switch (statusEnum) {
       case PurchaseReturnStatus.pending:
@@ -178,6 +208,7 @@ class PurchaseReturnModel extends HiveObject {
         'notes': notes,
         'createdAt': createdAt,
         'updatedAt': updatedAt,
+        'creditApplied': creditApplied,
       };
 
   factory PurchaseReturnModel.fromMap(Map<String, dynamic> map) {
@@ -200,6 +231,7 @@ class PurchaseReturnModel extends HiveObject {
       notes: map['notes'] as String?,
       createdAt: map['createdAt'] as String,
       updatedAt: map['updatedAt'] as String,
+      creditApplied: map['creditApplied'] as bool?,
     );
   }
 
@@ -212,6 +244,7 @@ class PurchaseReturnModel extends HiveObject {
     double? creditNoteAmount,
     String? notes,
     String? updatedAt,
+    bool? creditApplied,
   }) {
     return PurchaseReturnModel(
       returnId: returnId,
@@ -232,6 +265,7 @@ class PurchaseReturnModel extends HiveObject {
       notes: notes ?? this.notes,
       createdAt: createdAt,
       updatedAt: updatedAt ?? DateTime.now().toIso8601String(),
+      creditApplied: creditApplied ?? this.creditApplied,
     );
   }
 }
