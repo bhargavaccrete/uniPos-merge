@@ -121,6 +121,19 @@ class SaleModel extends HiveObject {
   @HiveField(30)
   final bool? isTaxInclusive;
 
+  /// How much of [discountAmount] came from PER-LINE discounts rather than the
+  /// order-level one.
+  ///
+  /// Stored so the receipt can print "Item Discounts" and "Bill Discount" as
+  /// separate rows without folding over the sale's items, and so the split is
+  /// explicit in the record rather than inferred. `discountType`/`discountValue`
+  /// describe only the ORDER-level part.
+  ///
+  /// Null on every sale written before line discounts existed, which correctly
+  /// reads as "all of the discount was order-level".
+  @HiveField(31)
+  final double? lineDiscountTotal;
+
   SaleModel({
     required this.saleId,
     this.customerId,
@@ -153,6 +166,7 @@ class SaleModel extends HiveObject {
     this.loyaltyPointsUsed,
     this.roundOff,
     this.isTaxInclusive,
+    this.lineDiscountTotal,
   })  : isReturn = isReturn ?? false,
         paidAmount = paidAmount ?? totalAmount,
         dueAmount = dueAmount ?? 0.0,
@@ -260,6 +274,7 @@ class SaleModel extends HiveObject {
     int? loyaltyPointsUsed,
     double? roundOff,
     bool? isTaxInclusive,
+    double? lineDiscountTotal,
     /// When the customer tenders less than [grandTotal], pass what was actually
     /// collected. The remainder is recorded as due and the sale is marked
     /// partially paid rather than paid.
@@ -312,6 +327,7 @@ class SaleModel extends HiveObject {
       loyaltyPointsUsed: loyaltyPointsUsed,
       roundOff: roundOff,
       isTaxInclusive: isTaxInclusive,
+      lineDiscountTotal: lineDiscountTotal,
       paidAmount: collected,
       dueAmount: isShort ? due : 0.0,
       status: isShort ? SaleStatus.partiallyPaid : SaleStatus.paid,
@@ -354,6 +370,7 @@ class SaleModel extends HiveObject {
     int? loyaltyPointsUsed,
     double? roundOff,
     bool? isTaxInclusive,
+    double? lineDiscountTotal,
   }) {
     final now = DateTime.now().toIso8601String();
     final cgst = double.parse((totalGstAmount / 2).toStringAsFixed(2));
@@ -391,6 +408,7 @@ class SaleModel extends HiveObject {
       loyaltyPointsUsed: loyaltyPointsUsed,
       roundOff: roundOff,
       isTaxInclusive: isTaxInclusive,
+      lineDiscountTotal: lineDiscountTotal,
     );
   }
 
@@ -447,6 +465,7 @@ class SaleModel extends HiveObject {
     int? loyaltyPointsUsed,
     double? roundOff,
     bool? isTaxInclusive,
+    double? lineDiscountTotal,
   }) {
     return SaleModel(
       saleId: saleId ?? this.saleId,
@@ -485,6 +504,7 @@ class SaleModel extends HiveObject {
       loyaltyPointsUsed: loyaltyPointsUsed ?? this.loyaltyPointsUsed,
       roundOff: roundOff ?? this.roundOff,
       isTaxInclusive: isTaxInclusive ?? this.isTaxInclusive,
+      lineDiscountTotal: lineDiscountTotal ?? this.lineDiscountTotal,
     );
   }
 
@@ -528,6 +548,7 @@ class SaleModel extends HiveObject {
       'loyaltyPointsUsed': loyaltyPointsUsed,
       'roundOff': roundOff,
       'isTaxInclusive': isTaxInclusive,
+      'lineDiscountTotal': lineDiscountTotal,
     };
   }
 
@@ -576,6 +597,8 @@ class SaleModel extends HiveObject {
       loyaltyPointsUsed: (map['loyaltyPointsUsed'] as num?)?.toInt(),
       roundOff: (map['roundOff'] as num?)?.toDouble(),
       isTaxInclusive: map['isTaxInclusive'] as bool?,
+      lineDiscountTotal:
+          (map['lineDiscountTotal'] as num?)?.toDouble(),
     );
   }
 }

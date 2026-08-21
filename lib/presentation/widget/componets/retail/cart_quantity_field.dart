@@ -171,7 +171,10 @@ class _CartQuantityFieldState extends State<CartQuantityField> {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 58,
+      // Tight on purpose: the cart row also carries a name, a price line that
+      // may show an override AND a discount, a line total and the actions menu.
+      // 52 still fits four digits at the field's 14px font.
+      width: 52,
       child: AppTextField(
         controller: _controller,
         focusNode: _focusNode,

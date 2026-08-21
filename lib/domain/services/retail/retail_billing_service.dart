@@ -17,8 +17,17 @@ class RetailBillLine {
   /// price * qty, before any discount.
   final double originalAmount;
 
-  /// This line's share of the order discount.
+  /// TOTAL discount on this line — its own line discount plus its share of the
+  /// order discount. This is what gets persisted onto `SaleItemModel`.
   final double discountAmount;
+
+  /// The part of [discountAmount] that belonged to this line alone, after the
+  /// engine's cap. A SUBSET of [discountAmount] — never add the two together.
+  ///
+  /// Persist THIS rather than the cart row's stored figure: a ₹500 discount
+  /// typed on a ₹300 line is capped to ₹300 here, and a receipt printing the
+  /// uncapped ₹500 would stop reconciling.
+  final double lineDiscountAmount;
 
   /// Base this line is taxed on — after discount and loyalty redemption.
   final double taxableAmount;
@@ -34,6 +43,7 @@ class RetailBillLine {
     required this.item,
     required this.originalAmount,
     required this.discountAmount,
+    required this.lineDiscountAmount,
     required this.taxableAmount,
     required this.gstAmount,
     required this.cgstAmount,
@@ -43,6 +53,10 @@ class RetailBillLine {
 
   /// What this line contributes to the grand total.
   double get total => taxableAmount + gstAmount;
+
+  /// This line's share of the ORDER-level discount. Derived, so it can never
+  /// disagree with the two figures it comes from.
+  double get billDiscountAmount => discountAmount - lineDiscountAmount;
 }
 
 /// The computed result of a retail bill. Every retail screen that creates a
@@ -98,6 +112,23 @@ class RetailBill {
   /// Total quantity across all lines.
   int get totalItems => lines.fold(0, (s, l) => s + l.item.qty);
 
+  /// Sum of the per-line discounts, i.e. the part of [discountAmount] that
+  /// belonged to individual lines rather than the order.
+  ///
+  /// A getter folding over [lines] on purpose: it is then BY CONSTRUCTION the sum
+  /// of the very figures that get persisted and printed per line, so the
+  /// receipt's "Item Discounts" row can never disagree with its own sub-rows.
+  double get lineDiscountTotal =>
+      lines.fold(0.0, (s, l) => s + l.lineDiscountAmount);
+
+  /// The order-level remainder: what [discountAmount] holds beyond the per-line
+  /// discounts. Clamped at zero — the per-line and total figures are rounded
+  /// independently, so the residual can land a paisa negative.
+  double get billDiscountRemainder {
+    final remainder = discountAmount - lineDiscountTotal;
+    return remainder > 0 ? remainder : 0;
+  }
+
   static const RetailBill empty = RetailBill(
     itemTotal: 0,
     discountAmount: 0,
@@ -149,6 +180,9 @@ class RetailBillingService {
           .map((i) => CalcLine(
                 price: i.price,
                 quantity: i.qty,
+                // Per-line discount, already resolved to currency on the cart
+                // row. The engine caps it at the line.
+                lineDiscount: i.lineDiscountAmount ?? 0,
                 // CartItemModel.gstRate is a PERCENT (18); the engine expects a
                 // FRACTION (0.18). Getting this wrong is a 100x error.
                 taxRate: (i.gstRate ?? 0) / 100.0,
@@ -158,7 +192,11 @@ class RetailBillingService {
       discountValue: discountValue,
       loyaltyRedemption: loyaltyRedemption,
       isTaxInclusive: isTaxInclusive,
-      discountOnItems: discountOnItems,
+      // Retail's money math must not depend on a restaurant toggle that is
+      // commented out of the settings UI (staticswitch.dart:83) yet still has a
+      // persisted key — a stale `true` would route retail down the per-item
+      // branch. Default it explicitly.
+      discountOnItems: discountOnItems ?? false,
       // Retail has no service or delivery charge — that is restaurant-only.
       serviceChargePercentage: 0,
       deliveryCharge: 0,
@@ -174,6 +212,7 @@ class RetailBillingService {
         item: items[i],
         originalAmount: _r2(r.originalAmount),
         discountAmount: _r2(r.discountAmount),
+        lineDiscountAmount: _r2(r.lineDiscountAmount),
         taxableAmount: _r2(r.taxableAmount),
         gstAmount: gst,
         cgstAmount: half,
@@ -221,7 +260,11 @@ class RetailBillingService {
       discountType: discountType,
       discountValue: discountValue,
       loyaltyRedemption: loyaltyRedemption,
-      discountOnItems: discountOnItems,
+      // Retail's money math must not depend on a restaurant toggle that is
+      // commented out of the settings UI (staticswitch.dart:83) yet still has a
+      // persisted key — a stale `true` would route retail down the per-item
+      // branch. Default it explicitly.
+      discountOnItems: discountOnItems ?? false,
     );
   }
 

@@ -48,13 +48,14 @@ class SaleModelAdapter extends TypeAdapter<SaleModel> {
       loyaltyPointsUsed: fields[28] as int?,
       roundOff: fields[29] as double?,
       isTaxInclusive: fields[30] as bool?,
+      lineDiscountTotal: fields[31] as double?,
     );
   }
 
   @override
   void write(BinaryWriter writer, SaleModel obj) {
     writer
-      ..writeByte(31)
+      ..writeByte(32)
       ..writeByte(0)
       ..write(obj.saleId)
       ..writeByte(1)
@@ -116,7 +117,9 @@ class SaleModelAdapter extends TypeAdapter<SaleModel> {
       ..writeByte(29)
       ..write(obj.roundOff)
       ..writeByte(30)
-      ..write(obj.isTaxInclusive);
+      ..write(obj.isTaxInclusive)
+      ..writeByte(31)
+      ..write(obj.lineDiscountTotal);
   }
 
   @override

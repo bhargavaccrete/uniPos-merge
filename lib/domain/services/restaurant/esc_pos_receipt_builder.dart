@@ -5,6 +5,7 @@ import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/restaurant/print_settings.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/core/plan/mode_keys.dart';
+import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/domain/services/restaurant/tax_breakdown.dart';
 import 'package:billberrylite/core/di/service_locator.dart'
     show taxStore, attributeStore;
@@ -343,6 +344,14 @@ class EscPosReceiptBuilder {
       bytes.addAll(_text(
           _formatRow(name, '${item.qty}', amount, cols)));
 
+      // This line's OWN discount, indented under it. RETAIL ONLY — restaurant
+      // has no per-line discount concept and its output must not change. The
+      // Amount column above stays gross so it still sums to Sub Total.
+      if (AppConfig.isRetail && receiptLineDiscount(item) > 0.009) {
+        bytes.addAll(_text(
+            '  ${receiptLineDiscountLabel(item)} -$currency${_fmt(receiptLineDiscount(item))}'));
+      }
+
       // Extras/choices info (indented, stored in weight field)
       if (item.weight != null && item.weight!.isNotEmpty) {
         for (final part in item.weight!.split(' | ')) {
@@ -381,8 +390,21 @@ class EscPosReceiptBuilder {
       bytes.addAll(_text(_formatTotalRow('Sub Total', _fmt(subValue), cols)));
     }
 
-    // Discount (only show if > 0)
-    if ((sale.discountAmount ?? 0) > 0.009) {
+    // Discount. Retail splits it into the per-line part and the order-level
+    // remainder, so a line discount is not passed off as a bill discount.
+    // Restaurant keeps its single row, byte-for-byte as before.
+    final double escLineDiscTotal = AppConfig.isRetail
+        ? receiptLineDiscountTotal(receiptData.items)
+        : 0;
+    if (escLineDiscTotal > 0.009) {
+      bytes.addAll(_text(_formatTotalRow(
+          'Item Discounts', '-$currency${_fmt(escLineDiscTotal)}', cols)));
+      final remainder = (sale.discountAmount ?? 0) - escLineDiscTotal;
+      if (remainder > 0.009) {
+        bytes.addAll(_text(_formatTotalRow(
+            'Bill Discount', '-$currency${_fmt(remainder)}', cols)));
+      }
+    } else if ((sale.discountAmount ?? 0) > 0.009) {
       bytes.addAll(_text(
           _formatTotalRow('Discount', '-$currency${_fmt(sale.discountAmount ?? 0)}', cols)));
     }
@@ -398,14 +420,32 @@ class EscPosReceiptBuilder {
 
     // Tax block — per-rate GST summary, shown in BOTH modes when GST applies.
     // (0% bills produce no lines and skip the whole block.)
-    final taxLines = TaxBreakdown.compute(
-      items: receiptData.items
-          .map((it) => (gross: receiptLineGross(it), ratePercent: it.gstRate ?? 0))
-          .toList(),
-      billDiscount: sale.discountAmount ?? 0,
-      isTaxInclusive: isTaxInclusive,
-      reconcileToGst: sale.totalGstAmount ?? 0, // lines must sum to the order's GST
-    );
+    // Retail: a line discount belongs to its own GST bucket, and only the
+    // order-level remainder is spread proportionally. Restaurant keeps calling
+    // `compute`, whose behaviour is unchanged.
+    final taxLines = AppConfig.isRetail
+        ? TaxBreakdown.computeWithLineDiscounts(
+            items: receiptData.items
+                .map((it) => (
+                      gross: receiptLineGross(it),
+                      lineDiscount: receiptLineDiscount(it),
+                      ratePercent: it.gstRate ?? 0,
+                    ))
+                .toList(),
+            billDiscount:
+                receiptBillDiscountRemainder(sale, receiptData.items),
+            isTaxInclusive: isTaxInclusive,
+            reconcileToGst: sale.totalGstAmount ?? 0,
+          )
+        : TaxBreakdown.compute(
+            items: receiptData.items
+                .map((it) =>
+                    (gross: receiptLineGross(it), ratePercent: it.gstRate ?? 0))
+                .toList(),
+            billDiscount: sale.discountAmount ?? 0,
+            isTaxInclusive: isTaxInclusive,
+            reconcileToGst: sale.totalGstAmount ?? 0, // lines must sum to the order's GST
+          );
     if (receiptData.taxEnabled && PrintSettings.showTax && taxLines.isNotEmpty) {
       final totalGst = sale.totalGstAmount ?? 0; // authoritative — matches order
       bytes.addAll(_divider(cols));

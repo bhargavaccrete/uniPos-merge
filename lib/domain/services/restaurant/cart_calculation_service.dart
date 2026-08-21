@@ -20,10 +20,22 @@ class CalcLine {
   final int quantity;
   final double? taxRate;
 
+  /// Discount belonging to THIS line only, in currency, already resolved from
+  /// whatever percentage or flat amount the user entered.
+  ///
+  /// Comes off this line before the order-level discount is prorated, so a
+  /// discount on one item never moves another item's taxable base. Capped at the
+  /// line by the engine, so a caller may pass an over-large figure safely.
+  ///
+  /// Defaults to 0, which makes every expression below reduce exactly to the
+  /// pre-line-discount arithmetic — restaurant passes nothing and is unaffected.
+  final double lineDiscount;
+
   const CalcLine({
     required this.price,
     required this.quantity,
     this.taxRate,
+    this.lineDiscount = 0,
   });
 }
 
@@ -33,8 +45,18 @@ class CalcLineResult {
   /// price * quantity, before any discount.
   final double originalAmount;
 
-  /// This line's share of the order discount.
+  /// TOTAL discount on this line: its own [lineDiscountAmount] plus its share of
+  /// the order-level discount. This is what callers persist as the line's
+  /// discount, and what every existing report reads.
   final double discountAmount;
+
+  /// The part of [discountAmount] that belonged to this line alone, after the
+  /// engine's cap. A SUBSET of [discountAmount] — never add the two together.
+  ///
+  /// Deliberately `required`: the loyalty-redemption rebuild in `_calculate`
+  /// re-lists every field, and a defaulted value there would silently zero every
+  /// line discount on any bill where points were redeemed.
+  final double lineDiscountAmount;
 
   /// Base this line is taxed on, after discount and loyalty redemption.
   final double taxableAmount;
@@ -47,10 +69,15 @@ class CalcLineResult {
   const CalcLineResult({
     required this.originalAmount,
     required this.discountAmount,
+    required this.lineDiscountAmount,
     required this.taxableAmount,
     required this.gstAmount,
     required this.taxRate,
   });
+
+  /// This line's share of the ORDER-level discount. A getter, not a field, so it
+  /// cannot drift out of step with the two values it is derived from.
+  double get billDiscountAmount => discountAmount - lineDiscountAmount;
 }
 
 class CartCalculationService {
@@ -156,6 +183,26 @@ class CartCalculationService {
     final double totalOriginalAmount = lines.fold(0.0, (sum, item) => sum + (item.price * item.quantity));
     itemTotal = totalOriginalAmount;
 
+    // STEP 1b: Line-level discounts, capped per line and totalled ONCE.
+    //
+    // Computed here rather than inside the loop so the proration denominator
+    // below and the per-line figure can never disagree — two separate clamp
+    // expressions would let the shares stop summing to the bill.
+    //
+    // The cap mirrors `TaxBreakdown.computeWithLineDiscounts` exactly, including
+    // its negative-gross guard, so the two engines never differ on what a line
+    // discount actually took.
+    final List<double> effLineDiscount = List<double>.generate(lines.length, (i) {
+      final gross = lines[i].price * lines[i].quantity;
+      final wanted = lines[i].lineDiscount > 0 ? lines[i].lineDiscount : 0.0;
+      return wanted > gross ? (gross > 0 ? gross : 0.0) : wanted;
+    }, growable: false);
+
+    // Net of line discounts. With no line discounts this is bit-identical to
+    // totalOriginalAmount (subtracting exactly 0.0 is exact in IEEE-754).
+    final double totalNetAmount =
+        totalOriginalAmount - effLineDiscount.fold(0.0, (s, v) => s + v);
+
     // STEP 2: Accumulators
     double accumulatedTaxableAmount = 0;
     double accumulatedGST = 0;
@@ -164,9 +211,16 @@ class CartCalculationService {
 
     // STEP 3: Loop through items
     final bool taxFeatureEnabled = TaxFeature.enabled;
-    for (final item in lines) {
+    for (int i = 0; i < lines.length; i++) {
+      final item = lines[i];
       final double itemOriginalAmount = item.price * item.quantity;
       final double itemTaxRate = taxFeatureEnabled ? (item.taxRate ?? 0) : 0;
+
+      // This line's own discount, and what is left of the line after it. The
+      // order-level discount below works on the NET, per the approved order:
+      // override → line discount → bill discount → tax.
+      final double itemLineDiscount = effLineDiscount[i];
+      final double itemNet = itemOriginalAmount - itemLineDiscount;
 
       double itemDiscount = 0;
       double itemBase;
@@ -176,18 +230,23 @@ class CartCalculationService {
       // Use provided value if available, otherwise use AppSettings
       final bool useDiscountOnItems = discountOnItems ?? AppSettings.discountOnItems;
       if (useDiscountOnItems) {
-        // Calculate discount per item
+        // Order discount, computed against the line NET so a line discount is
+        // not re-discounted. Applied on top of the line's own discount.
+        double billShare = 0;
         if (discountType == DiscountType.percentage) {
-          itemDiscount = itemOriginalAmount * (discountValue / 100);
+          billShare = itemNet * (discountValue / 100);
         } else {
-          itemDiscount = totalOriginalAmount > 0
-              ? (itemOriginalAmount / totalOriginalAmount) * discountValue
+          billShare = totalNetAmount > 0
+              ? (itemNet / totalNetAmount) * discountValue
               : 0;
         }
-        itemDiscount = itemDiscount.clamp(0, itemOriginalAmount);
+        billShare = billShare.clamp(0, itemNet).toDouble();
+
+        // Total off this line = its own discount + its share of the order's.
+        itemDiscount = itemLineDiscount + billShare;
 
         // Discount applied FIRST, then GST on discounted amount
-        final discountedItemAmount = itemOriginalAmount - itemDiscount;
+        final discountedItemAmount = itemNet - billShare;
 
         // Use provided value if available, otherwise use AppSettings
         final bool useTaxInclusive = isTaxInclusive ?? AppSettings.isTaxInclusive;
@@ -204,27 +263,37 @@ class CartCalculationService {
 
       // ================= DISCOUNT OFF ITEMS =================
       else {
-        // Calculate bill-level discount (but apply proportionally later)
+        // Calculate bill-level discount (but apply proportionally later).
+        //
+        // A PERCENTAGE is taken against the NET, not the original gross — the
+        // approved order is line discount first, then the order discount on what
+        // is left. Against gross, "10% off the bill" would quietly discount
+        // amounts the line discount had already removed.
         double billDiscount = 0;
         if (discountType == DiscountType.percentage) {
-          billDiscount = totalOriginalAmount * (discountValue / 100);
+          billDiscount = totalNetAmount * (discountValue / 100);
         } else {
           billDiscount = discountValue;
         }
 
-        // Cap the discount at the bill total. Without this a flat amount larger
-        // than the bill (or a percentage over 100) drives afterDiscountTotal
+        // Cap the discount at what is left AFTER line discounts. Without this a
+        // flat amount larger than the remaining bill drives afterDiscountTotal
         // negative, which cascades into a negative taxable base, negative GST
         // and a negative grand total — nothing downstream rejects it.
-        billDiscount = billDiscount.clamp(0, totalOriginalAmount);
+        billDiscount = billDiscount.clamp(0, totalNetAmount).toDouble();
 
-        // Calculate this item's share after bill discount
-        final double afterDiscountTotal = totalOriginalAmount - billDiscount;
-        final double itemShare = totalOriginalAmount > 0
-            ? (itemOriginalAmount / totalOriginalAmount) * afterDiscountTotal
+        // Calculate this item's share after bill discount. Weighted by NET, not
+        // gross: gross weights would let a fully line-discounted line (net 0)
+        // absorb bill discount it cannot absorb, producing a negative share. Net
+        // weights also match TaxBreakdown, so the printed per-rate table agrees
+        // with the per-line taxable amounts.
+        final double afterDiscountTotal = totalNetAmount - billDiscount;
+        final double itemShare = totalNetAmount > 0
+            ? (itemNet / totalNetAmount) * afterDiscountTotal
             : 0;
 
-        // Item's portion of discount
+        // Item's portion of discount. This already equals
+        // (line discount) + (share of bill discount) — no need to add them.
         itemDiscount = itemOriginalAmount - itemShare;
 
         // GST calculated on discounted share
@@ -249,6 +318,7 @@ class CartCalculationService {
       results.add(CalcLineResult(
         originalAmount: itemOriginalAmount,
         discountAmount: itemDiscount,
+        lineDiscountAmount: itemLineDiscount,
         taxableAmount: itemBase,
         gstAmount: itemGST,
         taxRate: itemTaxRate,
@@ -278,6 +348,12 @@ class CartCalculationService {
           results[i] = CalcLineResult(
             originalAmount: r.originalAmount,
             discountAmount: r.discountAmount,
+            // NOT scaled by f, exactly like discountAmount above: the line
+            // discount is what actually came off the line. Scaling it would make
+            // the receipt's "Item Discounts" row understate reality, and the
+            // derived bill-discount remainder would silently absorb the loyalty
+            // reduction and mis-bucket the per-rate tax table.
+            lineDiscountAmount: r.lineDiscountAmount,
             taxableAmount: r.taxableAmount * f,
             gstAmount: r.gstAmount * f,
             taxRate: r.taxRate,

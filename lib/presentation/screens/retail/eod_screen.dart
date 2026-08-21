@@ -29,6 +29,11 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
   bool _isLoading = false;
   bool _isGenerating = false;
   bool _isCompleted = false; // NEW: Track if EOD has been completed
+
+  /// Whether a session is open at all — the ONLY thing that should gate the
+  /// empty state. A session with zero sales still needs to be closed, so this
+  /// must not be conflated with "no data to show" (see [_loadEODData]).
+  bool _hasActiveSession = false;
   EndOfDayReport? _currentReport;
   DateTime selectedDate = DateTime.now();
   double openingBalance = 0.0;
@@ -61,6 +66,23 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // A session that is null or already closed is the ONLY "nothing to do
+      // here" case. Zero sales inside an OPEN session still needs closing —
+      // that used to be conflated below, and a session with no activity but
+      // stuck open (e.g. past the auto-close duration) had no way to reach
+      // the settlement form at all.
+      final currentSession = await DayManagementService.getCurrentSession();
+      if (currentSession == null || currentSession.isClosed) {
+        if (!mounted) return;
+        setState(() {
+          _hasActiveSession = false;
+          _currentReport = null;
+          _isLoading = false;
+        });
+        return;
+      }
+      _hasActiveSession = true;
+
       // Get opening balance with detailed error handling
       final currentOpeningBalance =
           await DayManagementService.getOpeningBalance();
@@ -88,24 +110,15 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
           .where((p) => p.paymentType.toLowerCase().trim() == 'cash')
           .fold<double>(0.0, (sum, p) => sum + p.totalAmount);
 
-      // Check if there's any data to show
-      final hasAnyData =
-          (report.totalSales > 0) ||
-          (report.totalOrderCount > 0) ||
-          (report.totalDiscount > 0) ||
-          (report.totalTax > 0) ||
-          (report.totalExpenses > 0) ||
-          (currentOpeningBalance > 0);
-
       if (!mounted) return;
-
-      // Debug logging
 
       // Clear any previous error messages
       ScaffoldMessenger.of(context).clearSnackBars();
 
       setState(() {
-        _currentReport = hasAnyData ? report : null;
+        // Always the report, session-gated above — a zero-activity day still
+        // has to be settled and closed, same as restaurant's EOD screen.
+        _currentReport = report;
         openingBalance = currentOpeningBalance;
         expectedCash = expectedCashAmount;
         totalExpenses = report.totalExpenses;
@@ -327,8 +340,10 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
       );
     }
 
-    // If generating EOD or no data to show
-    if (_isGenerating || _currentReport == null) {
+    // Generating, or genuinely no session to close — NOT gated on zero
+    // activity, which used to strand an open zero-sales session with no way
+    // to reach the settlement form.
+    if (_isGenerating || !_hasActiveSession) {
       return Scaffold(
         backgroundColor: AppColors.surfaceLight,
         appBar: buildPrimaryAppBar(

@@ -86,6 +86,14 @@ class ReturnService {
         originalPrice: item.originalPrice,
         overrideReason: item.overrideReason,
         overrideNote: item.overrideNote,
+        // Line-discount audit, mirrored so a credit note can print the same
+        // split as the sale it reverses. A full return reverses the whole line,
+        // so the amount carries across unchanged.
+        lineDiscountType: item.lineDiscountType,
+        lineDiscountValue: item.lineDiscountValue,
+        lineDiscountAmount: item.lineDiscountAmount,
+        lineDiscountReason: item.lineDiscountReason,
+        lineDiscountNote: item.lineDiscountNote,
       );
       returnItems.add(returnItem);
     }
@@ -213,6 +221,17 @@ class ReturnService {
         originalPrice: originalItem.originalPrice,
         overrideReason: originalItem.overrideReason,
         overrideNote: originalItem.overrideNote,
+        // Pro-rated by the returned quantity, exactly like itemDiscount above,
+        // so a flat line discount on a qty-2 line refunds half when one unit
+        // comes back.
+        lineDiscountType: originalItem.lineDiscountType,
+        lineDiscountValue: originalItem.lineDiscountValue,
+        lineDiscountAmount: originalItem.lineDiscountAmount == null
+            ? null
+            : originalItem.lineDiscountAmount! *
+                (returnQty / originalItem.qty),
+        lineDiscountReason: originalItem.lineDiscountReason,
+        lineDiscountNote: originalItem.lineDiscountNote,
       );
 
       returnItems.add(returnItem);
@@ -260,6 +279,14 @@ class ReturnService {
         originalPrice: item.originalPrice,
         overrideReason: item.overrideReason,
         overrideNote: item.overrideNote,
+        // Line-discount audit, mirrored so a credit note can print the same
+        // split as the sale it reverses. A full return reverses the whole line,
+        // so the amount carries across unchanged.
+        lineDiscountType: item.lineDiscountType,
+        lineDiscountValue: item.lineDiscountValue,
+        lineDiscountAmount: item.lineDiscountAmount,
+        lineDiscountReason: item.lineDiscountReason,
+        lineDiscountNote: item.lineDiscountNote,
       );
     }).toList();
 

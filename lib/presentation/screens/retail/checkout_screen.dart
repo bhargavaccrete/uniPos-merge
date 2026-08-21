@@ -65,9 +65,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String _selectedDiscountReason = _discountReasons.first;
   final TextEditingController _otherReasonController = TextEditingController();
 
-  /// Resolved reason, only meaningful when a discount was actually applied.
+  /// Resolved reason for the ORDER-LEVEL discount.
+  ///
+  /// Gated on the bill-discount INPUT, not on `_bill.discountAmount` — that total
+  /// now also contains per-line discounts, so a line-discount-only sale would
+  /// otherwise get a bill-discount reason stamped on it explaining nothing. Line
+  /// discounts carry their own `lineDiscountReason`.
   String? get _discountReason {
-    if (_bill.discountAmount <= 0) return null;
+    if (retailCartStore.discountValue <= 0) return null;
     return _selectedDiscountReason == 'Other'
         ? _otherReasonController.text.trim()
         : _selectedDiscountReason;
@@ -156,6 +161,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   double get _subtotal => _bill.itemTotal;
   double get _discountAmount => _bill.discountAmount;
+
+  /// The part of [_discountAmount] that came from individual lines, and the
+  /// order-level remainder. Read straight off the bill (which folds over its own
+  /// lines) so these can never disagree with the per-line figures the cart shows
+  /// or the receipt prints.
+  double get _lineDiscountTotal => _bill.lineDiscountTotal;
+  double get _billDiscountRemainder => _bill.billDiscountRemainder;
   double get _totalTaxableAmount => _bill.taxableAmount;
   double get _totalGstAmount => _bill.totalGst;
   double get _totalCgstAmount => _bill.cgstAmount;
@@ -314,6 +326,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         discountType: retailCartStore.discountType.name,
         discountValue: retailCartStore.discountValue,
         discountReason: _discountReason,
+        // How much of discountAmount came from individual lines. Lets a reprint
+        // split "Item Discounts" from "Bill Discount" without re-deriving.
+        lineDiscountTotal: bill.lineDiscountTotal,
         loyaltyPointsUsed: _pointsRedeemed,
         roundOff: bill.roundOff,
         isTaxInclusive: bill.isTaxInclusive,
@@ -453,6 +468,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         originalPrice: cartItem.originalPrice,
         overrideReason: cartItem.overrideReason,
         overrideNote: cartItem.overrideNote,
+        // Line-discount audit. The AMOUNT comes from the engine, not the cart
+        // row: a discount larger than the line is capped there, and persisting
+        // the uncapped figure would print a receipt that does not reconcile.
+        // `discountAmount` above stays the TOTAL (line + bill share).
+        lineDiscountType: cartItem.lineDiscountType,
+        lineDiscountValue: cartItem.lineDiscountValue,
+        lineDiscountAmount:
+            line.lineDiscountAmount > 0 ? line.lineDiscountAmount : null,
+        lineDiscountReason: cartItem.lineDiscountReason,
+        lineDiscountNote: cartItem.lineDiscountNote,
       );
     }).toList();
   }
@@ -507,6 +532,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         discountType: retailCartStore.discountType.name,
         discountValue: retailCartStore.discountValue,
         discountReason: _discountReason,
+        // How much of discountAmount came from individual lines. Lets a reprint
+        // split "Item Discounts" from "Bill Discount" without re-deriving.
+        lineDiscountTotal: bill.lineDiscountTotal,
         loyaltyPointsUsed: _pointsRedeemed,
         roundOff: bill.roundOff,
         isTaxInclusive: bill.isTaxInclusive,
@@ -897,8 +925,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ],
           ),
 
-          // Reason — only asked for once a discount actually applies
-          if (_bill.discountAmount > 0) ...[
+          // Reason — only asked for once an ORDER-LEVEL discount applies.
+          // Line discounts collect their own reason in their own dialog.
+          if (retailCartStore.discountValue > 0) ...[
             const Divider(height: 24, thickness: 0.5, color: Color(0xFFE8E8E8)),
             Row(
               children: [
@@ -1397,13 +1426,31 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                   const SizedBox(height: 8),
                   if (_discountAmount > 0) ...[
-                    _buildSummaryRow(
-                      'Discount',
-                      '- $symbol${_discountAmount.toStringAsFixed(precision)}',
-                      isBold: false,
-                      color: Colors.red,
-                    ),
-                    const SizedBox(height: 8),
+                    // Split exactly as the receipt does, so the cashier and the
+                    // customer are never looking at differently-grouped numbers.
+                    // A lumped "Discount" row would pass per-line reductions off
+                    // as an order-level one. Both figures come from the same
+                    // bill, so the rows always sum to _discountAmount.
+                    if (_lineDiscountTotal > 0.009) ...[
+                      _buildSummaryRow(
+                        'Item Discounts',
+                        '- $symbol${_lineDiscountTotal.toStringAsFixed(precision)}',
+                        isBold: false,
+                        color: Colors.red,
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    if (_billDiscountRemainder > 0.009) ...[
+                      _buildSummaryRow(
+                        _lineDiscountTotal > 0.009
+                            ? 'Bill Discount'
+                            : 'Discount',
+                        '- $symbol${_billDiscountRemainder.toStringAsFixed(precision)}',
+                        isBold: false,
+                        color: Colors.red,
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     _buildSummaryRow(
                       'Taxable Amount',
                       '$symbol${_totalTaxableAmount.toStringAsFixed(precision)}',

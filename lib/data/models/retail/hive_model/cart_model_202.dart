@@ -85,6 +85,43 @@ class CartItemModel extends HiveObject {
   @HiveField(24)
   final String? overrideNote;
 
+  // ==================== LINE DISCOUNT ====================
+  // A discount belonging to THIS line, distinct from the order-level discount
+  // the cart store holds. [price] stays the charged unit price (carrying any
+  // override); these five only describe what comes off the line and why.
+  //
+  // Indices continue at 25 — 4, 5 and 6 are retired legacy size/color/weight
+  // columns and reusing them would deserialize old rows as the wrong type.
+  //
+  // Note the DEAD [discountAmount] @18 above is deliberately left alone: it is
+  // never written and never read, and giving it a meaning now would hand
+  // `total`/`taxableAmount` a third interpretation.
+
+  /// `DiscountType.name` — 'percentage' or 'amount'. Stored so a percentage can
+  /// be RE-DERIVED when the quantity or the unit price changes; keeping only the
+  /// resolved amount would let a 10% discount silently decay to 2% at qty 5.
+  @HiveField(25)
+  final String? lineDiscountType;
+
+  /// Raw input as typed: `10` for 10%, or `90` for a flat 90.
+  @HiveField(26)
+  final double? lineDiscountValue;
+
+  /// Resolved currency amount for the WHOLE line (not per unit).
+  /// **Null means no line discount** — no separate bool to drift, and Hive
+  /// returns null for absent fields so every pre-existing cart row reads back as
+  /// undiscounted.
+  @HiveField(27)
+  final double? lineDiscountAmount;
+
+  /// `LineDiscountReason.code`. Set whenever [lineDiscountAmount] is.
+  @HiveField(28)
+  final String? lineDiscountReason;
+
+  /// Free-text detail; required when the reason is 'other'.
+  @HiveField(29)
+  final String? lineDiscountNote;
+
   CartItemModel({
     required this.cartItemId,
     required this.variantId,
@@ -108,10 +145,29 @@ class CartItemModel extends HiveObject {
     this.originalPrice,
     this.overrideReason,
     this.overrideNote,
+    this.lineDiscountType,
+    this.lineDiscountValue,
+    this.lineDiscountAmount,
+    this.lineDiscountReason,
+    this.lineDiscountNote,
   });
 
   /// True when the cashier changed this line's price from the catalogue value.
   bool get isPriceOverridden => originalPrice != null;
+
+  /// True when this line carries a discount of its own.
+  bool get hasLineDiscount =>
+      lineDiscountAmount != null && lineDiscountAmount! > 0;
+
+  /// Gross for the line before any discount: charged unit price x quantity.
+  double get grossAmount => price * qty;
+
+  /// What the line is worth after its own discount, before any order-level
+  /// discount. Never negative.
+  double get netAmount {
+    final net = grossAmount - (lineDiscountAmount ?? 0);
+    return net > 0 ? net : 0;
+  }
 
   factory CartItemModel.create({
     required String cartItemId,
@@ -131,6 +187,11 @@ class CartItemModel extends HiveObject {
     double? originalPrice,
     String? overrideReason,
     String? overrideNote,
+    String? lineDiscountType,
+    double? lineDiscountValue,
+    double? lineDiscountAmount,
+    String? lineDiscountReason,
+    String? lineDiscountNote,
   }) {
     final now = DateTime.now().toIso8601String();
     final rate = gstRate ?? 0;
@@ -182,6 +243,11 @@ class CartItemModel extends HiveObject {
       originalPrice: originalPrice,
       overrideReason: overrideReason,
       overrideNote: overrideNote,
+      lineDiscountType: lineDiscountType,
+      lineDiscountValue: lineDiscountValue,
+      lineDiscountAmount: lineDiscountAmount,
+      lineDiscountReason: lineDiscountReason,
+      lineDiscountNote: lineDiscountNote,
     );
   }
 
@@ -212,6 +278,11 @@ class CartItemModel extends HiveObject {
       'originalPrice': originalPrice,
       'overrideReason': overrideReason,
       'overrideNote': overrideNote,
+      'lineDiscountType': lineDiscountType,
+      'lineDiscountValue': lineDiscountValue,
+      'lineDiscountAmount': lineDiscountAmount,
+      'lineDiscountReason': lineDiscountReason,
+      'lineDiscountNote': lineDiscountNote,
     };
   }
 
@@ -241,6 +312,11 @@ class CartItemModel extends HiveObject {
       originalPrice: (map['originalPrice'] as num?)?.toDouble(),
       overrideReason: map['overrideReason'] as String?,
       overrideNote: map['overrideNote'] as String?,
+      lineDiscountType: map['lineDiscountType'] as String?,
+      lineDiscountValue: (map['lineDiscountValue'] as num?)?.toDouble(),
+      lineDiscountAmount: (map['lineDiscountAmount'] as num?)?.toDouble(),
+      lineDiscountReason: map['lineDiscountReason'] as String?,
+      lineDiscountNote: map['lineDiscountNote'] as String?,
     );
   }
 }

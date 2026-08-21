@@ -11,6 +11,7 @@ import '../../../data/models/retail/hive_model/billing_tab_model_173.dart';
 import '../../../data/repositories/retail/cart_repository.dart';
 import '../../services/retail/gst_service.dart';
 import '../../services/retail/retail_billing_service.dart';
+import '../../services/retail/line_discount_service.dart';
 
 
 
@@ -285,6 +286,11 @@ abstract class _CartStore with Store {
   /// [originalPrice]/[overrideReason]/[overrideNote] replay a price override
   /// that was in force when the sale was parked. For a NEW override at the
   /// till, use [overrideLinePrice] instead — this method never invents one.
+  ///
+  /// [lineDiscountType]/[lineDiscountValue]/[lineDiscountReason]/
+  /// [lineDiscountNote] likewise replay a parked LINE discount. The amount is
+  /// re-resolved here rather than replayed, so a percentage is exact for the
+  /// restored quantity. For a NEW discount, use [setLineDiscount].
   @action
   Future<CartOperationResult> addItem(
     ProductModel product,
@@ -296,6 +302,10 @@ abstract class _CartStore with Store {
     double? originalPrice,
     String? overrideReason,
     String? overrideNote,
+    String? lineDiscountType,
+    double? lineDiscountValue,
+    String? lineDiscountReason,
+    String? lineDiscountNote,
   }) async {
     final availableStock = variant.stockQty;
 
@@ -343,6 +353,8 @@ abstract class _CartStore with Store {
       // price — the cashier already agreed a price with this customer, so
       // reverting to the catalogue price on the second unit would be wrong and
       // silent. The override fields ride along for the same reason.
+      // A percentage line discount follows the new gross; a flat one is kept.
+      final ld = _reResolveLineDiscount(item, item.price * updatedQty);
       final updatedItem = CartItemModel.create(
         cartItemId: item.cartItemId,
         variantId: item.variantId,
@@ -359,6 +371,11 @@ abstract class _CartStore with Store {
         originalPrice: item.originalPrice,
         overrideReason: item.overrideReason,
         overrideNote: item.overrideNote,
+        lineDiscountType: ld.type,
+        lineDiscountValue: ld.value,
+        lineDiscountAmount: ld.amount,
+        lineDiscountReason: ld.reason,
+        lineDiscountNote: ld.note,
       );
 
       await _repository.saveCartItem(updatedItem);
@@ -372,6 +389,16 @@ abstract class _CartStore with Store {
     // If not, add it as a new item
     final cartItemId = '${variant.varianteId}_${DateTime.now().millisecondsSinceEpoch}';
     final price = priceOverride ?? variant.sellingPrice ?? variant.mrp ?? 0.0;
+
+    // A line discount being replayed from a parked sale. Zero when there is none.
+    final replayedDiscount = LineDiscountService.resolveAmount(
+      type: lineDiscountType == DiscountType.percentage.name
+          ? DiscountType.percentage
+          : DiscountType.amount,
+      value: lineDiscountValue ?? 0,
+      gross: price * qty,
+    );
+
     final newItem = CartItemModel.create(
       cartItemId: cartItemId,
       variantId: variant.varianteId,
@@ -390,6 +417,13 @@ abstract class _CartStore with Store {
       originalPrice: originalPrice,
       overrideReason: overrideReason,
       overrideNote: overrideNote,
+      // Replayed from a parked sale. Resolved against THIS line's gross rather
+      // than trusting the parked amount, so a percentage is exact.
+      lineDiscountType: replayedDiscount > 0 ? lineDiscountType : null,
+      lineDiscountValue: replayedDiscount > 0 ? lineDiscountValue : null,
+      lineDiscountAmount: replayedDiscount > 0 ? replayedDiscount : null,
+      lineDiscountReason: replayedDiscount > 0 ? lineDiscountReason : null,
+      lineDiscountNote: replayedDiscount > 0 ? lineDiscountNote : null,
     );
 
     await _repository.saveCartItem(newItem);
@@ -458,6 +492,10 @@ abstract class _CartStore with Store {
 
     final taxInclusive = await gstService.isTaxInclusiveMode();
 
+    // The override changes the line's gross, so a percentage line discount must
+    // be re-resolved against the new price — and a flat one re-capped to it.
+    final ld = _reResolveLineDiscount(item, newPrice * item.qty);
+
     final updatedItem = CartItemModel.create(
       cartItemId: item.cartItemId,
       variantId: item.variantId,
@@ -474,6 +512,155 @@ abstract class _CartStore with Store {
       originalPrice: isRevert ? null : cataloguePrice,
       overrideReason: isRevert ? null : reason,
       overrideNote: isRevert || trimmedNote.isEmpty ? null : trimmedNote,
+      lineDiscountType: ld.type,
+      lineDiscountValue: ld.value,
+      lineDiscountAmount: ld.amount,
+      lineDiscountReason: ld.reason,
+      lineDiscountNote: ld.note,
+    );
+
+    await _repository.saveCartItem(updatedItem);
+
+    // removeAt + insert, matching every other mutation here — an in-place
+    // assignment does not always fire the observable.
+    items.removeAt(index);
+    items.insert(index, updatedItem);
+    return CartOperationResult.success();
+  }
+
+
+  /// Re-resolve a line's discount for a NEW gross (quantity or unit price
+  /// changed), and hand back the five fields ready to pass to
+  /// [CartItemModel.create].
+  ///
+  /// **A percentage is recomputed from the new gross; a flat amount is carried
+  /// forward untouched.** Blindly carrying the resolved amount would let a
+  /// 10%-off line decay to 2% by the time the cashier reached quantity 5, with
+  /// nothing on screen to say so. This is the single reason the type and raw value
+  /// are persisted alongside the amount.
+  ///
+  /// Returns all-null when the line carries no discount, so it is safe to spread
+  /// unconditionally at every rebuild site.
+  ({
+    String? type,
+    double? value,
+    double? amount,
+    String? reason,
+    String? note,
+  }) _reResolveLineDiscount(CartItemModel item, double newGross) {
+    final type = item.lineDiscountType;
+    final value = item.lineDiscountValue;
+    if (type == null || value == null || value <= 0) {
+      return (type: null, value: null, amount: null, reason: null, note: null);
+    }
+
+    final discountType = type == DiscountType.percentage.name
+        ? DiscountType.percentage
+        : DiscountType.amount;
+
+    final amount = LineDiscountService.resolveAmount(
+      type: discountType,
+      value: value,
+      gross: newGross,
+    );
+
+    // A flat discount that no longer fits the (smaller) line is capped by
+    // resolveAmount; if it caps to nothing there is no discount left to keep.
+    if (amount <= 0) {
+      return (type: null, value: null, amount: null, reason: null, note: null);
+    }
+
+    return (
+      type: type,
+      value: value,
+      amount: amount,
+      reason: item.lineDiscountReason,
+      note: item.lineDiscountNote,
+    );
+  }
+
+  /// Set (or clear) a discount on one cart line.
+  ///
+  /// Writes the resolved currency amount plus the raw type/value/reason/note onto
+  /// the line. The engine (`CartCalculationService`) then takes the line discount
+  /// off this line FIRST and prorates the order-level discount over what remains,
+  /// so a discount on one item never moves another item's taxable base.
+  ///
+  /// **The variant master is never written.** `CartItemModel.price` keeps carrying
+  /// any price override; this is a separate, additional reduction.
+  ///
+  /// Passing [value] `<= 0` CLEARS the discount — all five fields go null. That is
+  /// the only way back, deliberately, so a cleared line can never keep a stale
+  /// reason.
+  ///
+  /// The raw type and value are stored so a percentage can be re-resolved when the
+  /// quantity or unit price changes; see [_reResolveLineDiscount].
+  ///
+  /// Permission and validation are the CALLER's job
+  /// (`LineDiscountService.canDiscount` / `.validate`) — this action is the write,
+  /// not the gate, matching how [overrideLinePrice] trusts `PriceOverrideService`.
+  @action
+  Future<CartOperationResult> setLineDiscount({
+    required String variantId,
+    required DiscountType type,
+    required double value,
+    required String reason,
+    String? note,
+  }) async {
+    final index = items.indexWhere((item) => item.variantId == variantId);
+    if (index == -1) {
+      return CartOperationResult(
+        success: false,
+        errorMessage: 'Item not found in cart',
+      );
+    }
+
+    final item = items[index];
+    final gross = item.price * item.qty;
+    final clearing = value <= 0;
+
+    final amount = clearing
+        ? 0.0
+        : LineDiscountService.resolveAmount(
+            type: type,
+            value: value,
+            gross: gross,
+          );
+
+    // A free line is refused rather than clamped: "100% off" and "more than the
+    // line" are both a deliberate no, not a silent zero.
+    if (!clearing && amount >= gross) {
+      return CartOperationResult(
+        success: false,
+        errorMessage: 'Discount cannot equal or exceed the line total',
+      );
+    }
+
+    final trimmedNote = (note ?? '').trim();
+    final taxInclusive = await gstService.isTaxInclusiveMode();
+
+    final updatedItem = CartItemModel.create(
+      cartItemId: item.cartItemId,
+      variantId: item.variantId,
+      productId: item.productId,
+      productName: item.productName,
+      attributes: item.attributes,
+      // price still carries any override — a discount stacks on top of it.
+      price: item.price,
+      qty: item.qty,
+      barcode: item.barcode,
+      gstRate: item.gstRate,
+      hsnCode: item.hsnCode,
+      categoryName: item.categoryName,
+      taxInclusive: taxInclusive,
+      originalPrice: item.originalPrice,
+      overrideReason: item.overrideReason,
+      overrideNote: item.overrideNote,
+      lineDiscountType: clearing ? null : type.name,
+      lineDiscountValue: clearing ? null : value,
+      lineDiscountAmount: clearing ? null : amount,
+      lineDiscountReason: clearing ? null : reason,
+      lineDiscountNote: clearing || trimmedNote.isEmpty ? null : trimmedNote,
     );
 
     await _repository.saveCartItem(updatedItem);
@@ -598,6 +785,9 @@ abstract class _CartStore with Store {
 
     final taxInclusive = await gstService.isTaxInclusiveMode();
 
+    // Percentage discounts follow the new quantity; flat ones are carried.
+    final ld = _reResolveLineDiscount(item, item.price * quantity);
+
     final updatedItem = CartItemModel.create(
       cartItemId: item.cartItemId,
       variantId: item.variantId,
@@ -617,6 +807,11 @@ abstract class _CartStore with Store {
       originalPrice: item.originalPrice,
       overrideReason: item.overrideReason,
       overrideNote: item.overrideNote,
+      lineDiscountType: ld.type,
+      lineDiscountValue: ld.value,
+      lineDiscountAmount: ld.amount,
+      lineDiscountReason: ld.reason,
+      lineDiscountNote: ld.note,
     );
 
     await _repository.saveCartItem(updatedItem);
@@ -655,6 +850,8 @@ abstract class _CartStore with Store {
     // Check if tax inclusive mode is enabled
     final taxInclusive = await gstService.isTaxInclusiveMode();
 
+    final ld = _reResolveLineDiscount(item, item.price * requestedQty);
+
     final updatedItem = CartItemModel.create(
       cartItemId: item.cartItemId,
       variantId: item.variantId,
@@ -671,6 +868,11 @@ abstract class _CartStore with Store {
       originalPrice: item.originalPrice,
       overrideReason: item.overrideReason,
       overrideNote: item.overrideNote,
+      lineDiscountType: ld.type,
+      lineDiscountValue: ld.value,
+      lineDiscountAmount: ld.amount,
+      lineDiscountReason: ld.reason,
+      lineDiscountNote: ld.note,
     );
 
     await _repository.saveCartItem(updatedItem);
@@ -692,6 +894,8 @@ abstract class _CartStore with Store {
         // Check if tax inclusive mode is enabled
         final taxInclusive = await gstService.isTaxInclusiveMode();
 
+        final ld = _reResolveLineDiscount(item, item.price * updatedQty);
+
         final updatedItem = CartItemModel.create(
           cartItemId: item.cartItemId,
           variantId: item.variantId,
@@ -708,6 +912,11 @@ abstract class _CartStore with Store {
           originalPrice: item.originalPrice,
           overrideReason: item.overrideReason,
           overrideNote: item.overrideNote,
+          lineDiscountType: ld.type,
+          lineDiscountValue: ld.value,
+          lineDiscountAmount: ld.amount,
+          lineDiscountReason: ld.reason,
+          lineDiscountNote: ld.note,
         );
 
         await _repository.saveCartItem(updatedItem);
@@ -906,6 +1115,10 @@ abstract class _CartStore with Store {
     double? originalPrice,
     String? overrideReason,
     String? overrideNote,
+    String? lineDiscountType,
+    double? lineDiscountValue,
+    String? lineDiscountReason,
+    String? lineDiscountNote,
   }) async {
     final result = await addItem(
       product,
@@ -917,6 +1130,10 @@ abstract class _CartStore with Store {
       originalPrice: originalPrice,
       overrideReason: overrideReason,
       overrideNote: overrideNote,
+      lineDiscountType: lineDiscountType,
+      lineDiscountValue: lineDiscountValue,
+      lineDiscountReason: lineDiscountReason,
+      lineDiscountNote: lineDiscountNote,
     );
     if (result.success) {
       await _saveCurrentTabItems();
@@ -956,6 +1173,31 @@ abstract class _CartStore with Store {
     int quantity,
   ) async {
     final result = await setQuantity(variantId, quantity);
+    if (result.success) {
+      await _saveCurrentTabItems();
+    }
+    return result;
+  }
+
+  /// Line discount, persisted to the active tab.
+  ///
+  /// Same durability reason as the quantity wrappers above: a discount that only
+  /// reached the cart box would vanish on restart.
+  @action
+  Future<CartOperationResult> setLineDiscountInTab({
+    required String variantId,
+    required DiscountType type,
+    required double value,
+    required String reason,
+    String? note,
+  }) async {
+    final result = await setLineDiscount(
+      variantId: variantId,
+      type: type,
+      value: value,
+      reason: reason,
+      note: note,
+    );
     if (result.success) {
       await _saveCurrentTabItems();
     }

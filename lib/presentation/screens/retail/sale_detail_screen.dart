@@ -9,6 +9,8 @@ import '../../../domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:billberrylite/data/models/common/customer_model_125.dart';
+import 'package:billberrylite/domain/services/retail/receipt_pdf_service.dart'
+    show receiptLineDiscount, receiptLineDiscountTotal, receiptBillDiscountRemainder;
 import 'package:billberrylite/presentation/screens/retail/sale_return_screen.dart';
 import 'package:billberrylite/domain/services/retail/print_service.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
@@ -676,12 +678,16 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                   formatMoney((item.qty * item.price)),
                   isBold: false,
                 ),
-                if (item.discountAmount != null &&
-                    item.discountAmount! > 0) ...[
+                // The line's OWN discount only. `discountAmount` also carries
+                // this line's share of the order-level discount, which the
+                // totals block below subtracts once as "Bill Discount" — showing
+                // it here too would read as a double deduction. Same rule the
+                // receipt follows.
+                if (receiptLineDiscount(item) > 0.009) ...[
                   const SizedBox(height: 6),
                   _buildPriceRow(
                     'Discount',
-                    '- ${formatMoney(item.discountAmount!)}',
+                    '- ${formatMoney(receiptLineDiscount(item))}',
                     color: Colors.red,
                     isBold: false,
                   ),
@@ -757,13 +763,28 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
             isBold: false,
           ),
           const SizedBox(height: 12),
-          _buildPriceRow(
-            'Discount',
-            '- ${formatMoney(_sale!.discountAmount)}',
-            color: Colors.red,
-            isBold: false,
-          ),
-          const SizedBox(height: 12),
+          // Split exactly as the receipt and the checkout screen do, from the
+          // same items, so all three views group the numbers identically.
+          if (receiptLineDiscountTotal(_saleItems) > 0.009) ...[
+            _buildPriceRow(
+              'Item Discounts',
+              '- ${formatMoney(receiptLineDiscountTotal(_saleItems))}',
+              color: Colors.red,
+              isBold: false,
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (receiptBillDiscountRemainder(_sale!, _saleItems) > 0.009) ...[
+            _buildPriceRow(
+              receiptLineDiscountTotal(_saleItems) > 0.009
+                  ? 'Bill Discount'
+                  : 'Discount',
+              '- ${formatMoney(receiptBillDiscountRemainder(_sale!, _saleItems))}',
+              color: Colors.red,
+              isBold: false,
+            ),
+            const SizedBox(height: 12),
+          ],
           _buildPriceRow(
             'Tax',
             '+ ${formatMoney(_sale!.taxAmount)}',

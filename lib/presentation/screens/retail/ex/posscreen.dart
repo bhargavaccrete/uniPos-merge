@@ -23,6 +23,9 @@ import 'package:billberrylite/presentation/widget/retail/variant_picker_dialog.d
 import 'package:billberrylite/presentation/widget/componets/retail/price_override_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/retail/cart_quantity_field.dart';
 import 'package:billberrylite/domain/services/retail/price_override_service.dart';
+import 'package:billberrylite/domain/services/retail/line_discount_service.dart';
+import 'package:billberrylite/domain/services/retail/retail_billing_service.dart' show DiscountType;
+import 'package:billberrylite/presentation/widget/componets/retail/line_discount_dialog.dart';
 import '../../../../core/di/service_locator.dart';
 import 'package:billberrylite/core/routes/routes_name.dart';
 import 'package:billberrylite/domain/services/common/notification_service.dart';
@@ -1439,9 +1442,13 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                         ),
                         const SizedBox(width: 8),
                         SizedBox(
-                          width: 60,
+                          // 60 clipped a 4-digit total: "₹2000.00" wrapped onto
+                          // two lines. Sized for the widest realistic line total.
+                          width: 74,
                           child: Text(
                             _money(item.total),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             textAlign: TextAlign.right,
                             style: GoogleFonts.poppins(
                               fontSize: AppResponsive.bodyFontSize(context),
@@ -1452,21 +1459,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                         ),
                         SizedBox(
                           width: 40,
-                          child: IconButton(
-                            icon: const Icon(
-                              Icons.delete_outline,
-                              size: 20,
-                              color: AppColors.danger,
-                            ),
-                            onPressed: () {
-                              cartStore.removeItemFromTab(item.variantId);
-                            },
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(
-                              minWidth: 40,
-                              minHeight: 40,
-                            ),
-                          ),
+                          child: _buildLineActions(item),
                         ),
                       ],
                     ),
@@ -1512,6 +1505,127 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     return result.success;
   }
 
+  /// '10' rather than '10.0' for a whole-number percentage.
+  static String _trimPct(double v) =>
+      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
+
+  /// Overflow menu for one cart line: Price Override, Discount, Remove.
+  ///
+  /// Replaces the old bare delete icon, in the same 40px slot the header already
+  /// reserves. Follows the retail house pattern (`inventory_screen`,
+  /// `product_detail_screen`, `supplier_list_screen`, `purchase_order_list_screen`
+  /// …): a `more_vert` `PopupMenuButton` whose admin-only entries are simply NOT
+  /// BUILT for a non-admin, rather than shown and refused.
+  Widget _buildLineActions(CartItemModel item) {
+    final canOverride = PriceOverrideService.canOverride;
+    final canDiscount = LineDiscountService.canDiscount;
+
+    return PopupMenuButton<String>(
+      tooltip: 'Line options',
+      icon: Icon(
+        Icons.more_vert,
+        size: 20,
+        color: AppColors.textSecondary,
+      ),
+      padding: EdgeInsets.zero,
+      color: AppColors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      onSelected: (value) async {
+        switch (value) {
+          case 'override':
+            await _openPriceOverride(item);
+            break;
+          case 'discount':
+            await _openLineDiscount(item);
+            break;
+          case 'remove':
+            await cartStore.removeItemFromTab(item.variantId);
+            break;
+        }
+      },
+      itemBuilder: (context) => [
+        if (canOverride)
+          const PopupMenuItem(
+            value: 'override',
+            child: Row(
+              children: [
+                Icon(Icons.sell_outlined, size: 18, color: AppColors.primary),
+                SizedBox(width: 10),
+                Text('Price Override'),
+              ],
+            ),
+          ),
+        if (canDiscount)
+          const PopupMenuItem(
+            value: 'discount',
+            child: Row(
+              children: [
+                Icon(Icons.percent_rounded, size: 18, color: AppColors.primary),
+                SizedBox(width: 10),
+                Text('Discount'),
+              ],
+            ),
+          ),
+        const PopupMenuItem(
+          value: 'remove',
+          child: Row(
+            children: [
+              Icon(Icons.delete_outline, size: 18, color: AppColors.danger),
+              SizedBox(width: 10),
+              Text('Remove'),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Open the line-discount dialog for one cart line.
+  ///
+  /// The variant is re-read here rather than cached on the cart row: its cost
+  /// price is the below-cost floor, and it lives on the variant.
+  Future<void> _openLineDiscount(CartItemModel item) async {
+    if (!LineDiscountService.canDiscount) return;
+
+    final variant = await productStore.getVariantById(item.variantId);
+    if (!mounted) return;
+
+    if (variant == null) {
+      NotificationService.instance.showError(
+        'Variant no longer exists — remove this line and re-add it.',
+      );
+      return;
+    }
+
+    await showDialog<bool>(
+      context: context,
+      builder: (_) => _moneyScope(
+        LineDiscountDialog(
+          item: item,
+          variant: variant,
+          money: _money,
+          onApply: ({
+            required DiscountType type,
+            required double value,
+            required String reason,
+            String? note,
+          }) async {
+            final result = await cartStore.setLineDiscountInTab(
+              variantId: item.variantId,
+              type: type,
+              value: value,
+              reason: reason,
+              note: note,
+            );
+            return result.success
+                ? null
+                : (result.errorMessage ?? 'Could not apply discount');
+          },
+        ),
+      ),
+    );
+  }
+
   /// Cart line price. Tapping it opens the override dialog — making the price
   /// itself the control, rather than adding a competing action button beside
   /// Delete. Non-admins get a plain label: the action is HIDDEN, not shown and
@@ -1519,10 +1633,17 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
   Widget _buildLinePrice(BuildContext context, CartItemModel item) {
     final overridden = item.isPriceOverridden;
 
-    final priceText = Row(
-      mainAxisSize: MainAxisSize.min,
+    // A Wrap, NOT a Row. With an override AND a line discount this line carries
+    // four pieces ("~~2000~~ 1600 ✏ -320.00 (20%)"), which on a phone exceeds
+    // the name column's share and made a Row overflow by ~60px. Wrapping lets it
+    // flow onto a second line instead of clipping, and costs no height when it
+    // fits.
+    final priceText = Wrap(
+      spacing: 5,
+      runSpacing: 2,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        if (overridden) ...[
+        if (overridden)
           Text(
             _money(item.originalPrice!),
             style: GoogleFonts.poppins(
@@ -1531,8 +1652,6 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
               decoration: TextDecoration.lineThrough,
             ),
           ),
-          const SizedBox(width: 5),
-        ],
         Text(
           _money(item.price),
           style: GoogleFonts.poppins(
@@ -1541,14 +1660,24 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
             color: overridden ? AppColors.warning : AppColors.textSecondary,
           ),
         ),
-        if (PriceOverrideService.canOverride) ...[
-          const SizedBox(width: 5),
+        if (PriceOverrideService.canOverride)
           Icon(
             Icons.edit_outlined,
             size: AppResponsive.smallFontSize(context),
             color: AppColors.primary,
           ),
-        ],
+        // This line's own discount. The line total to the right stays GROSS,
+        // mirroring the receipt, and this is what explains the gap.
+        if (item.hasLineDiscount)
+          Text(
+            '-${_money(item.lineDiscountAmount!)}'
+            '${item.lineDiscountType == 'percentage' && item.lineDiscountValue != null ? ' (${_trimPct(item.lineDiscountValue!)}%)' : ''}',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              fontWeight: FontWeight.w600,
+              color: AppColors.danger,
+            ),
+          ),
       ],
     );
 

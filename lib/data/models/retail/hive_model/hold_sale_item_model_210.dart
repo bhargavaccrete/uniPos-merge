@@ -76,6 +76,27 @@ class HoldSaleItemModel extends HiveObject {
   @HiveField(20)
   final String? overrideNote;
 
+  // ==================== LINE DISCOUNT ====================
+  // Parked with the line so restoring reproduces the discounted bill AND the
+  // reason. Without these a fifteen-line parked sale loses every line discount
+  // silently on restore, which is not something a cashier can retype.
+  // Indices continue at 21 (5-7 are retired legacy columns).
+
+  @HiveField(21)
+  final String? lineDiscountType;
+
+  @HiveField(22)
+  final double? lineDiscountValue;
+
+  @HiveField(23)
+  final double? lineDiscountAmount;
+
+  @HiveField(24)
+  final String? lineDiscountReason;
+
+  @HiveField(25)
+  final String? lineDiscountNote;
+
   HoldSaleItemModel({
     required this.holdSaleItemId,
     required this.holdSaleId,
@@ -95,6 +116,11 @@ class HoldSaleItemModel extends HiveObject {
     this.originalPrice,
     this.overrideReason,
     this.overrideNote,
+    this.lineDiscountType,
+    this.lineDiscountValue,
+    this.lineDiscountAmount,
+    this.lineDiscountReason,
+    this.lineDiscountNote,
   });
 
   factory HoldSaleItemModel.create({
@@ -113,6 +139,11 @@ class HoldSaleItemModel extends HiveObject {
     double? originalPrice,
     String? overrideReason,
     String? overrideNote,
+    String? lineDiscountType,
+    double? lineDiscountValue,
+    double? lineDiscountAmount,
+    String? lineDiscountReason,
+    String? lineDiscountNote,
   }) {
     final now = DateTime.now().toIso8601String();
     final holdSaleItemId = '${holdSaleId}_${variantId}_${DateTime.now().millisecondsSinceEpoch}';
@@ -136,6 +167,11 @@ class HoldSaleItemModel extends HiveObject {
       originalPrice: originalPrice,
       overrideReason: overrideReason,
       overrideNote: overrideNote,
+      lineDiscountType: lineDiscountType,
+      lineDiscountValue: lineDiscountValue,
+      lineDiscountAmount: lineDiscountAmount,
+      lineDiscountReason: lineDiscountReason,
+      lineDiscountNote: lineDiscountNote,
     );
   }
 
@@ -159,6 +195,11 @@ class HoldSaleItemModel extends HiveObject {
       'originalPrice': originalPrice,
       'overrideReason': overrideReason,
       'overrideNote': overrideNote,
+      'lineDiscountType': lineDiscountType,
+      'lineDiscountValue': lineDiscountValue,
+      'lineDiscountAmount': lineDiscountAmount,
+      'lineDiscountReason': lineDiscountReason,
+      'lineDiscountNote': lineDiscountNote,
     };
   }
 
@@ -183,6 +224,11 @@ class HoldSaleItemModel extends HiveObject {
       originalPrice: (map['originalPrice'] as num?)?.toDouble(),
       overrideReason: map['overrideReason'] as String?,
       overrideNote: map['overrideNote'] as String?,
+      lineDiscountType: map['lineDiscountType'] as String?,
+      lineDiscountValue: (map['lineDiscountValue'] as num?)?.toDouble(),
+      lineDiscountAmount: (map['lineDiscountAmount'] as num?)?.toDouble(),
+      lineDiscountReason: map['lineDiscountReason'] as String?,
+      lineDiscountNote: map['lineDiscountNote'] as String?,
     );
   }
 }

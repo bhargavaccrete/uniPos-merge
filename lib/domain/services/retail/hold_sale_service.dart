@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/retail/hive_model/hold_sale_item_model_210.dart';
 import '../../../data/models/retail/hive_model/hold_sale_model_209.dart';
+import 'retail_billing_service.dart' show DiscountType;
 
 /// Park / restore for retail sales.
 ///
@@ -59,6 +60,13 @@ class HoldSaleService {
         originalPrice: cartItem.originalPrice,
         overrideReason: cartItem.overrideReason,
         overrideNote: cartItem.overrideNote,
+        // And the line discount. A cashier can retype one bill discount; fifteen
+        // per-line discounts are not recoverable, and the loss would be silent.
+        lineDiscountType: cartItem.lineDiscountType,
+        lineDiscountValue: cartItem.lineDiscountValue,
+        lineDiscountAmount: cartItem.lineDiscountAmount,
+        lineDiscountReason: cartItem.lineDiscountReason,
+        lineDiscountNote: cartItem.lineDiscountNote,
       );
     }).toList();
 
@@ -107,8 +115,27 @@ class HoldSaleService {
         originalPrice: holdItem.originalPrice,
         overrideReason: holdItem.overrideReason,
         overrideNote: holdItem.overrideNote,
+        // The amount is re-resolved from type+value inside addItem, so a
+        // percentage is exact for the restored quantity.
+        lineDiscountType: holdItem.lineDiscountType,
+        lineDiscountValue: holdItem.lineDiscountValue,
+        lineDiscountReason: holdItem.lineDiscountReason,
+        lineDiscountNote: holdItem.lineDiscountNote,
       );
       if (!result.success) skipped++;
+    }
+
+    // Replay the ORDER-level discount too. `clearCartAndSave` above runs
+    // `resetBillingInputs`, which zeroes it, and nothing put it back — so a
+    // parked 10%-off bill used to restore at full price. The parked figure is a
+    // resolved amount, so it is replayed as an amount regardless of how it was
+    // originally entered.
+    final parkedDiscount = holdSale.discountAmount ?? 0;
+    if (parkedDiscount > 0) {
+      retailCartStore.setDiscount(
+        type: DiscountType.amount,
+        value: parkedDiscount,
+      );
     }
 
     await holdSaleStore.deleteHoldSale(holdSale.holdSaleId);

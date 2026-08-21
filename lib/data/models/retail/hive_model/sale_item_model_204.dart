@@ -112,6 +112,38 @@ class SaleItemModel extends HiveObject {
   @HiveField(24)
   final String? overrideNote;
 
+  // ==================== LINE DISCOUNT (audit) ====================
+  // [discountAmount] @10 above keeps its existing meaning: the TOTAL discount on
+  // this line, i.e. its own discount PLUS its share of the order-level discount.
+  // Every report reads that field and must keep doing so.
+  //
+  // These five describe only the line's OWN part, so a receipt can show
+  // "Discount 10% -90" on the line and the order remainder separately.
+
+  /// `DiscountType.name` of the line discount that was applied.
+  @HiveField(25)
+  final String? lineDiscountType;
+
+  /// Raw input as typed: `10` for 10%, or `90` for a flat 90.
+  @HiveField(26)
+  final double? lineDiscountValue;
+
+  /// The line's own discount in currency, AFTER the engine's cap.
+  ///
+  /// **A SUBSET of [discountAmount] — never add the two together.** A report that
+  /// summed both would double-count. Null means this line sold with no discount
+  /// of its own, which is also how every pre-existing sale line reads back.
+  @HiveField(27)
+  final double? lineDiscountAmount;
+
+  /// `LineDiscountReason.code`. Set whenever [lineDiscountAmount] is.
+  @HiveField(28)
+  final String? lineDiscountReason;
+
+  /// Free-text detail; required when the reason is 'other'.
+  @HiveField(29)
+  final String? lineDiscountNote;
+
   SaleItemModel({
     required this.saleItemId,
     required this.saleId,
@@ -138,7 +170,22 @@ class SaleItemModel extends HiveObject {
     this.originalPrice,
     this.overrideReason,
     this.overrideNote,
+    this.lineDiscountType,
+    this.lineDiscountValue,
+    this.lineDiscountAmount,
+    this.lineDiscountReason,
+    this.lineDiscountNote,
   });
+
+  /// True when this line sold with a discount of its own.
+  bool get hasLineDiscount =>
+      lineDiscountAmount != null && lineDiscountAmount! > 0;
+
+  /// This line's share of the ORDER-level discount: the total minus its own.
+  double get billDiscountShare {
+    final share = (discountAmount ?? 0) - (lineDiscountAmount ?? 0);
+    return share > 0 ? share : 0;
+  }
 
   /// True when this line was sold at a price other than the catalogue price.
   bool get isPriceOverridden => originalPrice != null;
@@ -166,6 +213,11 @@ class SaleItemModel extends HiveObject {
     double? originalPrice,
     String? overrideReason,
     String? overrideNote,
+    String? lineDiscountType,
+    double? lineDiscountValue,
+    double? lineDiscountAmount,
+    String? lineDiscountReason,
+    String? lineDiscountNote,
   }) {
     // ✅ FIX: Check if tax is inclusive (for restaurant mode)
     final bool isTaxInclusive = AppConfig.isRestaurant && AppSettings.isTaxInclusive;
@@ -232,6 +284,11 @@ class SaleItemModel extends HiveObject {
       originalPrice: originalPrice,
       overrideReason: overrideReason,
       overrideNote: overrideNote,
+      lineDiscountType: lineDiscountType,
+      lineDiscountValue: lineDiscountValue,
+      lineDiscountAmount: lineDiscountAmount,
+      lineDiscountReason: lineDiscountReason,
+      lineDiscountNote: lineDiscountNote,
     );
   }
 
@@ -258,6 +315,11 @@ class SaleItemModel extends HiveObject {
     double? originalPrice,
     String? overrideReason,
     String? overrideNote,
+    String? lineDiscountType,
+    double? lineDiscountValue,
+    double? lineDiscountAmount,
+    String? lineDiscountReason,
+    String? lineDiscountNote,
   }) {
     final cgst = _roundTo2Decimals(gstAmount / 2);
     final sgst = _roundTo2Decimals(gstAmount / 2);
@@ -288,6 +350,11 @@ class SaleItemModel extends HiveObject {
       originalPrice: originalPrice,
       overrideReason: overrideReason,
       overrideNote: overrideNote,
+      lineDiscountType: lineDiscountType,
+      lineDiscountValue: lineDiscountValue,
+      lineDiscountAmount: lineDiscountAmount,
+      lineDiscountReason: lineDiscountReason,
+      lineDiscountNote: lineDiscountNote,
     );
   }
 
@@ -322,6 +389,11 @@ class SaleItemModel extends HiveObject {
       'originalPrice': originalPrice,
       'overrideReason': overrideReason,
       'overrideNote': overrideNote,
+      'lineDiscountType': lineDiscountType,
+      'lineDiscountValue': lineDiscountValue,
+      'lineDiscountAmount': lineDiscountAmount,
+      'lineDiscountReason': lineDiscountReason,
+      'lineDiscountNote': lineDiscountNote,
     };
   }
 
@@ -359,6 +431,11 @@ class SaleItemModel extends HiveObject {
       originalPrice: (map['originalPrice'] as num?)?.toDouble(),
       overrideReason: map['overrideReason'] as String?,
       overrideNote: map['overrideNote'] as String?,
+      lineDiscountType: map['lineDiscountType'] as String?,
+      lineDiscountValue: (map['lineDiscountValue'] as num?)?.toDouble(),
+      lineDiscountAmount: (map['lineDiscountAmount'] as num?)?.toDouble(),
+      lineDiscountReason: map['lineDiscountReason'] as String?,
+      lineDiscountNote: map['lineDiscountNote'] as String?,
     );
   }
 }

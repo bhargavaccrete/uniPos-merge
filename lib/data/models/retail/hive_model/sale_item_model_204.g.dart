@@ -42,13 +42,18 @@ class SaleItemModelAdapter extends TypeAdapter<SaleItemModel> {
       originalPrice: fields[22] as double?,
       overrideReason: fields[23] as String?,
       overrideNote: fields[24] as String?,
+      lineDiscountType: fields[25] as String?,
+      lineDiscountValue: fields[26] as double?,
+      lineDiscountAmount: fields[27] as double?,
+      lineDiscountReason: fields[28] as String?,
+      lineDiscountNote: fields[29] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, SaleItemModel obj) {
     writer
-      ..writeByte(25)
+      ..writeByte(30)
       ..writeByte(0)
       ..write(obj.saleItemId)
       ..writeByte(1)
@@ -98,7 +103,17 @@ class SaleItemModelAdapter extends TypeAdapter<SaleItemModel> {
       ..writeByte(23)
       ..write(obj.overrideReason)
       ..writeByte(24)
-      ..write(obj.overrideNote);
+      ..write(obj.overrideNote)
+      ..writeByte(25)
+      ..write(obj.lineDiscountType)
+      ..writeByte(26)
+      ..write(obj.lineDiscountValue)
+      ..writeByte(27)
+      ..write(obj.lineDiscountAmount)
+      ..writeByte(28)
+      ..write(obj.lineDiscountReason)
+      ..writeByte(29)
+      ..write(obj.lineDiscountNote);
   }
 
   @override

@@ -207,7 +207,11 @@ mixin _$CartStore on _CartStore, Store {
       int qty = 1,
       double? originalPrice,
       String? overrideReason,
-      String? overrideNote}) {
+      String? overrideNote,
+      String? lineDiscountType,
+      double? lineDiscountValue,
+      String? lineDiscountReason,
+      String? lineDiscountNote}) {
     return _$addItemAsyncAction.run(() => super.addItem(product, variant,
         category: category,
         priceOverride: priceOverride,
@@ -215,7 +219,11 @@ mixin _$CartStore on _CartStore, Store {
         qty: qty,
         originalPrice: originalPrice,
         overrideReason: overrideReason,
-        overrideNote: overrideNote));
+        overrideNote: overrideNote,
+        lineDiscountType: lineDiscountType,
+        lineDiscountValue: lineDiscountValue,
+        lineDiscountReason: lineDiscountReason,
+        lineDiscountNote: lineDiscountNote));
   }
 
   late final _$overrideLinePriceAsyncAction =
@@ -229,6 +237,24 @@ mixin _$CartStore on _CartStore, Store {
       String? note}) {
     return _$overrideLinePriceAsyncAction.run(() => super.overrideLinePrice(
         variantId: variantId, newPrice: newPrice, reason: reason, note: note));
+  }
+
+  late final _$setLineDiscountAsyncAction =
+      AsyncAction('_CartStore.setLineDiscount', context: context);
+
+  @override
+  Future<CartOperationResult> setLineDiscount(
+      {required String variantId,
+      required DiscountType type,
+      required double value,
+      required String reason,
+      String? note}) {
+    return _$setLineDiscountAsyncAction.run(() => super.setLineDiscount(
+        variantId: variantId,
+        type: type,
+        value: value,
+        reason: reason,
+        note: note));
   }
 
   late final _$removeItemAsyncAction =
@@ -310,7 +336,11 @@ mixin _$CartStore on _CartStore, Store {
       int qty = 1,
       double? originalPrice,
       String? overrideReason,
-      String? overrideNote}) {
+      String? overrideNote,
+      String? lineDiscountType,
+      double? lineDiscountValue,
+      String? lineDiscountReason,
+      String? lineDiscountNote}) {
     return _$addItemToTabAsyncAction.run(() => super.addItemToTab(
         product, variant,
         category: category,
@@ -319,7 +349,11 @@ mixin _$CartStore on _CartStore, Store {
         qty: qty,
         originalPrice: originalPrice,
         overrideReason: overrideReason,
-        overrideNote: overrideNote));
+        overrideNote: overrideNote,
+        lineDiscountType: lineDiscountType,
+        lineDiscountValue: lineDiscountValue,
+        lineDiscountReason: lineDiscountReason,
+        lineDiscountNote: lineDiscountNote));
   }
 
   late final _$removeItemFromTabAsyncAction =
@@ -356,6 +390,25 @@ mixin _$CartStore on _CartStore, Store {
   Future<CartOperationResult> setQuantityInTab(String variantId, int quantity) {
     return _$setQuantityInTabAsyncAction
         .run(() => super.setQuantityInTab(variantId, quantity));
+  }
+
+  late final _$setLineDiscountInTabAsyncAction =
+      AsyncAction('_CartStore.setLineDiscountInTab', context: context);
+
+  @override
+  Future<CartOperationResult> setLineDiscountInTab(
+      {required String variantId,
+      required DiscountType type,
+      required double value,
+      required String reason,
+      String? note}) {
+    return _$setLineDiscountInTabAsyncAction.run(() => super
+        .setLineDiscountInTab(
+            variantId: variantId,
+            type: type,
+            value: value,
+            reason: reason,
+            note: note));
   }
 
   late final _$overrideLinePriceInTabAsyncAction =
