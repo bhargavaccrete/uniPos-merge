@@ -69,6 +69,8 @@ class ReturnService {
         color: item.color,
         weight: item.weight,
         attributes: item.attributes,
+        // The CHARGED price, which already includes any override — a refund
+        // must return what was taken, never today's catalogue price.
         price: item.price,
         qty: item.qty, // Keep positive for stock restoration
         discountAmount: item.discountAmount,
@@ -79,6 +81,11 @@ class ReturnService {
         // out against the sale it reverses, and it can only do that if both
         // sides are costed identically.
         costPrice: item.costPrice,
+        // Mirror the override audit onto the return line, so a refund below
+        // list carries the same explanation as the sale it reverses.
+        originalPrice: item.originalPrice,
+        overrideReason: item.overrideReason,
+        overrideNote: item.overrideNote,
       );
       returnItems.add(returnItem);
     }
@@ -203,6 +210,9 @@ class ReturnService {
         // See the full-return path: a partial return must be costed exactly as
         // the line it reverses.
         costPrice: originalItem.costPrice,
+        originalPrice: originalItem.originalPrice,
+        overrideReason: originalItem.overrideReason,
+        overrideNote: originalItem.overrideNote,
       );
 
       returnItems.add(returnItem);
@@ -245,6 +255,11 @@ class ReturnService {
         barcode: item.barcode,
         hsnCode: item.hsnCode,
         costPrice: item.costPrice,
+        // Mirror the override audit onto the return line, so a refund below
+        // list carries the same explanation as the sale it reverses.
+        originalPrice: item.originalPrice,
+        overrideReason: item.overrideReason,
+        overrideNote: item.overrideNote,
       );
     }).toList();
 

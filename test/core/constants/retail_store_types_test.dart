@@ -1,0 +1,144 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:billberrylite/core/constants/retail_store_types.dart';
+import 'package:billberrylite/domain/store/retail/attribute_store.dart';
+
+void main() {
+  group('RetailStoreTypes catalogue', () {
+    test('offers exactly the six approved store types, in order', () {
+      expect(
+        RetailStoreTypes.all.map((t) => t.key).toList(),
+        equals([
+          'garment',
+          'footwear',
+          'sports',
+          'cosmetics_beauty',
+          'stationery',
+          'gift_general',
+        ]),
+      );
+    });
+
+    test('display names match the agreed wording', () {
+      expect(
+        RetailStoreTypes.all.map((t) => t.name).toList(),
+        equals([
+          'Garment Store',
+          'Footwear Store',
+          'Sports Store',
+          'Cosmetics & Beauty Store',
+          'Stationery Store',
+          'Gift & General Store',
+        ]),
+      );
+    });
+
+    // Grocery needs decimal quantity, UOM, weight selling and batch/expiry —
+    // none of which the POS has. It must stay out until those exist.
+    test('does not offer grocery', () {
+      expect(RetailStoreTypes.isKnown('grocery'), isFalse);
+      expect(
+        RetailStoreTypes.all.any((t) => t.key.contains('grocer')),
+        isFalse,
+      );
+    });
+
+    test('keys are unique', () {
+      final keys = RetailStoreTypes.all.map((t) => t.key).toList();
+      expect(keys.toSet().length, equals(keys.length));
+    });
+
+    test('every entry carries a description and an icon name', () {
+      for (final type in RetailStoreTypes.all) {
+        expect(type.description, isNotEmpty, reason: type.key);
+        expect(type.iconName, isNotEmpty, reason: type.key);
+      }
+    });
+
+    group('byKey / isKnown / nameFor', () {
+      test('resolve a known key', () {
+        expect(RetailStoreTypes.byKey('cosmetics_beauty'),
+            same(RetailStoreTypes.cosmeticsBeauty));
+        expect(RetailStoreTypes.isKnown('gift_general'), isTrue);
+        expect(RetailStoreTypes.nameFor('garment'), equals('Garment Store'));
+      });
+
+      test('tolerate null, empty and retired keys instead of throwing', () {
+        for (final bad in [null, '', 'Garment Store', 'GARMENT', 'hardware']) {
+          expect(RetailStoreTypes.byKey(bad), isNull, reason: '$bad');
+          expect(RetailStoreTypes.isKnown(bad), isFalse, reason: '$bad');
+          expect(RetailStoreTypes.nameFor(bad), isNull, reason: '$bad');
+        }
+      });
+    });
+  });
+
+  group('store-type default attributes', () {
+    test('each store type seeds the agreed attribute names', () {
+      expect(RetailStoreTypes.garment.defaultAttributeNames,
+          equals(['Size', 'Color']));
+      expect(RetailStoreTypes.footwear.defaultAttributeNames,
+          equals(['Size', 'Color']));
+      expect(RetailStoreTypes.sports.defaultAttributeNames,
+          equals(['Size', 'Color']));
+      expect(RetailStoreTypes.cosmeticsBeauty.defaultAttributeNames,
+          equals(['Shade', 'Volume']));
+      expect(RetailStoreTypes.stationery.defaultAttributeNames,
+          equals(['Pack Size']));
+      expect(RetailStoreTypes.giftGeneral.defaultAttributeNames, isEmpty);
+    });
+
+    // The distinction the fallback depends on: an unknown key means "no store
+    // type, use kBaseAttributeNames"; gift_general means "genuinely none".
+    test('defaultAttributeNamesFor separates unknown from deliberately empty',
+        () {
+      expect(RetailStoreTypes.defaultAttributeNamesFor('gift_general'),
+          isEmpty);
+      expect(RetailStoreTypes.defaultAttributeNamesFor(null), isNull);
+      expect(RetailStoreTypes.defaultAttributeNamesFor('grocery'), isNull);
+      expect(RetailStoreTypes.defaultAttributeNamesFor('garment'),
+          equals(['Size', 'Color']));
+    });
+
+    // Contract: a default name misspelled here would create an attribute with
+    // no starter values and no error anywhere.
+    test('every default name has starter values in kSeedAttributeValues', () {
+      for (final type in RetailStoreTypes.all) {
+        for (final name in type.defaultAttributeNames) {
+          expect(
+            kSeedAttributeValues.containsKey(name),
+            isTrue,
+            reason: '${type.key} defaults to "$name", '
+                'which has no entry in kSeedAttributeValues',
+          );
+          expect(kSeedAttributeValues[name], isNotEmpty, reason: name);
+        }
+      }
+    });
+
+    test('the app-wide fallback names are also seedable', () {
+      for (final name in kBaseAttributeNames) {
+        expect(kSeedAttributeValues.containsKey(name), isTrue, reason: name);
+      }
+    });
+
+    test('colour swatch lists align with their value lists', () {
+      for (final entry in kSeedAttributeColorCodes.entries) {
+        final values = kSeedAttributeValues[entry.key];
+        expect(values, isNotNull, reason: entry.key);
+        expect(
+          entry.value.length,
+          equals(values!.length),
+          reason: '${entry.key}: ${entry.value.length} swatches for '
+              '${values.length} values',
+        );
+      }
+    });
+
+    test('no store type defaults to a duplicate attribute', () {
+      for (final type in RetailStoreTypes.all) {
+        final names = type.defaultAttributeNames;
+        expect(names.toSet().length, equals(names.length), reason: type.key);
+      }
+    });
+  });
+}

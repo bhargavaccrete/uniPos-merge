@@ -84,6 +84,21 @@ class AppTextField extends StatefulWidget {
   /// full-form validation. Pass [AutovalidateMode.disabled] to opt out.
   final AutovalidateMode autovalidateMode;
 
+  /// Overrides the default roomy padding. For fields that must sit inline in a
+  /// tight row (e.g. the POS cart quantity between its −/+ buttons) rather than
+  /// stacked in a form.
+  final EdgeInsetsGeometry? contentPadding;
+
+  /// Fired when the user taps Done on the on-screen [VisualKeyboard].
+  ///
+  /// Opt-in, and deliberately separate from [onFieldSubmitted]: in VK mode the
+  /// field is `readOnly`, so `onFieldSubmitted` never fires and a caller that
+  /// needs a definite "user confirmed" signal has nothing to listen to. Wiring
+  /// it to [onFieldSubmitted] for everyone would change behaviour for the ~20
+  /// existing callers that use that hook to chain focus, so callers who need it
+  /// ask for it.
+  final VoidCallback? onVisualKeyboardDone;
+
   const AppTextField({
     super.key,
     this.controller,
@@ -114,6 +129,8 @@ class AppTextField extends StatefulWidget {
     this.autocorrect = true,
     this.textCapitalization = TextCapitalization.none,
     this.autovalidateMode = AutovalidateMode.onUserInteraction,
+    this.contentPadding,
+    this.onVisualKeyboardDone,
   });
 
   @override
@@ -194,6 +211,7 @@ class _AppTextFieldState extends State<AppTextField> {
                 context: context,
                 controller: widget.controller!,
                 keyboardType: _mapKeyboardType(),
+                onDone: widget.onVisualKeyboardDone,
               );
             }
           : widget.onTap,
@@ -225,7 +243,8 @@ class _AppTextFieldState extends State<AppTextField> {
         counterText: '',
         filled: true,
         fillColor: widget.enabled ? AppColors.surfaceLight : AppColors.divider.withOpacity(0.4),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: widget.contentPadding ??
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.divider),

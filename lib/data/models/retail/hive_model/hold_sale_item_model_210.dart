@@ -59,6 +59,23 @@ class HoldSaleItemModel extends HiveObject {
   @HiveField(16)
   final double? discountAmount;
 
+  // ==================== PRICE OVERRIDE ====================
+  // Parked WITH the line so restoring reproduces the overridden bill, and the
+  // reason survives a park that spans a shift change.
+  // Indices continue at 18: 5-7 are retired legacy columns and must not be
+  // reused, or old parked rows would deserialize as the wrong type.
+
+  /// Catalogue price at override time. Null = the line was not overridden.
+  @HiveField(18)
+  final double? originalPrice;
+
+  /// `PriceOverrideReason.code`.
+  @HiveField(19)
+  final String? overrideReason;
+
+  @HiveField(20)
+  final String? overrideNote;
+
   HoldSaleItemModel({
     required this.holdSaleItemId,
     required this.holdSaleId,
@@ -75,6 +92,9 @@ class HoldSaleItemModel extends HiveObject {
     this.taxableAmount,
     this.gstAmount,
     this.discountAmount,
+    this.originalPrice,
+    this.overrideReason,
+    this.overrideNote,
   });
 
   factory HoldSaleItemModel.create({
@@ -90,6 +110,9 @@ class HoldSaleItemModel extends HiveObject {
     double? taxableAmount,
     double? gstAmount,
     double? discountAmount,
+    double? originalPrice,
+    String? overrideReason,
+    String? overrideNote,
   }) {
     final now = DateTime.now().toIso8601String();
     final holdSaleItemId = '${holdSaleId}_${variantId}_${DateTime.now().millisecondsSinceEpoch}';
@@ -110,6 +133,9 @@ class HoldSaleItemModel extends HiveObject {
       taxableAmount: taxableAmount,
       gstAmount: gstAmount,
       discountAmount: discountAmount,
+      originalPrice: originalPrice,
+      overrideReason: overrideReason,
+      overrideNote: overrideNote,
     );
   }
 
@@ -130,6 +156,9 @@ class HoldSaleItemModel extends HiveObject {
       'taxableAmount': taxableAmount,
       'gstAmount': gstAmount,
       'discountAmount': discountAmount,
+      'originalPrice': originalPrice,
+      'overrideReason': overrideReason,
+      'overrideNote': overrideNote,
     };
   }
 
@@ -151,6 +180,9 @@ class HoldSaleItemModel extends HiveObject {
       taxableAmount: (map['taxableAmount'] as num?)?.toDouble(),
       gstAmount: (map['gstAmount'] as num?)?.toDouble(),
       discountAmount: (map['discountAmount'] as num?)?.toDouble(),
+      originalPrice: (map['originalPrice'] as num?)?.toDouble(),
+      overrideReason: map['overrideReason'] as String?,
+      overrideNote: map['overrideNote'] as String?,
     );
   }
 }

@@ -16,6 +16,17 @@ import '../../services/retail/retail_billing_service.dart';
 
 part 'cart_store.g.dart';
 
+/// Upper bound on a typed cart quantity.
+///
+/// A typo guard only — the real limit is the variant's stock, checked on every
+/// quantity change. Four digits so the UI formatter and the store agree; the
+/// field limits input length and this backs it up for non-UI callers.
+///
+/// Top-level rather than a `static` on the store: `CartStore` is a mixin
+/// application (`= _CartStore with _$CartStore`), so statics on the private
+/// base class are unreachable through it.
+const int kMaxCartLineQuantity = 9999;
+
 /// Result of cart operations with stock validation
 class CartOperationResult {
   final bool success;
@@ -270,6 +281,10 @@ abstract class _CartStore with Store {
   /// [priceOverride]/[gstRateOverride]/[qty] exist for restoring a parked sale:
   /// the bill was frozen when it was parked, so it must be replayed at the
   /// parked figures rather than re-priced from whatever the rates are now.
+  ///
+  /// [originalPrice]/[overrideReason]/[overrideNote] replay a price override
+  /// that was in force when the sale was parked. For a NEW override at the
+  /// till, use [overrideLinePrice] instead — this method never invents one.
   @action
   Future<CartOperationResult> addItem(
     ProductModel product,
@@ -278,6 +293,9 @@ abstract class _CartStore with Store {
     double? priceOverride,
     double? gstRateOverride,
     int qty = 1,
+    double? originalPrice,
+    String? overrideReason,
+    String? overrideNote,
   }) async {
     final availableStock = variant.stockQty;
 
@@ -321,6 +339,10 @@ abstract class _CartStore with Store {
       // Update quantity for existing item
       final item = items[index];
       final updatedQty = item.qty + qty;
+      // Re-scanning an overridden line bumps the quantity at the OVERRIDDEN
+      // price — the cashier already agreed a price with this customer, so
+      // reverting to the catalogue price on the second unit would be wrong and
+      // silent. The override fields ride along for the same reason.
       final updatedItem = CartItemModel.create(
         cartItemId: item.cartItemId,
         variantId: item.variantId,
@@ -334,6 +356,9 @@ abstract class _CartStore with Store {
         hsnCode: item.hsnCode,
         categoryName: item.categoryName,
         taxInclusive: taxInclusive,
+        originalPrice: item.originalPrice,
+        overrideReason: item.overrideReason,
+        overrideNote: item.overrideNote,
       );
 
       await _repository.saveCartItem(updatedItem);
@@ -362,12 +387,101 @@ abstract class _CartStore with Store {
       hsnCode: effectiveHsnCode,
       categoryName: categoryDisplayName,
       taxInclusive: taxInclusive,
+      originalPrice: originalPrice,
+      overrideReason: overrideReason,
+      overrideNote: overrideNote,
     );
 
     await _repository.saveCartItem(newItem);
 
     // Add to observable list at the top
     items.insert(0, newItem);
+    return CartOperationResult.success();
+  }
+
+  /// Change one cart line's charged unit price.
+  ///
+  /// Writes the new figure to [CartItemModel.price] — which is already the sole
+  /// per-line money input to `RetailBillingService` — so subtotal, discount
+  /// share, taxable amount, GST, grand total, the sale line, the receipt and
+  /// every report follow automatically with no other change.
+  ///
+  /// **The variant master is never written.** [CartItemModel.originalPrice]
+  /// records what the catalogue said, so a squeezed margin stays explainable.
+  ///
+  /// [newPrice] equal to the catalogue price REVERTS the line: the override
+  /// fields are cleared rather than storing an override that changed nothing.
+  /// That is the only way back, and it is deliberate — one code path, so a
+  /// revert can never leave a stale reason behind.
+  ///
+  /// Quantity, tax rate, HSN and descriptors are preserved exactly; only the
+  /// money is recomputed (via [CartItemModel.create], honouring the current
+  /// tax-inclusive mode).
+  ///
+  /// Permission and price validation are the CALLER's job
+  /// (`PriceOverrideService.canOverride` / `.validate`) — this action is the
+  /// write, not the gate, matching how `updateVariantStock` trusts
+  /// `StockAdjustmentService`.
+  @action
+  Future<CartOperationResult> overrideLinePrice({
+    required String variantId,
+    required double newPrice,
+    required String reason,
+    String? note,
+  }) async {
+    final index = items.indexWhere((item) => item.variantId == variantId);
+    if (index == -1) {
+      return CartOperationResult(
+        success: false,
+        errorMessage: 'Item not found in cart',
+      );
+    }
+
+    if (newPrice <= 0) {
+      return CartOperationResult(
+        success: false,
+        errorMessage: 'Price must be greater than zero',
+      );
+    }
+
+    final item = items[index];
+
+    // The catalogue price is read from the variant, NOT from the line — a
+    // second override of an already-overridden line must still record the
+    // catalogue figure, otherwise originalPrice would decay towards the
+    // overridden one on each edit.
+    final variant = await variantRepository.getVariantById(variantId);
+    final cataloguePrice = variant?.effectivePrice ?? item.originalPrice ?? item.price;
+
+    final isRevert = newPrice == cataloguePrice;
+    final trimmedNote = (note ?? '').trim();
+
+    final taxInclusive = await gstService.isTaxInclusiveMode();
+
+    final updatedItem = CartItemModel.create(
+      cartItemId: item.cartItemId,
+      variantId: item.variantId,
+      productId: item.productId,
+      productName: item.productName,
+      attributes: item.attributes,
+      price: newPrice,
+      qty: item.qty,
+      barcode: item.barcode,
+      gstRate: item.gstRate,
+      hsnCode: item.hsnCode,
+      categoryName: item.categoryName,
+      taxInclusive: taxInclusive,
+      originalPrice: isRevert ? null : cataloguePrice,
+      overrideReason: isRevert ? null : reason,
+      overrideNote: isRevert || trimmedNote.isEmpty ? null : trimmedNote,
+    );
+
+    await _repository.saveCartItem(updatedItem);
+
+    // removeAt + insert, matching every other mutation here — an in-place
+    // assignment does not always fire the observable.
+    items.removeAt(index);
+    items.insert(index, updatedItem);
     return CartOperationResult.success();
   }
 
@@ -419,6 +533,101 @@ abstract class _CartStore with Store {
     items.removeWhere((item) => item.variantId == variantId);
   }
 
+  /// Set a cart line to an absolute quantity, as typed at the till.
+  ///
+  /// The absolute counterpart to [incrementQuantity] / [decrementQuantity],
+  /// which are delta-only. Stock rules are IDENTICAL to [incrementQuantity] —
+  /// the variant is re-read from the repository (another till or a GRN may have
+  /// moved stock since this line was added) and a request over the ceiling is
+  /// refused with the same [CartOperationResult.insufficientStock].
+  ///
+  /// `quantity == 0` REMOVES the line, matching what [decrementQuantity] does
+  /// at a quantity of 1. Callers must only pass 0 on an explicit confirmation —
+  /// an empty field mid-typing is not a zero.
+  ///
+  /// Rebuilds through [CartItemModel.create] so every derived figure (total,
+  /// taxable, GST, CGST/SGST, tax-inclusive handling) comes from the one source
+  /// of truth, and carries forward everything that must survive a quantity
+  /// change — including the price override and its audit trail.
+  @action
+  Future<CartOperationResult> setQuantity(String variantId, int quantity) async {
+    final index = items.indexWhere((item) => item.variantId == variantId);
+    if (index == -1) {
+      return CartOperationResult(
+        success: false,
+        errorMessage: 'Item not found in cart',
+      );
+    }
+
+    if (quantity < 0) {
+      return CartOperationResult(
+        success: false,
+        errorMessage: 'Quantity cannot be negative',
+      );
+    }
+
+    // Zero means "take it off the bill", the same as decrementing from 1.
+    if (quantity == 0) {
+      await removeItem(variantId);
+      return CartOperationResult.success();
+    }
+
+    // Typo guard, not a business rule — stock below is the real limit.
+    if (quantity > kMaxCartLineQuantity) {
+      return CartOperationResult(
+        success: false,
+        errorMessage: 'Maximum quantity is $kMaxCartLineQuantity',
+      );
+    }
+
+    final item = items[index];
+    if (quantity == item.qty) return CartOperationResult.success();
+
+    // Re-read the variant for live stock, exactly as incrementQuantity does.
+    final variant = await variantRepository.getVariantById(variantId);
+
+    if (variant != null) {
+      final availableStock = variant.stockQty;
+      if (quantity > availableStock) {
+        return CartOperationResult.insufficientStock(
+          available: availableStock,
+          requested: quantity,
+        );
+      }
+    }
+
+    final taxInclusive = await gstService.isTaxInclusiveMode();
+
+    final updatedItem = CartItemModel.create(
+      cartItemId: item.cartItemId,
+      variantId: item.variantId,
+      productId: item.productId,
+      productName: item.productName,
+      attributes: item.attributes,
+      // Everything below must survive a quantity change. `price` carries any
+      // override, and the three audit fields carry why — dropping them here
+      // would silently reprice the line to catalogue on the first typed qty.
+      price: item.price,
+      qty: quantity,
+      barcode: item.barcode,
+      gstRate: item.gstRate,
+      hsnCode: item.hsnCode,
+      categoryName: item.categoryName,
+      taxInclusive: taxInclusive,
+      originalPrice: item.originalPrice,
+      overrideReason: item.overrideReason,
+      overrideNote: item.overrideNote,
+    );
+
+    await _repository.saveCartItem(updatedItem);
+
+    // removeAt + insert, matching every other mutation here — an in-place
+    // assignment does not always fire the observable.
+    items.removeAt(index);
+    items.insert(index, updatedItem);
+    return CartOperationResult.success();
+  }
+
   @action
   Future<CartOperationResult> incrementQuantity(String variantId) async {
     final index = items.indexWhere((item) => item.variantId == variantId);
@@ -459,6 +668,9 @@ abstract class _CartStore with Store {
       hsnCode: item.hsnCode,
       categoryName: item.categoryName,
       taxInclusive: taxInclusive,
+      originalPrice: item.originalPrice,
+      overrideReason: item.overrideReason,
+      overrideNote: item.overrideNote,
     );
 
     await _repository.saveCartItem(updatedItem);
@@ -493,6 +705,9 @@ abstract class _CartStore with Store {
           hsnCode: item.hsnCode,
           categoryName: item.categoryName,
           taxInclusive: taxInclusive,
+          originalPrice: item.originalPrice,
+          overrideReason: item.overrideReason,
+          overrideNote: item.overrideNote,
         );
 
         await _repository.saveCartItem(updatedItem);
@@ -670,11 +885,39 @@ abstract class _CartStore with Store {
     tabs[activeTabIndex] = updatedTab;
   }
 
-  /// Update all cart methods to save to active tab
+  // ==================== TAB-PERSISTING WRAPPERS ====================
+  //
+  // Every cart mutation the POS makes must go through one of these, NOT the
+  // bare method. The bare methods save the line to the cart box, but
+  // [_loadActiveTabItems] restores from the ACTIVE TAB's snapshot — so a change
+  // that never refreshed the snapshot is lost if the app dies before the next
+  // tab switch (which is the only other thing that saves it). These wrappers
+  // are the single place that closes that gap; do not inline
+  // [_saveCurrentTabItems] at a call site instead.
 
   @action
-  Future<CartOperationResult> addItemToTab(ProductModel product, VarianteModel variant, {Category? category}) async {
-    final result = await addItem(product, variant, category: category);
+  Future<CartOperationResult> addItemToTab(
+    ProductModel product,
+    VarianteModel variant, {
+    Category? category,
+    double? priceOverride,
+    double? gstRateOverride,
+    int qty = 1,
+    double? originalPrice,
+    String? overrideReason,
+    String? overrideNote,
+  }) async {
+    final result = await addItem(
+      product,
+      variant,
+      category: category,
+      priceOverride: priceOverride,
+      gstRateOverride: gstRateOverride,
+      qty: qty,
+      originalPrice: originalPrice,
+      overrideReason: overrideReason,
+      overrideNote: overrideNote,
+    );
     if (result.success) {
       await _saveCurrentTabItems();
     }
@@ -700,6 +943,46 @@ abstract class _CartStore with Store {
   Future<void> decrementQuantityInTab(String variantId) async {
     await decrementQuantity(variantId);
     await _saveCurrentTabItems();
+  }
+
+  /// Absolute quantity, persisted to the active tab.
+  ///
+  /// Saves on success AND on a zero (which removes the line) — [setQuantity]
+  /// reports success for both, and a removal that is not snapshotted comes back
+  /// from the dead on restart.
+  @action
+  Future<CartOperationResult> setQuantityInTab(
+    String variantId,
+    int quantity,
+  ) async {
+    final result = await setQuantity(variantId, quantity);
+    if (result.success) {
+      await _saveCurrentTabItems();
+    }
+    return result;
+  }
+
+  /// Price override, persisted to the active tab.
+  ///
+  /// Same durability reason as the quantity wrappers above: an override that
+  /// only reached the cart box would revert to catalogue price on restart.
+  @action
+  Future<CartOperationResult> overrideLinePriceInTab({
+    required String variantId,
+    required double newPrice,
+    required String reason,
+    String? note,
+  }) async {
+    final result = await overrideLinePrice(
+      variantId: variantId,
+      newPrice: newPrice,
+      reason: reason,
+      note: note,
+    );
+    if (result.success) {
+      await _saveCurrentTabItems();
+    }
+    return result;
   }
 
   @action

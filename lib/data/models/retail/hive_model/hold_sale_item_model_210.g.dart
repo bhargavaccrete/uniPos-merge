@@ -32,13 +32,16 @@ class HoldSaleItemModelAdapter extends TypeAdapter<HoldSaleItemModel> {
       taxableAmount: fields[14] as double?,
       gstAmount: fields[15] as double?,
       discountAmount: fields[16] as double?,
+      originalPrice: fields[18] as double?,
+      overrideReason: fields[19] as String?,
+      overrideNote: fields[20] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, HoldSaleItemModel obj) {
     writer
-      ..writeByte(15)
+      ..writeByte(18)
       ..writeByte(0)
       ..write(obj.holdSaleItemId)
       ..writeByte(1)
@@ -68,7 +71,13 @@ class HoldSaleItemModelAdapter extends TypeAdapter<HoldSaleItemModel> {
       ..writeByte(15)
       ..write(obj.gstAmount)
       ..writeByte(16)
-      ..write(obj.discountAmount);
+      ..write(obj.discountAmount)
+      ..writeByte(18)
+      ..write(obj.originalPrice)
+      ..writeByte(19)
+      ..write(obj.overrideReason)
+      ..writeByte(20)
+      ..write(obj.overrideNote);
   }
 
   @override

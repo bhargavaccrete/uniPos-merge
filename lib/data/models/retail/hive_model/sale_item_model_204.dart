@@ -93,6 +93,25 @@ class SaleItemModel extends HiveObject {
   @HiveField(21)
   final double? costPrice;
 
+  // ==================== PRICE OVERRIDE (audit) ====================
+  // [price] is ALWAYS what was charged. These record what the catalogue said
+  // and why it was changed, so a squeezed margin on a settled sale is
+  // explainable months later. The variant master is never rewritten.
+
+  /// Catalogue price at the moment of override. **Null means this line sold at
+  /// the catalogue price** — no bool to keep in sync, and old sale lines read
+  /// back as null automatically.
+  @HiveField(22)
+  final double? originalPrice;
+
+  /// `PriceOverrideReason.code`. Set whenever [originalPrice] is.
+  @HiveField(23)
+  final String? overrideReason;
+
+  /// Free-text detail; required when the reason is 'other'.
+  @HiveField(24)
+  final String? overrideNote;
+
   SaleItemModel({
     required this.saleItemId,
     required this.saleId,
@@ -116,7 +135,17 @@ class SaleItemModel extends HiveObject {
     this.weight,
     this.attributes,
     this.costPrice,
+    this.originalPrice,
+    this.overrideReason,
+    this.overrideNote,
   });
+
+  /// True when this line was sold at a price other than the catalogue price.
+  bool get isPriceOverridden => originalPrice != null;
+
+  /// What the override saved (positive) or added (negative) per unit.
+  double get overrideDeltaPerUnit =>
+      originalPrice == null ? 0 : originalPrice! - price;
 
   factory SaleItemModel.create({
     required String saleId,
@@ -134,6 +163,9 @@ class SaleItemModel extends HiveObject {
     String? barcode,
     String? hsnCode,
     double? costPrice,
+    double? originalPrice,
+    String? overrideReason,
+    String? overrideNote,
   }) {
     // ✅ FIX: Check if tax is inclusive (for restaurant mode)
     final bool isTaxInclusive = AppConfig.isRestaurant && AppSettings.isTaxInclusive;
@@ -197,6 +229,9 @@ class SaleItemModel extends HiveObject {
       barcode: barcode,
       hsnCode: hsnCode,
       costPrice: costPrice,
+      originalPrice: originalPrice,
+      overrideReason: overrideReason,
+      overrideNote: overrideNote,
     );
   }
 
@@ -220,6 +255,9 @@ class SaleItemModel extends HiveObject {
     String? barcode,
     String? hsnCode,
     double? costPrice,
+    double? originalPrice,
+    String? overrideReason,
+    String? overrideNote,
   }) {
     final cgst = _roundTo2Decimals(gstAmount / 2);
     final sgst = _roundTo2Decimals(gstAmount / 2);
@@ -247,6 +285,9 @@ class SaleItemModel extends HiveObject {
       barcode: barcode,
       hsnCode: hsnCode,
       costPrice: costPrice,
+      originalPrice: originalPrice,
+      overrideReason: overrideReason,
+      overrideNote: overrideNote,
     );
   }
 
@@ -278,6 +319,9 @@ class SaleItemModel extends HiveObject {
       'barcode': barcode,
       'hsnCode': hsnCode,
       'costPrice': costPrice,
+      'originalPrice': originalPrice,
+      'overrideReason': overrideReason,
+      'overrideNote': overrideNote,
     };
   }
 
@@ -312,6 +356,9 @@ class SaleItemModel extends HiveObject {
       attributes: (map['attributes'] as Map?)
           ?.map((k, v) => MapEntry(k.toString(), v.toString())),
       costPrice: (map['costPrice'] as num?)?.toDouble(),
+      originalPrice: (map['originalPrice'] as num?)?.toDouble(),
+      overrideReason: map['overrideReason'] as String?,
+      overrideNote: map['overrideNote'] as String?,
     );
   }
 }

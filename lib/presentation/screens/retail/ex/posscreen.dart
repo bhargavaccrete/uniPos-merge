@@ -16,9 +16,13 @@ import 'package:billberrylite/presentation/widget/componets/common/app_text_fiel
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
+import 'package:billberrylite/data/models/retail/hive_model/cart_model_202.dart';
 import 'package:billberrylite/presentation/screens/retail/checkout_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/parked_sales_screen.dart';
 import 'package:billberrylite/presentation/widget/retail/variant_picker_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/retail/price_override_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/retail/cart_quantity_field.dart';
+import 'package:billberrylite/domain/services/retail/price_override_service.dart';
 import '../../../../core/di/service_locator.dart';
 import 'package:billberrylite/core/routes/routes_name.dart';
 import 'package:billberrylite/domain/services/common/notification_service.dart';
@@ -422,7 +426,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     }
 
     if (variants.length == 1) {
-      final result = await cartStore.addItem(product, variants.first);
+      final result = await cartStore.addItemToTab(product, variants.first);
       _clearSearch();
       if (mounted) {
         if (result.success) {
@@ -470,7 +474,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
       final product = await productStore.findByBarcode(barcode);
 
       if (product != null) {
-        final result = await cartStore.addItem(product, variant);
+        final result = await cartStore.addItemToTab(product, variant);
 
         if (mounted) {
           _clearSearch();
@@ -505,7 +509,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     );
 
     if (selectedVariant != null && mounted) {
-      final result = await cartStore.addItem(product, selectedVariant);
+      final result = await cartStore.addItemToTab(product, selectedVariant);
       if (result.success) {
         NotificationService.instance.showSuccess(
           '${product.productName} ${selectedVariant.shortDescription} added to cart',
@@ -1391,67 +1395,49 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 4),
-                              Text(
-                                _money(item.price),
-                                style: GoogleFonts.poppins(
-                                  fontSize: AppResponsive.smallFontSize(
-                                    context,
-                                  ),
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
+                              _buildLinePrice(context, item),
                             ],
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Container(
-                          height: 34,
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceLight,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: AppColors.divider),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _stepperButton(
-                                icon: Icons.remove_rounded,
-                                color: AppColors.textSecondary,
-                                onTap: () =>
-                                    cartStore.decrementQuantity(item.variantId),
-                              ),
-                              SizedBox(
-                                width: 30,
-                                child: Text(
-                                  item.qty.toString(),
-                                  textAlign: TextAlign.center,
-                                  style: GoogleFonts.poppins(
-                                    fontSize: AppResponsive.smallFontSize(
-                                      context,
-                                    ),
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                ),
-                              ),
-                              _stepperButton(
-                                icon: Icons.add_rounded,
-                                color: AppColors.primary,
-                                onTap: () async {
-                                  final result = await cartStore
-                                      .incrementQuantity(item.variantId);
-                                  if (!result.success && mounted) {
-                                    NotificationService.instance.showWarning(
-                                      result.errorMessage ??
-                                          'Cannot add more items',
-                                    );
-                                  }
-                                },
-                              ),
-                            ],
-                          ),
+                        const SizedBox(width: 8),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CartQuantityStepperButton(
+                              icon: Icons.remove_rounded,
+                              color: AppColors.textSecondary,
+                              onTap: () => cartStore
+                                  .decrementQuantityInTab(item.variantId),
+                            ),
+                            const SizedBox(width: 4),
+                            // Keyed by cart line: the list is dynamic, and an
+                            // unkeyed field would carry one line's controller
+                            // (and half-typed text) onto another after a
+                            // removal.
+                            CartQuantityField(
+                              key: ValueKey(item.cartItemId),
+                              qty: item.qty,
+                              onSubmitted: (qty) =>
+                                  _applyTypedQuantity(item, qty),
+                            ),
+                            const SizedBox(width: 4),
+                            CartQuantityStepperButton(
+                              icon: Icons.add_rounded,
+                              color: AppColors.primary,
+                              onTap: () async {
+                                final result = await cartStore
+                                    .incrementQuantityInTab(item.variantId);
+                                if (!result.success && mounted) {
+                                  NotificationService.instance.showWarning(
+                                    result.errorMessage ??
+                                        'Cannot add more items',
+                                  );
+                                }
+                              },
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 8),
                         SizedBox(
                           width: 60,
                           child: Text(
@@ -1473,7 +1459,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                               color: AppColors.danger,
                             ),
                             onPressed: () {
-                              cartStore.removeItem(item.variantId);
+                              cartStore.removeItemFromTab(item.variantId);
                             },
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
@@ -1496,21 +1482,125 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
 
   /// One +/- key of the cart stepper. Kept as a real tap target (32×34) so a
   /// cashier isn't hunting for a 14px icon mid-queue.
-  Widget _stepperButton({
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: onTap,
-        child: SizedBox(
-          width: 32,
-          height: 34,
-          child: Icon(icon, size: 17, color: color),
+  /// Apply a typed cart quantity. Returns whether it took effect, so the field
+  /// can snap back when it did not.
+  ///
+  /// A submitted 0 removes the line — the same outcome as decrementing from 1 —
+  /// so it is confirmed first: typing a digit is a much easier slip than
+  /// pressing − repeatedly, and the line may carry a negotiated price override
+  /// that would be lost with it.
+  Future<bool> _applyTypedQuantity(CartItemModel item, int qty) async {
+    if (qty == 0) {
+      final confirmed = await showAppConfirmDialog(
+        context: context,
+        title: 'Remove item?',
+        message:
+            'A quantity of 0 removes ${cartStore.getDisplayName(item)} from the bill.',
+        confirmLabel: 'Remove',
+        icon: Icons.delete_outline_rounded,
+        accent: AppColors.danger,
+      );
+      if (!confirmed) return false;
+    }
+
+    final result = await cartStore.setQuantityInTab(item.variantId, qty);
+    if (!result.success && mounted) {
+      NotificationService.instance.showWarning(
+        result.errorMessage ?? 'Could not set that quantity',
+      );
+    }
+    return result.success;
+  }
+
+  /// Cart line price. Tapping it opens the override dialog — making the price
+  /// itself the control, rather than adding a competing action button beside
+  /// Delete. Non-admins get a plain label: the action is HIDDEN, not shown and
+  /// refused, matching the stock-adjustment precedent.
+  Widget _buildLinePrice(BuildContext context, CartItemModel item) {
+    final overridden = item.isPriceOverridden;
+
+    final priceText = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (overridden) ...[
+          Text(
+            _money(item.originalPrice!),
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+              decoration: TextDecoration.lineThrough,
+            ),
+          ),
+          const SizedBox(width: 5),
+        ],
+        Text(
+          _money(item.price),
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.smallFontSize(context),
+            fontWeight: overridden ? FontWeight.w700 : FontWeight.w400,
+            color: overridden ? AppColors.warning : AppColors.textSecondary,
+          ),
+        ),
+        if (PriceOverrideService.canOverride) ...[
+          const SizedBox(width: 5),
+          Icon(
+            Icons.edit_outlined,
+            size: AppResponsive.smallFontSize(context),
+            color: AppColors.primary,
+          ),
+        ],
+      ],
+    );
+
+    if (!PriceOverrideService.canOverride) return priceText;
+
+    return InkWell(
+      onTap: () => _openPriceOverride(item),
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: priceText,
+      ),
+    );
+  }
+
+  /// Open the override dialog for one cart line.
+  ///
+  /// The variant is re-read here rather than cached on the cart row: MRP and
+  /// cost are the validation ceilings and floors, and they live on the variant.
+  Future<void> _openPriceOverride(CartItemModel item) async {
+    if (!PriceOverrideService.canOverride) return;
+
+    final variant = await productStore.getVariantById(item.variantId);
+    if (!mounted) return;
+
+    if (variant == null) {
+      NotificationService.instance.showError(
+        'Variant no longer exists — remove this line and re-add it.',
+      );
+      return;
+    }
+
+    await showDialog<bool>(
+      context: context,
+      builder: (_) => _moneyScope(
+        PriceOverrideDialog(
+          item: item,
+          variant: variant,
+          money: _money,
+          onApply: ({
+            required double newPrice,
+            required String reason,
+            String? note,
+          }) async {
+            final result = await cartStore.overrideLinePriceInTab(
+              variantId: item.variantId,
+              newPrice: newPrice,
+              reason: reason,
+              note: note,
+            );
+            return result.success ? null : (result.errorMessage ?? 'Could not apply price');
+          },
         ),
       ),
     );
@@ -2231,7 +2321,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
         stockQty: int.parse(stock.trim().isEmpty ? '1' : stock.trim()),
       );
 
-      final result = await cartStore.addItem(product, variant);
+      final result = await cartStore.addItemToTab(product, variant);
 
       // Close bottom sheet — check the SHEET's context, not this State's;
       // the sheet can be dismissed while the screen behind it is still mounted.

@@ -204,12 +204,31 @@ mixin _$CartStore on _CartStore, Store {
       {Category? category,
       double? priceOverride,
       double? gstRateOverride,
-      int qty = 1}) {
+      int qty = 1,
+      double? originalPrice,
+      String? overrideReason,
+      String? overrideNote}) {
     return _$addItemAsyncAction.run(() => super.addItem(product, variant,
         category: category,
         priceOverride: priceOverride,
         gstRateOverride: gstRateOverride,
-        qty: qty));
+        qty: qty,
+        originalPrice: originalPrice,
+        overrideReason: overrideReason,
+        overrideNote: overrideNote));
+  }
+
+  late final _$overrideLinePriceAsyncAction =
+      AsyncAction('_CartStore.overrideLinePrice', context: context);
+
+  @override
+  Future<CartOperationResult> overrideLinePrice(
+      {required String variantId,
+      required double newPrice,
+      required String reason,
+      String? note}) {
+    return _$overrideLinePriceAsyncAction.run(() => super.overrideLinePrice(
+        variantId: variantId, newPrice: newPrice, reason: reason, note: note));
   }
 
   late final _$removeItemAsyncAction =
@@ -218,6 +237,15 @@ mixin _$CartStore on _CartStore, Store {
   @override
   Future<void> removeItem(String variantId) {
     return _$removeItemAsyncAction.run(() => super.removeItem(variantId));
+  }
+
+  late final _$setQuantityAsyncAction =
+      AsyncAction('_CartStore.setQuantity', context: context);
+
+  @override
+  Future<CartOperationResult> setQuantity(String variantId, int quantity) {
+    return _$setQuantityAsyncAction
+        .run(() => super.setQuantity(variantId, quantity));
   }
 
   late final _$incrementQuantityAsyncAction =
@@ -276,9 +304,22 @@ mixin _$CartStore on _CartStore, Store {
   @override
   Future<CartOperationResult> addItemToTab(
       ProductModel product, VarianteModel variant,
-      {Category? category}) {
-    return _$addItemToTabAsyncAction
-        .run(() => super.addItemToTab(product, variant, category: category));
+      {Category? category,
+      double? priceOverride,
+      double? gstRateOverride,
+      int qty = 1,
+      double? originalPrice,
+      String? overrideReason,
+      String? overrideNote}) {
+    return _$addItemToTabAsyncAction.run(() => super.addItemToTab(
+        product, variant,
+        category: category,
+        priceOverride: priceOverride,
+        gstRateOverride: gstRateOverride,
+        qty: qty,
+        originalPrice: originalPrice,
+        overrideReason: overrideReason,
+        overrideNote: overrideNote));
   }
 
   late final _$removeItemFromTabAsyncAction =
@@ -306,6 +347,32 @@ mixin _$CartStore on _CartStore, Store {
   Future<void> decrementQuantityInTab(String variantId) {
     return _$decrementQuantityInTabAsyncAction
         .run(() => super.decrementQuantityInTab(variantId));
+  }
+
+  late final _$setQuantityInTabAsyncAction =
+      AsyncAction('_CartStore.setQuantityInTab', context: context);
+
+  @override
+  Future<CartOperationResult> setQuantityInTab(String variantId, int quantity) {
+    return _$setQuantityInTabAsyncAction
+        .run(() => super.setQuantityInTab(variantId, quantity));
+  }
+
+  late final _$overrideLinePriceInTabAsyncAction =
+      AsyncAction('_CartStore.overrideLinePriceInTab', context: context);
+
+  @override
+  Future<CartOperationResult> overrideLinePriceInTab(
+      {required String variantId,
+      required double newPrice,
+      required String reason,
+      String? note}) {
+    return _$overrideLinePriceInTabAsyncAction.run(() => super
+        .overrideLinePriceInTab(
+            variantId: variantId,
+            newPrice: newPrice,
+            reason: reason,
+            note: note));
   }
 
   late final _$clearCartAndSaveAsyncAction =

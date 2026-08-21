@@ -8,7 +8,8 @@
       "Bash(sed -i \"\\\\#constants/restaurant/color.dart#d\" presentation/widget/componets/restaurant/componets/visual_keyboard.dart)",
       "Bash(rm -f constants/restaurant/color.dart)",
       "Bash(rmdir constants/restaurant constants)",
-      "PowerShell(flutter analyze *)"
+      "PowerShell(flutter analyze *)",
+      "Bash(flutter test *)"
     ]
   },
   "outputStyle": "Explanatory"

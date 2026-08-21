@@ -336,7 +336,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final customer = customerStore.selectedCustomer;
 
       // Clear the cart
-      await cartStore.clearCart();
+      await cartStore.clearCartAndSave();
 
       // Refresh credit store
       creditStore.loadData();
@@ -447,6 +447,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         barcode: cartItem.barcode,
         hsnCode: cartItem.hsnCode,
         costPrice: costByVariantId[cartItem.variantId],
+        // Price-override audit. `price` above is already the charged figure, so
+        // these only carry WHAT the catalogue said and WHY it changed — without
+        // them a settled sale's squeezed margin is unexplainable.
+        originalPrice: cartItem.originalPrice,
+        overrideReason: cartItem.overrideReason,
+        overrideNote: cartItem.overrideNote,
       );
     }).toList();
   }
@@ -538,7 +544,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final customer = customerStore.selectedCustomer;
 
       // Clear the cart
-      await cartStore.clearCart();
+      await cartStore.clearCartAndSave();
 
       if (mounted) {
         // Show success dialog with print options

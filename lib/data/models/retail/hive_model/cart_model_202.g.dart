@@ -36,13 +36,16 @@ class CartItemModelAdapter extends TypeAdapter<CartItemModel> {
       discountAmount: fields[18] as double?,
       categoryName: fields[19] as String?,
       tabIndex: fields[20] as int?,
+      originalPrice: fields[22] as double?,
+      overrideReason: fields[23] as String?,
+      overrideNote: fields[24] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, CartItemModel obj) {
     writer
-      ..writeByte(19)
+      ..writeByte(22)
       ..writeByte(0)
       ..write(obj.cartItemId)
       ..writeByte(1)
@@ -80,7 +83,13 @@ class CartItemModelAdapter extends TypeAdapter<CartItemModel> {
       ..writeByte(20)
       ..write(obj.tabIndex)
       ..writeByte(21)
-      ..write(obj.attributes);
+      ..write(obj.attributes)
+      ..writeByte(22)
+      ..write(obj.originalPrice)
+      ..writeByte(23)
+      ..write(obj.overrideReason)
+      ..writeByte(24)
+      ..write(obj.overrideNote);
   }
 
   @override

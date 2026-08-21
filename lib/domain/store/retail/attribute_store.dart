@@ -16,6 +16,34 @@ part 'attribute_store.g.dart';
 /// expose the base class's statics.
 const List<String> kBaseAttributeNames = ['Size', 'Color', 'Weight'];
 
+/// Starter values for every attribute the app knows how to seed, keyed by
+/// attribute name. A name absent from here is still created by
+/// [_AttributeStoreBase.ensureBaseAttributes] — just with no values, which the
+/// user then fills in.
+///
+/// One dictionary shared by all store types on purpose: a garment shop and a
+/// sports shop that both start with "Size" get the SAME Size attribute, so a
+/// product can move between them and reports stay comparable. Per-store-type
+/// value sets (UK/EU shoe sizes vs S–XXL) are deliberately NOT here — that is a
+/// separate feature, not a default.
+const Map<String, List<String>> kSeedAttributeValues = <String, List<String>>{
+  'Size': ['Small', 'Medium', 'Large', 'Extra Large'],
+  'Color': ['Red', 'Blue', 'Green', 'Black', 'White'],
+  'Weight': ['250g', '500g', '1kg'],
+  // Cosmetics: shade families, not brand shade names — those are per-brand and
+  // belong to the shop, not to us.
+  'Shade': ['Nude', 'Pink', 'Red', 'Berry', 'Brown'],
+  'Volume': ['30ml', '50ml', '100ml', '200ml'],
+  'Pack Size': ['Pack of 5', 'Pack of 10', 'Pack of 12', 'Box of 12', 'Ream (500)'],
+};
+
+/// Hex swatches for the attributes whose values are colours, index-aligned with
+/// [kSeedAttributeValues]. Any attribute not listed here seeds without swatches.
+const Map<String, List<String?>> kSeedAttributeColorCodes = <String, List<String?>>{
+  'Color': ['#FF0000', '#0000FF', '#00FF00', '#000000', '#FFFFFF'],
+  'Shade': ['#E3BC9A', '#F4A6C0', '#C62828', '#8E2A5B', '#6D4C41'],
+};
+
 class AttributeStore = _AttributeStoreBase with _$AttributeStore;
 
 abstract class _AttributeStoreBase with Store {
@@ -492,36 +520,32 @@ abstract class _AttributeStoreBase with Store {
     return result;
   }
 
-  /// Create the base attributes and their starter values if they don't exist.
+  /// Create the given attributes and their starter values if they don't exist.
   ///
-  /// Idempotent: [addAttribute] returns false for a name that already exists,
-  /// so values are only seeded alongside a freshly created attribute.
+  /// [names] defaults to [kBaseAttributeNames]. Retail passes its store type's
+  /// defaults instead (see `SimpleProductFieldsService.defaultFieldNames`) —
+  /// this method stays store-type-agnostic and only seeds what it is told to.
+  ///
+  /// Idempotent and non-destructive: [addAttribute] returns false for a name
+  /// that already exists, so values are only seeded alongside a freshly created
+  /// attribute and a user's edits are never overwritten. Passing an empty list
+  /// is valid and seeds nothing.
   @action
-  Future<void> ensureBaseAttributes() async {
-    const seed = <String, List<String>>{
-      'Size': ['Small', 'Medium', 'Large', 'Extra Large'],
-      'Color': ['Red', 'Blue', 'Green', 'Black', 'White'],
-      'Weight': ['250g', '500g', '1kg'],
-    };
-    const colorCodes = <String?>[
-      '#FF0000',
-      '#0000FF',
-      '#00FF00',
-      '#000000',
-      '#FFFFFF',
-    ];
-
-    for (final entry in seed.entries) {
-      final created = await addAttribute(entry.key);
+  Future<void> ensureBaseAttributes({List<String>? names}) async {
+    for (final name in names ?? kBaseAttributeNames) {
+      final created = await addAttribute(name);
       if (!created) continue; // already present — leave the user's edits alone
 
-      final attribute = getAttributeByName(entry.key);
+      final attribute = getAttributeByName(name);
       if (attribute == null) continue;
+
+      final values = kSeedAttributeValues[name];
+      if (values == null || values.isEmpty) continue; // created, values are the user's to add
 
       await addMultipleValues(
         attribute.attributeId,
-        entry.value,
-        colorCodes: entry.key == 'Color' ? colorCodes : null,
+        values,
+        colorCodes: kSeedAttributeColorCodes[name],
       );
     }
   }

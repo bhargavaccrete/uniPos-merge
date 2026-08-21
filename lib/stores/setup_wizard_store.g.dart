@@ -23,6 +23,20 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
       (_$hasStoreDetailsComputed ??= Computed<bool>(() => super.hasStoreDetails,
               name: '_SetupWizardStore.hasStoreDetails'))
           .value;
+  Computed<bool>? _$needsRetailStoreTypeComputed;
+
+  @override
+  bool get needsRetailStoreType => (_$needsRetailStoreTypeComputed ??=
+          Computed<bool>(() => super.needsRetailStoreType,
+              name: '_SetupWizardStore.needsRetailStoreType'))
+      .value;
+  Computed<bool>? _$hasRetailStoreTypeComputed;
+
+  @override
+  bool get hasRetailStoreType => (_$hasRetailStoreTypeComputed ??=
+          Computed<bool>(() => super.hasRetailStoreType,
+              name: '_SetupWizardStore.hasRetailStoreType'))
+      .value;
   Computed<bool>? _$canProceedFromBusinessTypeComputed;
 
   @override
@@ -140,6 +154,23 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
     _$selectedBusinessTypeNameAtom
         .reportWrite(value, super.selectedBusinessTypeName, () {
       super.selectedBusinessTypeName = value;
+    });
+  }
+
+  late final _$selectedRetailStoreTypeAtom =
+      Atom(name: '_SetupWizardStore.selectedRetailStoreType', context: context);
+
+  @override
+  String? get selectedRetailStoreType {
+    _$selectedRetailStoreTypeAtom.reportRead();
+    return super.selectedRetailStoreType;
+  }
+
+  @override
+  set selectedRetailStoreType(String? value) {
+    _$selectedRetailStoreTypeAtom
+        .reportWrite(value, super.selectedRetailStoreType, () {
+      super.selectedRetailStoreType = value;
     });
   }
 
@@ -614,6 +645,17 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
   }
 
   @override
+  void selectRetailStoreType(String key) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.selectRetailStoreType');
+    try {
+      return super.selectRetailStoreType(key);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
   void setStoreName(String value) {
     final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
         name: '_SetupWizardStore.setStoreName');
@@ -885,6 +927,7 @@ isLoading: ${isLoading},
 errorMessage: ${errorMessage},
 selectedBusinessTypeId: ${selectedBusinessTypeId},
 selectedBusinessTypeName: ${selectedBusinessTypeName},
+selectedRetailStoreType: ${selectedRetailStoreType},
 storeName: ${storeName},
 ownerName: ${ownerName},
 phone: ${phone},
@@ -910,6 +953,8 @@ taxRates: ${taxRates},
 logoByte: ${logoByte},
 hasBusinessType: ${hasBusinessType},
 hasStoreDetails: ${hasStoreDetails},
+needsRetailStoreType: ${needsRetailStoreType},
+hasRetailStoreType: ${hasRetailStoreType},
 canProceedFromBusinessType: ${canProceedFromBusinessType},
 canProceedFromStoreDetails: ${canProceedFromStoreDetails},
 progressPercentage: ${progressPercentage},

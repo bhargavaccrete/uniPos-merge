@@ -4,7 +4,6 @@ import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/retail/hive_model/attribute_model_219.dart';
 import 'package:billberrylite/domain/services/common/notification_service.dart';
 import 'package:billberrylite/domain/services/retail/simple_product_fields_service.dart';
-import 'package:billberrylite/domain/store/retail/attribute_store.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -40,19 +39,10 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
   }
 
   Future<void> _load() async {
-    // Make sure Size / Color / Weight exist before we try to resolve them.
-    await attributeStore.ensureBaseAttributes();
-    await attributeStore.loadAttributes();
-
-    final savedIds = await _service.getFieldIds();
-    final List<AttributeModel> fields;
-    if (savedIds == null) {
-      // Never configured — start from the fields the Simple form used to
-      // hardcode, so the existing experience doesn't change.
-      fields = AttributeStoreBaseFields.resolve();
-    } else {
-      fields = attributeStore.attributesByIds(savedIds);
-    }
+    // resolveFields seeds this store type's default attributes, then returns
+    // either the saved selection or those defaults — one definition, shared
+    // with every product form.
+    final fields = await _service.resolveFields();
 
     if (!mounted) return;
     setState(() {
@@ -78,21 +68,33 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
   }
 
   Future<void> _resetToDefaults() async {
+    // Name the actual defaults for THIS store type rather than a fixed list —
+    // a cosmetics shop being offered "Size, Color and Weight" would be wrong.
+    final defaults = _service.defaultFieldNames();
+    final restoring = defaults.isEmpty
+        ? 'Clear the fields shown on simple products?'
+        : 'Restore ${_joinNames(defaults)} as the fields on simple products?';
+
     final confirmed = await showAppConfirmDialog(
       context: context,
       title: 'Reset Fields',
-      message:
-          'Restore Size, Color and Weight as the fields on simple products? '
-          'Your attributes themselves are not deleted.',
+      message: '$restoring Your attributes themselves are not deleted.',
       confirmLabel: 'Reset',
       icon: Icons.restart_alt_rounded,
     );
     if (!confirmed) return;
 
     await _service.resetToDefaults();
+    final fields = await _service.resolveDefaultFields();
     if (!mounted) return;
-    setState(() => _fields = AttributeStoreBaseFields.resolve());
+    setState(() => _fields = fields);
     NotificationService.instance.showSuccess('Fields reset');
+  }
+
+  /// 'Size, Color and Weight' — for the confirm message.
+  static String _joinNames(List<String> names) {
+    if (names.length == 1) return names.first;
+    return '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
   }
 
   void _removeField(AttributeModel attribute) {
@@ -468,17 +470,3 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
   }
 }
 
-/// Resolves the base field set (Size, Color, Weight) from the attribute store.
-/// Kept as a helper so both the initial seed and "Reset" use one definition.
-class AttributeStoreBaseFields {
-  const AttributeStoreBaseFields._();
-
-  static List<AttributeModel> resolve() {
-    final result = <AttributeModel>[];
-    for (final name in kBaseAttributeNames) {
-      final attribute = attributeStore.getAttributeByName(name);
-      if (attribute != null) result.add(attribute);
-    }
-    return result;
-  }
-}

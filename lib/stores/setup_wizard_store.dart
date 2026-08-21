@@ -8,6 +8,7 @@ import 'package:billberrylite/data/repositories/business_type_repository.dart';
 import 'package:billberrylite/data/repositories/business_details_repository.dart';
 import 'package:billberrylite/data/repositories/tax_details_repository.dart';
 import 'package:billberrylite/core/config/app_config.dart';
+import 'package:billberrylite/core/constants/retail_store_types.dart';
 import 'package:billberrylite/core/init/hive_init.dart';
 import 'package:billberrylite/core/di/service_locator.dart' as sl;
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
@@ -47,6 +48,12 @@ abstract class _SetupWizardStore with Store {
 
   @observable
   String? selectedBusinessTypeName;
+
+  /// Retail sub-type: a stable `RetailStoreTypes` key (e.g. 'garment').
+  /// Meaningless for restaurant, so it is cleared whenever the business type
+  /// moves away from retail.
+  @observable
+  String? selectedRetailStoreType;
 
   // Store Details
   @observable
@@ -141,8 +148,17 @@ abstract class _SetupWizardStore with Store {
   @computed
   bool get hasStoreDetails => storeName.isNotEmpty && ownerName.isNotEmpty && phone.isNotEmpty;
 
+  /// Retail must also say WHICH kind of retail store before moving on.
   @computed
-  bool get canProceedFromBusinessType => hasBusinessType;
+  bool get needsRetailStoreType => selectedBusinessTypeId == 'retail';
+
+  @computed
+  bool get hasRetailStoreType =>
+      RetailStoreTypes.isKnown(selectedRetailStoreType);
+
+  @computed
+  bool get canProceedFromBusinessType =>
+      hasBusinessType && (!needsRetailStoreType || hasRetailStoreType);
 
   @computed
   bool get canProceedFromStoreDetails => hasStoreDetails;
@@ -190,10 +206,25 @@ abstract class _SetupWizardStore with Store {
     }
   }
 
+  /// Pick the retail store type. Silently ignores an unknown key so a stale
+  /// caller can never park the wizard on a value `canProceedFromBusinessType`
+  /// will refuse.
+  @action
+  void selectRetailStoreType(String key) {
+    if (!RetailStoreTypes.isKnown(key)) return;
+    selectedRetailStoreType = key;
+  }
+
   @action
   Future<void> selectBusinessType(String id, String name) async {
     selectedBusinessTypeId = id;
     selectedBusinessTypeName = name;
+
+    // A restaurant has no retail store type. Drop any stale pick so it can't
+    // be persisted onto a restaurant business.
+    if (id != 'retail') {
+      selectedRetailStoreType = null;
+    }
 
     // Determine the business mode based on selection
     final mode = id == 'restaurant'
@@ -426,6 +457,11 @@ abstract class _SetupWizardStore with Store {
         logoByte = savedDetails.logo;
         isRegisteredForTax = savedDetails.isRegisteredForTax;
         taxEnabled = savedDetails.taxEnabled;
+        // Only restore a key this build still offers, so a retired store type
+        // doesn't leave Continue permanently disabled with nothing highlighted.
+        if (RetailStoreTypes.isKnown(savedDetails.retailStoreType)) {
+          selectedRetailStoreType = savedDetails.retailStoreType;
+        }
         // Use AppConfig as source of truth for setup complete status
         if (!AppConfig.isBusinessModeSet) {
           isSetupComplete = savedDetails.isSetupComplete;
@@ -464,6 +500,21 @@ abstract class _SetupWizardStore with Store {
         isSelected: true,
       );
       await _businessTypeRepo.saveSelectedType(businessType);
+
+      // Mirror the retail store type onto BusinessDetails right away, so going
+      // back and changing it after the Store Details step is already saved
+      // doesn't leave the old value on the record until the wizard completes.
+      // Only UPDATES an existing record — it must not create one early, since
+      // splashScreen resumes the wizard off BusinessDetails.storeName.
+      final existingDetails = _businessDetailsRepo.get();
+      if (existingDetails != null) {
+        await _businessDetailsRepo.save(
+          existingDetails.copyWith(
+            retailStoreType: selectedRetailStoreType,
+            clearRetailStoreType: selectedRetailStoreType == null,
+          ),
+        );
+      }
     } catch (e) {
       errorMessage = 'Failed to save business type: $e';
     } finally {
@@ -492,7 +543,8 @@ abstract class _SetupWizardStore with Store {
         isRegisteredForTax: isRegisteredForTax,
         taxEnabled: taxEnabled,
         isSetupComplete: false,
-        logo: logoByte
+        logo: logoByte,
+        retailStoreType: selectedRetailStoreType,
       );
       await _businessDetailsRepo.save(details);
 
@@ -584,7 +636,7 @@ abstract class _SetupWizardStore with Store {
         taxEnabled: taxEnabled,
         logo: logoByte,
         isSetupComplete: true,
-
+        retailStoreType: selectedRetailStoreType,
       );
       await _businessDetailsRepo.save(details);
 

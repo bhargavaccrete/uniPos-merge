@@ -65,6 +65,26 @@ class CartItemModel extends HiveObject {
   @HiveField(21)
   final Map<String, String>? attributes;
 
+  // ==================== PRICE OVERRIDE ====================
+  // [price] above is ALWAYS the charged unit price, overridden or not, so the
+  // billing pipeline needs no knowledge of this block. These three only record
+  // WHAT the price would have been and WHY it changed.
+
+  /// Catalogue price this line was seeded from, kept only when the cashier
+  /// overrode it. **Null means the line was never overridden** — there is no
+  /// separate bool to drift out of sync, and Hive returns null for absent
+  /// fields, so every pre-existing cart row reads back as "not overridden".
+  @HiveField(22)
+  final double? originalPrice;
+
+  /// `PriceOverrideReason.code`. Set whenever [originalPrice] is.
+  @HiveField(23)
+  final String? overrideReason;
+
+  /// Free-text detail; required when the reason is 'other'.
+  @HiveField(24)
+  final String? overrideNote;
+
   CartItemModel({
     required this.cartItemId,
     required this.variantId,
@@ -85,7 +105,13 @@ class CartItemModel extends HiveObject {
     this.discountAmount,
     this.categoryName,
     this.tabIndex,
+    this.originalPrice,
+    this.overrideReason,
+    this.overrideNote,
   });
+
+  /// True when the cashier changed this line's price from the catalogue value.
+  bool get isPriceOverridden => originalPrice != null;
 
   factory CartItemModel.create({
     required String cartItemId,
@@ -102,6 +128,9 @@ class CartItemModel extends HiveObject {
     String? categoryName,
     bool taxInclusive = false,
     int ? tabIndex = 1,
+    double? originalPrice,
+    String? overrideReason,
+    String? overrideNote,
   }) {
     final now = DateTime.now().toIso8601String();
     final rate = gstRate ?? 0;
@@ -150,6 +179,9 @@ class CartItemModel extends HiveObject {
       discountAmount: discount,
       categoryName: categoryName,
       tabIndex: tabIndex,
+      originalPrice: originalPrice,
+      overrideReason: overrideReason,
+      overrideNote: overrideNote,
     );
   }
 
@@ -177,6 +209,9 @@ class CartItemModel extends HiveObject {
       'hsnCode': hsnCode,
       'discountAmount': discountAmount,
       'categoryName': categoryName,
+      'originalPrice': originalPrice,
+      'overrideReason': overrideReason,
+      'overrideNote': overrideNote,
     };
   }
 
@@ -203,6 +238,9 @@ class CartItemModel extends HiveObject {
       discountAmount: (map['discountAmount'] as num?)?.toDouble(),
       categoryName: map['categoryName'] as String?,
       tabIndex: (map['tabIndex'] as num?)?.toInt(),
+      originalPrice: (map['originalPrice'] as num?)?.toDouble(),
+      overrideReason: map['overrideReason'] as String?,
+      overrideNote: map['overrideNote'] as String?,
     );
   }
 }

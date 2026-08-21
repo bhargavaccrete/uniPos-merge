@@ -54,11 +54,16 @@ class HoldSaleService {
         taxableAmount: line.taxableAmount,
         gstAmount: line.gstAmount,
         discountAmount: line.discountAmount,
+        // Park the price override too, or restoring would silently re-price the
+        // line to the catalogue figure and lose the agreed reason.
+        originalPrice: cartItem.originalPrice,
+        overrideReason: cartItem.overrideReason,
+        overrideNote: cartItem.overrideNote,
       );
     }).toList();
 
     await holdSaleStore.addHoldSale(holdSale, holdSaleItems);
-    await retailCartStore.clearCart();
+    await retailCartStore.clearCartAndSave();
 
     return holdSaleId;
   }
@@ -74,7 +79,7 @@ class HoldSaleService {
       throw StateError('No items found in parked sale');
     }
 
-    await retailCartStore.clearCart();
+    await retailCartStore.clearCartAndSave();
 
     int skipped = 0;
     for (final holdItem in items) {
@@ -87,13 +92,21 @@ class HoldSaleService {
       }
 
       // Replay the parked price and tax rate, not today's — the customer was
-      // quoted these figures when the sale was held.
-      final result = await retailCartStore.addItem(
+      // quoted these figures when the sale was held. The override audit rides
+      // along so a restored line still says why it is below list.
+      //
+      // Via the tab wrapper, so a restored bill reaches the active tab's
+      // snapshot: restoring straight into the cart box left a restart showing
+      // the pre-restore tab, i.e. an empty cart.
+      final result = await retailCartStore.addItemToTab(
         product,
         variant,
         priceOverride: holdItem.price,
         gstRateOverride: holdItem.gstRate,
         qty: holdItem.qty,
+        originalPrice: holdItem.originalPrice,
+        overrideReason: holdItem.overrideReason,
+        overrideNote: holdItem.overrideNote,
       );
       if (!result.success) skipped++;
     }

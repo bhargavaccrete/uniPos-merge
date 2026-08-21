@@ -39,13 +39,16 @@ class SaleItemModelAdapter extends TypeAdapter<SaleItemModel> {
       weight: fields[19] as String?,
       attributes: (fields[20] as Map?)?.cast<String, String>(),
       costPrice: fields[21] as double?,
+      originalPrice: fields[22] as double?,
+      overrideReason: fields[23] as String?,
+      overrideNote: fields[24] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, SaleItemModel obj) {
     writer
-      ..writeByte(22)
+      ..writeByte(25)
       ..writeByte(0)
       ..write(obj.saleItemId)
       ..writeByte(1)
@@ -89,7 +92,13 @@ class SaleItemModelAdapter extends TypeAdapter<SaleItemModel> {
       ..writeByte(20)
       ..write(obj.attributes)
       ..writeByte(21)
-      ..write(obj.costPrice);
+      ..write(obj.costPrice)
+      ..writeByte(22)
+      ..write(obj.originalPrice)
+      ..writeByte(23)
+      ..write(obj.overrideReason)
+      ..writeByte(24)
+      ..write(obj.overrideNote);
   }
 
   @override
