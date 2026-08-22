@@ -913,6 +913,25 @@ class UnifiedBackupService {
         exportMap["variants"] = [];
       }
 
+      // App Counters -- retail needs these as much as restaurant does.
+      //
+      // Holds `lastSkuSequence`, `lastBarcodeSequence` and the per-day PO/GRN
+      // counters. Without it a restored device restarts every sequence at zero
+      // and re-issues SKUs, barcodes and document numbers already in use.
+      // Mirrors the restaurant export.
+      try {
+        final countersBox = Hive.box(HiveBoxNames.appCounters);
+        final Map<String, dynamic> countersMap = {};
+        for (var key in countersBox.keys) {
+          countersMap[key.toString()] = countersBox.get(key);
+        }
+        exportMap["appCounters"] = [countersMap];
+        debugPrint("App Counters exported: ${countersMap.keys.length} entries");
+      } catch (e) {
+        debugPrint("App Counters box error: $e");
+        exportMap["appCounters"] = [];
+      }
+
       // Sales
       try {
         exportMap["sales"] = Hive.box<SaleModel>(HiveBoxNames.sales).values.map((e) => e.toMap()).toList();
@@ -2197,6 +2216,49 @@ class UnifiedBackupService {
           (m) => VarianteModel.fromMap(m),
           (v) => v.varianteId,  // Use varianteId as key
     );
+
+    // Report (never block) duplicate barcodes in the restored catalogue.
+    //
+    // A backup must ALWAYS restore -- refusing a row because the FILE contains a
+    // duplicate would leave the catalogue half-populated, which is worse than
+    // the duplicate. But a duplicate makes one variant permanently unscannable,
+    // so it must not pass unnoticed either.
+    try {
+      final seen = <String, String>{};
+      final dupes = <String>[];
+      for (final v in Hive.box<VarianteModel>(HiveBoxNames.variants).values) {
+        final code = v.barcode?.trim() ?? '';
+        if (code.isEmpty) continue;
+        final firstOwner = seen[code];
+        if (firstOwner != null) {
+          dupes.add('$code (${v.varianteId} vs $firstOwner)');
+        } else {
+          seen[code] = v.varianteId;
+        }
+      }
+      if (dupes.isNotEmpty) {
+        debugPrint("WARNING: restored catalogue has ${dupes.length} duplicate "
+            "barcode(s); the second variant of each pair will not scan: "
+            "${dupes.take(10).join(', ')}");
+      }
+    } catch (e) {
+      debugPrint("Duplicate-barcode scan skipped: $e");
+    }
+
+    // Restore App Counters (retail) -- see the export for why this matters.
+    try {
+      if (data["appCounters"] != null && data["appCounters"].isNotEmpty) {
+        final countersBox = Hive.box(HiveBoxNames.appCounters);
+        await countersBox.clear();
+        final countersData = data["appCounters"][0] as Map<String, dynamic>;
+        for (var entry in countersData.entries) {
+          await countersBox.put(entry.key, entry.value);
+        }
+        debugPrint("App counters restored: ${countersData.keys.length} entries");
+      }
+    } catch (e) {
+      debugPrint("Error restoring app counters: $e");
+    }
 
     // ✅ Restore Cart Items
     await restoreBoxTyped(

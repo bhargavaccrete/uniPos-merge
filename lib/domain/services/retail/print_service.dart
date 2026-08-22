@@ -21,6 +21,7 @@ import 'package:billberrylite/domain/services/restaurant/esc_pos_receipt_builder
 import '../../../data/models/common/customer_model_125.dart';
 import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
 import '../../../data/models/retail/hive_model/sale_model_203.dart';
+import 'label_pdf_service.dart';
 
 /// Enum for receipt format types
 enum ReceiptFormat {
@@ -30,6 +31,8 @@ enum ReceiptFormat {
 
 /// Service for handling all print operations
 class PrintService {
+  final LabelPdfService _labelPdfService = const LabelPdfService();
+
   final ReceiptPdfService _receiptPdfService = ReceiptPdfService();
   final StoreSettingsService _storeSettingsService = StoreSettingsService();
 
@@ -566,6 +569,62 @@ class PrintService {
     await file.writeAsBytes(bytes);
 
     return file.path;
+  }
+
+  // ==================== LABELS ====================
+
+  /// Send an A4 sticker sheet of barcode/price labels to the OS print dialog.
+  ///
+  /// Reuses the same `Printing.layoutPdf` path as an A4 invoice, so labels need
+  /// no printer role, no new transport and no second printer architecture.
+  ///
+  /// Read-only with respect to the catalogue: [labels] are already-resolved
+  /// values, so printing can never mint or change a barcode.
+  Future<void> printLabels(List<LabelSpec> labels) async {
+    if (labels.isEmpty) return;
+    final pdf = await _labelPdfService.build(labels);
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat _) async => pdf.save(),
+      name: 'Labels_${labels.length}',
+      format: PdfPageFormat.a4,
+    );
+  }
+
+  /// On-screen preview of the label sheet, so a misaligned pitch is caught
+  /// before a sheet of stickers is spent. Mirrors [showPrintPreview].
+  Future<void> showLabelPreview({
+    required BuildContext context,
+    required List<LabelSpec> labels,
+  }) async {
+    if (labels.isEmpty) return;
+    final pdf = await _labelPdfService.build(labels);
+
+    if (!context.mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(
+            backgroundColor: AppColors.primary,
+            iconTheme: const IconThemeData(color: Colors.white),
+            elevation: 0,
+            title: Text(
+              'Label Preview',
+              style: GoogleFonts.poppins(
+                  color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+            centerTitle: true,
+          ),
+          body: PdfPreview(
+            build: (pageFormat) async => pdf.save(),
+            canChangePageFormat: false,
+            canChangeOrientation: false,
+            canDebug: false,
+            pdfFileName: 'Labels_${labels.length}.pdf',
+            initialPageFormat: PdfPageFormat.a4,
+          ),
+        ),
+      ),
+    );
   }
 
   /// Show print options dialog

@@ -373,10 +373,15 @@ class _AddProductScreenState extends State<AddProductScreen>
 
           // Check if variant exists, if so update, otherwise add
           final existingVariant = await productStore.getVariantById(variantData.id);
-          if (existingVariant != null) {
-            await productStore.updateVariant(variant);
-          } else {
-            await productStore.addVariant(variant);
+          final result = existingVariant != null
+              ? await productStore.updateVariant(variant)
+              : await productStore.addVariant(variant);
+          // The repository refuses a barcode another variant holds. Surface it
+          // rather than losing the variant silently.
+          if (!result.success) {
+            NotificationService.instance
+                .showError(result.errorMessage ?? 'Could not save variant.');
+            return false;
           }
         }
       } else {
@@ -401,7 +406,12 @@ class _AddProductScreenState extends State<AddProductScreen>
             taxRate: _formStore.taxRate > 0 ? _formStore.taxRate : null,
           );
 
-          await productStore.updateVariant(updatedVariant);
+          final result = await productStore.updateVariant(updatedVariant);
+          if (!result.success) {
+            NotificationService.instance
+                .showError(result.errorMessage ?? 'Could not save variant.');
+            return false;
+          }
         }
       }
 

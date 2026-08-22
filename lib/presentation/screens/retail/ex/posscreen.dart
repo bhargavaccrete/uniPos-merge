@@ -493,8 +493,14 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
         }
       }
     } else {
-      final isLikelyBarcode = RegExp(r'^\d+$').hasMatch(barcode);
-      if (mounted && isLikelyBarcode) {
+      // Any unrecognised code reaches the not-found flow, numeric or not.
+      //
+      // This used to be gated on `RegExp(r'^\d+$')`, which silently swallowed
+      // every alphanumeric scan — no cart line, no dialog, not even a message.
+      // Internally generated Code 128 values ("BB0000000042") and the import
+      // template's own samples ("TS-RED-S") are alphanumeric, so a scanned label
+      // simply vanished.
+      if (mounted) {
         _showProductNotFoundDialog(barcode);
         _clearSearch();
       }

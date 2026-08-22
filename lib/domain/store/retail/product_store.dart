@@ -89,6 +89,12 @@ abstract class _ProductStore with Store {
   /// Create a single-variant product in one step — used by the POS "product not
   /// found for this barcode" flow. Model construction lives here rather than in
   /// the screen so the id/timestamp rules stay in one place.
+  ///
+  /// Throws [StateError] when [barcode] already belongs to a variant. Checked
+  /// BEFORE the product is written: creating the product first and letting the
+  /// variant be refused would leave an orphan product in the catalogue, which is
+  /// worse than the collision. Reaching this is unlikely (the caller only gets
+  /// here after a lookup missed) but a whitespace difference could do it.
   @action
   Future<(ProductModel, VarianteModel)> createSimpleProduct({
     required String name,
@@ -98,6 +104,11 @@ abstract class _ProductStore with Store {
     double? mrp,
     int stockQty = 1,
   }) async {
+    final code = barcode.trim();
+    if (code.isNotEmpty && isBarcodeTaken(code)) {
+      throw StateError('Barcode "$code" is already used by another variant.');
+    }
+
     const uuid = Uuid();
     final productId = uuid.v4();
     final now = DateTime.now().toIso8601String();
@@ -119,7 +130,7 @@ abstract class _ProductStore with Store {
     final variant = VarianteModel(
       varianteId: uuid.v4(),
       productId: productId,
-      barcode: barcode,
+      barcode: code.isEmpty ? null : code,
       sellingPrice: sellingPrice,
       mrp: effectiveMrp,
       costPrice: 0,
@@ -310,16 +321,29 @@ abstract class _ProductStore with Store {
     return await _variantRepository.getVariantsByProductId(productId);
   }
 
+  /// Add a variant.
+  ///
+  /// The repository refuses a barcode another variant already holds; the result
+  /// says why so a form can show it. The in-memory list is only updated on
+  /// success, or the cache would disagree with the box.
   @action
-  Future<void> addVariant(VarianteModel variant) async {
-    await _variantRepository.addVariant(variant);
-    _upsertVariantInMemory(variant);
+  Future<VariantWriteResult> addVariant(VarianteModel variant) async {
+    final result = await _variantRepository.addVariant(variant);
+    // Only mirror into the in-memory list on success, or the cache would
+    // disagree with the box. The failure message rides on the result — callers
+    // surface it, so there is no store-level error state to keep in sync.
+    if (result.success) _upsertVariantInMemory(variant);
+    return result;
   }
 
   @action
-  Future<void> updateVariant(VarianteModel variant) async {
-    await _variantRepository.updateVariant(variant);
-    _upsertVariantInMemory(variant);
+  Future<VariantWriteResult> updateVariant(VarianteModel variant) async {
+    final result = await _variantRepository.updateVariant(variant);
+    // Only mirror into the in-memory list on success, or the cache would
+    // disagree with the box. The failure message rides on the result — callers
+    // surface it, so there is no store-level error state to keep in sync.
+    if (result.success) _upsertVariantInMemory(variant);
+    return result;
   }
 
   @action

@@ -457,6 +457,21 @@ class _AddProductScreenState extends State<AddProductScreen> {
       }
     }
 
+    // Attribute-generated rows carry their OWN editable/scannable barcode and
+    // were previously written straight through unchecked — against the
+    // catalogue, against each other, and against the manual rows above. They
+    // share `seenBarcodes` so a code typed in both halves of the form is caught.
+    for (final variant in _generatedVariants) {
+      final barcode = variant.barcode?.trim() ?? '';
+      if (barcode.isEmpty) continue;
+      if (productStore.isBarcodeTaken(barcode) || !seenBarcodes.add(barcode)) {
+        NotificationService.instance.showError(
+          'Barcode "$barcode" is already used by another variant',
+        );
+        return;
+      }
+    }
+
     // GST rate is set per product/variant, not inherited from category.
     // taxRate is resolved once from the selected shared Tax entity and kept
     // as a cached percentage on the model, exactly like before — only the
@@ -1020,7 +1035,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
           _buildTextField(
             controller: variant.barcodeController,
             label: 'Barcode',
-            hint: 'Scan or enter',
+            // Blank is fine and normal: VariantRepository.addVariant mints an
+            // internal code, so the field is only for a real one off the packet.
+            hint: 'Scan, or leave blank to auto-generate',
             suffixIcon: IconButton(
               icon: const Icon(
                 Icons.qr_code_scanner,

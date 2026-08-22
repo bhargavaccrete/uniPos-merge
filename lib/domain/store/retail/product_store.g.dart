@@ -115,7 +115,7 @@ mixin _$ProductStore on _ProductStore, Store {
       AsyncAction('_ProductStore.addVariant', context: context);
 
   @override
-  Future<void> addVariant(VarianteModel variant) {
+  Future<VariantWriteResult> addVariant(VarianteModel variant) {
     return _$addVariantAsyncAction.run(() => super.addVariant(variant));
   }
 
@@ -123,7 +123,7 @@ mixin _$ProductStore on _ProductStore, Store {
       AsyncAction('_ProductStore.updateVariant', context: context);
 
   @override
-  Future<void> updateVariant(VarianteModel variant) {
+  Future<VariantWriteResult> updateVariant(VarianteModel variant) {
     return _$updateVariantAsyncAction.run(() => super.updateVariant(variant));
   }
 

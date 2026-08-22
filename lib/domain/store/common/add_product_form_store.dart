@@ -599,7 +599,13 @@ abstract class _AddProductFormStore with Store {
           minStock: minStock,
           taxRate: taxRate > 0 ? taxRate : null,
         );
-        await productStore.addVariant(variant);
+        // A refused variant must not pass silently — the product is already
+        // written, so ignoring this would leave it with no variant at all.
+        // `submit()` catches and reports via errorMessage.
+        final result = await productStore.addVariant(variant);
+        if (!result.success) {
+          throw StateError(result.errorMessage ?? 'Could not save variant.');
+        }
       }
     } else {
       // Create default variant for simple product
@@ -617,7 +623,10 @@ abstract class _AddProductFormStore with Store {
         taxRate: taxRate > 0 ? taxRate : null,
         customAttributes: mergeVariantAttributes(Map.of(simpleFieldValues)),
       );
-      await productStore.addVariant(variant);
+      final result = await productStore.addVariant(variant);
+      if (!result.success) {
+        throw StateError(result.errorMessage ?? 'Could not save variant.');
+      }
     }
   }
 

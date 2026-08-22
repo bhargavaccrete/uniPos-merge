@@ -27,6 +27,9 @@ import 'package:billberrylite/presentation/widget/componets/retail/stock_adjustm
 import 'package:billberrylite/presentation/widget/componets/retail/stock_history_dialog.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
+import 'package:billberrylite/presentation/screens/retail/scanner_screen.dart';
+import 'package:billberrylite/domain/services/retail/barcode_generator_service.dart';
+import 'package:billberrylite/presentation/widget/componets/retail/print_labels_sheet.dart';
 
 /// Money input — digits with at most two decimals, the same rule the checkout,
 /// expense and add-product screens apply.
@@ -159,6 +162,41 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   /// `retail.inventory` because an adjustment is an inventory operation, not a
   /// catalog edit — editing the variant and correcting its stock are different
   /// privileges.
+  /// Print a label for ONE variant. Opens the shared sheet with that variant
+  /// pre-selected, so both entry points share one code path.
+  Future<void> _openPrintLabel(VarianteModel variant) async {
+    if (!BarcodeLabelPermission.canPrint) return;
+    await showPrintLabelsSheet(
+      context: context,
+      product: _product,
+      variants: [variant],
+      money: formatMoney,
+      preselectAll: true,
+    );
+  }
+
+  /// Print labels for the product. Opens the same sheet with EVERY variant
+  /// listed and none selected -- the admin picks, sets counts and sees the total
+  /// before anything prints.
+  ///
+  /// The list comes from the store observable, so a barcode generated inside the
+  /// sheet is reflected here without a manual reload.
+  Future<void> _openPrintLabels() async {
+    if (!BarcodeLabelPermission.canPrint) return;
+    final variants = productStore.variantsFor(widget.product.productId);
+    if (variants.isEmpty) {
+      NotificationService.instance
+          .showWarning('Add a variant before printing labels.');
+      return;
+    }
+    await showPrintLabelsSheet(
+      context: context,
+      product: _product,
+      variants: variants,
+      money: formatMoney,
+    );
+  }
+
   Future<void> _openAdjustStock(VarianteModel variant) async {
     if (!PlanGuard.allowedOr(
       context,
@@ -256,6 +294,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 case 'history':
                   _openStockHistory();
                   break;
+                case 'labels':
+                  _openPrintLabels();
+                  break;
               }
             },
             itemBuilder: (context) => [
@@ -268,6 +309,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               const PopupMenuDivider(),
               _menuItem('edit', Icons.edit_outlined, 'Edit Details'),
               _menuItem('history', Icons.history_rounded, 'Stock History'),
+              if (BarcodeLabelPermission.canPrint)
+                _menuItem('labels', Icons.qr_code_2_rounded, 'Print Labels'),
             ],
           ),
           const SizedBox(width: 4),
@@ -720,6 +763,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   _openEditVariant(variant);
                 } else if (value == 'adjust') {
                   _openAdjustStock(variant);
+                } else if (value == 'label') {
+                  _openPrintLabel(variant);
                 } else if (value == 'delete') {
                   _deleteVariant(variant);
                 }
@@ -760,6 +805,29 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         const SizedBox(width: 12),
                         Text(
                           'Adjust Stock',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                // Admin-only, hidden for everyone else — same rule as
+                // Adjust Stock above.
+                if (BarcodeLabelPermission.canPrint)
+                  PopupMenuItem<String>(
+                    value: 'label',
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.qr_code_2_rounded,
+                          size: 20,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Print Label',
                           style: GoogleFonts.poppins(
                             fontSize: AppResponsive.bodyFontSize(context),
                             color: AppColors.textPrimary,
@@ -1046,7 +1114,7 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
             AppTextField(
               controller: _barcodeController,
               label: 'Barcode (Optional)',
-              hint: 'Scan or enter',
+              hint: 'Scan, or leave blank to auto-generate',
               icon: Icons.qr_code_rounded,
             ),
             const SizedBox(height: 12),
@@ -1100,6 +1168,10 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
   late final TextEditingController _mrpController;
   late final TextEditingController _minStockController;
 
+  /// The variant's barcode. Editable HERE and nowhere else — without this field
+  /// a duplicate barcode could be created but never repaired.
+  late final TextEditingController _barcodeController;
+
   /// False parks the variant: it keeps its stock and history but disappears
   /// from the POS, so a line can be pulled from sale without being deleted.
   late bool _active;
@@ -1121,6 +1193,7 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
     _minStockController = TextEditingController(
       text: v.minStock?.toString() ?? '',
     );
+    _barcodeController = TextEditingController(text: v.barcode ?? '');
 
     for (final entry
         in (v.customAttributes ?? const <String, String>{}).entries) {
@@ -1137,10 +1210,21 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
     _costPriceController.dispose();
     _mrpController.dispose();
     _minStockController.dispose();
+    _barcodeController.dispose();
     for (final attr in _customAttributes) {
       attr.dispose();
     }
     super.dispose();
+  }
+
+  /// Push the shared scanner and drop the result into the field. Mirrors the
+  /// Add Product form's scan button.
+  Future<void> _scanBarcode() async {
+    final code = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const ScannerScreen()),
+    );
+    if (code == null || !mounted) return;
+    setState(() => _barcodeController.text = code.trim());
   }
 
   Future<void> _save() async {
@@ -1155,6 +1239,66 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
 
     final mrpText = _mrpController.text.trim();
     final minStockText = _minStockController.text.trim();
+
+    final oldBarcode = widget.variant.barcode?.trim() ?? '';
+    final newBarcode = _barcodeController.text.trim();
+
+    // Changing or clearing a barcode strands every label already printed with
+    // the old value, so it is never silent. Only asked when there WAS one.
+    //
+    // The wording depends on WHERE the old code came from. Since a barcode is
+    // now generated automatically on create, most variants carry an internal
+    // "BB..." code that may never have been printed — warning about printed
+    // labels there would cry wolf on the routine act of pasting a real
+    // manufacturer barcode over it. A code the user entered themselves gets the
+    // firmer message.
+    if (oldBarcode.isNotEmpty && newBarcode != oldBarcode) {
+      final wasGenerated = BarcodeGeneratorService.isGenerated(oldBarcode);
+
+      final String message;
+      if (newBarcode.isEmpty) {
+        message = wasGenerated
+            ? 'This variant will have no barcode and will stop scanning until '
+                'one is set. If you already printed labels with "$oldBarcode", '
+                'they will no longer identify it.'
+            : 'Labels already printed with "$oldBarcode" will no longer '
+                'identify this variant, and it will stop scanning until a new '
+                'barcode is set.';
+      } else {
+        message = wasGenerated
+            ? 'This variant will use "$newBarcode" instead of the '
+                'auto-generated "$oldBarcode". If you already printed labels '
+                'with the old code, they will no longer identify it.'
+            : 'Labels already printed with "$oldBarcode" will no longer '
+                'identify this variant.';
+      }
+
+      final confirmed = await showAppConfirmDialog(
+        context: context,
+        title: newBarcode.isEmpty ? 'Remove barcode?' : 'Change barcode?',
+        message: message,
+        confirmLabel: newBarcode.isEmpty ? 'Remove' : 'Change',
+        icon: Icons.qr_code_2_rounded,
+        // An internal code that may never have printed is a softer decision
+        // than overwriting one the shop deliberately recorded.
+        accent: wasGenerated ? AppColors.primary : AppColors.danger,
+      );
+      if (!confirmed) return;
+      if (!mounted) return;
+    }
+
+    // Pre-flight so the user sees the reason on the field they typed in; the
+    // repository is the backstop.
+    if (newBarcode.isNotEmpty &&
+        productStore.isBarcodeTaken(
+          newBarcode,
+          exceptVariantId: widget.variant.varianteId,
+        )) {
+      NotificationService.instance.showError(
+        'Barcode "$newBarcode" is already used by another variant',
+      );
+      return;
+    }
 
     // MUST go through copyWith. Hand-building a VarianteModel here is how
     // sellingPrice, hsnCode, attributeValueIds, imagePath, isDefault and status
@@ -1173,10 +1317,19 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
       // them instead of falling back to the old values.
       customAttributes:
           _customAttributesMap(_customAttributes) ?? const <String, String>{},
+      // `barcode ?? this.barcode` cannot null the field, so removing one needs
+      // the explicit flag — same reason as clearMrp above.
+      barcode: newBarcode.isEmpty ? null : newBarcode,
+      clearBarcode: newBarcode.isEmpty,
     );
 
-    await productStore.updateVariant(updated);
+    final result = await productStore.updateVariant(updated);
     if (!mounted) return;
+    if (!result.success) {
+      NotificationService.instance
+          .showError(result.errorMessage ?? 'Could not save the variant.');
+      return;
+    }
     Navigator.pop(context);
     NotificationService.instance.showSuccess('Variant updated');
   }
@@ -1196,6 +1349,20 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // The ONLY place a variant's barcode can be corrected. Without it a
+            // duplicate or a typo was permanent short of deleting the variant.
+            AppTextField(
+              controller: _barcodeController,
+              label: 'Barcode (Optional)',
+              hint: 'Scan or enter',
+              icon: Icons.qr_code_2_rounded,
+              suffixIcon: IconButton(
+                tooltip: 'Scan barcode',
+                icon: const Icon(Icons.qr_code_scanner, size: 20),
+                onPressed: _scanBarcode,
+              ),
+            ),
+            const SizedBox(height: 12),
             AppTextField(
               controller: _sellingPriceController,
               label: 'Selling Price',

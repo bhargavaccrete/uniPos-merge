@@ -263,12 +263,18 @@ class VarianteModel extends HiveObject {
     // sellingPrice/hsnCode/status used to get silently wiped).
     bool clearMrp = false,
     bool clearMinStock = false,
+    /// Same reason as [clearMrp]: `barcode ?? this.barcode` cannot put the field
+    /// back to null, so removing a barcode needs an explicit flag.
+    ///
+    /// Clearing a barcode strands every label already printed with it, so a
+    /// caller must confirm with the user first.
+    bool clearBarcode = false,
   }) {
     return VarianteModel(
       varianteId: varianteId ?? this.varianteId,
       productId: productId ?? this.productId,
       sku: sku ?? this.sku,
-      barcode: barcode ?? this.barcode,
+      barcode: clearBarcode ? null : (barcode ?? this.barcode),
       mrp: clearMrp ? null : (mrp ?? this.mrp),
       costPrice: costPrice ?? this.costPrice,
       stockQty: stockQty ?? this.stockQty,

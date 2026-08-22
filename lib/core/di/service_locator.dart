@@ -85,6 +85,7 @@ import 'package:billberrylite/domain/services/restaurant/thermal_printer_service
 
 import 'package:billberrylite/data/repositories/restaurant/attendance_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/notification_repository.dart';
+import '../../domain/services/retail/barcode_generator_service.dart';
 
 // Type aliases for convenience getters (to avoid prefixing with 'restaurant.')
 typedef CartStoreRes = restaurant.CartStoreRes;
@@ -175,6 +176,8 @@ Future<void> _registerRetailDependencies() async {
   locator.registerLazySingleton<StockAlertService>(() => StockAlertService());
   locator.registerLazySingleton<GstService>(() => GstService());
   locator.registerLazySingleton<SkuGeneratorService>(() => SkuGeneratorService());
+  locator.registerLazySingleton<BarcodeGeneratorService>(
+      () => BarcodeGeneratorService());
   locator.registerLazySingleton<CustomerIdGeneratorService>(
       () => CustomerIdGeneratorService());
   locator.registerLazySingleton<DamagedGoodsStore>(() => DamagedGoodsStore());
@@ -448,6 +451,8 @@ PrintService get printService => locator<PrintService>();
 StockAlertService get stockAlertService => locator<StockAlertService>();
 GstService get gstService => locator<GstService>();
 SkuGeneratorService get skuGeneratorService => locator<SkuGeneratorService>();
+BarcodeGeneratorService get barcodeGeneratorService =>
+    locator<BarcodeGeneratorService>();
 CustomerIdGeneratorService get customerIdGeneratorService =>
     locator<CustomerIdGeneratorService>();
 AuthService get authService => locator<AuthService>();
