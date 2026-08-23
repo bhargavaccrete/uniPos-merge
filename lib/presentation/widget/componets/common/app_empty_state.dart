@@ -14,6 +14,29 @@ import 'package:billberrylite/util/color.dart';
 ///   message: 'Try a different search term.',
 /// )
 /// ```
+/// Standard call-to-action button for [AppEmptyState.action] — keeps every
+/// "Add the first X" prompt identical (primary fill, radius 10).
+Widget appEmptyStateAction({
+  required String label,
+  required VoidCallback onPressed,
+  IconData icon = Icons.add,
+}) {
+  return ElevatedButton.icon(
+    onPressed: onPressed,
+    icon: Icon(icon),
+    label: Text(label,
+        style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+    style: ElevatedButton.styleFrom(
+      backgroundColor: AppColors.primary,
+      foregroundColor: AppColors.white,
+      elevation: 0,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ),
+  );
+}
+
 class AppEmptyState extends StatelessWidget {
   final IconData icon;
   final String title;

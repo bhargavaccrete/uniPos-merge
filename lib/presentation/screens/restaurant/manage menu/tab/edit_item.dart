@@ -8,9 +8,10 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/core/constants/item_units.dart';
 import 'package:billberrylite/util/restaurant/staticswitch.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/config/tax_feature.dart';
 import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
-import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
+import 'package:billberrylite/data/models/common/categorymodel_300.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
@@ -592,13 +593,15 @@ class _EdititemScreenState extends State<EdititemScreen> {
           const SizedBox(height: 25),
 
           // Tax Section
-          _buildSectionHeader('Tax', Icons.percent_rounded),
-          const SizedBox(height: 15),
-          TaxSelectorButton(
-            taxRate: selectedTaxRate,
-            onTap: _selectTax,
-          ),
-          const SizedBox(height: 25),
+          if (TaxFeature.enabled) ...[
+            _buildSectionHeader('Tax', Icons.percent_rounded),
+            const SizedBox(height: 15),
+            TaxSelectorButton(
+              taxRate: selectedTaxRate,
+              onTap: _selectTax,
+            ),
+            const SizedBox(height: 25),
+          ],
 
           // Food Type (Veg / Non-Veg)
           _buildSectionHeader('Food Type', Icons.eco_outlined),

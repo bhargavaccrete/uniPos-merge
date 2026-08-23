@@ -1,10 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:billberrylite/core/config/phone_rule.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import '../../../core/di/service_locator.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model_211.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_item_model_212.dart';
 import 'package:billberrylite/data/models/retail/hive_model/supplier_model_205.dart';
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 
 class AddPurchaseOrderScreen extends StatefulWidget {
   final PurchaseOrderModel? purchaseOrder;
@@ -20,7 +35,9 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
   DateTime _expectedDeliveryDate = DateTime.now().add(const Duration(days: 7));
   final TextEditingController _notesController = TextEditingController();
   final List<POItemData> _orderItems = [];
-  late String _poNumber;
+  // Empty until the number is reserved — generation now writes a counter to
+  // Hive, so it can't run synchronously in initState.
+  String _poNumber = '';
 
   bool get isEditing => widget.purchaseOrder != null;
 
@@ -30,8 +47,13 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
     if (isEditing) {
       _loadPOData();
     } else {
-      _poNumber = purchaseOrderStore.generatePONumber();
+      _reservePONumber();
     }
+  }
+
+  Future<void> _reservePONumber() async {
+    final number = await purchaseOrderStore.generatePONumber();
+    if (mounted) setState(() => _poNumber = number);
   }
 
   Future<void> _loadPOData() async {
@@ -55,12 +77,14 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
     for (var item in items) {
       final variant = await productStore.getVariantById(item.variantId);
       if (variant != null) {
-        loadedItems.add(POItemData(
-          variant: variant,
-          orderedQty: item.orderedQty,
-          estimatedPrice: item.estimatedPrice,
-          poItemId: item.poItemId,
-        ));
+        loadedItems.add(
+          POItemData(
+            variant: variant,
+            orderedQty: item.orderedQty,
+            estimatedPrice: item.estimatedPrice,
+            poItemId: item.poItemId,
+          ),
+        );
       }
     }
 
@@ -86,23 +110,20 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
   }
 
   Future<void> _savePO() async {
+    if (!PlanGuard.allowedOr(
+      context,
+      RetailEntKeys.purchaseCreate,
+      featureName: 'Purchase Orders',
+    )) {
+      return;
+    }
     if (_selectedSupplier == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a supplier'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      NotificationService.instance.showError('Please select a supplier');
       return;
     }
 
     if (_orderItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please add at least one item'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      NotificationService.instance.showError('Please add at least one item');
       return;
     }
 
@@ -122,15 +143,19 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
           );
 
     final items = _orderItems
-        .map((item) => PurchaseOrderItemModel.create(
-              poId: po.poId,
-              variantId: item.variant.varianteId,
-              productId: item.variant.productId,
-              productName: productStore.getProductById(item.variant.productId)?.productName,
-              variantInfo: _getVariantDescription(item.variant),
-              orderedQty: item.orderedQty,
-              estimatedPrice: item.estimatedPrice,
-            ))
+        .map(
+          (item) => PurchaseOrderItemModel.create(
+            poId: po.poId,
+            variantId: item.variant.varianteId,
+            productId: item.variant.productId,
+            productName: productStore
+                .getProductById(item.variant.productId)
+                ?.productName,
+            variantInfo: _getVariantDescription(item.variant),
+            orderedQty: item.orderedQty,
+            estimatedPrice: item.estimatedPrice,
+          ),
+        )
         .toList();
 
     if (isEditing) {
@@ -141,93 +166,90 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
 
     if (mounted) {
       Navigator.pop(context, true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(isEditing ? 'Purchase Order updated' : 'Purchase Order created'),
-          backgroundColor: const Color(0xFF4CAF50),
-        ),
+      NotificationService.instance.showSuccess(
+        isEditing ? 'Purchase Order updated' : 'Purchase Order created',
       );
     }
   }
 
   void _showSupplierSelection() {
-    showDialog(
+    showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select Supplier'),
-        content: SizedBox(
+      builder: (dialogContext) => AppDialogShell(
+        title: 'Select Supplier',
+        accent: AppColors.primary,
+        icon: Icons.storefront_rounded,
+        body: SizedBox(
           width: double.maxFinite,
           child: Observer(
             builder: (context) {
               final suppliers = supplierStore.suppliers;
+
               if (suppliers.isEmpty) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.people_outline,
-                          size: 64,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'No suppliers found',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Add a supplier to create purchase orders',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF6B6B6B),
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 24),
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _showAddSupplierDialog();
-                          },
-                          icon: const Icon(Icons.add),
-                          label: const Text('Add Supplier'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF4CAF50),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                // No CTA here on purpose — the footer's 'Add New' is the one
+                // way to create a supplier from this dialog.
+                return const AppEmptyState(
+                  dense: true,
+                  icon: Icons.storefront_outlined,
+                  title: 'No suppliers yet',
+                  message: 'Tap Add New to create your first supplier.',
                 );
               }
-              return ListView.builder(
+
+              return ListView.separated(
                 shrinkWrap: true,
                 itemCount: suppliers.length,
+                separatorBuilder: (_, _) =>
+                    const Divider(height: 1, color: AppColors.divider),
                 itemBuilder: (context, index) {
                   final supplier = suppliers[index];
+                  final isSelected =
+                      _selectedSupplier?.supplierId == supplier.supplierId;
+
                   return ListTile(
+                    contentPadding: EdgeInsets.zero,
                     leading: CircleAvatar(
-                      backgroundColor: const Color(0xFF2196F3).withOpacity(0.1),
+                      backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                       child: Text(
-                        supplier.name[0].toUpperCase(),
-                        style: const TextStyle(color: Color(0xFF2196F3)),
+                        supplier.name.trim().isEmpty
+                            ? '?'
+                            : supplier.name.trim()[0].toUpperCase(),
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
                       ),
                     ),
-                    title: Text(supplier.name),
-                    subtitle: supplier.phone != null ? Text(supplier.phone!) : null,
+                    title: Text(
+                      supplier.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    subtitle: supplier.phone?.isNotEmpty == true
+                        ? Text(
+                            supplier.phone!,
+                            maxLines: 1,
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.captionFontSize(context),
+                              color: AppColors.textSecondary,
+                            ),
+                          )
+                        : null,
+                    trailing: isSelected
+                        ? const Icon(
+                            Icons.check_circle_rounded,
+                            color: AppColors.primary,
+                            size: 20,
+                          )
+                        : null,
                     onTap: () {
-                      setState(() {
-                        _selectedSupplier = supplier;
-                      });
-                      Navigator.pop(context);
+                      setState(() => _selectedSupplier = supplier);
+                      Navigator.pop(dialogContext);
                     },
                   );
                 },
@@ -236,20 +258,14 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton.icon(
+          appDialogCancelButton(dialogContext, label: 'Close'),
+          const SizedBox(width: 12),
+          appDialogPrimaryButton(
+            label: 'Add New',
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               _showAddSupplierDialog();
             },
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('Add New'),
-            style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFF4CAF50),
-            ),
           ),
         ],
       ),
@@ -263,117 +279,139 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
     final gstController = TextEditingController();
     final openingBalanceController = TextEditingController(text: '0');
 
-    showDialog(
+    showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add New Supplier'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Name *',
-                  border: OutlineInputBorder(),
+      builder: (dialogContext) => DialogDisposeScope(
+        disposables: [
+          nameController,
+          phoneController,
+          addressController,
+          gstController,
+          openingBalanceController,
+        ],
+        child: MoneyScope(
+          child: AppDialogShell(
+            title: 'Add Supplier',
+            subtitle: 'Selected automatically once saved',
+            accent: AppColors.primary,
+            icon: Icons.storefront_rounded,
+            body: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppTextField(
+                  controller: nameController,
+                  label: 'Name',
+                  required: true,
+                  icon: Icons.storefront_outlined,
+                  textCapitalization: TextCapitalization.words,
+                  autofocus: true,
+                  textInputAction: TextInputAction.next,
                 ),
-                textCapitalization: TextCapitalization.words,
-                autofocus: true,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: phoneController,
-                decoration: const InputDecoration(
-                  labelText: 'Phone',
-                  border: OutlineInputBorder(),
-                  prefixText: '+91 ',
+                const SizedBox(height: 12),
+                AppTextField(
+                  controller: phoneController,
+                  label: 'Phone',
+                  hint: PhoneRule.hint,
+                  icon: Icons.phone_outlined,
+                  keyboardType: TextInputType.phone,
+                  maxLength: PhoneRule.maxLength,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (v) => PhoneRule.validate(v, required: false),
+                  textInputAction: TextInputAction.next,
                 ),
-                keyboardType: TextInputType.phone,
-                maxLength: 10,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: addressController,
-                decoration: const InputDecoration(
-                  labelText: 'Address',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 12),
+                AppTextField(
+                  controller: addressController,
+                  label: 'Address',
+                  icon: Icons.location_on_outlined,
+                  maxLines: 2,
                 ),
-                maxLines: 2,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: gstController,
-                decoration: const InputDecoration(
-                  labelText: 'GST Number',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 12),
+                AppTextField(
+                  controller: gstController,
+                  label: 'GST Number',
+                  hint: 'e.g. 22AAAAA0000A1Z5',
+                  icon: Icons.badge_outlined,
+                  textCapitalization: TextCapitalization.characters,
                 ),
-                textCapitalization: TextCapitalization.characters,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: openingBalanceController,
-                decoration: const InputDecoration(
-                  labelText: 'Opening Balance',
-                  border: OutlineInputBorder(),
-                  prefixText: '₹ ',
+                const SizedBox(height: 12),
+                AppTextField(
+                  controller: openingBalanceController,
+                  label: 'Opening Balance',
+                  hint: 'Amount already owed to this supplier',
+                  icon: Icons.account_balance_wallet_outlined,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d*\.?\d{0,2}'),
+                    ),
+                  ],
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              ],
+            ),
+            actions: [
+              appDialogCancelButton(dialogContext),
+              const SizedBox(width: 12),
+              appDialogPrimaryButton(
+                label: 'Add Supplier',
+                onPressed: () async {
+                  // Validate the TRIMMED name — the same whitespace-only trap
+                  // the supplier list screen had.
+                  final name = nameController.text.trim();
+                  if (name.isEmpty) {
+                    NotificationService.instance.showError(
+                      'Supplier name is required',
+                    );
+                    return;
+                  }
+
+                  final phone = phoneController.text.trim();
+                  final phoneError = PhoneRule.validate(phone, required: false);
+                  if (phoneError != null) {
+                    NotificationService.instance.showError(phoneError);
+                    return;
+                  }
+
+                  final address = addressController.text.trim();
+                  final gst = gstController.text.trim();
+                  final openingBalance =
+                      double.tryParse(openingBalanceController.text.trim()) ??
+                      0;
+
+                  final newSupplier = SupplierModel.create(
+                    name: name,
+                    phone: phone.isEmpty ? null : phone,
+                    address: address.isEmpty ? null : address,
+                    gstNumber: gst.isEmpty ? null : gst.toUpperCase(),
+                    openingBalance: openingBalance,
+                    currentBalance: openingBalance,
+                  );
+
+                  try {
+                    await supplierStore.addSupplier(newSupplier);
+                  } catch (e) {
+                    if (!mounted) return;
+                    NotificationService.instance.showError(
+                      'Failed to add supplier: $e',
+                    );
+                    return;
+                  }
+
+                  if (!mounted || !dialogContext.mounted) return;
+
+                  setState(() => _selectedSupplier = newSupplier);
+                  Navigator.pop(dialogContext);
+                  NotificationService.instance.showSuccess(
+                    '"${newSupplier.name}" added and selected',
+                  );
+                },
               ),
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Supplier name is required'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-
-              final openingBalance = double.tryParse(openingBalanceController.text) ?? 0;
-
-              final newSupplier = SupplierModel.create(
-                name: nameController.text.trim(),
-                phone: phoneController.text.trim().isEmpty ? null : phoneController.text.trim(),
-                address: addressController.text.trim().isEmpty ? null : addressController.text.trim(),
-                gstNumber: gstController.text.trim().isEmpty ? null : gstController.text.trim(),
-                openingBalance: openingBalance,
-                currentBalance: openingBalance,
-              );
-
-              await supplierStore.addSupplier(newSupplier);
-
-              if (mounted) {
-                // Auto-select the newly added supplier
-                setState(() {
-                  _selectedSupplier = newSupplier;
-                });
-
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Supplier "${newSupplier.name}" added and selected'),
-                    backgroundColor: const Color(0xFF4CAF50),
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4CAF50),
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Add Supplier'),
-          ),
-        ],
       ),
     );
   }
@@ -401,37 +439,51 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
     final item = _orderItems[index];
     final controller = TextEditingController(text: item.orderedQty.toString());
 
-    showDialog(
+    showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Quantity'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Quantity',
-            border: OutlineInputBorder(),
+      builder: (dialogContext) => DialogDisposeScope(
+        disposables: [controller],
+        child: AppDialogShell(
+          title: 'Edit Quantity',
+          subtitle:
+              productStore
+                  .getProductById(item.variant.productId)
+                  ?.productName ??
+              _getVariantDescription(item.variant),
+          accent: AppColors.primary,
+          icon: Icons.numbers_rounded,
+          body: AppTextField(
+            controller: controller,
+            label: 'Quantity',
+            required: true,
+            icon: Icons.inventory_2_outlined,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            autofocus: true,
           ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final newQty = int.tryParse(controller.text) ?? 0;
-              if (newQty > 0) {
+          actions: [
+            appDialogCancelButton(dialogContext),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: 'Save',
+              onPressed: () {
+                final newQty = int.tryParse(controller.text.trim()) ?? 0;
+                // Silently ignoring 0 used to close the dialog with nothing
+                // changed, which reads as the save having failed.
+                if (newQty <= 0) {
+                  NotificationService.instance.showError(
+                    'Quantity must be at least 1',
+                  );
+                  return;
+                }
                 setState(() {
                   _orderItems[index] = item.copyWith(orderedQty: newQty);
                 });
-              }
-              Navigator.pop(context);
-            },
-            child: const Text('Save'),
-          ),
-        ],
+                Navigator.pop(dialogContext);
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -444,28 +496,78 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
     return '${date.day}/${date.month}/${date.year}';
   }
 
+  /// Caps content width on large screens. Backgrounds still span edge to edge —
+  /// only what you read is constrained, so this form doesn't stretch a single
+  /// column of fields across a whole laptop.
+  Widget _capped(BuildContext context, Widget child) {
+    final maxWidth = AppResponsive.maxCardWidth(context);
+    if (maxWidth == double.infinity) return child;
+    return Align(
+      // topCenter, not Center: Center aligns on BOTH axes, so a
+      // shrink-wrapping child floats in the vertical middle.
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: child,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final totalItems = _orderItems.fold<int>(0, (sum, item) => sum + item.orderedQty);
+    final totalItems = _orderItems.fold<int>(
+      0,
+      (sum, item) => sum + item.orderedQty,
+    );
     final estimatedTotal = _orderItems.fold<double>(
-        0.0, (sum, item) => sum + (item.orderedQty * (item.estimatedPrice ?? 0)));
+      0.0,
+      (sum, item) => sum + (item.orderedQty * (item.estimatedPrice ?? 0)),
+    );
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: Text(isEditing ? 'Edit Purchase Order' : 'Create Purchase Order'),
-        centerTitle: true,
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        // Title + reserved PO number, so the number is visible while filling
+        // the form rather than only after saving.
+        titleWidget: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              isEditing ? 'Edit Purchase Order' : 'Create Purchase Order',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.subheadingFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: AppColors.white,
+              ),
+            ),
+            if (_poNumber.isNotEmpty)
+              Text(
+                _poNumber,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.white.withValues(alpha: 0.75),
+                ),
+              ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: _savePO,
-            child: const Text(
+            child: Text(
               'Save',
-              style: TextStyle(
-                color: Color(0xFF4CAF50),
+              style: GoogleFonts.poppins(
+                color: AppColors.white,
                 fontWeight: FontWeight.w600,
               ),
             ),
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: CustomScrollView(
@@ -474,97 +576,140 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
           SliverToBoxAdapter(
             child: Container(
               color: Colors.white,
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // PO Number
-                  Row(
-                    children: [
-                      const Icon(Icons.tag, color: Color(0xFF6B6B6B), size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        _poNumber,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+              padding: AppResponsive.padding(context),
+              child: _capped(
+                context,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // PO Number
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.tag,
+                          color: AppColors.textSecondary,
+                          size: AppResponsive.iconSize(context),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Supplier Selection
-                  InkWell(
-                    onTap: isEditing && widget.purchaseOrder!.statusEnum != POStatus.draft
-                        ? null
-                        : _showSupplierSelection,
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFFE8E8E8)),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.storefront, color: Color(0xFF6B6B6B), size: 20),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              _selectedSupplier?.name ?? 'Select Supplier *',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: _selectedSupplier == null
-                                    ? const Color(0xFFB0B0B0)
-                                    : const Color(0xFF1A1A1A),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _poNumber,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: AppResponsive.subheadingFontSize(
+                                context,
                               ),
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                          const Icon(Icons.arrow_drop_down, color: Color(0xFF6B6B6B)),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 12),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
 
-                  // Expected Delivery Date
-                  InkWell(
-                    onTap: _selectDeliveryDate,
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFFE8E8E8)),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.calendar_today, color: Color(0xFF6B6B6B), size: 20),
-                          const SizedBox(width: 12),
-                          Text(
-                            'Expected: ${_formatDate(_expectedDeliveryDate)}',
-                            style: const TextStyle(fontSize: 14),
+                    // Supplier Selection
+                    InkWell(
+                      onTap:
+                          isEditing &&
+                              widget.purchaseOrder!.statusEnum != POStatus.draft
+                          ? null
+                          : _showSupplierSelection,
+                      child: Container(
+                        padding: EdgeInsets.all(
+                          AppResponsive.mediumSpacing(context),
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.divider),
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.smallBorderRadius(context),
                           ),
-                          const Spacer(),
-                          const Icon(Icons.edit, color: Color(0xFF6B6B6B), size: 18),
-                        ],
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.storefront,
+                              color: AppColors.textSecondary,
+                              size: AppResponsive.iconSize(context),
+                            ),
+                            SizedBox(
+                              width: AppResponsive.mediumSpacing(context),
+                            ),
+                            Expanded(
+                              child: Text(
+                                _selectedSupplier?.name ?? 'Select Supplier *',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: AppResponsive.bodyFontSize(context),
+                                  color: _selectedSupplier == null
+                                      ? AppColors.textSecondary
+                                      : AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            const Icon(
+                              Icons.arrow_drop_down,
+                              color: AppColors.textSecondary,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
 
-                  // Notes (single line)
-                  TextField(
-                    controller: _notesController,
-                    decoration: const InputDecoration(
-                      labelText: 'Notes (Optional)',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.notes, size: 20),
-                      isDense: true,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    // Expected Delivery Date
+                    InkWell(
+                      onTap: _selectDeliveryDate,
+                      child: Container(
+                        padding: EdgeInsets.all(
+                          AppResponsive.mediumSpacing(context),
+                        ),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.divider),
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.smallBorderRadius(context),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today,
+                              color: AppColors.textSecondary,
+                              size: AppResponsive.iconSize(context),
+                            ),
+                            SizedBox(
+                              width: AppResponsive.mediumSpacing(context),
+                            ),
+                            Expanded(
+                              child: Text(
+                                'Expected: ${_formatDate(_expectedDeliveryDate)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: AppResponsive.bodyFontSize(context),
+                                ),
+                              ),
+                            ),
+                            Icon(
+                              Icons.edit,
+                              color: AppColors.textSecondary,
+                              size: AppResponsive.smallIconSize(context),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    maxLines: 1,
-                  ),
-                ],
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
+
+                    // Notes (single line)
+                    AppTextField(
+                      controller: _notesController,
+                      label: 'Notes (Optional)',
+                      icon: Icons.notes,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -573,45 +718,67 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
           SliverToBoxAdapter(
             child: Container(
               color: Colors.white,
-              margin: const EdgeInsets.only(top: 8),
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Total Items',
-                        style: TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
-                      ),
-                      Text(
-                        totalItems.toString(),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
+              margin: EdgeInsets.only(top: AppResponsive.smallSpacing(context)),
+              padding: AppResponsive.padding(context),
+              child: _capped(
+                context,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Total Items',
+                          style: TextStyle(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            color: AppColors.textSecondary,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      const Text(
-                        'Estimated Total',
-                        style: TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
-                      ),
-                      Text(
-                        estimatedTotal > 0 ? '₹${estimatedTotal.toStringAsFixed(2)}' : '--',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF4CAF50),
+                        Text(
+                          totalItems.toString(),
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontSize: AppResponsive.subheadingFontSize(context),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
+                      ],
+                    ),
+                    const SizedBox(width: 12),
+                    Flexible(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            'Estimated Total',
+                            style: TextStyle(
+                              fontSize: AppResponsive.smallFontSize(context),
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              estimatedTotal > 0
+                                  ? formatMoney(estimatedTotal)
+                                  : '--',
+                              maxLines: 1,
+                              style: TextStyle(
+                                fontSize: AppResponsive.subheadingFontSize(
+                                  context,
+                                ),
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.success,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -620,26 +787,32 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
           SliverToBoxAdapter(
             child: Container(
               color: Colors.white,
-              margin: const EdgeInsets.only(top: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Order Items',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+              margin: EdgeInsets.only(top: AppResponsive.smallSpacing(context)),
+              padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.padding(context).left,
+                vertical: AppResponsive.mediumSpacing(context),
+              ),
+              child: _capped(
+                context,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Order Items',
+                      style: TextStyle(
+                        fontSize: AppResponsive.subheadingFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  Text(
-                    '${_orderItems.length} products',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF6B6B6B),
+                    Text(
+                      '${_orderItems.length} products',
+                      style: TextStyle(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -647,42 +820,62 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
           // Items List
           _orderItems.isEmpty
               ? SliverFillRemaining(
+                  hasScrollBody: false,
                   child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[300]),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'No items added',
-                          style: TextStyle(fontSize: 16, color: Color(0xFF6B6B6B)),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Tap + button to add items',
-                          style: TextStyle(fontSize: 14, color: Color(0xFFB0B0B0)),
-                        ),
-                      ],
+                    child: Padding(
+                      padding: AppResponsive.padding(context),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.inventory_2_outlined,
+                            size: AppResponsive.getValue(
+                              context,
+                              mobile: 64.0,
+                              tablet: 76.0,
+                              desktop: 88.0,
+                            ),
+                            color: Colors.grey[300],
+                          ),
+                          SizedBox(height: AppResponsive.largeSpacing(context)),
+                          Text(
+                            'No items added',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: AppResponsive.subheadingFontSize(
+                                context,
+                              ),
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          SizedBox(height: AppResponsive.smallSpacing(context)),
+                          Text(
+                            'Tap + button to add items',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: AppResponsive.bodyFontSize(context),
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 )
               : SliverPadding(
-                  padding: const EdgeInsets.all(16),
+                  padding: AppResponsive.padding(context),
                   sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final item = _orderItems[index];
-                        return _buildItemCard(item, index);
-                      },
-                      childCount: _orderItems.length,
-                    ),
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final item = _orderItems[index];
+                      return _capped(context, _buildItemCard(item, index));
+                    }, childCount: _orderItems.length),
                   ),
                 ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddItemDialog,
-        backgroundColor: const Color(0xFF4CAF50),
+        backgroundColor: AppColors.primary,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
@@ -692,14 +885,16 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
     final product = productStore.getProductById(item.variant.productId);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider, width: 0.5),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: AppResponsive.cardPadding(context),
         child: Row(
           children: [
             Expanded(
@@ -708,68 +903,86 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                 children: [
                   Text(
                     product?.productName ?? 'Unknown Product',
-                    style: const TextStyle(
-                      fontSize: 15,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     _getVariantDescription(item.variant),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF6B6B6B),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      color: AppColors.textSecondary,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Row(
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
+                  // Wrap so the unit price drops below the qty chip instead of
+                  // overflowing a narrow card.
+                  Wrap(
+                    spacing: AppResponsive.mediumSpacing(context),
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       InkWell(
                         onTap: () => _editItemQty(index),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF2196F3).withOpacity(0.1),
+                            color: AppColors.info.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             'Qty: ${item.orderedQty}',
-                            style: const TextStyle(
-                              fontSize: 13,
+                            maxLines: 1,
+                            style: TextStyle(
+                              fontSize: AppResponsive.smallFontSize(context),
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF2196F3),
+                              color: AppColors.info,
                             ),
                           ),
                         ),
                       ),
-                      if (item.estimatedPrice != null) ...[
-                        const SizedBox(width: 12),
+                      if (item.estimatedPrice != null)
                         Text(
-                          '@ ₹${item.estimatedPrice!.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF6B6B6B),
+                          '@ ${formatMoney(item.estimatedPrice!)}',
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            color: AppColors.textSecondary,
                           ),
                         ),
-                      ],
                     ],
                   ),
                 ],
               ),
             ),
+            const SizedBox(width: 8),
             Column(
               children: [
                 if (item.estimatedPrice != null)
                   Text(
-                    '₹${(item.orderedQty * item.estimatedPrice!).toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 14,
+                    formatMoney(item.orderedQty * item.estimatedPrice!),
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF4CAF50),
+                      color: AppColors.success,
                     ),
                   ),
                 IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  icon: Icon(
+                    Icons.delete_outline,
+                    color: Colors.red,
+                    size: AppResponsive.iconSize(context),
+                  ),
                   onPressed: () => _removeItem(index),
                 ),
               ],
@@ -822,7 +1035,9 @@ class _AddPOItemDialog extends StatefulWidget {
 
 class _AddPOItemDialogState extends State<_AddPOItemDialog> {
   VarianteModel? _selectedVariant;
-  final TextEditingController _quantityController = TextEditingController(text: '1');
+  final TextEditingController _quantityController = TextEditingController(
+    text: '1',
+  );
   final TextEditingController _priceController = TextEditingController();
 
   void _showVariantSelection() async {
@@ -834,24 +1049,27 @@ class _AddPOItemDialogState extends State<_AddPOItemDialog> {
 
     if (selectedVariants != null && selectedVariants.isNotEmpty && mounted) {
       // Show quantity confirmation dialog
-      final quantityData = await showDialog<Map<VarianteModel, _QuantityPriceData>>(
-        context: context,
-        builder: (context) => _QuantityConfirmationDialog(
-          variants: selectedVariants,
-          onConfirm: (data) {
-            Navigator.pop(context, data);
-          },
-        ),
-      );
+      final quantityData =
+          await showDialog<Map<VarianteModel, _QuantityPriceData>>(
+            context: context,
+            builder: (context) => _QuantityConfirmationDialog(
+              variants: selectedVariants,
+              onConfirm: (data) {
+                Navigator.pop(context, data);
+              },
+            ),
+          );
 
       if (quantityData != null && quantityData.isNotEmpty) {
         // Add all selected products to the order
         for (var entry in quantityData.entries) {
-          widget.onAdd(POItemData(
-            variant: entry.key,
-            orderedQty: entry.value.quantity,
-            estimatedPrice: entry.value.price,
-          ));
+          widget.onAdd(
+            POItemData(
+              variant: entry.key,
+              orderedQty: entry.value.quantity,
+              estimatedPrice: entry.value.price,
+            ),
+          );
         }
 
         // Check if widget is still mounted before popping
@@ -864,11 +1082,12 @@ class _AddPOItemDialogState extends State<_AddPOItemDialog> {
 
   String _getVariantDescription(VarianteModel variant) {
     List<String> parts = [];
-    if (variant.size != null) parts.add(variant.size!);
-    if (variant.color != null) parts.add(variant.color!);
-    if (variant.weight != null) parts.add(variant.weight!);
+    // if (variant.size != null) parts.add(variant.size!);
+    // if (variant.color != null) parts.add(variant.color!);
+    // if (variant.weight != null) parts.add(variant.weight!);
     // Add custom attributes
-    if (variant.customAttributes != null && variant.customAttributes!.isNotEmpty) {
+    if (variant.customAttributes != null &&
+        variant.customAttributes!.isNotEmpty) {
       for (var entry in variant.customAttributes!.entries) {
         parts.add('${entry.key}: ${entry.value}');
       }
@@ -879,121 +1098,202 @@ class _AddPOItemDialogState extends State<_AddPOItemDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Add Item to Order'),
-      content: SingleChildScrollView(
-        child: Column(
+    final hasVariant = _selectedVariant != null;
+
+    return MoneyScope(
+      child: AppDialogShell(
+        title: 'Add Item to Order',
+        accent: AppColors.primary,
+        icon: Icons.add_shopping_cart_rounded,
+        body: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Product picker styled like an AppTextField so it doesn't read as
+            // a different kind of control from the fields under it.
             InkWell(
               onTap: _showVariantSelection,
+              borderRadius: BorderRadius.circular(12),
               child: Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
-                  border: Border.all(color: const Color(0xFFE8E8E8)),
-                  borderRadius: BorderRadius.circular(8),
+                  color: AppColors.surfaceLight,
+                  border: Border.all(
+                    color: hasVariant ? AppColors.primary : AppColors.divider,
+                    width: hasVariant ? 1.5 : 1,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.inventory_2, color: Color(0xFF6B6B6B)),
+                    Icon(
+                      Icons.inventory_2_outlined,
+                      size: 20,
+                      color: hasVariant
+                          ? AppColors.primary
+                          : AppColors.textSecondary,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Text(
-                        _selectedVariant == null
-                            ? 'Select Product *'
-                            : '${productStore.getProductById(_selectedVariant!.productId)?.productName ?? "Unknown"}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: _selectedVariant == null
-                              ? const Color(0xFFB0B0B0)
-                              : const Color(0xFF1A1A1A),
-                        ),
-                        overflow: TextOverflow.ellipsis,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            hasVariant
+                                ? productStore
+                                          .getProductById(
+                                            _selectedVariant!.productId,
+                                          )
+                                          ?.productName ??
+                                      'Unknown product'
+                                : 'Select Product *',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.bodyFontSize(context),
+                              fontWeight: hasVariant
+                                  ? FontWeight.w500
+                                  : FontWeight.w400,
+                              color: hasVariant
+                                  ? AppColors.textPrimary
+                                  : AppColors.textSecondary,
+                            ),
+                          ),
+                          if (hasVariant)
+                            Text(
+                              _getVariantDescription(_selectedVariant!),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.captionFontSize(
+                                  context,
+                                ),
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                    const Icon(Icons.arrow_drop_down, color: Color(0xFF6B6B6B)),
+                    const Icon(
+                      Icons.arrow_drop_down,
+                      color: AppColors.textSecondary,
+                    ),
                   ],
                 ),
               ),
             ),
-            if (_selectedVariant != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                _getVariantDescription(_selectedVariant!),
-                style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
+            const SizedBox(height: 12),
+            AppTextField(
+              controller: _quantityController,
+              label: 'Quantity',
+              required: true,
+              icon: Icons.numbers_rounded,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 12),
+            AppTextField(
+              controller: _priceController,
+              label: 'Estimated Price',
+              hint: 'Leave empty if unknown',
+              icon: Icons.sell_outlined,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+              ],
+              onChanged: (_) => setState(() {}),
+            ),
+            if (_lineTotal > 0) ...[
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceMedium,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Line total',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    Flexible(
+                      child: Text(
+                        formatMoney(_lineTotal),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.success,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
-            const SizedBox(height: 16),
-            TextField(
-              controller: _quantityController,
-              decoration: const InputDecoration(
-                labelText: 'Quantity *',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _priceController,
-              decoration: const InputDecoration(
-                labelText: 'Estimated Price (Optional)',
-                border: OutlineInputBorder(),
-                prefixText: '₹ ',
-                helperText: 'Leave empty if unknown',
-              ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            ),
           ],
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            if (_selectedVariant == null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Please select a product'),
-                  backgroundColor: Colors.red,
+        actions: [
+          appDialogCancelButton(context),
+          const SizedBox(width: 12),
+          appDialogPrimaryButton(
+            label: 'Add',
+            onPressed: () {
+              if (_selectedVariant == null) {
+                NotificationService.instance.showError(
+                  'Please select a product',
+                );
+                return;
+              }
+
+              final quantity =
+                  int.tryParse(_quantityController.text.trim()) ?? 0;
+              if (quantity <= 0) {
+                NotificationService.instance.showError(
+                  'Please enter a valid quantity',
+                );
+                return;
+              }
+
+              widget.onAdd(
+                POItemData(
+                  variant: _selectedVariant!,
+                  orderedQty: quantity,
+                  estimatedPrice: _priceController.text.trim().isEmpty
+                      ? null
+                      : double.tryParse(_priceController.text.trim()),
                 ),
               );
-              return;
-            }
 
-            final quantity = int.tryParse(_quantityController.text) ?? 0;
-            if (quantity <= 0) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Please enter a valid quantity'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-              return;
-            }
-
-            final price = _priceController.text.isNotEmpty
-                ? double.tryParse(_priceController.text)
-                : null;
-
-            widget.onAdd(POItemData(
-              variant: _selectedVariant!,
-              orderedQty: quantity,
-              estimatedPrice: price,
-            ));
-
-            Navigator.pop(context);
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF4CAF50),
-            foregroundColor: Colors.white,
+              Navigator.pop(context);
+            },
           ),
-          child: const Text('Add'),
-        ),
-      ],
+        ],
+      ),
     );
+  }
+
+  /// Live qty × price preview, so the cost of the line is visible before it's
+  /// added rather than only in the order list afterwards.
+  double get _lineTotal {
+    final qty = int.tryParse(_quantityController.text.trim()) ?? 0;
+    final price = double.tryParse(_priceController.text.trim()) ?? 0;
+    return qty * price;
   }
 }
 
@@ -1005,11 +1305,10 @@ class _QuantityPriceData {
   _QuantityPriceData({required this.quantity, this.price});
 }
 
-// Product Search Dialog with search functionality and multiple selection
+/// Product search with multi-select. Returns the chosen variants via
+/// `Navigator.pop`, so it needs no callback.
 class _ProductSearchDialog extends StatefulWidget {
-  final Function(Map<VarianteModel, _QuantityPriceData>)? onMultipleSelect;
-
-  const _ProductSearchDialog({this.onMultipleSelect});
+  const _ProductSearchDialog();
 
   @override
   State<_ProductSearchDialog> createState() => _ProductSearchDialogState();
@@ -1057,25 +1356,26 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
     setState(() {
       _filteredVariants = _allVariants.where((variant) {
         final product = productStore.getProductById(variant.productId);
-        final productName = product?.productName?.toLowerCase() ?? '';
+        final productName = product?.productName.toLowerCase() ?? '';
         final variantDesc = _getVariantDescription(variant).toLowerCase();
         final sku = variant.sku?.toLowerCase() ?? '';
         final barcode = variant.barcode?.toLowerCase() ?? '';
 
         return productName.contains(query) ||
-               variantDesc.contains(query) ||
-               sku.contains(query) ||
-               barcode.contains(query);
+            variantDesc.contains(query) ||
+            sku.contains(query) ||
+            barcode.contains(query);
       }).toList();
     });
   }
 
   String _getVariantDescription(VarianteModel variant) {
     List<String> parts = [];
-    if (variant.size != null) parts.add(variant.size!);
-    if (variant.color != null) parts.add(variant.color!);
-    if (variant.weight != null) parts.add(variant.weight!);
-    if (variant.customAttributes != null && variant.customAttributes!.isNotEmpty) {
+    // if (variant.size != null) parts.add(variant.size!);
+    // if (variant.color != null) parts.add(variant.color!);
+    // if (variant.weight != null) parts.add(variant.weight!);
+    if (variant.customAttributes != null &&
+        variant.customAttributes!.isNotEmpty) {
       for (var entry in variant.customAttributes!.entries) {
         parts.add('${entry.key}: ${entry.value}');
       }
@@ -1086,20 +1386,22 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Select Product'),
-      contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-      content: SizedBox(
-        width: double.maxFinite,
-        height: MediaQuery.of(context).size.height * 0.6,
-        child: Column(
-          children: [
-            // Search Bar
-            TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search products, SKU, barcode...',
-                prefixIcon: const Icon(Icons.search, color: Color(0xFF6B6B6B)),
+    return MoneyScope(
+      child: AppDialogShell(
+        title: 'Select Product',
+        subtitle: 'Tap to select — pick several at once',
+        accent: AppColors.primary,
+        icon: Icons.inventory_2_rounded,
+        body: SizedBox(
+          width: double.maxFinite,
+          height: MediaQuery.of(context).size.height * 0.6,
+          child: Column(
+            children: [
+              AppTextField(
+                controller: _searchController,
+                hint: 'Search products, SKU, barcode...',
+                icon: Icons.search_rounded,
+                autofocus: true,
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.clear, size: 20),
@@ -1108,201 +1410,241 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
                         },
                       )
                     : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
-              autofocus: true,
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // Selection controls and results count
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _selectedVariantIds.isEmpty
-                        ? (_searchController.text.isNotEmpty
-                            ? '${_filteredVariants.length} result${_filteredVariants.length != 1 ? 's' : ''} found'
-                            : '${_filteredVariants.length} product${_filteredVariants.length != 1 ? 's' : ''}')
-                        : '${_selectedVariantIds.length} selected',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: _selectedVariantIds.isEmpty ? const Color(0xFF6B6B6B) : const Color(0xFF4CAF50),
-                      fontWeight: _selectedVariantIds.isEmpty ? FontWeight.normal : FontWeight.w600,
-                    ),
-                  ),
-                ),
-                if (_filteredVariants.isNotEmpty) ...[
-                  TextButton(
-                    onPressed: () {
-                      setState(() {
-                        if (_selectedVariantIds.length == _filteredVariants.length) {
-                          _selectedVariantIds.clear();
-                        } else {
-                          _selectedVariantIds.clear();
-                          _selectedVariantIds.addAll(_filteredVariants.map((v) => v.varianteId));
-                        }
-                      });
-                    },
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
+              // Selection controls and results count
+              Row(
+                children: [
+                  Expanded(
                     child: Text(
-                      _selectedVariantIds.length == _filteredVariants.length ? 'Clear All' : 'Select All',
-                      style: const TextStyle(fontSize: 12),
+                      _selectedVariantIds.isEmpty
+                          ? (_searchController.text.isNotEmpty
+                                ? '${_filteredVariants.length} result${_filteredVariants.length != 1 ? 's' : ''} found'
+                                : '${_filteredVariants.length} product${_filteredVariants.length != 1 ? 's' : ''}')
+                          : '${_selectedVariantIds.length} selected',
+                      style: TextStyle(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        color: _selectedVariantIds.isEmpty
+                            ? AppColors.textSecondary
+                            : AppColors.primary,
+                        fontWeight: _selectedVariantIds.isEmpty
+                            ? FontWeight.normal
+                            : FontWeight.w600,
+                      ),
                     ),
                   ),
+                  if (_filteredVariants.isNotEmpty) ...[
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          if (_selectedVariantIds.length ==
+                              _filteredVariants.length) {
+                            _selectedVariantIds.clear();
+                          } else {
+                            _selectedVariantIds.clear();
+                            _selectedVariantIds.addAll(
+                              _filteredVariants.map((v) => v.varianteId),
+                            );
+                          }
+                        });
+                      },
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(
+                        _selectedVariantIds.length == _filteredVariants.length
+                            ? 'Clear All'
+                            : 'Select All',
+                        style: TextStyle(
+                          fontSize: AppResponsive.smallFontSize(context),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
-            ),
-            const SizedBox(height: 8),
+              ),
+              const SizedBox(height: 8),
 
-            // Product List
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _filteredVariants.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                _searchController.text.isEmpty
-                                    ? Icons.inventory_2_outlined
-                                    : Icons.search_off,
-                                size: 64,
-                                color: Colors.grey[300],
+              // Product List
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _filteredVariants.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _searchController.text.isEmpty
+                                  ? Icons.inventory_2_outlined
+                                  : Icons.search_off,
+                              size: AppResponsive.getValue(
+                                context,
+                                mobile: 64.0,
+                                tablet: 76.0,
+                                desktop: 88.0,
                               ),
-                              const SizedBox(height: 16),
-                              Text(
-                                _searchController.text.isEmpty
-                                    ? 'No products found.\nPlease add products first.'
-                                    : 'No products match your search',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Color(0xFF6B6B6B),
-                                ),
-                                textAlign: TextAlign.center,
+                              color: Colors.grey[300],
+                            ),
+                            SizedBox(
+                              height: AppResponsive.largeSpacing(context),
+                            ),
+                            Text(
+                              _searchController.text.isEmpty
+                                  ? 'No products found.\nPlease add products first.'
+                                  : 'No products match your search',
+                              style: TextStyle(
+                                fontSize: AppResponsive.bodyFontSize(context),
+                                color: AppColors.textSecondary,
                               ),
-                            ],
-                          ),
-                        )
-                      : ListView.separated(
-                          itemCount: _filteredVariants.length,
-                          separatorBuilder: (context, index) => const Divider(height: 1),
-                          itemBuilder: (context, index) {
-                            final variant = _filteredVariants[index];
-                            final product = productStore.getProductById(variant.productId);
-                            final isSelected = _selectedVariantIds.contains(variant.varianteId);
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: _filteredVariants.length,
+                        separatorBuilder: (context, index) =>
+                            const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final variant = _filteredVariants[index];
+                          final product = productStore.getProductById(
+                            variant.productId,
+                          );
+                          final isSelected = _selectedVariantIds.contains(
+                            variant.varianteId,
+                          );
 
-                            return ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
-                              leading: Checkbox(
-                                value: isSelected,
-                                onChanged: (value) {
-                                  setState(() {
-                                    if (value == true) {
-                                      _selectedVariantIds.add(variant.varianteId);
-                                    } else {
-                                      _selectedVariantIds.remove(variant.varianteId);
-                                    }
-                                  });
-                                },
-                                activeColor: const Color(0xFF4CAF50),
-                              ),
-                              title: Text(
-                                product?.productName ?? 'Unknown',
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _getVariantDescription(variant),
-                                    style: const TextStyle(fontSize: 13),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: variant.stockQty > 0
-                                              ? const Color(0xFF4CAF50).withOpacity(0.1)
-                                              : Colors.red.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          'Stock: ${variant.stockQty}',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                            color: variant.stockQty > 0
-                                                ? const Color(0xFF4CAF50)
-                                                : Colors.red,
-                                          ),
-                                        ),
-                                      ),
-                                      if (variant.costPrice != null) ...[
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          '₹${variant.costPrice!.toStringAsFixed(2)}',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                            color: Color(0xFF4CAF50),
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              onTap: () {
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 0,
+                              vertical: 4,
+                            ),
+                            leading: Checkbox(
+                              value: isSelected,
+                              onChanged: (value) {
                                 setState(() {
-                                  if (isSelected) {
-                                    _selectedVariantIds.remove(variant.varianteId);
-                                  } else {
+                                  if (value == true) {
                                     _selectedVariantIds.add(variant.varianteId);
+                                  } else {
+                                    _selectedVariantIds.remove(
+                                      variant.varianteId,
+                                    );
                                   }
                                 });
                               },
-                            );
-                          },
-                        ),
+                              activeColor: AppColors.primary,
+                            ),
+                            title: Text(
+                              product?.productName ?? 'Unknown',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: AppResponsive.bodyFontSize(context),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _getVariantDescription(variant),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: AppResponsive.smallFontSize(
+                                      context,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: variant.stockQty > 0
+                                            ? AppColors.success.withValues(
+                                                alpha: 0.1,
+                                              )
+                                            : Colors.red.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        'Stock: ${variant.stockQty}',
+                                        maxLines: 1,
+                                        style: TextStyle(
+                                          fontSize:
+                                              AppResponsive.captionFontSize(
+                                                context,
+                                              ),
+                                          fontWeight: FontWeight.w600,
+                                          color: variant.stockQty > 0
+                                              ? AppColors.success
+                                              : Colors.red,
+                                        ),
+                                      ),
+                                    ),
+                                    if (variant.costPrice != null) ...[
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        formatMoney(variant.costPrice!),
+                                        maxLines: 1,
+                                        style: TextStyle(
+                                          fontSize: AppResponsive.smallFontSize(
+                                            context,
+                                          ),
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.success,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ],
+                            ),
+                            onTap: () {
+                              setState(() {
+                                if (isSelected) {
+                                  _selectedVariantIds.remove(
+                                    variant.varianteId,
+                                  );
+                                } else {
+                                  _selectedVariantIds.add(variant.varianteId);
+                                }
+                              });
+                            },
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          appDialogCancelButton(context),
+          if (_selectedVariantIds.isNotEmpty) ...[
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(
+              label: 'Add Selected (${_selectedVariantIds.length})',
+              onPressed: () {
+                final selectedVariants = _allVariants
+                    .where((v) => _selectedVariantIds.contains(v.varianteId))
+                    .toList();
+
+                // Pop this dialog and pass the selected variants
+                Navigator.pop(context, selectedVariants);
+              },
             ),
           ],
-        ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        if (_selectedVariantIds.isNotEmpty)
-          ElevatedButton(
-            onPressed: () {
-              final selectedVariants = _allVariants
-                  .where((v) => _selectedVariantIds.contains(v.varianteId))
-                  .toList();
-
-              // Pop this dialog and pass the selected variants
-              Navigator.pop(context, selectedVariants);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4CAF50),
-              foregroundColor: Colors.white,
-            ),
-            child: Text('Add Selected (${_selectedVariantIds.length})'),
-          ),
-      ],
     );
   }
 }
@@ -1318,10 +1660,12 @@ class _QuantityConfirmationDialog extends StatefulWidget {
   });
 
   @override
-  State<_QuantityConfirmationDialog> createState() => _QuantityConfirmationDialogState();
+  State<_QuantityConfirmationDialog> createState() =>
+      _QuantityConfirmationDialogState();
 }
 
-class _QuantityConfirmationDialogState extends State<_QuantityConfirmationDialog> {
+class _QuantityConfirmationDialogState
+    extends State<_QuantityConfirmationDialog> {
   late Map<String, TextEditingController> _quantityControllers;
   late Map<String, TextEditingController> _priceControllers;
 
@@ -1332,7 +1676,9 @@ class _QuantityConfirmationDialogState extends State<_QuantityConfirmationDialog
     _priceControllers = {};
 
     for (var variant in widget.variants) {
-      _quantityControllers[variant.varianteId] = TextEditingController(text: '1');
+      _quantityControllers[variant.varianteId] = TextEditingController(
+        text: '1',
+      );
       _priceControllers[variant.varianteId] = TextEditingController(
         text: variant.costPrice?.toString() ?? '',
       );
@@ -1352,10 +1698,11 @@ class _QuantityConfirmationDialogState extends State<_QuantityConfirmationDialog
 
   String _getVariantDescription(VarianteModel variant) {
     List<String> parts = [];
-    if (variant.size != null) parts.add(variant.size!);
-    if (variant.color != null) parts.add(variant.color!);
-    if (variant.weight != null) parts.add(variant.weight!);
-    if (variant.customAttributes != null && variant.customAttributes!.isNotEmpty) {
+    // if (variant.size != null) parts.add(variant.size!);
+    // if (variant.color != null) parts.add(variant.color!);
+    // if (variant.weight != null) parts.add(variant.weight!);
+    if (variant.customAttributes != null &&
+        variant.customAttributes!.isNotEmpty) {
       for (var entry in variant.customAttributes!.entries) {
         parts.add('${entry.key}: ${entry.value}');
       }
@@ -1366,130 +1713,143 @@ class _QuantityConfirmationDialogState extends State<_QuantityConfirmationDialog
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('Set Quantities (${widget.variants.length} items)'),
-      contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-      content: SizedBox(
-        width: double.maxFinite,
-        height: MediaQuery.of(context).size.height * 0.6,
-        child: ListView.separated(
-          itemCount: widget.variants.length,
-          separatorBuilder: (context, index) => const Divider(height: 1),
-          itemBuilder: (context, index) {
-            final variant = widget.variants[index];
-            final product = productStore.getProductById(variant.productId);
+    return MoneyScope(
+      child: AppDialogShell(
+        title: 'Set Quantities',
+        subtitle:
+            '${widget.variants.length} product${widget.variants.length == 1 ? '' : 's'} selected',
+        accent: AppColors.primary,
+        icon: Icons.numbers_rounded,
+        body: SizedBox(
+          width: double.maxFinite,
+          height: MediaQuery.of(context).size.height * 0.6,
+          child: ListView.separated(
+            itemCount: widget.variants.length,
+            separatorBuilder: (context, index) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final variant = widget.variants[index];
+              final product = productStore.getProductById(variant.productId);
 
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Product name and variant
-                  Text(
-                    product?.productName ?? 'Unknown',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _getVariantDescription(variant),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF6B6B6B),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Quantity and Price inputs
-                  Row(
-                    children: [
-                      // Quantity input
-                      Expanded(
-                        flex: 2,
-                        child: TextField(
-                          controller: _quantityControllers[variant.varianteId],
-                          decoration: const InputDecoration(
-                            labelText: 'Qty',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          ),
-                          keyboardType: TextInputType.number,
-                          style: const TextStyle(fontSize: 14),
-                        ),
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Product name and variant
+                    Text(
+                      product?.productName ?? 'Unknown',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
                       ),
-                      const SizedBox(width: 12),
-
-                      // Price input
-                      Expanded(
-                        flex: 3,
-                        child: TextField(
-                          controller: _priceControllers[variant.varianteId],
-                          decoration: const InputDecoration(
-                            labelText: 'Price (Optional)',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                            prefixText: '₹ ',
-                          ),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          style: const TextStyle(fontSize: 14),
-                        ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _getVariantDescription(variant),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        color: AppColors.textSecondary,
                       ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            // Build map of variants with their quantities and prices
-            final result = <VarianteModel, _QuantityPriceData>{};
+                    ),
+                    SizedBox(height: AppResponsive.smallSpacing(context)),
 
-            for (var variant in widget.variants) {
-              final qty = int.tryParse(_quantityControllers[variant.varianteId]!.text) ?? 0;
-              if (qty > 0) {
-                final price = _priceControllers[variant.varianteId]!.text.isNotEmpty
-                    ? double.tryParse(_priceControllers[variant.varianteId]!.text)
-                    : null;
+                    // Quantity and Price inputs
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Quantity input
+                        Expanded(
+                          flex: 2,
+                          child: AppTextField(
+                            controller:
+                                _quantityControllers[variant.varianteId],
+                            label: 'Qty',
+                            keyboardType: TextInputType.number,
+                            // keyboardType alone doesn't block letters from a
+                            // paste or a hardware keyboard.
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                          ),
+                        ),
+                        SizedBox(width: AppResponsive.mediumSpacing(context)),
 
-                result[variant] = _QuantityPriceData(
-                  quantity: qty,
-                  price: price,
-                );
-              }
-            }
-
-            if (result.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Please enter valid quantities'),
-                  backgroundColor: Colors.orange,
+                        // Price input
+                        Expanded(
+                          flex: 3,
+                          child: AppTextField(
+                            controller: _priceControllers[variant.varianteId],
+                            label: 'Price (Optional)',
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d*\.?\d{0,2}'),
+                              ),
+                            ],
+                            prefixWidget: Padding(
+                              padding: const EdgeInsets.only(
+                                left: 12,
+                                right: 4,
+                              ),
+                              child: Text(CurrencyHelper.currentSymbol),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               );
-              return;
-            }
-
-            // Pop with the result data
-            Navigator.pop(context, result);
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF4CAF50),
-            foregroundColor: Colors.white,
+            },
           ),
-          child: const Text('Add to Order'),
         ),
-      ],
+        actions: [
+          appDialogCancelButton(context),
+          const SizedBox(width: 12),
+          appDialogPrimaryButton(
+            label: 'Add to Order',
+            onPressed: () {
+              // Build map of variants with their quantities and prices
+              final result = <VarianteModel, _QuantityPriceData>{};
+
+              for (var variant in widget.variants) {
+                final qty =
+                    int.tryParse(
+                      _quantityControllers[variant.varianteId]!.text,
+                    ) ??
+                    0;
+                if (qty > 0) {
+                  final priceText = _priceControllers[variant.varianteId]!.text
+                      .trim();
+                  result[variant] = _QuantityPriceData(
+                    quantity: qty,
+                    price: priceText.isEmpty
+                        ? null
+                        : double.tryParse(priceText),
+                  );
+                }
+              }
+
+              if (result.isEmpty) {
+                // Was showSuccess — a validation failure reported as success.
+                NotificationService.instance.showError(
+                  'Enter a quantity for at least one product',
+                );
+                return;
+              }
+
+              // Pop with the result data
+              Navigator.pop(context, result);
+            },
+          ),
+        ],
+      ),
     );
   }
 }

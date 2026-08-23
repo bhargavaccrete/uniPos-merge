@@ -1,25 +1,23 @@
-
-
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../data/models/retail/hive_model/admin_model_217.dart';
-import '../../../data/repositories/retail/admin_repository.dart';
+import '../../../core/di/service_locator.dart';
+import '../../../util/restaurant/restaurant_auth_helper.dart';
 
 /// Authentication result
 class AuthResult {
   final bool success;
   final String? errorMessage;
-  final AdminModel? admin;
+  final String? username;
 
   AuthResult({
     required this.success,
     this.errorMessage,
-    this.admin,
+    this.username,
   });
 
-  factory AuthResult.success(AdminModel admin) => AuthResult(
+  factory AuthResult.success(String username) => AuthResult(
         success: true,
-        admin: admin,
+        username: username,
       );
 
   factory AuthResult.failure(String message) => AuthResult(
@@ -28,24 +26,28 @@ class AuthResult {
       );
 }
 
-/// Authentication Service for session management
+/// Authentication Service — PIN-only login, same mechanism restaurant uses
+/// (see `restaurant_login.dart`): the entered PIN is checked against the
+/// stored admin PIN first, then against every active staff member's PIN
+/// (staff already have PINs via the shared/unified Staff model). Session
+/// tracking stays local to this service so `splashScreen.dart`,
+/// `home_screen.dart`, and `existingUserRestoreScreen.dart` keep working
+/// unchanged — they only ever call `initialize()`/`logout()`/`isLoggedIn`.
 class AuthService {
   static const String _sessionKey = 'admin_session';
   static const String _sessionTimestampKey = 'admin_session_timestamp';
+  // Display name shown after login — "Admin" or a staff member's name.
   static const String _usernameKey = 'admin_username';
 
-  final AdminRepository _adminRepository;
+  static const String _defaultPin = '123456';
 
-  // Current logged in admin (cached)
-  AdminModel? _currentAdmin;
+  String? _currentUsername;
 
-  AuthService(this._adminRepository);
+  /// Currently logged-in identity's display name ("Admin" or a staff name),
+  /// or null if not logged in.
+  String? get currentUsername => _currentUsername;
 
-  /// Get current logged in admin
-  AdminModel? get currentAdmin => _currentAdmin;
-
-  /// Check if user is logged in
-  bool get isLoggedIn => _currentAdmin != null;
+  bool get isLoggedIn => _currentUsername != null;
 
   /// Initialize auth service - check for existing session
   Future<bool> initialize() async {
@@ -53,10 +55,8 @@ class AuthService {
     final hasSession = prefs.getBool(_sessionKey) ?? false;
 
     if (hasSession) {
-      // Verify session is still valid
-      final admin = await _adminRepository.getAdmin();
-      if (admin != null) {
-        _currentAdmin = admin;
+      _currentUsername = prefs.getString(_usernameKey);
+      if (_currentUsername != null) {
         return true;
       }
     }
@@ -64,93 +64,131 @@ class AuthService {
     return false;
   }
 
-  /// Ensure default admin exists
+  /// Ensure a default admin PIN exists (first run only — never overwrites an
+  /// already-set PIN).
   Future<void> ensureDefaultAdmin() async {
-    await _adminRepository.ensureDefaultAdmin();
+    final prefs = await SharedPreferences.getInstance();
+    if (!prefs.containsKey(RestaurantAuthHelper.adminPinKey)) {
+      await prefs.setString(
+        RestaurantAuthHelper.adminPinKey,
+        RestaurantAuthHelper.hashPassword(_defaultPin),
+      );
+    }
   }
 
-  /// Login with username and password
-  Future<AuthResult> login(String username, String password) async {
-    // Validate input
-    if (username.trim().isEmpty) {
-      return AuthResult.failure('Username is required');
+  /// True only while the admin PIN is still the un-changed default — used to
+  /// show the "default PIN" hint on first run and hide it the moment the PIN
+  /// is actually changed, instead of disclosing it permanently.
+  Future<bool> isUsingDefaultCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final storedHash = prefs.getString(RestaurantAuthHelper.adminPinKey);
+    if (storedHash == null) return true;
+    return RestaurantAuthHelper.verifyPassword(_defaultPin, storedHash);
+  }
+
+  /// PIN-only login. The PIN identifies whoever it is — admin first, then
+  /// staff (mirrors restaurant's login exactly).
+  Future<AuthResult> login(String pin) async {
+    final trimmedPin = pin.trim();
+    if (trimmedPin.isEmpty) {
+      return AuthResult.failure('PIN is required');
     }
 
-    if (password.isEmpty) {
-      return AuthResult.failure('Password is required');
+    final prefs = await SharedPreferences.getInstance();
+    final storedHash = prefs.getString(RestaurantAuthHelper.adminPinKey);
+
+    // 1. Admin (PIN = stored admin PIN)
+    if (storedHash != null &&
+        RestaurantAuthHelper.verifyPassword(trimmedPin, storedHash)) {
+      await _saveSession('Admin');
+      _currentUsername = 'Admin';
+      return AuthResult.success('Admin');
     }
 
-    // Authenticate
-    final admin = await _adminRepository.authenticate(
-      username.trim(),
-      password,
-    );
+    // 2. Staff (match PIN against active staff)
+    await staffStore.loadStaff();
+    final match = staffStore.staff
+        .where((s) =>
+            s.isActive &&
+            RestaurantAuthHelper.verifyPassword(trimmedPin, s.pinNo.trim()))
+        .firstOrNull;
 
-    if (admin == null) {
-      return AuthResult.failure('Invalid username or password');
+    if (match != null) {
+      final name = '${match.firstName} ${match.lastName}'.trim();
+      await _saveSession(name);
+      _currentUsername = name;
+      return AuthResult.success(name);
     }
 
-    // Save session
-    await _saveSession(admin);
-    _currentAdmin = admin;
-
-    return AuthResult.success(admin);
+    // 3. No match
+    return AuthResult.failure('Invalid PIN');
   }
 
   /// Logout
   Future<void> logout() async {
     await _clearSession();
-    _currentAdmin = null;
+    _currentUsername = null;
   }
 
-  /// Change password
-  Future<AuthResult> changePassword({
-    required String oldPassword,
-    required String newPassword,
-    required String confirmPassword,
+  /// Change the admin PIN (requires proving the current one first).
+  Future<AuthResult> changePin({
+    required String oldPin,
+    required String newPin,
+    required String confirmPin,
   }) async {
-    // Validate input
-    if (oldPassword.isEmpty) {
-      return AuthResult.failure('Current password is required');
+    if (oldPin.isEmpty) {
+      return AuthResult.failure('Current PIN is required');
     }
 
-    if (newPassword.isEmpty) {
-      return AuthResult.failure('New password is required');
+    if (newPin.isEmpty) {
+      return AuthResult.failure('New PIN is required');
     }
 
-    if (newPassword.length < 6) {
-      return AuthResult.failure('New password must be at least 6 characters');
+    if (!RegExp(r'^\d{4,6}$').hasMatch(newPin)) {
+      return AuthResult.failure('PIN must be 4–6 digits');
     }
 
-    if (newPassword != confirmPassword) {
-      return AuthResult.failure('New passwords do not match');
+    if (newPin != confirmPin) {
+      return AuthResult.failure('New PINs do not match');
     }
 
-    if (oldPassword == newPassword) {
-      return AuthResult.failure('New password must be different from current password');
+    if (oldPin == newPin) {
+      return AuthResult.failure('New PIN must be different from current PIN');
     }
 
-    // Update password
-    final success = await _adminRepository.updatePassword(
-      oldPassword: oldPassword,
-      newPassword: newPassword,
-    );
+    final prefs = await SharedPreferences.getInstance();
+    final storedHash = prefs.getString(RestaurantAuthHelper.adminPinKey);
 
-    if (!success) {
-      return AuthResult.failure('Current password is incorrect');
+    if (storedHash == null || !RestaurantAuthHelper.verifyPassword(oldPin, storedHash)) {
+      return AuthResult.failure('Current PIN is incorrect');
     }
 
-    // Refresh current admin
-    _currentAdmin = await _adminRepository.getAdmin();
+    await prefs.setString(
+        RestaurantAuthHelper.adminPinKey, RestaurantAuthHelper.hashPassword(newPin));
 
-    return AuthResult.success(_currentAdmin!);
+    return AuthResult.success('Admin');
+  }
+
+  /// Sets the admin PIN directly, without requiring the old one — used
+  /// during onboarding to replace the first-run default.
+  Future<AuthResult> setInitialPin(String pin) async {
+    final trimmedPin = pin.trim();
+    if (!RegExp(r'^\d{4,6}$').hasMatch(trimmedPin)) {
+      return AuthResult.failure('PIN must be 4–6 digits');
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+        RestaurantAuthHelper.adminPinKey, RestaurantAuthHelper.hashPassword(trimmedPin));
+
+    return AuthResult.success('Admin');
   }
 
   /// Save session to SharedPreferences
-  Future<void> _saveSession(AdminModel admin) async {
+  Future<void> _saveSession(String username) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_sessionKey, true);
-    await prefs.setString(_usernameKey, admin.username);
+    await prefs.setString(_usernameKey, username);
     await prefs.setString(
       _sessionTimestampKey,
       DateTime.now().toIso8601String(),

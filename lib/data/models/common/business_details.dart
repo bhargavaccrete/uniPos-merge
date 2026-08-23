@@ -58,6 +58,27 @@ class BusinessDetails extends HiveObject {
   @HiveField(16)
   final DateTime updatedAt;
 
+  /// Behavioral: does this business use tax features in BillBerry? Billing and
+  /// wizard step-gating logic should read this field. Kept separate from
+  /// [isRegisteredForTax] (see below) even though V1 onboarding always sets both
+  /// identically — a future "Tax Settings" screen could decouple them.
+  @HiveField(17)
+  final bool taxEnabled;
+
+  /// Legal/business status: is the business registered for GST/VAT/Sales Tax?
+  /// Gates whether the registration-number field is shown during onboarding.
+  @HiveField(18)
+  final bool isRegisteredForTax;
+
+  /// Which kind of retail store this is — a `RetailStoreTypes` key such as
+  /// 'garment' or 'cosmetics_beauty'. Null for restaurant businesses, and null
+  /// for a retail setup saved before store types existed.
+  ///
+  /// Stored as the stable key, never the display name, so the wording can
+  /// change without orphaning saved data.
+  @HiveField(19)
+  final String? retailStoreType;
+
   BusinessDetails({
     this.businessTypeId,
     this.businessTypeName,
@@ -74,6 +95,9 @@ class BusinessDetails extends HiveObject {
     this.pincode,
     this.logo,
     this.isSetupComplete = false,
+    this.taxEnabled = true,
+    this.isRegisteredForTax = true,
+    this.retailStoreType,
     DateTime? createdAt,
     DateTime? updatedAt,
   })  : createdAt = createdAt ?? DateTime.now(),
@@ -95,9 +119,15 @@ class BusinessDetails extends HiveObject {
     String? pincode,
     Uint8List? logo,
     bool? isSetupComplete,
+    bool? taxEnabled,
+    bool? isRegisteredForTax,
+    String? retailStoreType,
     /// `logo: null` cannot clear the logo — `??` falls back to the old value.
     /// Pass `clearLogo: true` to remove it.
     bool clearLogo = false,
+    /// Same reason as [clearLogo]: switching a business from retail back to
+    /// restaurant has to null the store type, which `??` cannot do.
+    bool clearRetailStoreType = false,
   }) {
     return BusinessDetails(
       businessTypeId: businessTypeId ?? this.businessTypeId,
@@ -115,6 +145,11 @@ class BusinessDetails extends HiveObject {
       pincode: pincode ?? this.pincode,
       logo: clearLogo ? null : (logo ?? this.logo),
       isSetupComplete: isSetupComplete ?? this.isSetupComplete,
+      taxEnabled: taxEnabled ?? this.taxEnabled,
+      isRegisteredForTax: isRegisteredForTax ?? this.isRegisteredForTax,
+      retailStoreType: clearRetailStoreType
+          ? null
+          : (retailStoreType ?? this.retailStoreType),
       createdAt: createdAt,
       updatedAt: DateTime.now(),
     );
@@ -138,6 +173,9 @@ class BusinessDetails extends HiveObject {
       'logo': logo?.toList(),
 
       'isSetupComplete': isSetupComplete,
+      'taxEnabled': taxEnabled,
+      'isRegisteredForTax': isRegisteredForTax,
+      'retailStoreType': retailStoreType,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
@@ -163,6 +201,9 @@ class BusinessDetails extends HiveObject {
           : null,
 
       isSetupComplete: map['isSetupComplete'] as bool? ?? false,
+      taxEnabled: map['taxEnabled'] as bool? ?? true,
+      isRegisteredForTax: map['isRegisteredForTax'] as bool? ?? true,
+      retailStoreType: map['retailStoreType'] as String?,
       createdAt: DateTime.tryParse(map['createdAt'] ?? ''),
       updatedAt: DateTime.tryParse(map['updatedAt'] ?? ''),
     );

@@ -13,22 +13,63 @@ class TaxRateLine {
 
 /// Builds the per-rate tax summary for a bill.
 ///
-/// Receipts only carry each item's UNDISCOUNTED gross + its rate, and the
-/// discount is bill-level. So we re-distribute the discount across rates exactly
-/// like `cart_calculation_service.dart` (proportional to each item's gross,
-/// discount applied before tax). Computed purely from receipt data so it works
-/// for first-prints and re-prints alike.
+/// Two kinds of discount reach a bill and they must be spread differently:
+///
+///  * a **line discount** belongs to one item, so it comes off that item's own
+///    rate bucket and nothing else;
+///  * a **bill discount** belongs to the whole order, so it is inherently
+///    uniform and spreads proportionally over whatever is left.
+///
+/// Line discounts first, then the bill discount on the remainder — matching
+/// `cart_calculation_service.dart` (discount before tax) and how a shop explains
+/// it ("40% off this shirt, then 10% off the bill"). Computed purely from
+/// receipt data, so it works for first-prints and re-prints alike.
 class TaxBreakdown {
+  /// Per-rate summary for a bill whose discount is entirely order-level.
+  ///
   /// [items] = each line's gross (price*qty) + its tax rate (%).
   /// [billDiscount] = the order's total discount amount.
-  /// [reconcileToGst] = the order's authoritative total GST (`sale.taxAmount`).
-  /// When provided, the per-rate GST is scaled so the lines sum EXACTLY to it
-  /// (and each taxable is back-filled so `taxable × rate = GST`). This guarantees
-  /// the bill's breakdown always matches the order, even though the receipt's
-  /// per-item prices are mode-adjusted by the global setting.
-  /// Returns rates ascending; 0% rates are dropped from the summary table.
+  ///
+  /// A thin adapter over [computeWithLineDiscounts] with every line discount at
+  /// zero, so this signature — and therefore both existing receipt callers —
+  /// stay exactly as they were.
   static List<TaxRateLine> compute({
     required List<({double gross, double ratePercent})> items,
+    required double billDiscount,
+    required bool isTaxInclusive,
+    double? reconcileToGst,
+  }) {
+    return computeWithLineDiscounts(
+      items: items
+          .map((it) => (
+                gross: it.gross,
+                lineDiscount: 0.0,
+                ratePercent: it.ratePercent,
+              ))
+          .toList(),
+      billDiscount: billDiscount,
+      isTaxInclusive: isTaxInclusive,
+      reconcileToGst: reconcileToGst,
+    );
+  }
+
+  /// Per-rate summary where each line may carry its OWN discount.
+  ///
+  /// [items] = per line: gross (price*qty), that line's own discount, its rate.
+  /// [billDiscount] = order-level discount ONLY. Anything already accounted for
+  /// in a line's [lineDiscount] must not be repeated here, or it is deducted
+  /// twice.
+  /// [reconcileToGst] = the order's authoritative total GST (`sale.taxAmount`).
+  /// When provided, the per-rate GST is scaled so the lines sum EXACTLY to it,
+  /// while each taxable is PRESERVED (it is the real per-rate base, and matches
+  /// the amounts printed on the item lines).
+  /// Returns rates ascending; 0% rates are dropped from the summary table.
+  ///
+  /// A line discount larger than its line is capped at the line — it can never
+  /// bleed onto another rate.
+  static List<TaxRateLine> computeWithLineDiscounts({
+    required List<({double gross, double lineDiscount, double ratePercent})>
+        items,
     required double billDiscount,
     required bool isTaxInclusive,
     double? reconcileToGst,
@@ -36,22 +77,33 @@ class TaxBreakdown {
     final totalGross = items.fold<double>(0, (s, it) => s + it.gross);
     if (totalGross <= 0) return const [];
 
-    // Same proportional, discount-before-tax distribution as the cart service.
-    final afterDiscount =
-        (totalGross - billDiscount).clamp(0, double.infinity).toDouble();
-    final factor = afterDiscount / totalGross;
-
-    final grossByRate = <double, double>{};
+    // STEP 1 — each line's own discount comes off its own rate bucket.
+    final netByRate = <double, double>{};
+    double totalNet = 0;
     for (final it in items) {
-      grossByRate[it.ratePercent] =
-          (grossByRate[it.ratePercent] ?? 0) + it.gross;
+      // Capped at the line, and a zero discount leaves `gross` untouched
+      // (including a negative gross) so the discount-free path is unchanged.
+      final wanted = it.lineDiscount > 0 ? it.lineDiscount : 0.0;
+      final capped = wanted > it.gross ? (it.gross > 0 ? it.gross : 0.0) : wanted;
+      final net = it.gross - capped;
+
+      netByRate[it.ratePercent] = (netByRate[it.ratePercent] ?? 0) + net;
+      totalNet += net;
     }
 
+    // STEP 2 — the order-level remainder is uniform by nature, so it spreads
+    // proportionally across what the line discounts left behind.
+    final afterBillDiscount =
+        (totalNet - billDiscount).clamp(0, double.infinity).toDouble();
+    // Guard the division: line discounts can legitimately take the whole bill
+    // to zero, which must yield zeroed rows rather than NaN.
+    final factor = totalNet > 0 ? afterBillDiscount / totalNet : 0.0;
+
     var lines = <TaxRateLine>[];
-    final rates = grossByRate.keys.toList()..sort();
+    final rates = netByRate.keys.toList()..sort();
     for (final rate in rates) {
       if (rate <= 0) continue; // 0% items don't appear in the summary
-      final rateShare = grossByRate[rate]! * factor;
+      final rateShare = netByRate[rate]! * factor;
       final double taxable;
       final double gst;
       if (isTaxInclusive) {

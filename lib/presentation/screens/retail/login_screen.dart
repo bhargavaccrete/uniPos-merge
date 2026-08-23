@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
+import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 
 import 'home_screen.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
-
+/// PIN-only login — same mechanism as restaurant's login (see
+/// `restaurant_login.dart`): the entered PIN identifies whoever it is,
+/// admin first, then staff (see `AuthService.login`).
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -13,17 +20,27 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _pinController = TextEditingController();
 
   bool _isLoading = false;
-  bool _obscurePassword = true;
+  bool _obscurePin = true;
   String? _errorMessage;
+  bool _showDefaultPinHint = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkDefaultCredentials();
+  }
+
+  Future<void> _checkDefaultCredentials() async {
+    final isDefault = await authService.isUsingDefaultCredentials();
+    if (mounted) setState(() => _showDefaultPinHint = isDefault);
+  }
 
   @override
   void dispose() {
-    _usernameController.dispose();
-    _passwordController.dispose();
+    _pinController.dispose();
     super.dispose();
   }
 
@@ -38,15 +55,11 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final result = await authService.login(
-        _usernameController.text,
-        _passwordController.text,
-      );
+      final result = await authService.login(_pinController.text);
 
       if (!mounted) return;
 
       if (result.success) {
-        // Navigate to home screen
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const HomeScreen()),
         );
@@ -68,13 +81,22 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
+      backgroundColor: AppColors.surfaceLight,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
+              // Login card stays narrow on every device — maxFormWidth is
+              // unbounded on mobile, which would stretch it edge to edge.
+              constraints: BoxConstraints(
+                maxWidth: AppResponsive.getValue(
+                  context,
+                  mobile: 400.0,
+                  tablet: 480.0,
+                  desktop: 560.0,
+                ),
+              ),
               child: Form(
                 key: _formKey,
                 child: Column(
@@ -86,11 +108,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       width: 100,
                       height: 100,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF4CAF50),
+                        color: AppColors.primary,
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF4CAF50).withOpacity(0.3),
+                            color: AppColors.primary.withOpacity(0.3),
                             blurRadius: 20,
                             offset: const Offset(0, 10),
                           ),
@@ -105,23 +127,27 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 32),
 
                     // Title
-                    const Text(
-                      'RPOS',
+                    Text(
+                      'Bill Berry Lite',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 32,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.getValue(
+                          context,
+                          mobile: 28.0,
+                          tablet: 32.0,
+                          desktop: 36.0,
+                        ),
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF1A1A1A),
-                        letterSpacing: 2,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'Admin Login',
+                    Text(
+                      'Login to Continue',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Color(0xFF6B6B6B),
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.subheadingFontSize(context),
+                        color: AppColors.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 48),
@@ -131,26 +157,26 @@ class _LoginScreenState extends State<LoginScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.1),
+                          color: AppColors.danger.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: Colors.red.withOpacity(0.3),
+                            color: AppColors.danger.withOpacity(0.3),
                           ),
                         ),
                         child: Row(
                           children: [
                             const Icon(
                               Icons.error_outline,
-                              color: Colors.red,
+                              color: AppColors.danger,
                               size: 20,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 _errorMessage!,
-                                style: const TextStyle(
-                                  color: Colors.red,
-                                  fontSize: 14,
+                                style: GoogleFonts.poppins(
+                                  color: AppColors.danger,
+                                  fontSize: AppResponsive.bodyFontSize(context),
                                 ),
                               ),
                             ),
@@ -160,79 +186,40 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 24),
                     ],
 
-                    // Username Field
-                    TextFormField(
-                      controller: _usernameController,
+                    // PIN Field — the only credential needed
+                    AppTextField(
+                      controller: _pinController,
+                      autofocus: true,
                       enabled: !_isLoading,
-                      textInputAction: TextInputAction.next,
-                      decoration: InputDecoration(
-                        labelText: 'Username',
-                        hintText: 'Enter your username',
-                        prefixIcon: const Icon(Icons.person_outline),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                      label: 'PIN',
+                      hint: 'Enter your PIN',
+                      icon: Icons.lock_outline_rounded,
+                      required: true,
+                      obscureText: _obscurePin,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      maxLength: 6,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) {
+                        if (!_isLoading) _handleLogin();
+                      },
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePin
+                              ? Icons.visibility_off_rounded
+                              : Icons.visibility_rounded,
+                          size: 20,
+                          color: AppColors.textSecondary,
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFFE8E8E8)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFF4CAF50), width: 2),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
+                        onPressed: () =>
+                            setState(() => _obscurePin = !_obscurePin),
                       ),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
-                          return 'Please enter your username';
+                          return 'PIN is required';
                         }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Password Field
-                    TextFormField(
-                      controller: _passwordController,
-                      enabled: !_isLoading,
-                      obscureText: _obscurePassword,
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _handleLogin(),
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        hintText: 'Enter your password',
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                            color: const Color(0xFF6B6B6B),
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFFE8E8E8)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFF4CAF50), width: 2),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your password';
+                        if (!RegExp(r'^\d{4,6}$').hasMatch(value.trim())) {
+                          return 'PIN must be 4–6 digits';
                         }
                         return null;
                       },
@@ -245,13 +232,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: ElevatedButton(
                         onPressed: _isLoading ? null : _handleLogin,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF4CAF50),
+                          backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
                           elevation: 0,
-                          disabledBackgroundColor: const Color(0xFFB0B0B0),
+                          disabledBackgroundColor: AppColors.divider,
                         ),
                         child: _isLoading
                             ? const SizedBox(
@@ -262,44 +249,53 @@ class _LoginScreenState extends State<LoginScreen> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Text(
+                            : Text(
                                 'Login',
-                                style: TextStyle(
-                                  fontSize: 16,
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.subheadingFontSize(
+                                    context,
+                                  ),
                                   fontWeight: FontWeight.w600,
+                                  color: Colors.white,
                                 ),
                               ),
                       ),
                     ),
-                    const SizedBox(height: 24),
-
-                    // Help Text
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2196F3).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            color: const Color(0xFF2196F3),
-                            size: 18,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Default credentials: admin / admin123',
-                              style: TextStyle(
-                                color: const Color(0xFF2196F3),
-                                fontSize: 13,
+                    // Help Text — only while the PIN is still the un-changed
+                    // default (see AuthService.isUsingDefaultCredentials).
+                    // Disappears the moment the PIN is actually changed,
+                    // instead of disclosing it permanently.
+                    if (_showDefaultPinHint) ...[
+                      const SizedBox(height: 24),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.info.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.info_outline,
+                              color: AppColors.info,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Default PIN: 123456',
+                                style: GoogleFonts.poppins(
+                                  color: AppColors.info,
+                                  fontSize: AppResponsive.smallFontSize(
+                                    context,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),

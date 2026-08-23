@@ -10,6 +10,11 @@ import '../../../data/models/restaurant/db/cash_movement_model.dart';
 import 'package:hive/hive.dart';
 import 'package:billberrylite/util/restaurant/order_status_filter.dart';
 import 'package:billberrylite/util/restaurant/payment_mode_summary.dart';
+import 'package:billberrylite/util/retail/payment_mode_summary.dart';
+import 'package:billberrylite/util/retail/retail_cash_expectation.dart';
+import 'package:billberrylite/domain/services/retail/eod_report_service.dart';
+import 'package:billberrylite/domain/services/retail/report_service.dart';
+import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 
 class EODService {
   static const _uuid = Uuid();
@@ -502,8 +507,24 @@ class EODService {
       totalCashOut = todayMoves.where((m) => m.type == 'out').fold(0.0, (s, m) => s + m.amount);
     }
 
-    // Full formula: Opening + Cash Sales + Cash In − Cash Out − Cash Expenses
-    final closingBalance = openingBalance + expectedCash + totalCashIn - totalCashOut - cashExpenses;
+    // Cash handed back on returns leaves the drawer, so it must come off the
+    // expectation. This term was missing here while the EOD screen subtracted
+    // it — so the variance the cashier signed off on never matched the variance
+    // stored in the archived close.
+    //
+    // Retail only: restaurant nets refunds per-order via `refundAmount`, which
+    // is already inside its totals, so adding a term there would double-count.
+    final cashRefunds = EODReportService.cashRefundsIn(allSales);
+
+    // One definition, shared with the EOD screen — see RetailCashExpectation.
+    final closingBalance = RetailCashExpectation.expected(
+      openingBalance: openingBalance,
+      cashSales: expectedCash,
+      cashIn: totalCashIn,
+      cashOut: totalCashOut,
+      cashExpenses: cashExpenses,
+      cashRefunds: cashRefunds,
+    );
     final cashDifference = actualCash - closingBalance;
 
     String reconciliationStatus;
@@ -522,6 +543,28 @@ class EODService {
       reconciliationStatus: reconciliationStatus,
       remarks: remarks,
     );
+
+    // ==================== CREDIT COLLECTIONS ====================
+    // Repayments against credit sold on earlier days. Not revenue — adding them
+    // to `totalSales` would book the same goods twice — but the cash leg is
+    // real money that has to be in the drawer.
+    final collections = await creditPaymentRepository.getCollectionByModeInRange(
+        startTime, endTime);
+
+    // ==================== PROFIT ====================
+    // Through ReportService rather than recomputed here, so the day close and
+    // the Profit report can never disagree. It nets returns, reads the cost
+    // frozen on each sale line, and takes GST out of revenue — the engine this
+    // replaces did none of those and force-unwrapped `costPrice!`.
+    final profit = await ReportService()
+        .getProfitReport(startDate: startTime, endDate: endTime);
+    final totalCost = (profit['totalCost'] as num).toDouble();
+    final grossProfit = (profit['grossProfit'] as num).toDouble();
+
+    // ==================== CUSTOMER OUTSTANDING ====================
+    // A position at close, not a movement during the day.
+    final customersWithCredit = await customerStore.getCustomersWithCredit();
+    final totalOutstanding = await saleStore.getTotalDueAmount();
 
     final reportId = _uuid.v4();
 
@@ -543,50 +586,26 @@ class EODService {
       totalExpenses: totalExpenses,
       cashExpenses: cashExpenses,
       mode: 'retail', // Mark as retail EOD
+      cashCollections: collections['cash'] ?? 0.0,
+      cardCollections: collections['card'] ?? 0.0,
+      upiCollections: collections['upi'] ?? 0.0,
+      totalCost: totalCost,
+      grossProfit: grossProfit,
+      customersWithDue: customersWithCredit.length,
+      totalOutstanding: totalOutstanding,
     );
   }
 
-  static List<PaymentSummary> _calculateRetailPaymentSummaries(List sales) {
-    final Map<String, double> paymentTotals = {};
-    final Map<String, int> paymentCounts = {};
-    double grandTotal = 0.0;
-
-    for (final sale in sales) {
-      String paymentType = sale.paymentType ?? 'Unknown';
-
-      // Handle split payments - expand into individual payment methods
-      if (sale.isSplitPayment == true && sale.paymentListJson != null && sale.paymentListJson!.isNotEmpty) {
-        for (final payment in sale.paymentList) {
-          final method = payment['method'] as String;
-          final amount = payment['amount'] as double;
-
-          paymentTotals[method] = (paymentTotals[method] ?? 0.0) + amount;
-          paymentCounts[method] = (paymentCounts[method] ?? 0) + 1;
-          grandTotal += amount;
-        }
-      } else {
-        // Single payment
-        final amount = sale.totalAmount as double;
-        paymentTotals[paymentType] = (paymentTotals[paymentType] ?? 0.0) + amount;
-        paymentCounts[paymentType] = (paymentCounts[paymentType] ?? 0) + 1;
-        grandTotal += amount;
-      }
-    }
-
-    return paymentTotals.entries.map((entry) {
-      final paymentType = entry.key;
-      final totalAmount = entry.value;
-      final transactionCount = paymentCounts[paymentType] ?? 0;
-      final percentage = grandTotal > 0 ? (totalAmount / grandTotal) * 100 : 0.0;
-
-      return PaymentSummary(
-        paymentType: paymentType,
-        totalAmount: totalAmount,
-        transactionCount: transactionCount,
-        percentage: percentage,
-      );
-    }).toList()..sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
-  }
+  /// Delegates to the shared retail summariser so EOD and any payment-mode
+  /// report can never disagree — the same reason restaurant's EOD goes through
+  /// `PaymentModeSummary.summarize`.
+  ///
+  /// The list handed in is still `activeSales` (returns excluded), which keeps
+  /// expected-cash gross of refunds; refunds are accounted for separately by
+  /// the drawer's own cash-refund figure.
+  static List<PaymentSummary> _calculateRetailPaymentSummaries(
+          List<SaleModel> sales) =>
+      RetailPaymentModeSummary.summarize(sales);
 
   static List<TaxSummary> _calculateRetailTaxSummaries(List sales) {
     double totalCgst = 0.0;

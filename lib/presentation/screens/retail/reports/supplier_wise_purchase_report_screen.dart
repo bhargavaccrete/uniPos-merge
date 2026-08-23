@@ -1,61 +1,121 @@
 import 'package:flutter/material.dart';
+
+import 'package:billberrylite/domain/services/common/report_export_service.dart';
 import 'package:billberrylite/domain/services/retail/report_service.dart';
+import 'package:billberrylite/presentation/screens/retail/reports/report_page_scaffold.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_summary_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_table.dart';
+import 'package:billberrylite/util/color.dart';
 
-class SupplierWisePurchaseReportScreen extends StatefulWidget {
+/// Spend per supplier, measured on goods actually received.
+///
+/// Previously this summed `estimatedTotal` across every purchase order with no
+/// status filter, so drafts and cancelled orders counted and the number was an
+/// estimate. It now reads confirmed GRNs at accepted value.
+class SupplierWisePurchaseReportScreen extends StatelessWidget {
   const SupplierWisePurchaseReportScreen({super.key});
-  @override
-  State<SupplierWisePurchaseReportScreen> createState() => _SupplierWisePurchaseReportScreenState();
-}
-
-class _SupplierWisePurchaseReportScreenState extends State<SupplierWisePurchaseReportScreen> {
-  final ReportService _reportService = ReportService();
-  List<Map<String, dynamic>> _reportData = [];
-  bool _isLoading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadReport();
-  }
-
-  Future<void> _loadReport() async {
-    setState(() => _isLoading = true);
-    final data = await _reportService.getSupplierWisePurchaseReport();
-    setState(() {
-      _reportData = data;
-      _isLoading = false;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(title: const Text('Supplier-wise Purchases'), centerTitle: true, backgroundColor: Colors.white, elevation: 0),
-      body: _isLoading ? const Center(child: CircularProgressIndicator()) : _reportData.isEmpty ? const Center(child: Text('No data')) : ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _reportData.length,
-        itemBuilder: (context, index) {
-          final item = _reportData[index];
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFE8E8E8))),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(item['supplierName'], style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('${item['totalPurchases']} purchases', style: const TextStyle(fontSize: 13, color: Color(0xFF6B6B6B))),
-                    Text('₹${(item['totalAmount'] as double).toStringAsFixed(0)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-                  ],
-                ),
-              ],
+    final service = ReportService();
+
+    return ReportPageScaffold(
+      title: 'Supplier-wise Purchases',
+      subtitle: 'Based on goods received',
+      featureNoun: 'purchases',
+      exportFileName: 'supplier_wise_purchases',
+      rowUnit: 'suppliers',
+      emptyIcon: Icons.local_shipping_outlined,
+      emptyTitle: 'No purchases received',
+      emptyMessage:
+          'Nothing has been received from any supplier in this period.',
+      loader: (start, end) =>
+          service.getSupplierWisePurchaseReport(startDate: start, endDate: end),
+      summaryCards: (rows) {
+        final total = rows.fold<double>(
+          0,
+          (s, r) => s + (r['totalAmount'] as double),
+        );
+        final damaged = rows.fold<double>(
+          0,
+          (s, r) => s + (r['damagedAmount'] as double),
+        );
+        return [
+          ReportSummaryCard(
+            title: 'Total Received',
+            value: formatMoney(total),
+            subtitle: '${rows.length} suppliers',
+            icon: Icons.storefront_rounded,
+            color: AppColors.primary,
+          ),
+          ReportSummaryCard(
+            title: 'Damaged',
+            value: formatMoney(damaged),
+            subtitle: 'excluded from spend',
+            icon: Icons.report_gmailerrorred_rounded,
+            color: AppColors.danger,
+          ),
+        ];
+      },
+      columns: (context) => [
+        ReportTable.column(context, 'Supplier'),
+        ReportTable.column(context, 'Receipts', numeric: true),
+        ReportTable.column(context, 'Units', numeric: true),
+        // Damaged value splits by whether the supplier can still credit it
+        // back: an open/credited return or a live claim is recoverable, a
+        // write-off or a refused claim is not.
+        ReportTable.column(context, 'Recoverable', numeric: true),
+        ReportTable.column(context, 'Absorbed', numeric: true),
+        ReportTable.column(context, 'Amount', numeric: true),
+      ],
+      rowBuilder: (context, row) => DataRow(
+        cells: [
+          DataCell(Text(row['supplierName'] as String)),
+          DataCell(Text('${row['receiptCount']}')),
+          DataCell(Text('${row['totalItems']}')),
+          DataCell(Text(formatMoney(row['damagedRecoverable'] as double))),
+          DataCell(
+            Text(
+              formatMoney(row['damagedAbsorbed'] as double),
+              style: (row['damagedAbsorbed'] as double) > 0
+                  ? const TextStyle(color: AppColors.danger)
+                  : null,
             ),
-          );
+          ),
+          DataCell(Text(formatMoney(row['totalAmount'] as double))),
+        ],
+      ),
+      exportData: (rows) => ReportExportData(
+        headers: const [
+          'Supplier',
+          'Receipts',
+          'Units',
+          'Damaged Recoverable',
+          'Damaged Absorbed',
+          'Amount',
+        ],
+        rows: rows
+            .map(
+              (r) => [
+                r['supplierName'],
+                r['receiptCount'],
+                r['totalItems'],
+                ReportExportService.formatCurrency(
+                  r['damagedRecoverable'] as double,
+                ),
+                ReportExportService.formatCurrency(
+                  r['damagedAbsorbed'] as double,
+                ),
+                ReportExportService.formatCurrency(r['totalAmount'] as double),
+              ],
+            )
+            .toList(),
+        summary: {
+          'Suppliers': rows.length,
+          'Total Received': ReportExportService.formatCurrency(
+            rows.fold<double>(0, (s, r) => s + (r['totalAmount'] as double)),
+          ),
         },
       ),
     );

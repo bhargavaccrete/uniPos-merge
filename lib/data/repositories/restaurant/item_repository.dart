@@ -2,7 +2,7 @@ import 'package:hive/hive.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:billberrylite/core/constants/hive_box_names.dart';
 import '../../models/restaurant/db/itemmodel_302.dart';
-import '../../models/restaurant/db/categorymodel_300.dart';
+import '../../models/common/categorymodel_300.dart';
 
 /// Repository layer for Item data access (Restaurant)
 /// Handles all Hive database operations for menu items
@@ -13,7 +13,7 @@ class ItemRepository {
 
   ItemRepository() {
     _itemBox = Hive.box<Items>(HiveBoxNames.restaurantItems);
-    _categoryBox = Hive.box<Category>(HiveBoxNames.restaurantCategories);
+    _categoryBox = Hive.box<Category>(HiveBoxNames.category);
   }
 
   /// Get all items from Hive.

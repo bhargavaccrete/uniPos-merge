@@ -4,9 +4,11 @@ import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/restaurant/print_settings.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
-import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/mode_keys.dart';
+import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/domain/services/restaurant/tax_breakdown.dart';
-import 'package:billberrylite/core/di/service_locator.dart' show taxStore;
+import 'package:billberrylite/core/di/service_locator.dart'
+    show taxStore, attributeStore;
 
 /// Builds raw ESC/POS byte arrays for thermal printers.
 ///
@@ -259,7 +261,9 @@ class EscPosReceiptBuilder {
         receiptData.storePhone!.isNotEmpty) {
       bytes.addAll(_text('Tel: ${receiptData.storePhone}'));
     }
-    if (receiptData.gstNumber != null && receiptData.gstNumber!.isNotEmpty) {
+    if (receiptData.taxEnabled &&
+        receiptData.gstNumber != null &&
+        receiptData.gstNumber!.isNotEmpty) {
       bytes.addAll(_text('GSTIN: ${receiptData.gstNumber}'));
     }
 
@@ -297,7 +301,7 @@ class EscPosReceiptBuilder {
     // Customer name
     if (PrintSettings.showCustomerName &&
         receiptData.customer != null &&
-        receiptData.customer!.name.isNotEmpty) {
+        (receiptData.customer!.name?.isNotEmpty ?? false)) {
       bytes.addAll(_text('Customer: ${receiptData.customer!.name}'));
     }
 
@@ -312,10 +316,20 @@ class EscPosReceiptBuilder {
 
     // ── ITEM ROWS ──
     for (final item in receiptData.items) {
-      // Item name (truncated to fit) + variant
+      // Item name (truncated to fit) + variant.
+      // Labelled only when real attribute names exist → "(Storage: 1tb)".
+      // Restaurant items carry no map and fall back to the legacy columns,
+      // where `size` holds the variant name — those stay bare: "(Large)".
       String name = item.productName ?? 'Item';
-      if (item.size != null && item.size!.isNotEmpty) {
-        name += ' (${item.size})';
+      final hasNamedAttributes = item.attributes?.isNotEmpty ?? false;
+      final descriptor = attributeStore.describeAttributes(
+        item.attributes,
+        size: item.size,
+        color: item.color,
+        labelled: hasNamedAttributes,
+      );
+      if (descriptor.isNotEmpty) {
+        name += ' ($descriptor)';
       }
 
       // Truncate name to fit columns (leave room for qty + amount)
@@ -324,9 +338,19 @@ class EscPosReceiptBuilder {
         name = '${name.substring(0, maxNameLen - 2)}..';
       }
 
-      final amount = _fmt(item.price * item.qty);
+      // Same basis the Sub Total and tax table use, so the Amount column
+      // sums to Sub Total in both modes (restaurant's price is mode-adjusted).
+      final amount = _fmt(receiptLineGross(item));
       bytes.addAll(_text(
           _formatRow(name, '${item.qty}', amount, cols)));
+
+      // This line's OWN discount, indented under it. RETAIL ONLY — restaurant
+      // has no per-line discount concept and its output must not change. The
+      // Amount column above stays gross so it still sums to Sub Total.
+      if (AppConfig.isRetail && receiptLineDiscount(item) > 0.009) {
+        bytes.addAll(_text(
+            '  ${receiptLineDiscountLabel(item)} -$currency${_fmt(receiptLineDiscount(item))}'));
+      }
 
       // Extras/choices info (indented, stored in weight field)
       if (item.weight != null && item.weight!.isNotEmpty) {
@@ -341,14 +365,11 @@ class EscPosReceiptBuilder {
     // ── TOTALS SECTION ──
     // This mirrors the bill summary from customerdetails.dart
 
-    // Per-rate base for the GST table. item.price is mode-adjusted (divided by
-    // 1+rate for exclusive display), so use item.total — which restores the true
-    // base and sums to Sub Total.
     // Derive the tax mode from the order totals (stored flag can be stale).
     // Fall back to the receipt's own line gross so the detector never has to
     // rely on the stale inclusive flag (which mis-classified exclusive bills).
     final double itemsGross =
-        receiptData.items.fold<double>(0, (s, it) => s + it.total);
+        receiptData.items.fold<double>(0, (s, it) => s + receiptLineGross(it));
     final double grossTotal = receiptData.itemTotal ?? itemsGross;
     final isTaxInclusive = (grossTotal > 0)
         ? TaxBreakdown.isInclusiveFromTotals(
@@ -369,8 +390,21 @@ class EscPosReceiptBuilder {
       bytes.addAll(_text(_formatTotalRow('Sub Total', _fmt(subValue), cols)));
     }
 
-    // Discount (only show if > 0)
-    if ((sale.discountAmount ?? 0) > 0.009) {
+    // Discount. Retail splits it into the per-line part and the order-level
+    // remainder, so a line discount is not passed off as a bill discount.
+    // Restaurant keeps its single row, byte-for-byte as before.
+    final double escLineDiscTotal = AppConfig.isRetail
+        ? receiptLineDiscountTotal(receiptData.items)
+        : 0;
+    if (escLineDiscTotal > 0.009) {
+      bytes.addAll(_text(_formatTotalRow(
+          'Item Discounts', '-$currency${_fmt(escLineDiscTotal)}', cols)));
+      final remainder = (sale.discountAmount ?? 0) - escLineDiscTotal;
+      if (remainder > 0.009) {
+        bytes.addAll(_text(_formatTotalRow(
+            'Bill Discount', '-$currency${_fmt(remainder)}', cols)));
+      }
+    } else if ((sale.discountAmount ?? 0) > 0.009) {
       bytes.addAll(_text(
           _formatTotalRow('Discount', '-$currency${_fmt(sale.discountAmount ?? 0)}', cols)));
     }
@@ -386,15 +420,33 @@ class EscPosReceiptBuilder {
 
     // Tax block — per-rate GST summary, shown in BOTH modes when GST applies.
     // (0% bills produce no lines and skip the whole block.)
-    final taxLines = TaxBreakdown.compute(
-      items: receiptData.items
-          .map((it) => (gross: it.total, ratePercent: it.gstRate ?? 0))
-          .toList(),
-      billDiscount: sale.discountAmount ?? 0,
-      isTaxInclusive: isTaxInclusive,
-      reconcileToGst: sale.totalGstAmount ?? 0, // lines must sum to the order's GST
-    );
-    if (PrintSettings.showTax && taxLines.isNotEmpty) {
+    // Retail: a line discount belongs to its own GST bucket, and only the
+    // order-level remainder is spread proportionally. Restaurant keeps calling
+    // `compute`, whose behaviour is unchanged.
+    final taxLines = AppConfig.isRetail
+        ? TaxBreakdown.computeWithLineDiscounts(
+            items: receiptData.items
+                .map((it) => (
+                      gross: receiptLineGross(it),
+                      lineDiscount: receiptLineDiscount(it),
+                      ratePercent: it.gstRate ?? 0,
+                    ))
+                .toList(),
+            billDiscount:
+                receiptBillDiscountRemainder(sale, receiptData.items),
+            isTaxInclusive: isTaxInclusive,
+            reconcileToGst: sale.totalGstAmount ?? 0,
+          )
+        : TaxBreakdown.compute(
+            items: receiptData.items
+                .map((it) =>
+                    (gross: receiptLineGross(it), ratePercent: it.gstRate ?? 0))
+                .toList(),
+            billDiscount: sale.discountAmount ?? 0,
+            isTaxInclusive: isTaxInclusive,
+            reconcileToGst: sale.totalGstAmount ?? 0, // lines must sum to the order's GST
+          );
+    if (receiptData.taxEnabled && PrintSettings.showTax && taxLines.isNotEmpty) {
       final totalGst = sale.totalGstAmount ?? 0; // authoritative — matches order
       bytes.addAll(_divider(cols));
       bytes.addAll(
@@ -408,7 +460,7 @@ class EscPosReceiptBuilder {
           isTaxInclusive ? 'Total Tax (Incl)' : 'Total Tax:',
           _fmt(totalGst),
           cols)));
-    } else if (!PrintSettings.showTax && (sale.totalGstAmount ?? 0) > 0.009) {
+    } else if (receiptData.taxEnabled && !PrintSettings.showTax && (sale.totalGstAmount ?? 0) > 0.009) {
       // Tax toggle OFF → single summary line so the bill still reconciles.
       bytes.addAll(_text(_formatTotalRow(
           isTaxInclusive ? 'Tax (Incl.)' : 'Tax',
@@ -464,7 +516,7 @@ class EscPosReceiptBuilder {
 
     // ── FOOTER ──
     bytes.addAll(_alignCenter);
-    if (isTaxInclusive) {
+    if (receiptData.taxEnabled && isTaxInclusive) {
       bytes.addAll(_text('All prices include GST'));
     }
     // Custom footer / "Thank You" message — owner-editable in Print
@@ -477,7 +529,7 @@ class EscPosReceiptBuilder {
     }
     // "Powered by Bill Berry Lite" + company line. Forced when the admin keeps
     // `billing.invoice.print` on; otherwise the shop's "Powered By" toggle decides.
-    if (PlanEnforce.allows(EntKeys.billingInvoicePrint) ||
+    if (PlanEnforce.allows(ModeKeys.billingInvoicePrint) ||
         PrintSettings.showPoweredBy) {
       bytes.addAll(_text('Powered by Bill Berry Lite'));
       bytes.addAll(_text('Accrete Infosolution Technologies Private Limited'));

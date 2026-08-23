@@ -5,10 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/stores/setup_wizard_store.dart';
 import '../../../util/common/app_responsive.dart';
 import 'package:billberrylite/core/config/app_config.dart';
-import 'package:billberrylite/data/models/retail/hive_model/staff_model_222.dart';
-import 'package:billberrylite/data/models/restaurant/db/staffModel_310.dart';
+import 'package:billberrylite/data/models/common/staffModel_310.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
-import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/di/service_locator.dart';
 import 'package:billberrylite/core/plan/entitlement_keys.dart';
@@ -55,14 +53,12 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
   final _pinFocus = FocusNode();
 
   String _selectedRole = 'Cashier';
-  final List<String> _retailRoles = ['Manager', 'Cashier', 'Sales', 'Inventory'];
+  final List<String> _retailRoles = ['Manager', 'Cashier'];
   final List<String> _restaurantRoles = ['Manager', 'Cashier', 'Waiter'];
 
   static const _roleIcons = {
     'Manager':   Icons.manage_accounts_rounded,
     'Cashier':   Icons.point_of_sale_rounded,
-    'Sales':     Icons.storefront_rounded,
-    'Inventory': Icons.inventory_2_rounded,
     'Waiter':    Icons.restaurant_rounded,
     'Chef':      Icons.soup_kitchen_rounded,
   };
@@ -70,16 +66,9 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
   static const _roleColors = {
     'Manager':   Color(0xFF7C3AED),
     'Cashier':   Color(0xFF059669),
-    'Sales':     Color(0xFFD97706),
-    'Inventory': Color(0xFF0284C7),
     'Waiter':    Color(0xFFDB2777),
     'Chef':      Color(0xFFDC2626),
   };
-
-  // Retail-specific permissions
-  bool _canGiveDiscounts = false;
-  bool _canAccessReports = false;
-  bool _canManageInventory = false;
 
   // UI state
   bool _isPinVisible = false;
@@ -90,7 +79,7 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
   // Inline error for first name
   String? _firstNameError;
 
-  List<dynamic> _staffMembers = [];
+  List<StaffModel> _staffMembers = [];
 
   @override
   void initState() {
@@ -103,14 +92,8 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
   /// and back (the PageView can dispose this off-screen step, wiping local
   /// state). Storage is the source of truth — staff are persisted on Add.
   Future<void> _loadExistingStaff() async {
-    if (AppConfig.isRetail) {
-      if (!Hive.isBoxOpen('retail_staff')) return;
-      final box = Hive.box<RetailStaffModel>('retail_staff');
-      setState(() => _staffMembers = box.values.toList());
-    } else {
-      await staffStore.loadStaff();
-      if (mounted) setState(() => _staffMembers = staffStore.staff.toList());
-    }
+    await staffStore.loadStaff();
+    if (mounted) setState(() => _staffMembers = staffStore.staff.toList());
   }
 
   void _syncUsernameFromFirstName() {
@@ -141,22 +124,8 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
     super.dispose();
   }
 
-  // ── Permissions reset when role changes ──────────────────────────────────
-
   void _applyRoleDefaults(String role) {
-    setState(() {
-      _selectedRole = role;
-      if (role == 'Manager') {
-        _canGiveDiscounts = true;
-        _canAccessReports = true;
-        _canManageInventory = true;
-      } else {
-        // Reset to non-manager defaults
-        _canGiveDiscounts = false;
-        _canAccessReports = false;
-        _canManageInventory = false;
-      }
-    });
+    setState(() => _selectedRole = role);
   }
 
   // ── Add staff member ─────────────────────────────────────────────────────
@@ -196,11 +165,8 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
         : _usernameController.text.trim();
 
     // Duplicate username check
-    final usernameExists = _staffMembers.any((s) {
-      if (s is RetailStaffModel) return s.username.toLowerCase() == username.toLowerCase();
-      if (s is StaffModel) return s.userName.toLowerCase() == username.toLowerCase();
-      return false;
-    });
+    final usernameExists = _staffMembers
+        .any((s) => s.userName.toLowerCase() == username.toLowerCase());
     if (usernameExists) {
       NotificationService.instance
           .showError('Username "$username" is already taken. Choose a different one.');
@@ -208,15 +174,9 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
       return;
     }
 
-    // Duplicate PIN check (compare plaintext PINs before hashing)
-    final pinExists = _staffMembers.any((s) {
-      if (s is RetailStaffModel) return s.pin == pin;
-      if (s is StaffModel) {
-        // The stored pinNo is already hashed; verify against the new pin
-        return RestaurantAuthHelper.verifyPassword(pin, s.pinNo);
-      }
-      return false;
-    });
+    // Duplicate PIN check — pinNo is stored hashed, verify against the new pin
+    final pinExists = _staffMembers
+        .any((s) => RestaurantAuthHelper.verifyPassword(pin, s.pinNo));
     if (pinExists) {
       NotificationService.instance
           .showError('This PIN is already in use. Choose a different one.');
@@ -263,46 +223,19 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
     try {
       // Persist immediately so the staff survives leaving and returning to this
       // step (storage is the source of truth — see _loadExistingStaff).
-      final bool saved;
-      if (AppConfig.isRetail) {
-        final newStaff = RetailStaffModel(
-          id: _uuid.v4(),
-          firstName: firstName,
-          lastName: _lastNameController.text.trim(),
-          email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
-          phone: phone.isEmpty ? null : phone,
-          username: username,
-          pin: pin,
-          role: _selectedRole,
-          canProcessSales: true,
-          canProcessReturns: _selectedRole == 'Manager',
-          canGiveDiscounts: _canGiveDiscounts,
-          maxDiscountPercent: _canGiveDiscounts ? 20.0 : 0.0,
-          canAccessReports: _canAccessReports,
-          canManageInventory: _canManageInventory,
-          canManageStaff: _selectedRole == 'Manager',
-          canVoidTransactions: _selectedRole == 'Manager',
-          canOpenCashDrawer: true,
-          createdAt: DateTime.now(),
-        );
-        await Hive.box<RetailStaffModel>('retail_staff').put(newStaff.id, newStaff);
-        _staffMembers.add(newStaff);
-        saved = true;
-      } else {
-        final newStaff = StaffModel(
-          id: _uuid.v4(),
-          userName: username,
-          firstName: firstName,
-          lastName: _lastNameController.text.trim(),
-          isCashier: _selectedRole,
-          mobileNo: phone,
-          emailId: _emailController.text.trim(),
-          pinNo: RestaurantAuthHelper.hashPassword(pin),
-          createdAt: DateTime.now(),
-        );
-        saved = await staffStore.addStaff(newStaff);
-        if (saved) _staffMembers.add(newStaff);
-      }
+      final newStaff = StaffModel(
+        id: _uuid.v4(),
+        userName: username,
+        firstName: firstName,
+        lastName: _lastNameController.text.trim(),
+        isCashier: _selectedRole,
+        mobileNo: phone,
+        emailId: _emailController.text.trim(),
+        pinNo: RestaurantAuthHelper.hashPassword(pin),
+        createdAt: DateTime.now(),
+      );
+      final saved = await staffStore.addStaff(newStaff);
+      if (saved) _staffMembers.add(newStaff);
 
       if (!saved) {
         NotificationService.instance
@@ -329,33 +262,17 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
     final staff = _staffMembers[index];
     // Remove from storage too — staff are persisted on Add, so a list-only
     // removal would reappear after _loadExistingStaff.
-    if (staff is RetailStaffModel) {
-      await Hive.box<RetailStaffModel>('retail_staff').delete(staff.id);
-    } else if (staff is StaffModel) {
-      await staffStore.deleteStaff(staff.id);
-    }
+    await staffStore.deleteStaff(staff.id);
     if (mounted) setState(() => _staffMembers.removeAt(index));
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
-  String _staffDisplayName(dynamic staff) {
-    if (staff is RetailStaffModel) return '${staff.firstName} ${staff.lastName}'.trim();
-    if (staff is StaffModel) return '${staff.firstName} ${staff.lastName}'.trim();
-    return 'Unknown';
-  }
+  String _staffDisplayName(StaffModel staff) => '${staff.firstName} ${staff.lastName}'.trim();
 
-  String _staffRole(dynamic staff) {
-    if (staff is RetailStaffModel) return staff.role;
-    if (staff is StaffModel) return staff.isCashier;
-    return '';
-  }
+  String _staffRole(StaffModel staff) => staff.isCashier;
 
-  String _staffUsername(dynamic staff) {
-    if (staff is RetailStaffModel) return '@${staff.username}';
-    if (staff is StaffModel) return '@${staff.userName}';
-    return '';
-  }
+  String _staffUsername(StaffModel staff) => '@${staff.userName}';
 
   // ── Build ─────────────────────────────────────────────────────────────────
 
@@ -577,32 +494,6 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                 // Role selector — inline chips
                 _buildRoleSelector(roles),
                 const SizedBox(height: 12),
-
-                // Retail permissions
-                if (isRetail) ...[
-                  Text('POS Permissions',
-                      style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary)),
-                  const SizedBox(height: 6),
-                  _buildPermissionTile(
-                    label: 'Can Give Discounts',
-                    value: _canGiveDiscounts,
-                    onChanged: (v) => setState(() => _canGiveDiscounts = v!),
-                  ),
-                  _buildPermissionTile(
-                    label: 'Can Access Reports',
-                    value: _canAccessReports,
-                    onChanged: (v) => setState(() => _canAccessReports = v!),
-                  ),
-                  _buildPermissionTile(
-                    label: 'Can Manage Inventory',
-                    value: _canManageInventory,
-                    onChanged: (v) => setState(() => _canManageInventory = v!),
-                  ),
-                  const SizedBox(height: 4),
-                ],
 
                 // Add button
                 SizedBox(
@@ -924,33 +815,4 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
     );
   }
 
-  Widget _buildPermissionTile({
-    required String label,
-    required bool value,
-    required ValueChanged<bool?> onChanged,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 24,
-            height: 24,
-            child: Checkbox(
-              value: value,
-              onChanged: onChanged,
-              activeColor: AppColors.primary,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4)),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(label,
-              style: GoogleFonts.poppins(
-                  fontSize: 13, color: AppColors.textPrimary)),
-        ],
-      ),
-    );
-  }
 }

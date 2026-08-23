@@ -13,6 +13,17 @@ enum FontSize {
   large,
 }
 
+/// Receipt layout, matching the two thermal templates restaurant offers.
+///
+/// Thermal only — an A4 invoice has a fixed layout, so this is ignored there.
+enum BillTemplate {
+  /// Clean, structured layout with full spacing.
+  simple,
+
+  /// Compact spacing and tighter margins, to use less roll paper.
+  paperSaver,
+}
+
 class RetailPrinterSettings {
   // Paper Configuration
   final PaperSize paperSize;
@@ -90,10 +101,14 @@ class RetailPrinterSettings {
   final String dateFormat; // 'dd/MM/yyyy', 'MM/dd/yyyy', etc.
   final String timeFormat; // '12h', '24h'
 
+  /// Thermal receipt layout. Ignored for A4, which has a fixed layout.
+  final BillTemplate billTemplate;
+
   const RetailPrinterSettings({
     // Paper Configuration
     this.paperSize = PaperSize.mm80,
     this.paperWidth = 80,
+    this.billTemplate = BillTemplate.simple,
 
     // Logo Settings
     this.showLogo = true,
@@ -223,6 +238,7 @@ class RetailPrinterSettings {
       'currencySymbol': currencySymbol,
       'dateFormat': dateFormat,
       'timeFormat': timeFormat,
+      'billTemplate': billTemplate.index,
     };
   }
 
@@ -231,6 +247,11 @@ class RetailPrinterSettings {
     return RetailPrinterSettings(
       paperSize: PaperSize.values[json['paperSize'] ?? 1],
       paperWidth: json['paperWidth'] ?? 80,
+      // Index-clamped: a stored value from a future build with more templates
+      // would otherwise throw a RangeError on startup.
+      billTemplate: BillTemplate.values[
+          ((json['billTemplate'] as int?) ?? 0)
+              .clamp(0, BillTemplate.values.length - 1)],
       showLogo: json['showLogo'] ?? true,
       logoPath: json['logoPath'],
       logoHeight: json['logoHeight'] ?? 20,
@@ -288,6 +309,7 @@ class RetailPrinterSettings {
   RetailPrinterSettings copyWith({
     PaperSize? paperSize,
     int? paperWidth,
+    BillTemplate? billTemplate,
     bool? showLogo,
     String? logoPath,
     double? logoHeight,
@@ -342,6 +364,7 @@ class RetailPrinterSettings {
     return RetailPrinterSettings(
       paperSize: paperSize ?? this.paperSize,
       paperWidth: paperWidth ?? this.paperWidth,
+      billTemplate: billTemplate ?? this.billTemplate,
       showLogo: showLogo ?? this.showLogo,
       logoPath: logoPath ?? this.logoPath,
       logoHeight: logoHeight ?? this.logoHeight,

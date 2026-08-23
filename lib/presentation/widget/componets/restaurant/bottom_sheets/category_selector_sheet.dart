@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
+import '../../../../../data/models/common/categorymodel_300.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
+import '../../../../../data/models/retail/hive_model/product_model_200.dart';
+import '../../../../../core/config/app_config.dart';
 import '../../../../../core/di/service_locator.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
@@ -67,6 +69,7 @@ class CategorySelectorSheet extends StatefulWidget {
 class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
   List<Category> _categories = [];
   List<Items> _items = [];
+  List<ProductModel> _products = [];
   bool _isLoading = true;
   String _query = '';
   final TextEditingController _searchCtrl = TextEditingController();
@@ -87,13 +90,18 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
   Future<void> _loadData() async {
     setState(() {
       _categories = categoryStore.categories.toList();
-      _items = itemStore.items.toList();
+      if (AppConfig.isRetail) {
+        _products = productStore.products.toList();
+      } else {
+        _items = itemStore.items.toList();
+      }
       _isLoading = false;
     });
   }
 
-  int _getItemCount(String categoryId) =>
-      _items.where((i) => i.categoryOfItem == categoryId).length;
+  int _getItemCount(String categoryId) => AppConfig.isRetail
+      ? _products.where((p) => p.category == categoryId).length
+      : _items.where((i) => i.categoryOfItem == categoryId).length;
 
   List<Category> get _filtered {
     if (_query.trim().isEmpty) return _categories;
@@ -295,7 +303,7 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
               style: GoogleFonts.poppins(
                   fontSize: 15, fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
-          Text('Add a category to organise your menu items.',
+          Text('Add a category to organise your ${AppConfig.isRetail ? "products" : "menu items"}.',
               style: GoogleFonts.poppins(
                   fontSize: 13, color: Colors.grey.shade500),
               textAlign: TextAlign.center),

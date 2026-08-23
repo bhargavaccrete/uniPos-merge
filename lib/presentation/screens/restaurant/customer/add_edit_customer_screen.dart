@@ -6,14 +6,14 @@ import 'package:uuid/uuid.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
-import 'package:billberrylite/data/models/restaurant/db/customer_model_125.dart';
+import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 
 class AddEditCustomerScreen extends StatefulWidget {
-  final RestaurantCustomer? customer;
+  final Customer? customer;
 
   const AddEditCustomerScreen({super.key, this.customer});
 
@@ -75,7 +75,7 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
         // Check if phone changed and now conflicts with another customer
         final newPhone = _phoneController.text.trim();
         if (newPhone != (widget.customer!.phone ?? '')) {
-          final existingCustomer = await restaurantCustomerStore.getCustomerByPhone(newPhone);
+          final existingCustomer = await customerStore.getCustomerByPhone(newPhone);
           if (existingCustomer != null && existingCustomer.customerId != widget.customer!.customerId) {
             if (mounted) {
               NotificationService.instance.showError('A customer with this phone number already exists');
@@ -86,26 +86,29 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
         }
 
         // Update existing customer
+        final foodPreference = _foodPreferenceController.text.trim();
+        final notes = _notesController.text.trim();
+
+        // Emptying an optional field must actually clear it — the clear* flags
+        // exist because `x ?? this.x` alone would silently keep the old value.
         final updatedCustomer = widget.customer!.copyWith(
           name: _nameController.text.trim(),
           phone: _phoneController.text.trim(),
-          foodPrefrence: _foodPreferenceController.text.trim().isEmpty
-              ? null
-              : _foodPreferenceController.text.trim(),
-          notes: _notesController.text.trim().isEmpty
-              ? null
-              : _notesController.text.trim(),
+          foodPrefrence: foodPreference.isEmpty ? null : foodPreference,
+          clearFoodPrefrence: foodPreference.isEmpty,
+          notes: notes.isEmpty ? null : notes,
+          clearNotes: notes.isEmpty,
           updatedAt: DateTime.now().toIso8601String(),
         );
 
-        final success = await restaurantCustomerStore.updateCustomer(updatedCustomer);
+        final success = await customerStore.updateCustomer(updatedCustomer);
 
         if (mounted) {
           Navigator.pop(context, success ? 'updated' : false);
         }
       } else {
         // Check if phone already exists
-        final existingCustomer = await restaurantCustomerStore.getCustomerByPhone(
+        final existingCustomer = await customerStore.getCustomerByPhone(
           _phoneController.text.trim(),
         );
 
@@ -120,7 +123,7 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
         }
 
         // Create new customer
-        final newCustomer = RestaurantCustomer.create(
+        final newCustomer = Customer.create(
           customerId: const Uuid().v4(),
           name: _nameController.text.trim(),
           phone: _phoneController.text.trim(),
@@ -133,8 +136,8 @@ class _AddEditCustomerScreenState extends State<AddEditCustomerScreen> {
         );
 
         if (!PlanGuard.allowedOr(context, EntKeys.customers, featureName: 'Customers')) return;
-        if (!PlanGuard.withinLimitOr(context, EntKeys.customersMax, restaurantCustomerStore.customers.length, unit: 'customers')) return;
-        final success = await restaurantCustomerStore.addCustomer(newCustomer);
+        if (!PlanGuard.withinLimitOr(context, EntKeys.customersMax, customerStore.customers.length, unit: 'customers')) return;
+        final success = await customerStore.addCustomer(newCustomer);
 
         if (mounted) {
           Navigator.pop(context, success ? 'added' : false);

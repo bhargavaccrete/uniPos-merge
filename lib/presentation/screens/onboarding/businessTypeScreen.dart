@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/core/constants/retail_store_types.dart';
 import 'package:billberrylite/stores/setup_wizard_store.dart';
 import '../../../util/color.dart';
 import '../../../util/common/app_responsive.dart';
@@ -134,7 +135,67 @@ class BusinessTypeStep extends StatelessWidget {
             );
           }),
         ],
+        Observer(
+          builder: (_) => store.needsRetailStoreType
+              ? Padding(
+                  padding: EdgeInsets.only(top: gap),
+                  child: _buildRetailStoreTypes(context),
+                )
+              : const SizedBox.shrink(),
+        ),
       ],
+    );
+  }
+
+  // ── Retail store type (sub-selection) ──────────────────────────────
+
+  /// Shown only once Retail is picked. Renders as a nested panel rather than
+  /// more full-size cards so it reads as a refinement of the Retail choice,
+  /// not a third business type.
+  Widget _buildRetailStoreTypes(BuildContext context) {
+    final pad = AppResponsive.getValue<double>(context, mobile: 14, tablet: 18, desktop: 20);
+
+    return Container(
+      padding: EdgeInsets.all(pad),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.divider.withValues(alpha: 0.8)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'What do you sell?',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.getValue<double>(context, mobile: 15, tablet: 16, desktop: 17),
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Pick the one closest to your store.',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.getValue<double>(context, mobile: 12, tablet: 13, desktop: 13),
+              color: AppColors.textSecondary,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 14),
+          for (int i = 0; i < RetailStoreTypes.all.length; i++) ...[
+            if (i > 0) const SizedBox(height: 8),
+            Observer(builder: (_) {
+              final type = RetailStoreTypes.all[i];
+              return _RetailStoreTypeTile(
+                type: type,
+                isSelected: store.selectedRetailStoreType == type.key,
+                onTap: () => store.selectRetailStoreType(type.key),
+              );
+            }),
+          ],
+        ],
+      ),
     );
   }
 
@@ -144,20 +205,20 @@ class BusinessTypeStep extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
-        color: Colors.amber.withValues(alpha: 0.08),
+        color: AppColors.warning.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          Icon(Icons.lock_outline, size: 15, color: Colors.amber.shade700),
+          Icon(Icons.lock_outline, size: 15, color: AppColors.warning),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               'You cannot change your business type after setup.',
               style: GoogleFonts.poppins(
                 fontSize: AppResponsive.getValue<double>(context, mobile: 12, tablet: 13, desktop: 13),
-                color: Colors.amber.shade800,
+                color: AppColors.warning,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -269,7 +330,7 @@ class _BusinessTypeCard extends StatelessWidget {
   Color get _accentColor {
     switch (type['id']) {
       case 'restaurant':
-        return const Color(0xFFEF6C00);
+        return AppColors.orange;
       default:
         return AppColors.primary;
     }
@@ -383,4 +444,113 @@ class _BusinessTypeCard extends StatelessWidget {
     );
   }
 
+}
+
+// ── Retail Store Type Tile ───────────────────────────────────────
+
+class _RetailStoreTypeTile extends StatelessWidget {
+  final RetailStoreType type;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _RetailStoreTypeTile({
+    required this.type,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  IconData _icon() {
+    switch (type.iconName) {
+      case 'apparel':
+        return Icons.dry_cleaning_rounded;
+      case 'footwear':
+        return Icons.ice_skating_rounded;
+      case 'sports':
+        return Icons.sports_tennis_rounded;
+      case 'cosmetics':
+        return Icons.brush_rounded;
+      case 'stationery':
+        return Icons.edit_note_rounded;
+      case 'gift':
+        return Icons.card_giftcard_rounded;
+      default:
+        return Icons.storefront_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final iconSize = AppResponsive.getValue<double>(context, mobile: 18, tablet: 20, desktop: 21);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.getValue<double>(context, mobile: 12, tablet: 14, desktop: 14),
+          vertical: AppResponsive.getValue<double>(context, mobile: 11, tablet: 13, desktop: 13),
+        ),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary.withValues(alpha: 0.06) : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.divider,
+            width: isSelected ? 1.6 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              _icon(),
+              size: iconSize,
+              color: isSelected ? AppColors.primary : AppColors.textSecondary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    type.name,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.getValue<double>(context, mobile: 13.5, tablet: 15, desktop: 16),
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    type.description,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.getValue<double>(context, mobile: 11.5, tablet: 12.5, desktop: 13),
+                      color: AppColors.textSecondary,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: 19,
+              height: 19,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isSelected ? AppColors.primary : Colors.transparent,
+                border: Border.all(
+                  color: isSelected ? AppColors.primary : AppColors.divider,
+                  width: 2,
+                ),
+              ),
+              child: isSelected
+                  ? const Icon(Icons.check, size: 11, color: Colors.white)
+                  : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

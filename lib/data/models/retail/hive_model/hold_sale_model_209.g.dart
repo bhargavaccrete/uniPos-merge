@@ -25,13 +25,18 @@ class HoldSaleModelAdapter extends TypeAdapter<HoldSaleModel> {
       subtotal: fields[5] as double,
       createdAt: fields[6] as String,
       updatedAt: fields[7] as String,
+      itemTotal: fields[8] as double?,
+      discountAmount: fields[9] as double?,
+      taxableAmount: fields[10] as double?,
+      gstAmount: fields[11] as double?,
+      isTaxInclusive: fields[12] as bool?,
     );
   }
 
   @override
   void write(BinaryWriter writer, HoldSaleModel obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(13)
       ..writeByte(0)
       ..write(obj.holdSaleId)
       ..writeByte(1)
@@ -47,7 +52,17 @@ class HoldSaleModelAdapter extends TypeAdapter<HoldSaleModel> {
       ..writeByte(6)
       ..write(obj.createdAt)
       ..writeByte(7)
-      ..write(obj.updatedAt);
+      ..write(obj.updatedAt)
+      ..writeByte(8)
+      ..write(obj.itemTotal)
+      ..writeByte(9)
+      ..write(obj.discountAmount)
+      ..writeByte(10)
+      ..write(obj.taxableAmount)
+      ..writeByte(11)
+      ..write(obj.gstAmount)
+      ..writeByte(12)
+      ..write(obj.isTaxInclusive);
   }
 
   @override

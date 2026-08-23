@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/domain/store/retail/credit_store.dart';
-
-import '../../../core/di/service_locator.dart';
-import '../../../data/models/retail/hive_model/customer_model_208.dart';
-
-
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 /// Customer Ledger Screen - Timeline view of customer transactions
 class CustomerLedgerScreen extends StatefulWidget {
-  final CustomerModel customer;
+  final Customer customer;
 
-  const CustomerLedgerScreen({
-    super.key,
-    required this.customer,
-  });
+  const CustomerLedgerScreen({super.key, required this.customer});
 
   @override
   State<CustomerLedgerScreen> createState() => _CustomerLedgerScreenState();
@@ -34,10 +35,12 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
   Future<void> _loadLedger() async {
     setState(() => _isLoading = true);
     try {
-      final entries = await creditStore.getCustomerLedger(widget.customer.customerId);
-      setState(() => _entries = entries);
+      final entries = await creditStore.getCustomerLedger(
+        widget.customer.customerId,
+      );
+      if (mounted) setState(() => _entries = entries);
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -47,7 +50,9 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
     return _entries.where((entry) {
       final entryDate = DateTime.tryParse(entry.date);
       if (entryDate == null) return true;
-      return entryDate.isAfter(_dateFilter!.start.subtract(const Duration(days: 1))) &&
+      return entryDate.isAfter(
+            _dateFilter!.start.subtract(const Duration(days: 1)),
+          ) &&
           entryDate.isBefore(_dateFilter!.end.add(const Duration(days: 1)));
     }).toList();
   }
@@ -62,8 +67,8 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: Color(0xFF4CAF50),
-              onPrimary: Colors.white,
+              primary: AppColors.primary,
+              onPrimary: AppColors.white,
             ),
           ),
           child: child!,
@@ -79,118 +84,130 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
+    final entries = _filteredEntries;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text('Customer Ledger'),
-        backgroundColor: Colors.white,
-        elevation: 0,
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: 'Customer Ledger',
         actions: [
           IconButton(
-            icon: Icon(
-              Icons.filter_alt_outlined,
-              color: _dateFilter != null ? const Color(0xFF4CAF50) : null,
-            ),
+            icon: const Icon(Icons.filter_alt_outlined),
+            tooltip: 'Filter by date',
             onPressed: _selectDateRange,
           ),
           if (_dateFilter != null)
             IconButton(
-              icon: const Icon(Icons.clear),
+              icon: const Icon(Icons.filter_alt_off_outlined),
+              tooltip: 'Clear filter',
               onPressed: () => setState(() => _dateFilter = null),
             ),
+          const SizedBox(width: 4),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                // Customer Summary Card
-                _buildCustomerSummary(),
+      body: MoneyScope(
+        child: AppResponsive.constrainedContent(
+          context: context,
+          alignment: Alignment.topCenter,
+          maxWidth: AppResponsive.maxContentWidth(context),
+          child: _isLoading
+              ? const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                )
+              : Column(
+                  children: [
+                    _buildCustomerSummary(),
 
-                // Filter Info
-                if (_dateFilter != null)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    color: const Color(0xFFE3F2FD),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.calendar_today, size: 16, color: Color(0xFF1976D2)),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${DateFormat('dd/MM/yy').format(_dateFilter!.start)} - ${DateFormat('dd/MM/yy').format(_dateFilter!.end)}',
-                          style: const TextStyle(color: Color(0xFF1976D2), fontSize: 13),
+                    if (_dateFilter != null)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
                         ),
-                      ],
+                        color: AppColors.info.withValues(alpha: 0.08),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.calendar_today_rounded,
+                              size: 14,
+                              color: AppColors.info,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${DateFormat('dd/MM/yy').format(_dateFilter!.start)} — ${DateFormat('dd/MM/yy').format(_dateFilter!.end)}',
+                              style: GoogleFonts.poppins(
+                                color: AppColors.info,
+                                fontSize: AppResponsive.smallFontSize(context),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    Expanded(
+                      child: entries.isEmpty
+                          ? AppEmptyState(
+                              icon: Icons.receipt_long_outlined,
+                              title: 'No transactions found',
+                              message: _dateFilter != null
+                                  ? 'Nothing recorded in the selected date range.'
+                                  : 'Credit sales and payments will appear here.',
+                            )
+                          : RefreshIndicator(
+                              color: AppColors.primary,
+                              onRefresh: _loadLedger,
+                              child: ListView.builder(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  4,
+                                  16,
+                                  16,
+                                ),
+                                itemCount: entries.length,
+                                itemBuilder: (context, index) =>
+                                    _buildLedgerEntry(
+                                      entries[index],
+                                      dateFormat,
+                                      isLast: index == entries.length - 1,
+                                    ),
+                              ),
+                            ),
                     ),
-                  ),
-
-                // Ledger Timeline
-                Expanded(
-                  child: _filteredEntries.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.receipt_long_outlined,
-                                size: 64,
-                                color: Colors.grey[300],
-                              ),
-                              const SizedBox(height: 16),
-                              const Text(
-                                'No transactions found',
-                                style: TextStyle(color: Color(0xFF6B6B6B)),
-                              ),
-                            ],
-                          ),
-                        )
-                      : RefreshIndicator(
-                          onRefresh: _loadLedger,
-                          child: ListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: _filteredEntries.length,
-                            itemBuilder: (context, index) {
-                              final entry = _filteredEntries[index];
-                              return _buildLedgerEntry(entry, dateFormat, index == 0);
-                            },
-                          ),
-                        ),
+                  ],
                 ),
-              ],
-            ),
+        ),
+      ),
     );
   }
 
   Widget _buildCustomerSummary() {
+    final hasDue = widget.customer.creditBalance > 0;
+
     return Container(
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         children: [
           Row(
             children: [
               CircleAvatar(
-                radius: 24,
-                backgroundColor: const Color(0xFF4CAF50).withOpacity(0.1),
+                radius: 22,
+                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                 child: Text(
-                  widget.customer.name.substring(0, 1).toUpperCase(),
-                  style: const TextStyle(
-                    fontSize: 20,
+                  (widget.customer.name?.isNotEmpty ?? false)
+                      ? widget.customer.name![0].toUpperCase()
+                      : '?',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.subheadingFontSize(context),
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF4CAF50),
+                    color: AppColors.primary,
                   ),
                 ),
               ),
@@ -200,17 +217,20 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.customer.name,
-                      style: const TextStyle(
-                        fontSize: 16,
+                      widget.customer.name ?? 'Unknown',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     Text(
-                      widget.customer.phone,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF6B6B6B),
+                      widget.customer.phone ?? '—',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -218,26 +238,26 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          const Divider(height: 1),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+          const Divider(height: 1, color: AppColors.divider),
+          const SizedBox(height: 14),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildStatItem(
                 'Total Purchase',
-                '₹${widget.customer.totalPurchaseAmount.toStringAsFixed(0)}',
-                Colors.blue,
+                formatMoney(widget.customer.totalPurchaseAmount),
+                AppColors.primary,
               ),
               _buildStatItem(
                 'Outstanding',
-                '₹${widget.customer.creditBalance.toStringAsFixed(0)}',
-                widget.customer.creditBalance > 0 ? Colors.red : Colors.green,
+                formatMoney(widget.customer.creditBalance),
+                hasDue ? AppColors.danger : AppColors.success,
               ),
               _buildStatItem(
                 'Visits',
-                widget.customer.visitCount.toString(),
-                Colors.purple,
+                widget.customer.totalVisites.toString(),
+                AppColors.textSecondary,
               ),
             ],
           ),
@@ -251,149 +271,152 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
       children: [
         Text(
           value,
-          style: TextStyle(
-            fontSize: 18,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.subheadingFontSize(context),
             fontWeight: FontWeight.w700,
             color: color,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 2),
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Color(0xFF6B6B6B),
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.captionFontSize(context),
+            color: AppColors.textSecondary,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildLedgerEntry(LedgerEntry entry, DateFormat dateFormat, bool isFirst) {
+  Widget _buildLedgerEntry(
+    LedgerEntry entry,
+    DateFormat dateFormat, {
+    required bool isLast,
+  }) {
     final entryDate = DateTime.tryParse(entry.date);
-    final dateStr = entryDate != null ? dateFormat.format(entryDate) : entry.date;
+    final dateStr = entryDate != null
+        ? dateFormat.format(entryDate)
+        : entry.date;
 
-    // Determine colors and icons based on entry type
-    Color iconColor;
-    IconData icon;
-    Color amountColor;
-    String amountPrefix;
+    // Semantic per entry type — a credit sale grows the debt (red, "+"),
+    // a payment shrinks it (green), a write-off is neutral.
+    late final Color iconColor;
+    late final IconData icon;
+    late final Color amountColor;
+    late final String amountPrefix;
 
     switch (entry.type) {
       case LedgerEntryType.creditSale:
-        iconColor = const Color(0xFFFF9800);
-        icon = Icons.receipt_long;
-        amountColor = Colors.red;
+        iconColor = AppColors.warning;
+        icon = Icons.receipt_long_rounded;
+        amountColor = AppColors.danger;
         amountPrefix = '+';
         break;
       case LedgerEntryType.payment:
-        iconColor = const Color(0xFF4CAF50);
-        icon = Icons.payment;
-        amountColor = const Color(0xFF4CAF50);
+        iconColor = AppColors.success;
+        icon = Icons.payments_rounded;
+        amountColor = AppColors.success;
         amountPrefix = '';
         break;
       case LedgerEntryType.writeOff:
-        iconColor = const Color(0xFF9E9E9E);
-        icon = Icons.delete_outline;
-        amountColor = const Color(0xFF9E9E9E);
+        iconColor = AppColors.textSecondary;
+        icon = Icons.delete_outline_rounded;
+        amountColor = AppColors.textSecondary;
         amountPrefix = '';
         break;
     }
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Timeline Line
-        Column(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: iconColor, width: 2),
-              ),
-              child: Icon(icon, color: iconColor, size: 20),
-            ),
-            if (!isFirst || _filteredEntries.length > 1)
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Timeline rail — the connector stops at the last entry so the line
+          // never dangles below the final card.
+          Column(
+            children: [
               Container(
-                width: 2,
-                height: 60,
-                color: const Color(0xFFE8E8E8),
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: iconColor, width: 2),
+                ),
+                child: Icon(icon, color: iconColor, size: 18),
               ),
-          ],
-        ),
-        const SizedBox(width: 12),
+              if (!isLast)
+                Expanded(child: Container(width: 2, color: AppColors.divider)),
+            ],
+          ),
+          const SizedBox(width: 12),
 
-        // Entry Details
-        Expanded(
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFE8E8E8)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Date
-                Text(
-                  dateStr,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF9E9E9E),
-                  ),
-                ),
-                const SizedBox(height: 4),
-
-                // Description
-                Text(
-                  entry.description,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF1A1A1A),
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                // Amount and Balance
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '$amountPrefix₹${entry.amount.abs().toStringAsFixed(2)}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: amountColor,
-                      ),
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.divider),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    dateStr,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: AppColors.textSecondary,
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF5F5F5),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'Bal: ₹${entry.runningBalance.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF6B6B6B),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    entry.description,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '$amountPrefix${formatMoney(entry.amount.abs())}',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.subheadingFontSize(context),
+                          fontWeight: FontWeight.w700,
+                          color: amountColor,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceMedium,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'Bal: ${formatMoney(entry.runningBalance)}',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.captionFontSize(context),
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

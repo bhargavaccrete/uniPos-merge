@@ -81,14 +81,28 @@ abstract class _StockAlertStore with Store {
     await loadLowStockItems();
   }
 
+  /// Critical band for one low-stock row — a third of that row's reorder point
+  /// (its variant `minStock`, or the global threshold), never below 1. Same
+  /// rule as ProductStore.statusFor and StockAlertService, so all three agree.
+  /// Public so screens colour a row with the SAME rule the counts use.
+  /// `stock_alerts_screen` used to re-type it as a flat `stock <= 3`, which
+  /// meant the "Critical" tile and the red rows below it disagreed.
+  bool isCritical(Map<String, dynamic> item) => _isCritical(item);
+
+  bool _isCritical(Map<String, dynamic> item) {
+    final reorderPoint = (item['reorderPoint'] as int?) ?? threshold;
+    final critical = (reorderPoint / 3).ceil().clamp(1, reorderPoint);
+    return (item['currentStock'] as int) <= critical;
+  }
+
   @computed
   List<Map<String, dynamic>> get criticalItems {
-    return lowStockItems.where((item) => (item['currentStock'] as int) <= 3).toList();
+    return lowStockItems.where(_isCritical).toList();
   }
 
   @computed
   List<Map<String, dynamic>> get warningItems {
-    return lowStockItems.where((item) => (item['currentStock'] as int) > 3).toList();
+    return lowStockItems.where((item) => !_isCritical(item)).toList();
   }
 
   @computed

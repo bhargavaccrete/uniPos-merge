@@ -64,9 +64,4 @@ class SupplierRepository {
       await _supplierBox.put(supplierId, updatedSupplier);
     }
   }
-
-  // Get Total Outstanding Balance
-  double getTotalOutstanding() {
-    return _supplierBox.values.fold(0.0, (sum, supplier) => sum + supplier.currentBalance);
-  }
 }

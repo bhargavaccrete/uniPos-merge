@@ -14,7 +14,7 @@ import 'package:billberrylite/domain/services/restaurant/notification_service.da
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:uuid/uuid.dart';
-import '../../../../data/models/restaurant/db/staffModel_310.dart';
+import '../../../../data/models/common/staffModel_310.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../util/restaurant/restaurant_auth_helper.dart';
 import '../../../../util/common/app_responsive.dart';

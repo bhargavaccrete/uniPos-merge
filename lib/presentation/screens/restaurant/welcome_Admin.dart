@@ -19,6 +19,7 @@ import '../../../domain/store/restaurant/license_store.dart';
 import '../../../util/restaurant/restaurant_session.dart';
 import '../../widget/componets/restaurant/componets/drawer.dart';
 import '../../widget/componets/common/primary_app_bar.dart';
+import '../../widget/componets/common/dashboard_menu_card.dart';
 import '../../widget/restaurant/opening_balance_dialog.dart';
 import '../../../util/common/app_responsive.dart';
 
@@ -549,14 +550,36 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                     (cellW / naturalRatio) * rows + (rows - 1) * spacing;
 
                 final children = cards
-                    .map((card) => _buildMenuCard(
-                          context: context,
+                    .map((card) => DashboardMenuCard(
                           icon: card.icon,
                           title: card.title,
                           color: card.color,
-                          onTap: card.onTap,
-                          entitlementKey: card.entitlementKey,
-                          isTablet: isTablet,
+                          compact: !isTablet,
+                          onTap: () {
+                            // Entitlement denied → show upgrade blocker
+                            // instead of navigating.
+                            if (card.entitlementKey != null &&
+                                !PlanGuard.allowedOr(
+                                    context, card.entitlementKey!,
+                                    featureName: card.title)) {
+                              return;
+                            }
+                            card.onTap();
+                          },
+                          // Low-stock count badge on the Inventory tile.
+                          badge: card.title == 'Inventory'
+                              ? Observer(
+                                  builder: (_) {
+                                    final count = StockAdjustService
+                                        .lowStockEntries()
+                                        .length;
+                                    if (count == 0) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    return DashboardCardBadge(count: count);
+                                  },
+                                )
+                              : null,
                         ))
                     .toList();
 
@@ -634,115 +657,6 @@ class _AdminWelcomeState extends State<AdminWelcome> {
         .where((c) =>
             c.permission == 'logout' || RestaurantSession.canAccess(c.permission))
         .toList();
-  }
-
-  Widget _buildMenuCard({
-    required BuildContext context,
-    required IconData icon,
-    required String title,
-    required Color color,
-    required VoidCallback onTap,
-    required bool isTablet,
-    String? entitlementKey,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          // Entitlement denied → show upgrade blocker instead of navigating.
-          if (entitlementKey != null &&
-              !PlanGuard.allowedOr(context, entitlementKey, featureName: title)) {
-            return;
-          }
-          onTap();
-        },
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: AppColors.divider,
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(isTablet ? 20 : 14),
-                    decoration: BoxDecoration(
-                      color: color.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(
-                      icon,
-                      size: isTablet ? 38 : 28,
-                      color: color,
-                    ),
-                  ),
-                  // Low-stock count badge on the Inventory tile.
-                  if (title == 'Inventory')
-                    Positioned(
-                      right: -4,
-                      top: -4,
-                      child: Observer(
-                        builder: (_) {
-                          final count = StockAdjustService.lowStockEntries().length;
-                          if (count == 0) return const SizedBox.shrink();
-                          return Container(
-                            padding: const EdgeInsets.all(4),
-                            constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
-                            decoration: BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: AppColors.white, width: 1.5),
-                            ),
-                            child: Text(
-                              '$count',
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                ],
-              ),
-              SizedBox(height: isTablet ? 14 : 10),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(
-                    fontSize: isTablet ? 16 : 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   void _showLogoutDialog(BuildContext context) {

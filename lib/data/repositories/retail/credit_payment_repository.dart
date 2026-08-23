@@ -48,15 +48,21 @@ class CreditPaymentRepository {
       ..sort((a, b) => b.date.compareTo(a.date));
   }
 
-  /// Get payments by date range
+  /// Payments in a window: inclusive start, **exclusive** end.
+  ///
+  /// Matches `ReportService._inWindow` and `SaleRepository.getSalesByDateRange`.
+  /// The previous `±1 day` padding widened every range by a day at each end, so
+  /// a 1–7 Aug collections report also counted 31 Jul and 8 Aug.
+  ///
+  /// An unparseable date is skipped rather than thrown.
   Future<List<CreditPaymentModel>> getPaymentsByDateRange(
     DateTime startDate,
     DateTime endDate,
   ) async {
     return _paymentBox.values.where((payment) {
-      final paymentDate = DateTime.parse(payment.date);
-      return paymentDate.isAfter(startDate.subtract(const Duration(days: 1))) &&
-          paymentDate.isBefore(endDate.add(const Duration(days: 1)));
+      final paymentDate = DateTime.tryParse(payment.date);
+      if (paymentDate == null) return false;
+      return !paymentDate.isBefore(startDate) && paymentDate.isBefore(endDate);
     }).toList()
       ..sort((a, b) => b.date.compareTo(a.date));
   }
@@ -65,7 +71,8 @@ class CreditPaymentRepository {
   Future<List<CreditPaymentModel>> getTodayPayments() async {
     final today = DateTime.now();
     final startOfDay = DateTime(today.year, today.month, today.day);
-    final endOfDay = DateTime(today.year, today.month, today.day, 23, 59, 59);
+    // Start of tomorrow — the range end is exclusive.
+    final endOfDay = startOfDay.add(const Duration(days: 1));
     return getPaymentsByDateRange(startOfDay, endOfDay);
   }
 

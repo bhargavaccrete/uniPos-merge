@@ -4,15 +4,15 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:intl/intl.dart';
-import '../../../data/models/retail/hive_model/customer_model_208.dart';
+import '../../../data/models/common/customer_model_125.dart';
 import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
 import '../../../data/models/retail/hive_model/sale_model_203.dart';
 import '../../../data/models/retail/printer_settings_model.dart';
 import '../../../util/restaurant/print_settings.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/plan/plan_enforcement.dart';
-import '../../../core/plan/entitlement_keys.dart';
-import '../../../core/di/service_locator.dart' show taxStore;
+import '../../../core/plan/mode_keys.dart';
+import '../../../core/di/service_locator.dart' show taxStore, attributeStore;
 import '../../../util/restaurant/staticswitch.dart';
 import '../restaurant/tax_breakdown.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
@@ -20,11 +20,64 @@ import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/common/loyalty_points.dart';
 import 'retail_printer_settings_service.dart';
 
+/// What one receipt line contributes to Sub Total — the single definition every
+/// renderer must print in its Amount column and feed to the tax table.
+///
+/// The two modes build `SaleItemModel` from opposite ends:
+/// - **Restaurant** divides the gross menu price down to a base before calling
+///   `SaleItemModel.create` (`restaurant_print_helper.dart`), so `total` lands
+///   back on the original gross — which is what `CartCalculationService
+///   .itemTotal` (the Sub Total) sums.
+/// - **Retail** passes an already-base price, so `total` comes out
+///   tax-INCLUSIVE while its Sub Total (`bill.itemTotal`) is the ex-tax gross.
+///
+/// Printing raw `item.total` in both modes is what made a retail bill show a
+/// ₹118 line above a ₹100 Sub Total. Item-level discount is deliberately not
+/// subtracted here: retail's Sub Total is "before any discount" and the bill
+/// shows Discount as its own row.
+double receiptLineGross(SaleItemModel it) =>
+    AppConfig.isRestaurant ? it.total : it.price * it.qty;
+
+/// The line's OWN discount, or 0. Distinct from `SaleItemModel.discountAmount`,
+/// which is the total including this line's share of the order-level discount.
+double receiptLineDiscount(SaleItemModel it) => it.lineDiscountAmount ?? 0;
+
+/// Sum of the per-line discounts on a bill.
+///
+/// Folded over the very items the receipt renders, so the "Item Discounts" total
+/// can never disagree with the sub-rows printed above it. Deliberately NOT read
+/// from `SaleModel.lineDiscountTotal` for that reason (that field exists for
+/// reporting, and is absent on returns and on pre-feature sales).
+double receiptLineDiscountTotal(List<SaleItemModel> items) =>
+    items.fold<double>(0, (s, it) => s + receiptLineDiscount(it));
+
+/// The order-level part of a bill's discount: the stored total minus everything
+/// attributable to individual lines.
+///
+/// Clamped at zero — the per-line and total figures are rounded independently,
+/// so the residual can land a paisa negative.
+double receiptBillDiscountRemainder(SaleModel sale, List<SaleItemModel> items) {
+  final remainder = sale.discountAmount - receiptLineDiscountTotal(items);
+  return remainder > 0 ? remainder : 0;
+}
+
+/// "Discount 10%" / "Discount 90.00" label for a line's own discount.
+String receiptLineDiscountLabel(SaleItemModel it) {
+  final value = it.lineDiscountValue;
+  if (it.lineDiscountType == 'percentage' && value != null && value > 0) {
+    final pct = value == value.roundToDouble()
+        ? value.toStringAsFixed(0)
+        : value.toString();
+    return 'Discount $pct%';
+  }
+  return 'Discount';
+}
+
 /// Data class to hold all receipt information
 class ReceiptData {
   final SaleModel sale;
   final List<SaleItemModel> items;
-  final CustomerModel? customer;
+  final Customer? customer;
   final String? storeName;
   final String? storeAddress;
   final String? storePhone;
@@ -56,6 +109,12 @@ class ReceiptData {
 
   // Tax mode stored at order creation time (use this instead of live AppSettings)
   final bool? isTaxInclusive;
+
+  // Does this business use tax features at all (TaxFeature.enabled at the time
+  // this receipt was built)? Gates GSTIN, tax summary rows, and the "includes
+  // GST" footer across every renderer — authoritative, unlike per-item gstRate/
+  // taxRate which can be stale on old records.
+  final bool taxEnabled;
 
   // Service / Delivery charge (pre-calculated by CartCalculationService)
   final double? serviceCharge;
@@ -97,6 +156,7 @@ class ReceiptData {
     this.itemTotal,
     this.loyaltyPointsDiscount,
     this.isTaxInclusive,
+    this.taxEnabled = true,
     this.serviceCharge,
     this.isDeliveryOrder,
     this.roundOff,
@@ -271,9 +331,16 @@ class ReceiptPdfService {
     final retailSettings = _getRetailSettings();
 
     final isKot = data.kotNumber != null;
+    // The compact layout was already built here, but the flag came only from
+    // restaurant's PrintSettings — which retail's settings screen never exposed,
+    // so a retail user could not reach it. In retail mode the choice now comes
+    // from RetailPrinterSettings; restaurant keeps its own (and KOT is
+    // restaurant-only, so that branch is unchanged).
     final bool isPaperSaver = isKot
         ? PrintSettings.isKotTemplatePaperSaver
-        : PrintSettings.isBillTemplatePaperSaver;
+        : (isRetail && retailSettings != null
+            ? retailSettings.billTemplate == BillTemplate.paperSaver
+            : PrintSettings.isBillTemplatePaperSaver);
 
     // Font size baseline calculations based on template choice
     final double storeNameSize = isPaperSaver
@@ -329,7 +396,8 @@ class ReceiptPdfService {
     final showStoreName = isKot ? false : (isRetail ? (retailSettings?.showStoreName ?? true) : PrintSettings.showRestaurantName);
     final showStoreAddress = isKot ? false : (isRetail ? (retailSettings?.showStoreAddress ?? true) : PrintSettings.showRestaurantAddress);
     final showStorePhone = isKot ? false : (isRetail ? (retailSettings?.showStorePhone ?? true) : PrintSettings.showRestaurantMobile);
-    final showGST = isKot ? false : (isRetail ? (retailSettings?.showGSTNumber ?? true) : true);
+    final showGST = data.taxEnabled &&
+        (isKot ? false : (isRetail ? (retailSettings?.showGSTNumber ?? true) : true));
 
     final bool hasHeaderDetails = (showLogo && data.logoBytes != null) ||
         showStoreName ||
@@ -342,8 +410,15 @@ class ReceiptPdfService {
     final showPaymentMethod = isRetail ? (retailSettings?.showPaymentMethod ?? true) : PrintSettings.showPaymentType;
     final showCustomer = isRetail ? (retailSettings?.showCustomerDetails ?? true) : PrintSettings.showCustomerName;
     final showSubtotal = isRetail ? (retailSettings?.showSubtotal ?? true) : PrintSettings.showSubtotal;
-    final showTax = isRetail ? (retailSettings?.showTax ?? true) : PrintSettings.showTax;
+    final showTax = data.taxEnabled && (isRetail ? (retailSettings?.showTax ?? true) : PrintSettings.showTax);
     final showPaymentPaid = isRetail ? (retailSettings?.showSplitPayment ?? true) : PrintSettings.showPaymentPaid;
+    // Retail-only: per-line discounts printed under their item. Restaurant
+    // receipts are unchanged — they have no line-discount concept, and their
+    // per-item Discount column on the A4 invoice already covers the case.
+    // `showItemDiscount` has existed on the retail printer settings model since
+    // it was written; this is its first consumer.
+    final showItemDiscount =
+        isRetail && (retailSettings?.showItemDiscount ?? true);
     final showFooter = isRetail ? (retailSettings?.showFooter ?? true) : PrintSettings.showPoweredBy;
 
     // Custom text for retail
@@ -555,7 +630,7 @@ class ReceiptPdfService {
               children: [
                 pw.Text('Customer:', style: pw.TextStyle(fontSize: labelSize, fontWeight: pw.FontWeight.bold)),
                 pw.Text(
-                  data.customer!.name,
+                  data.customer!.name ?? '',
                   style: pw.TextStyle(fontSize: labelSize, fontWeight: pw.FontWeight.bold),
                 ),
               ],
@@ -588,6 +663,12 @@ class ReceiptPdfService {
           // Items Header
           pw.Row(
             children: [
+              // HSN/SAC — retail bills only; restaurant header is unchanged.
+              if (AppConfig.isRetail)
+                pw.Expanded(
+                  flex: 2,
+                  child: pw.Text('HSN', style: pw.TextStyle(fontSize: tableHeaderSize, fontWeight: pw.FontWeight.bold)),
+                ),
               pw.Expanded(
                 flex: 3,
                 child: pw.Text('Item', style: pw.TextStyle(fontSize: tableHeaderSize, fontWeight: pw.FontWeight.bold)),
@@ -614,6 +695,7 @@ class ReceiptPdfService {
                 fontSize: bodySize,
                 subFontSize: bodySize - 1.0,
                 isPaperSaver: isPaperSaver,
+                showItemDiscount: showItemDiscount,
               )),
 
           pw.SizedBox(height: lineSpacing),
@@ -627,12 +709,9 @@ class ReceiptPdfService {
             // stale and mismatch how THIS order was priced).
             final bool fallbackInclusive = AppConfig.isRestaurant &&
                 (data.isTaxInclusive ?? AppSettings.isTaxInclusive);
-            // Per-rate base for the GST table. On the restaurant side item.price
-            // is mode-adjusted (divided by 1+rate for exclusive display), so use
-            // item.total — which restores the true base and sums to Sub Total.
-            // Retail keeps price*qty (its price is already the base).
-            double lineGross(SaleItemModel it) =>
-                AppConfig.isRestaurant ? it.total : it.price * it.qty;
+            // Per-rate base for the GST table — the same figure the Amount
+            // column prints, so rows and the tax table can never disagree.
+            double lineGross(SaleItemModel it) => receiptLineGross(it);
             // Prefer the pre-calculated itemTotal, but fall back to the receipt's
             // own line gross so the detector never relies on the stale flag.
             final double itemsGross =
@@ -650,51 +729,52 @@ class ReceiptPdfService {
                     fallback: fallbackInclusive,
                   )
                 : fallbackInclusive;
-            // Per-rate tax summary (discount re-distributed like the cart). 0% dropped.
-            final taxLines = TaxBreakdown.compute(
+            // Per-rate tax summary. A line discount belongs to its own GST
+            // bucket; only the ORDER-level remainder is spread proportionally.
+            // Passing the total as billDiscount would deduct line discounts
+            // twice and smear them across every rate. 0% dropped.
+            final taxLines = TaxBreakdown.computeWithLineDiscounts(
               items: data.items
-                  .map((it) =>
-                      (gross: lineGross(it), ratePercent: it.gstRate ?? 0))
+                  .map((it) => (
+                        gross: lineGross(it),
+                        lineDiscount: receiptLineDiscount(it),
+                        ratePercent: it.gstRate ?? 0,
+                      ))
                   .toList(),
-              billDiscount: data.sale.discountAmount,
+              billDiscount:
+                  receiptBillDiscountRemainder(data.sale, data.items),
               isTaxInclusive: inclusive,
               reconcileToGst: data.sale.taxAmount, // lines must sum to the order's GST
             );
-            // TEMP DEBUG — remove after diagnosing tax-summary bug.
-            // ignore: avoid_print
-            print('🟢 TAXDEBUG thermal ───────────────────────────────\n'
-                '  isRestaurant=${AppConfig.isRestaurant} '
-                'itemTotal=${data.itemTotal} itemsGross=$itemsGross '
-                'grossTotal=$grossTotal\n'
-                '  sale.subtotal=${data.sale.subtotal} '
-                'sale.taxAmount=${data.sale.taxAmount} '
-                'sale.totalAmount=${data.sale.totalAmount} '
-                'discount=${data.sale.discountAmount}\n'
-                '  MODE: fallbackInclusive=$fallbackInclusive => inclusive=$inclusive\n'
-                '  ITEMS (price = what the row shows? -> lineGross fed to tax):\n'
-                '${data.items.map((it) => '    "${it.productName}" '
-                    'price=${it.price} qty=${it.qty} total=${it.total} '
-                    'lineGross=${lineGross(it)} gstRate=${it.gstRate} '
-                    'storedTaxable=${it.taxableAmount} storedGst=${it.gstAmount}').join("\n")}\n'
-                '  COMPUTED TAX LINES (printed in summary):\n'
-                '${taxLines.map((l) => '    ${l.ratePercent}% -> '
-                    'taxable=${l.taxable} gst=${l.gst} '
-                    'total=${(l.taxable + l.gst).toStringAsFixed(2)}').join("\n")}\n'
-                '─────────────────────────────────────────────────────');
             final bool hasGst = showTax && taxLines.isNotEmpty;
             // Authoritative total — always matches the order's GST.
             final double totalGst = data.sale.taxAmount;
             // Tax toggle OFF → collapse the per-rate table to a single summary
             // line so Sub Total + Tax still reconcile to the Grand Total.
-            final bool showTaxSummaryLine = !showTax && totalGst > 0.009;
+            final bool showTaxSummaryLine = data.taxEnabled && !showTax && totalGst > 0.009;
 
             return pw.Column(
               children: [
                 if (showSubtotal)
                   _buildThermalTotalRow(
                       'Sub Total:', data.itemTotal ?? data.sale.subtotal, fontSize: totalRowSize),
-                if (data.sale.discountAmount > 0.009 && showSubtotal)
-                  _buildThermalTotalRow('Discount', -data.sale.discountAmount, fontSize: totalRowSize),
+                // Discount, split so a per-line reduction is not passed off as a
+                // generic bill discount. Both figures come from the same items
+                // rendered above, so the rows always sum to sale.discountAmount.
+                if (showSubtotal &&
+                    receiptLineDiscountTotal(data.items) > 0.009)
+                  _buildThermalTotalRow(
+                      'Item Discounts',
+                      -receiptLineDiscountTotal(data.items),
+                      fontSize: totalRowSize),
+                if (showSubtotal &&
+                    receiptBillDiscountRemainder(data.sale, data.items) > 0.009)
+                  _buildThermalTotalRow(
+                      receiptLineDiscountTotal(data.items) > 0.009
+                          ? 'Bill Discount'
+                          : 'Discount',
+                      -receiptBillDiscountRemainder(data.sale, data.items),
+                      fontSize: totalRowSize),
                 if ((data.loyaltyPointsDiscount ?? 0) > 0)
                   _buildThermalTotalRow('Points Redeemed',
                       -(data.loyaltyPointsDiscount!.toDouble()), fontSize: totalRowSize),
@@ -788,7 +868,7 @@ class ReceiptPdfService {
 
           // Footer
           if (AppConfig.isRestaurant) ...[
-            if (data.isTaxInclusive ?? false)
+            if (data.taxEnabled && (data.isTaxInclusive ?? false))
               pw.Text(
                 'All prices include GST',
                 style: pw.TextStyle(fontSize: isSmallMedia ? 8 : 10),
@@ -803,7 +883,7 @@ class ReceiptPdfService {
               ),
             // "Powered by" + company line — forced by the admin flag, else the
             // shop's "Powered By" toggle decides.
-            if (PlanEnforce.allows(EntKeys.billingInvoicePrint) ||
+            if (PlanEnforce.allows(ModeKeys.billingInvoicePrint) ||
                 PrintSettings.showPoweredBy) ...[
               pw.SizedBox(height: 4),
               pw.Text(
@@ -857,7 +937,7 @@ class ReceiptPdfService {
                     style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
                   ),
                   pw.Text(
-                    'Total Points: ${data.customer!.pointsBalance}',
+                    'Total Points: ${data.customer!.loyaltyPoints}',
                     style: const pw.TextStyle(fontSize: 8),
                   ),
                 ],
@@ -889,14 +969,14 @@ class ReceiptPdfService {
     final showStoreAddress = isRetail ? (retailSettings?.showStoreAddress ?? true) : true;
     final showStorePhone = isRetail ? (retailSettings?.showStorePhone ?? true) : true;
     final showStoreEmail = isRetail ? (retailSettings?.showStoreEmail ?? false) : true;
-    final showGST = isRetail ? (retailSettings?.showGSTNumber ?? true) : true;
+    final showGST = data.taxEnabled && (isRetail ? (retailSettings?.showGSTNumber ?? true) : true);
     final showInvoiceNumber = isRetail ? (retailSettings?.showInvoiceNumber ?? true) : true;
     final showInvoiceDate = isRetail ? (retailSettings?.showInvoiceDate ?? true) : true;
     final showCustomer = isRetail ? (retailSettings?.showCustomerDetails ?? true) : true;
     final showPaymentMethod = isRetail ? (retailSettings?.showPaymentMethod ?? true) : true;
     final showSubtotal = isRetail ? (retailSettings?.showSubtotal ?? true) : true;
     final showDiscount = isRetail ? (retailSettings?.showDiscount ?? true) : true;
-    final showTax = isRetail ? (retailSettings?.showTax ?? true) : true;
+    final showTax = data.taxEnabled && (isRetail ? (retailSettings?.showTax ?? true) : true);
     final showGrandTotal = isRetail ? (retailSettings?.showGrandTotal ?? true) : true;
     final showLoyaltyPoints = isRetail ? (retailSettings?.showLoyaltyPoints ?? true) : true;
 
@@ -1063,10 +1143,10 @@ class ReceiptPdfService {
                     pw.SizedBox(height: 8),
                     if (data.customer != null) ...[
                       pw.Text(
-                        data.customer!.name,
+                        data.customer!.name ?? '',
                         style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
                       ),
-                      pw.Text(data.customer!.phone, style: const pw.TextStyle(fontSize: 10)),
+                      pw.Text(data.customer!.phone ?? '', style: const pw.TextStyle(fontSize: 10)),
                       if (data.customer!.email != null)
                         pw.Text(data.customer!.email!, style: const pw.TextStyle(fontSize: 10)),
                       if (data.customer!.address != null)
@@ -1151,9 +1231,25 @@ class ReceiptPdfService {
                     // Item Total - Pre-calculated
                     if (showSubtotal && data.itemTotal != null)
                       _buildInvoiceTotalRow('Item Total', data.itemTotal!),
-                    // Discount - Pre-calculated
-                    if (showDiscount && data.sale.discountAmount > 0.009)
-                      _buildInvoiceTotalRow('Discount', -data.sale.discountAmount, isRed: true),
+                    // Discount, split into the per-line part and the
+                    // order-level remainder. Same figures as the item table's
+                    // Discount column, so the two always agree.
+                    if (showDiscount &&
+                        receiptLineDiscountTotal(data.items) > 0.009)
+                      _buildInvoiceTotalRow(
+                          'Item Discounts',
+                          -receiptLineDiscountTotal(data.items),
+                          isRed: true),
+                    if (showDiscount &&
+                        receiptBillDiscountRemainder(data.sale, data.items) >
+                            0.009)
+                      _buildInvoiceTotalRow(
+                          receiptLineDiscountTotal(data.items) > 0.009
+                              ? 'Bill Discount'
+                              : 'Discount',
+                          -receiptBillDiscountRemainder(
+                              data.sale, data.items),
+                          isRed: true),
                     // Points Redeemed - only show if loyalty points were used
                     if ((data.loyaltyPointsDiscount ?? 0) > 0)
                       _buildInvoiceTotalRow('Points Redeemed', -(data.loyaltyPointsDiscount!.toDouble()), isRed: true),
@@ -1166,11 +1262,11 @@ class ReceiptPdfService {
                       _buildInvoiceTotalRow('Sub Total (Before Tax)', data.sale.subtotal),
                     // GST summary row (exclusive) — always shown so the invoice
                     // reconciles even when the detailed table above is toggled off.
-                    if (!isRestaurantInclusive && data.sale.taxAmount > 0)
+                    if (data.taxEnabled && !isRestaurantInclusive && data.sale.taxAmount > 0)
                       _buildInvoiceTotalRow('GST', data.sale.taxAmount),
                     // Inclusive mode: the detailed table carries tax; when it's
                     // toggled off, show a single informational line instead.
-                    if (isRestaurantInclusive && !showTax && data.sale.taxAmount > 0)
+                    if (data.taxEnabled && isRestaurantInclusive && !showTax && data.sale.taxAmount > 0)
                       _buildInvoiceTotalRow('Tax (Incl.)', data.sale.taxAmount),
                     // Service / Delivery Charge
                     if ((data.serviceCharge ?? 0) > 0.009)
@@ -1285,7 +1381,7 @@ class ReceiptPdfService {
                 textAlign: pw.TextAlign.center,
               ),
               pw.SizedBox(height: 4),
-              if (AppConfig.isRestaurant && (data.isTaxInclusive ?? false))
+              if (AppConfig.isRestaurant && data.taxEnabled && (data.isTaxInclusive ?? false))
                 pw.Text(
                   'All prices include GST',
                   style: pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
@@ -1297,7 +1393,7 @@ class ReceiptPdfService {
               // "Powered by" + company line — restaurant only. Forced by the admin
               // `billing.invoice.print` flag; otherwise the shop's toggle decides.
               if (AppConfig.isRestaurant &&
-                  (PlanEnforce.allows(EntKeys.billingInvoicePrint) ||
+                  (PlanEnforce.allows(ModeKeys.billingInvoicePrint) ||
                       PrintSettings.showPoweredBy)) ...[
                 pw.SizedBox(height: 4),
                 pw.Text(
@@ -1412,12 +1508,9 @@ class ReceiptPdfService {
     // the stored flag can be stale and mismatch how THIS order was priced.
     final bool fallbackInclusive = AppConfig.isRestaurant &&
         (data.isTaxInclusive ?? AppSettings.isTaxInclusive);
-    // Per-rate base for the GST table. On the restaurant side item.price is
-    // mode-adjusted (divided by 1+rate for exclusive display), so use item.total
-    // — which restores the true base and sums to Sub Total. Retail keeps
-    // price*qty (its price is already the base).
-    double lineGross(SaleItemModel it) =>
-        AppConfig.isRestaurant ? it.total : it.price * it.qty;
+    // Per-rate base for the GST table — the same figure the Amount column
+    // prints, so rows and the tax table can never disagree.
+    double lineGross(SaleItemModel it) => receiptLineGross(it);
     // Prefer itemTotal, but fall back to the receipt's own line gross so the
     // detector never has to rely on the stale inclusive flag.
     final double itemsGross =
@@ -1435,11 +1528,17 @@ class ReceiptPdfService {
           )
         : fallbackInclusive;
 
-    final taxLines = TaxBreakdown.compute(
+    // Same reasoning as the thermal path: a line discount stays in its own GST
+    // bucket, and only the order-level remainder is spread proportionally.
+    final taxLines = TaxBreakdown.computeWithLineDiscounts(
       items: data.items
-          .map((it) => (gross: lineGross(it), ratePercent: it.gstRate ?? 0))
+          .map((it) => (
+                gross: lineGross(it),
+                lineDiscount: receiptLineDiscount(it),
+                ratePercent: it.gstRate ?? 0,
+              ))
           .toList(),
-      billDiscount: data.sale.discountAmount,
+      billDiscount: receiptBillDiscountRemainder(data.sale, data.items),
       isTaxInclusive: inclusive,
       reconcileToGst: data.sale.taxAmount, // lines must sum to the order's GST
     );
@@ -1585,16 +1684,30 @@ class ReceiptPdfService {
   }
 
   /// Build item row for thermal receipt
-  pw.Widget _buildThermalItemRow(SaleItemModel item, {double fontSize = 9, double subFontSize = 8, bool isPaperSaver = false}) {
+  pw.Widget _buildThermalItemRow(SaleItemModel item, {double fontSize = 9, double subFontSize = 8, bool isPaperSaver = false, bool showItemDiscount = false}) {
     final name = item.productName ?? 'Unknown';
     // Full name + variant — let it WRAP (no truncation) so variant/extra details
     // in parentheses aren't hidden behind an ellipsis.
-    final displayName = item.size != null && item.size!.isNotEmpty
-        ? '$name (${item.size})'
-        : name;
+    // Label only when we have real attribute names to show, i.e. a retail sale
+    // recorded with generic attributes → "(Storage: 1tb)". Restaurant items
+    // carry no map and fall back to the legacy columns, where `size` holds the
+    // variant name — those stay bare, so KOT/bills still read "(Large)".
+    final hasNamedAttributes = item.attributes?.isNotEmpty ?? false;
+    final descriptor = attributeStore.describeAttributes(
+      item.attributes,
+      size: item.size,
+      color: item.color,
+      labelled: hasNamedAttributes,
+    );
+    final displayName = descriptor.isEmpty ? name : '$name ($descriptor)';
 
-    // Calculate unit price (total / quantity)
-    final unitPrice = item.qty > 0 ? item.total / item.qty : item.total;
+    // Rate and Amount both come off receiptLineGross, so the column sums to
+    // Sub Total. Printing item.total here put a tax-inclusive ₹118 line above
+    // a ₹100 ex-tax Sub Total on every retail bill.
+    final lineAmount = receiptLineGross(item);
+    final unitPrice = item.qty > 0 ? lineAmount / item.qty : lineAmount;
+
+    final hsn = (item.hsnCode?.trim().isNotEmpty ?? false) ? item.hsnCode!.trim() : '-';
 
     return pw.Padding(
       padding: pw.EdgeInsets.symmetric(vertical: isPaperSaver ? 0.5 : 2.0),
@@ -1606,6 +1719,12 @@ class ReceiptPdfService {
             // name wraps to two lines.
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
+              // HSN/SAC — retail bills only; must mirror the header's flex.
+              if (AppConfig.isRetail)
+                pw.Expanded(
+                  flex: 2,
+                  child: pw.Text(hsn, style: pw.TextStyle(fontSize: fontSize)),
+                ),
               pw.Expanded(
                 flex: 3,
                 child: pw.Text(displayName, style: pw.TextStyle(fontSize: fontSize)),
@@ -1625,13 +1744,29 @@ class ReceiptPdfService {
               pw.Expanded(
                 flex: 2,
                 child: pw.Text(
-                  _formatCurrency(item.total),
+                  _formatCurrency(lineAmount),
                   style: pw.TextStyle(fontSize: fontSize),
                   textAlign: pw.TextAlign.right,
                 ),
               ),
             ],
           ),
+          // This line's OWN discount, shown under it. The Amount column above
+          // stays GROSS so it still sums to Sub Total and still matches what the
+          // tax table was computed from; the totals block subtracts this once,
+          // as "Item Discounts".
+          if (showItemDiscount && receiptLineDiscount(item) > 0.009)
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(left: 8, top: 2),
+              child: pw.Text(
+                '${receiptLineDiscountLabel(item)}  '
+                '-${_formatCurrency(receiptLineDiscount(item))}',
+                style: pw.TextStyle(
+                  fontSize: subFontSize,
+                  color: PdfColors.grey600,
+                ),
+              ),
+            ),
           // Display extras and add-ons (stored in weight field)
           if (item.weight != null && item.weight!.isNotEmpty)
             pw.Padding(
@@ -1783,22 +1918,26 @@ class ReceiptPdfService {
 
   /// Build items table for A4 invoice
   pw.Widget _buildInvoiceTable(List<SaleItemModel> items) {
+    // HSN/SAC column is retail-only; restaurant keeps the original 6 columns.
+    final isRetail = AppConfig.isRetail;
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
-      columnWidths: {
-        0: const pw.FlexColumnWidth(1),
-        1: const pw.FlexColumnWidth(4),
-        2: const pw.FlexColumnWidth(2),
-        3: const pw.FlexColumnWidth(1),
-        4: const pw.FlexColumnWidth(2),
-        5: const pw.FlexColumnWidth(2),
-      },
+      columnWidths: <pw.TableColumnWidth>[
+        const pw.FlexColumnWidth(1), // #
+        if (isRetail) const pw.FlexColumnWidth(2), // HSN
+        const pw.FlexColumnWidth(4), // Product
+        const pw.FlexColumnWidth(2), // Unit Price
+        const pw.FlexColumnWidth(1), // Qty
+        const pw.FlexColumnWidth(2), // Discount
+        const pw.FlexColumnWidth(2), // Total
+      ].asMap(),
       children: [
         // Header
         pw.TableRow(
           decoration: const pw.BoxDecoration(color: PdfColors.green800),
           children: [
             _buildTableHeader('#'),
+            if (isRetail) _buildTableHeader('HSN'),
             _buildTableHeader('Product'),
             _buildTableHeader('Unit Price'),
             _buildTableHeader('Qty'),
@@ -1816,16 +1955,38 @@ class ReceiptPdfService {
             decoration: pw.BoxDecoration(color: bgColor),
             children: [
               _buildTableCell('${index + 1}', align: pw.TextAlign.center),
+              if (isRetail)
+                _buildTableCell(
+                  (item.hsnCode?.trim().isNotEmpty ?? false) ? item.hsnCode!.trim() : '-',
+                  align: pw.TextAlign.center,
+                ),
               _buildProductCell(item),
               _buildTableCell(_formatCurrency(item.price), align: pw.TextAlign.right),
               _buildTableCell('${item.qty}', align: pw.TextAlign.center),
+              // Per-item Discount column.
+              //
+              // Retail shows the line's OWN discount only — `discountAmount`
+              // there also carries the line's share of the order-level discount,
+              // which the totals block already subtracts once as "Bill
+              // Discount"; printing it here too would read as a double
+              // deduction. Restaurant keeps reading `discountAmount`, which is
+              // its only per-item figure and unchanged by line discounts.
               _buildTableCell(
-                item.discountAmount != null && item.discountAmount! > 0
-                    ? _formatCurrency(item.discountAmount!)
-                    : '-',
+                isRetail
+                    ? (receiptLineDiscount(item) > 0.009
+                        ? _formatCurrency(receiptLineDiscount(item))
+                        : '-')
+                    : (item.discountAmount != null && item.discountAmount! > 0
+                        ? _formatCurrency(item.discountAmount!)
+                        : '-'),
                 align: pw.TextAlign.right,
               ),
-              _buildTableCell(_formatCurrency(item.total), align: pw.TextAlign.right, isBold: true),
+              // Gross, matching the "Item Total" row in the totals block —
+              // the Discount column beside it is subtracted once there, not
+              // twice. item.total was tax-inclusive on retail, so this column
+              // never summed to Item Total.
+              _buildTableCell(_formatCurrency(receiptLineGross(item)),
+                  align: pw.TextAlign.right, isBold: true),
             ],
           );
         }),
@@ -1872,12 +2033,17 @@ class ReceiptPdfService {
             item.productName ?? 'Unknown Product',
             style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
           ),
-          if (item.size != null || item.color != null)
+          // Any configured attribute (Storage, Flavour…), falling back to the
+          // legacy size/color columns for sales recorded before generic
+          // attributes existed. `weight` is deliberately excluded — restaurant
+          // reuses it as the extras blob rendered separately below.
+          if (attributeStore
+              .describeAttributes(item.attributes,
+                  size: item.size, color: item.color, separator: ' | ')
+              .isNotEmpty)
             pw.Text(
-              [
-                if (item.size != null) 'Size: ${item.size}',
-                if (item.color != null) 'Color: ${item.color}',
-              ].join(' | '),
+              attributeStore.describeAttributes(item.attributes,
+                  size: item.size, color: item.color, separator: ' | '),
               style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
             ),
           // Variant/choice/extras info (stored in weight) — must read as a

@@ -15,18 +15,14 @@ class PaymentSetupNavigationScreen extends StatelessWidget {
         // Navigate to Staff Setup after Payment Setup
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (context) => const StaffSetupScreen(),
-          ),
+          MaterialPageRoute(builder: (context) => const StaffSetupScreen()),
         );
       },
       onSkip: () {
         // Skip Payment Setup and go to Staff Setup
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (context) => const StaffSetupScreen(),
-          ),
+          MaterialPageRoute(builder: (context) => const StaffSetupScreen()),
         );
       },
     );

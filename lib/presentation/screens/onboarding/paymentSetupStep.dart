@@ -260,7 +260,7 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: AppColors.white,
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(color: AppColors.divider),
                               ),
@@ -366,7 +366,7 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
                       decoration: BoxDecoration(
                         color: isSelected
                             ? AppColors.primary.withValues(alpha: 0.12)
-                            : Colors.grey.shade100,
+                            : AppColors.surfaceLight,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Center(
@@ -446,53 +446,22 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ── Name field ──
-              Text('Display Name',
-                  style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary)),
-              const SizedBox(height: 6),
-              TextField(
+              AppTextField(
                 controller: _methodNameController,
                 autofocus: true,
-                textCapitalization: TextCapitalization.words,
+                label: 'Display Name',
+                hint: 'e.g., PayTM, GPay, Sodexo',
+                icon: Icons.payment_rounded,
+                required: true,
                 textInputAction: TextInputAction.done,
-                onSubmitted: (_) => submitAdd(),
-                style: GoogleFonts.poppins(
-                    fontSize: 14, color: AppColors.textPrimary),
+                onFieldSubmitted: (_) => submitAdd(),
                 onChanged: (_) {
                   if (errorText != null) {
                     setDialogState(() => errorText = null);
                   }
                 },
-                decoration: InputDecoration(
-                  hintText: 'e.g., PayTM, GPay, Sodexo',
-                  hintStyle: GoogleFonts.poppins(
-                      fontSize: 13, color: AppColors.textSecondary),
-                  errorText: errorText,
-                  errorStyle: GoogleFonts.poppins(fontSize: 11),
-                  filled: true,
-                  fillColor: AppColors.surfaceLight,
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.divider),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.divider),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                        color: AppColors.primary, width: 1.5),
-                  ),
-                  errorBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.danger),
-                  ),
-                ),
+                validator: (_) => errorText,
+                autovalidateMode: AutovalidateMode.always,
               ),
               const SizedBox(height: 16),
 
@@ -511,7 +480,8 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
                   return InkWell(
                     onTap: () => setDialogState(() => selectedIcon = e.key),
                     borderRadius: BorderRadius.circular(10),
-                    child: Container(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 9),
                       decoration: BoxDecoration(
@@ -682,7 +652,7 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.white,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppColors.divider),
                   ),
@@ -720,7 +690,7 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
                           ],
                         ),
                       ),
-                      Icon(Icons.chevron_right, color: Colors.grey.shade400),
+                      Icon(Icons.chevron_right, color: AppColors.textSecondary),
                     ],
                   ),
                 ),
@@ -762,7 +732,7 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
         Container(
           padding: EdgeInsets.fromLTRB(hPad, 12, hPad, vPad),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.white,
             border: Border(
               top: BorderSide(color: AppColors.divider.withValues(alpha: 0.6)),
             ),

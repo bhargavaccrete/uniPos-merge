@@ -20,6 +20,22 @@ import 'package:billberrylite/presentation/widget/componets/common/app_text_fiel
 /// and by the order screens (so the day starts the moment the first order is
 /// placed, not forced on app open).
 Future<bool> promptStartDay(BuildContext context) async {
+  // A session is already open — never start a second one.
+  //
+  // `setOpeningBalance` below routes to `startSession`, which mints a NEW
+  // sessionId, repoints the current-session key (orphaning the live session as
+  // permanently un-closed), moves `dayStartTimestamp` to now — dropping every
+  // sale already rung up out of the EOD, since `generateRetailEODReport`
+  // filters from that timestamp — and resets the daily bill number.
+  //
+  // Ten of the eleven call sites checked `isDayStarted()` first; the retail
+  // Settings screen did not, so tapping "Start Day" mid-day silently lost the
+  // day's takings. Guarding here means no caller can do it.
+  //
+  // Returns true: the contract is "is a day now open?", and one already is.
+  if (await DayManagementService.isDayStarted()) return true;
+  if (!context.mounted) return false;
+
   final balance = await showDialog<double>(
     context: context,
     barrierDismissible: false,

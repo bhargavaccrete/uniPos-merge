@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/init/hive_init.dart';
@@ -39,6 +40,11 @@ void main() async {
 
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+
+    // Poppins is bundled locally (assets/fonts/, registered in pubspec.yaml)
+    // so GoogleFonts.poppins() must never try to fetch it over the network —
+    // this app needs to work fully offline.
+    GoogleFonts.config.allowRuntimeFetching = false;
 
     // Enable Wake Lock to prevent device from going to sleep
     WakelockPlus.enable();

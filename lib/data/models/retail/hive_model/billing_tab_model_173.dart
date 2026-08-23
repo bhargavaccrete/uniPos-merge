@@ -58,7 +58,11 @@ class BillingTabModel extends HiveObject {
   /// Check if tab is empty
   bool get isEmpty => items.isEmpty;
 
-  /// Get display name for tab
+  /// Get display name for tab.
+  ///
+  /// NOT what the POS tab strip shows — `name` is stamped at creation and goes
+  /// stale as soon as a middle tab is closed. Use `CartStore.tabLabel(index)`,
+  /// which numbers by position.
   String get displayName {
     if (customerName != null && customerName!.isNotEmpty) {
       return customerName!;

@@ -24,7 +24,7 @@ import '../../../../../util/common/loyalty_points.dart';
 import '../../../../../util/restaurant/staticswitch.dart';
 import '../../../../../util/restaurant/restaurant_session.dart';
 import '../../../../../stores/payment_method_store.dart';
-import '../../../../../data/models/restaurant/db/customer_model_125.dart';
+import '../../../../../data/models/common/customer_model_125.dart';
 import '../../../../widget/componets/common/split_payment_widget.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../../widget/componets/restaurant/componets/filterButton.dart';
@@ -34,7 +34,6 @@ import '../../util/restaurant_print_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
-enum DiscountType { amount, percentage }
 
 class Customerdetails extends StatefulWidget {
   final OrderModel? existingModel;
@@ -63,7 +62,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
   late TextEditingController _emailController = TextEditingController();
 
   // Customer selection
-  RestaurantCustomer? selectedCustomer;
+  Customer? selectedCustomer;
   String? _mobileError;
   bool _usePoints = false;
   final _serviceChargeController = TextEditingController();
@@ -138,7 +137,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
     final name = widget.existingModel?.customerName?.trim() ?? '';
     try {
       if (phone.isNotEmpty) {
-        final results = await restaurantCustomerStore.searchCustomers(phone);
+        final results = await customerStore.searchCustomers(phone);
         final match = results.where((c) => c.phone == phone).firstOrNull;
         if (match != null && mounted) {
           setState(() => selectedCustomer = match);
@@ -146,7 +145,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
         }
       }
       if (name.isNotEmpty) {
-        final results = await restaurantCustomerStore.searchCustomers(name);
+        final results = await customerStore.searchCustomers(name);
         final match = results
             .where((c) => c.name?.toLowerCase() == name.toLowerCase())
             .firstOrNull;
@@ -159,7 +158,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
   }
 
   // Handle customer selection from autocomplete
-  void _onCustomerSelected(RestaurantCustomer customer) {
+  void _onCustomerSelected(Customer customer) {
     setState(() {
       selectedCustomer = customer;
       _nameController.text = customer.name ?? '';
@@ -388,15 +387,15 @@ class _CustomerdetailsState extends State<Customerdetails> {
               ),
 
               // Autocomplete Name Field
-              Autocomplete<RestaurantCustomer>(
+              Autocomplete<Customer>(
                 optionsBuilder: (TextEditingValue textEditingValue) async {
                   if (textEditingValue.text.isEmpty) {
-                    return const Iterable<RestaurantCustomer>.empty();
+                    return const Iterable<Customer>.empty();
                   }
-                  return await restaurantCustomerStore.searchCustomers(textEditingValue.text);
+                  return await customerStore.searchCustomers(textEditingValue.text);
                 },
-                displayStringForOption: (RestaurantCustomer customer) => customer.name ?? '',
-                onSelected: (RestaurantCustomer customer) {
+                displayStringForOption: (Customer customer) => customer.name ?? '',
+                onSelected: (Customer customer) {
                   _onCustomerSelected(customer);
                 },
                 fieldViewBuilder: (context, controller, focusNode, onEditingComplete) {
@@ -490,15 +489,15 @@ class _CustomerdetailsState extends State<Customerdetails> {
               const SizedBox(height: 14),
 
               // Autocomplete Mobile Field
-              Autocomplete<RestaurantCustomer>(
+              Autocomplete<Customer>(
                 optionsBuilder: (TextEditingValue textEditingValue) async {
                   if (textEditingValue.text.isEmpty) {
-                    return const Iterable<RestaurantCustomer>.empty();
+                    return const Iterable<Customer>.empty();
                   }
-                  return await restaurantCustomerStore.searchCustomers(textEditingValue.text);
+                  return await customerStore.searchCustomers(textEditingValue.text);
                 },
-                displayStringForOption: (RestaurantCustomer customer) => customer.phone ?? '',
-                onSelected: (RestaurantCustomer customer) {
+                displayStringForOption: (Customer customer) => customer.phone ?? '',
+                onSelected: (Customer customer) {
                   _onCustomerSelected(customer);
                 },
                 fieldViewBuilder: (context, controller, focusNode, onEditingComplete) {
@@ -1362,7 +1361,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
               await completeOrder(completedOrder, calculations, pointsUsed: pointsUsed);
           if (selectedCustomer != null) {
             if (pointsUsed > 0) {
-              await restaurantCustomerStore.updateCustomerVisit(
+              await customerStore.updateCustomerVisit(
                   customerId: selectedCustomer!.customerId,
                   orderType: '',
                   pointsToAdd: -pointsUsed);
@@ -1391,7 +1390,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
         await restaurantCartStore.clearCart();
         if (selectedCustomer != null) {
           if (pointsUsed > 0) {
-            await restaurantCustomerStore.updateCustomerVisit(
+            await customerStore.updateCustomerVisit(
               customerId: selectedCustomer!.customerId, orderType: '', pointsToAdd: -pointsUsed);
           }
           final int earned =
@@ -1410,7 +1409,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       // Update customer stats if customer is linked
       if (selectedCustomer != null) {
         if (pointsUsed > 0) {
-          await restaurantCustomerStore.updateCustomerVisit(
+          await customerStore.updateCustomerVisit(
             customerId: selectedCustomer!.customerId, orderType: '', pointsToAdd: -pointsUsed);
         }
         final int earned =
@@ -1560,7 +1559,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
         // Update customer stats if customer is linked
         if (selectedCustomer != null) {
           if (pointsUsed > 0) {
-            await restaurantCustomerStore.updateCustomerVisit(
+            await customerStore.updateCustomerVisit(
               customerId: selectedCustomer!.customerId, orderType: '', pointsToAdd: -pointsUsed);
           }
           final int earned =
@@ -2009,18 +2008,18 @@ class _CustomerdetailsState extends State<Customerdetails> {
   }
 
   // Update customer statistics (visits, loyalty points, last visit, etc.)
-  Future<void> _updateCustomerStats(RestaurantCustomer customer, String orderType, {int pointsToEarn = 0}) async {
+  Future<void> _updateCustomerStats(Customer customer, String orderType, {int pointsToEarn = 0}) async {
     if (!PlanEnforce.allows(EntKeys.customers)) return;
     try {
 
-      await restaurantCustomerStore.updateCustomerVisit(
+      await customerStore.updateCustomerVisit(
         customerId: customer.customerId,
         orderType: orderType,
         pointsToAdd: pointsToEarn,
       );
 
       // Verify the update
-      final updatedCustomer = await restaurantCustomerStore.getCustomerById(customer.customerId);
+      final updatedCustomer = await customerStore.getCustomerById(customer.customerId);
       if (updatedCustomer != null) {
       } else {
       }
@@ -2041,7 +2040,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
     try {
       // Search by phone first to avoid creating duplicates
       if (phone.isNotEmpty) {
-        final results = await restaurantCustomerStore.searchCustomers(phone);
+        final results = await customerStore.searchCustomers(phone);
         final match = results.where((c) => c.phone == phone).firstOrNull;
         if (match != null) {
           if (mounted) setState(() => selectedCustomer = match);
@@ -2051,7 +2050,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
       // Search by name if phone didn't match
       if (name.isNotEmpty) {
-        final results = await restaurantCustomerStore.searchCustomers(name);
+        final results = await customerStore.searchCustomers(name);
         final match = results.where((c) =>
           c.name?.toLowerCase() == name.toLowerCase() &&
           (phone.isEmpty || c.phone == phone)
@@ -2063,12 +2062,12 @@ class _CustomerdetailsState extends State<Customerdetails> {
       }
 
       // No existing customer found — create new
-      final newCustomer = RestaurantCustomer.create(
+      final newCustomer = Customer.create(
         customerId: const Uuid().v4(),
         name: name.isNotEmpty ? name : null,
         phone: phone.isNotEmpty ? phone : null,
       );
-      final saved = await restaurantCustomerStore.addCustomer(newCustomer);
+      final saved = await customerStore.addCustomer(newCustomer);
       if (saved && mounted) {
         setState(() => selectedCustomer = newCustomer);
       }

@@ -86,7 +86,9 @@ class GRNItemRepository {
     return items.fold<int>(0, (sum, item) => sum + (item.damagedQty ?? 0));
   }
 
-  // Get Total Amount for a GRN
+  /// Inventory value of a GRN (accepted units only) — NOT what the supplier is
+  /// owed. The billed figure lives on `GRNModel.totalAmount`, which accrues the
+  /// full received value.
   Future<double> getTotalAmount(String grnId) async {
     final items = await getItemsByGRNId(grnId);
     return items.fold<double>(0.0, (sum, item) => sum + (item.totalAmount ?? 0));

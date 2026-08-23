@@ -9,6 +9,13 @@ part of 'supplier_store.dart';
 // ignore_for_file: non_constant_identifier_names, unnecessary_brace_in_string_interps, unnecessary_lambdas, prefer_expression_function_bodies, lines_longer_than_80_chars, avoid_as, avoid_annotating_with_dynamic, no_leading_underscores_for_local_identifiers
 
 mixin _$SupplierStore on _SupplierStore, Store {
+  Computed<List<SupplierModel>>? _$filteredSuppliersComputed;
+
+  @override
+  List<SupplierModel> get filteredSuppliers => (_$filteredSuppliersComputed ??=
+          Computed<List<SupplierModel>>(() => super.filteredSuppliers,
+              name: '_SupplierStore.filteredSuppliers'))
+      .value;
   Computed<int>? _$supplierCountComputed;
 
   @override
@@ -137,17 +144,48 @@ mixin _$SupplierStore on _SupplierStore, Store {
     return _$searchSuppliersAsyncAction.run(() => super.searchSuppliers(query));
   }
 
-  late final _$updateSupplierBalanceAsyncAction =
-      AsyncAction('_SupplierStore.updateSupplierBalance', context: context);
+  late final _$recordBalanceMovementAsyncAction =
+      AsyncAction('_SupplierStore.recordBalanceMovement', context: context);
 
   @override
-  Future<void> updateSupplierBalance(String supplierId, double amount) {
-    return _$updateSupplierBalanceAsyncAction
-        .run(() => super.updateSupplierBalance(supplierId, amount));
+  Future<void> recordBalanceMovement(
+      {required String supplierId,
+      required double amount,
+      required SupplierLedgerType type,
+      required String description,
+      String? docNumber,
+      String? docId,
+      String? paymentMode,
+      String? referenceNo,
+      String? note,
+      String? date}) {
+    return _$recordBalanceMovementAsyncAction.run(() => super
+        .recordBalanceMovement(
+            supplierId: supplierId,
+            amount: amount,
+            type: type,
+            description: description,
+            docNumber: docNumber,
+            docId: docId,
+            paymentMode: paymentMode,
+            referenceNo: referenceNo,
+            note: note,
+            date: date));
   }
 
   late final _$_SupplierStoreActionController =
       ActionController(name: '_SupplierStore', context: context);
+
+  @override
+  void setSearchQuery(String query) {
+    final _$actionInfo = _$_SupplierStoreActionController.startAction(
+        name: '_SupplierStore.setSearchQuery');
+    try {
+      return super.setSearchQuery(query);
+    } finally {
+      _$_SupplierStoreActionController.endAction(_$actionInfo);
+    }
+  }
 
   @override
   void selectSupplier(SupplierModel? supplier) {
@@ -178,6 +216,7 @@ suppliers: ${suppliers},
 searchResults: ${searchResults},
 searchQuery: ${searchQuery},
 selectedSupplier: ${selectedSupplier},
+filteredSuppliers: ${filteredSuppliers},
 supplierCount: ${supplierCount},
 hasSelection: ${hasSelection},
 totalOutstanding: ${totalOutstanding}

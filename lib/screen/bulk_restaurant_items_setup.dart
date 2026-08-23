@@ -3,7 +3,7 @@
 // import 'package:uuid/uuid.dart';
 // import 'package:hive/hive.dart';
 // import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
-// import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
+// import 'package:billberrylite/data/models/common/categorymodel_300.dart';
 // import 'package:billberrylite/data/models/restaurant/db/variantmodel_305.dart';
 // import 'package:billberrylite/data/models/restaurant/db/extramodel_303.dart';
 // import 'package:billberrylite/data/models/restaurant/db/toppingmodel_304.dart';

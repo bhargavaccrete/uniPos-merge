@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/restaurant/license_model.dart';
-import 'package:billberrylite/domain/store/restaurant/company_store.dart';
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/util/color.dart';
@@ -440,13 +439,7 @@ class _ActivateSheetState extends State<_ActivateSheet> {
     }
     setState(() => _loading = true);
 
-    final companyStore = locator<CompanyStore>();
-    // Ensure the company is hydrated — otherwise a stored store name would be
-    // lost and we'd re-activate with an empty businessname.
-    if (companyStore.company == null) {
-      await companyStore.loadCompany();
-    }
-    final businessName = companyStore.company?.comapanyName ?? '';
+    final businessName = businessDetailsRepository.get()?.storeName ?? '';
     final success = await widget.store.activateLicense(
       key,
       businessName: businessName,

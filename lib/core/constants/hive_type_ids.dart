@@ -16,12 +16,21 @@ class HiveTypeIds {
   static const int taxDetails = 2;
   static const int businessType = 3;
   static const int businessDetails = 4;
-  static const int taxRateItem = 5;
+  // 5 was taxRateItem — retired, named tax rates now live in the shared
+  // Tax entity (typeId 114, data/models/common/taxmodel_314.dart), not this
+  // per-record blob. Don't reuse 5.
   static const int paymentMethod = 6;
 
   // ==================== RESTAURANT MODELS (100-149) ====================
-  static const int restaurantCategory = 100;
-  static const int restaurantCompany = 101;
+  // category, staff, customer, and tax below are shared with retail (see
+  // data/models/common/) — kept in this numeric range since that's where
+  // they were first assigned; the number can never move, only what we
+  // call it in code.
+  static const int category = 100;
+  // 101 was restaurantCompany — retired, the Company model/repo/store were
+  // confirmed dead code (only writer was an unreachable screen) and deleted;
+  // store info lives in the shared BusinessDetails model instead. Don't
+  // reuse 101.
   static const int restaurantItem = 102;
   static const int restaurantExtra = 103;
   static const int restaurantTopping = 104;
@@ -30,11 +39,11 @@ class HiveTypeIds {
   static const int restaurantChoiceOption = 107;
   static const int restaurantCart = 108;
   static const int restaurantOrder = 109;
-  static const int restaurantStaff = 110;
+  static const int staff = 110;
   static const int restaurantTable = 111;
   static const int restaurantItemVariant = 112;
   static const int restaurantPastOrder = 113;
-  static const int restaurantTax = 114;
+  static const int tax = 114;
   static const int restaurantExpense = 115;
   static const int restaurantExpense1 = 116;
   static const int restaurantEod = 117;
@@ -48,7 +57,7 @@ class HiveTypeIds {
   static const int TestBill = 122;
   static const int TestBillItem = 123;
   static const int TaxSummary = 124;
-  static const int RestaurantCustomer = 125;
+  static const int customer = 125;
   static const int restaurantStockLog = 126;
   static const int restaurantShift = 127;
 
@@ -71,24 +80,50 @@ class HiveTypeIds {
   static const int retailSale = 153;
   static const int retailSaleItem = 154;
   static const int retailSupplier = 155;
-  static const int retailPurchaseItem = 156;
-  static const int retailPurchase = 157;
-  static const int retailCustomer = 158;
+  // RETIRED: 156 (retailPurchaseItem) and 157 (retailPurchase) belonged to the
+  // standalone Purchase feature, removed in favour of Purchase Orders + GRN.
+  // NEVER reassign these ids — old box files on disk still reference them.
+  // 158 was retailCustomer — retired, customer now shares RestaurantCustomer's
+  // typeId (125), see Customer in data/models/common/. Don't reuse 158.
   static const int retailHoldSale = 159;
   static const int retailHoldSaleItem = 160;
   static const int retailPurchaseOrder = 161;
   static const int retailPurchaseOrderItem = 162;
   static const int retailGrn = 163;
   static const int retailGrnItem = 164;
-  static const int retailCategory = 165;
+  // 165 was retailCategory — retired, category now shares restaurantCategory's
+  // typeId (100), see Category in data/models/common/. Don't reuse 165.
   static const int retailPaymentEntry = 166;
-  static const int retailAdmin = 167;
+  // 167 was retailAdmin — retired, admin credential is now a SharedPreferences
+  // value (see domain/services/retail/auth_service.dart), not a Hive model.
+  // Don't reuse 167.
   static const int retailCreditPayment = 168;
   static const int retailAttribute = 169;
   static const int retailAttributeValue = 170;
   static const int retailProductAttribute = 171;
-  static const int retailStaff = 172;
+  // 172 was retailStaff — retired, staff now shares restaurantStaff's typeId
+  // (110), see StaffModel in data/models/common/. Don't reuse 172.
   static const int retailBillingTab = 173;
+
+  // Damaged-goods workflow off the back of a GRN. Damaged units never enter
+  // stock and are never billed, so these are records of intent/outcome, not
+  // stock or ledger movements.
+  static const int retailPurchaseReturn = 174;
+  static const int retailPurchaseReturnItem = 175;
+  static const int retailSupplierClaim = 176;
+  static const int retailSupplierClaimItem = 177;
+  static const int retailInventoryLoss = 178;
+
+  /// Journal behind SupplierModel.currentBalance. One row per movement so the
+  /// balance can be explained, not just stated.
+  static const int retailSupplierLedgerEntry = 179;
+
+  /// Physical stock count. Header + lines, following the PO/GRN pair
+  /// convention: the header is the count session, each line one variant that
+  /// was counted. Committing a line goes through `StockAdjustmentService`, so
+  /// these boxes hold the count paperwork, never the stock movement itself.
+  static const int retailStockTake = 180;
+  static const int retailStockTakeItem = 181;
 
   // ==================== HELPER METHODS ====================
 
@@ -115,30 +150,31 @@ class HiveTypeIds {
     retailSale,
     retailSaleItem,
     retailSupplier,
-    retailPurchaseItem,
-    retailPurchase,
-    retailCustomer,
+    retailPurchaseReturn,
+    retailPurchaseReturnItem,
+    retailSupplierClaim,
+    retailSupplierClaimItem,
+    retailInventoryLoss,
+    retailSupplierLedgerEntry,
+    retailStockTake,
+    retailStockTakeItem,
     retailHoldSale,
     retailHoldSaleItem,
     retailPurchaseOrder,
     retailPurchaseOrderItem,
     retailGrn,
     retailGrnItem,
-    retailCategory,
     retailPaymentEntry,
-    retailAdmin,
     retailCreditPayment,
     retailAttribute,
     retailAttributeValue,
     retailProductAttribute,
-    retailStaff,
     retailBillingTab
   ];
 
   /// Get all restaurant model IDs
   static List<int> get restaurantModelIds => [
-    restaurantCategory,
-    restaurantCompany,
+    category,
     restaurantItem,
     restaurantExtra,
     restaurantTopping,
@@ -147,11 +183,11 @@ class HiveTypeIds {
     restaurantChoiceOption,
     restaurantCart,
     restaurantOrder,
-    restaurantStaff,
+    staff,
     restaurantTable,
     restaurantItemVariant,
     restaurantPastOrder,
-    restaurantTax,
+    tax,
     restaurantExpense,
     restaurantExpense1,
     restaurantEod,
@@ -162,7 +198,7 @@ class HiveTypeIds {
     TestBill,
     TestBillItem,
     TaxSummary,
-    RestaurantCustomer,
+    customer,
     restaurantStockLog,
     restaurantShift,
     restaurantCashMovement,

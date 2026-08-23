@@ -7,6 +7,7 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../../core/di/service_locator.dart';
+import '../../../../../core/config/tax_feature.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/color.dart';
 import '../../../../../util/common/app_responsive.dart';
@@ -420,8 +421,10 @@ class _AddItemSheetState extends State<AddItemSheet> {
       const SizedBox(height: 14),
       _buildCategorySelector(),
       const SizedBox(height: 14),
-      _buildTaxSelector(),
-      const SizedBox(height: 14),
+      if (TaxFeature.enabled) ...[
+        _buildTaxSelector(),
+        const SizedBox(height: 14),
+      ],
       _buildVegSelector(),
       const SizedBox(height: 14),
       _buildDescriptionField(),

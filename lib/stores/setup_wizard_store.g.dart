@@ -23,6 +23,20 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
       (_$hasStoreDetailsComputed ??= Computed<bool>(() => super.hasStoreDetails,
               name: '_SetupWizardStore.hasStoreDetails'))
           .value;
+  Computed<bool>? _$needsRetailStoreTypeComputed;
+
+  @override
+  bool get needsRetailStoreType => (_$needsRetailStoreTypeComputed ??=
+          Computed<bool>(() => super.needsRetailStoreType,
+              name: '_SetupWizardStore.needsRetailStoreType'))
+      .value;
+  Computed<bool>? _$hasRetailStoreTypeComputed;
+
+  @override
+  bool get hasRetailStoreType => (_$hasRetailStoreTypeComputed ??=
+          Computed<bool>(() => super.hasRetailStoreType,
+              name: '_SetupWizardStore.hasRetailStoreType'))
+      .value;
   Computed<bool>? _$canProceedFromBusinessTypeComputed;
 
   @override
@@ -140,6 +154,23 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
     _$selectedBusinessTypeNameAtom
         .reportWrite(value, super.selectedBusinessTypeName, () {
       super.selectedBusinessTypeName = value;
+    });
+  }
+
+  late final _$selectedRetailStoreTypeAtom =
+      Atom(name: '_SetupWizardStore.selectedRetailStoreType', context: context);
+
+  @override
+  String? get selectedRetailStoreType {
+    _$selectedRetailStoreTypeAtom.reportRead();
+    return super.selectedRetailStoreType;
+  }
+
+  @override
+  set selectedRetailStoreType(String? value) {
+    _$selectedRetailStoreTypeAtom
+        .reportWrite(value, super.selectedRetailStoreType, () {
+      super.selectedRetailStoreType = value;
     });
   }
 
@@ -334,19 +365,20 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
     });
   }
 
-  late final _$taxEnabledAtom =
-      Atom(name: '_SetupWizardStore.taxEnabled', context: context);
+  late final _$taxInclusiveRestaurantAtom =
+      Atom(name: '_SetupWizardStore.taxInclusiveRestaurant', context: context);
 
   @override
-  bool get taxEnabled {
-    _$taxEnabledAtom.reportRead();
-    return super.taxEnabled;
+  bool get taxInclusiveRestaurant {
+    _$taxInclusiveRestaurantAtom.reportRead();
+    return super.taxInclusiveRestaurant;
   }
 
   @override
-  set taxEnabled(bool value) {
-    _$taxEnabledAtom.reportWrite(value, super.taxEnabled, () {
-      super.taxEnabled = value;
+  set taxInclusiveRestaurant(bool value) {
+    _$taxInclusiveRestaurantAtom
+        .reportWrite(value, super.taxInclusiveRestaurant, () {
+      super.taxInclusiveRestaurant = value;
     });
   }
 
@@ -363,6 +395,38 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
   set taxInclusive(bool value) {
     _$taxInclusiveAtom.reportWrite(value, super.taxInclusive, () {
       super.taxInclusive = value;
+    });
+  }
+
+  late final _$isRegisteredForTaxAtom =
+      Atom(name: '_SetupWizardStore.isRegisteredForTax', context: context);
+
+  @override
+  bool get isRegisteredForTax {
+    _$isRegisteredForTaxAtom.reportRead();
+    return super.isRegisteredForTax;
+  }
+
+  @override
+  set isRegisteredForTax(bool value) {
+    _$isRegisteredForTaxAtom.reportWrite(value, super.isRegisteredForTax, () {
+      super.isRegisteredForTax = value;
+    });
+  }
+
+  late final _$taxEnabledAtom =
+      Atom(name: '_SetupWizardStore.taxEnabled', context: context);
+
+  @override
+  bool get taxEnabled {
+    _$taxEnabledAtom.reportRead();
+    return super.taxEnabled;
+  }
+
+  @override
+  set taxEnabled(bool value) {
+    _$taxEnabledAtom.reportWrite(value, super.taxEnabled, () {
+      super.taxEnabled = value;
     });
   }
 
@@ -559,11 +623,11 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
   }
 
   @override
-  void nextStep() {
+  void nextStep({int? maxStep}) {
     final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
         name: '_SetupWizardStore.nextStep');
     try {
-      return super.nextStep();
+      return super.nextStep(maxStep: maxStep);
     } finally {
       _$_SetupWizardStoreActionController.endAction(_$actionInfo);
     }
@@ -575,6 +639,17 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
         name: '_SetupWizardStore.previousStep');
     try {
       return super.previousStep();
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void selectRetailStoreType(String key) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.selectRetailStoreType');
+    try {
+      return super.selectRetailStoreType(key);
     } finally {
       _$_SetupWizardStoreActionController.endAction(_$actionInfo);
     }
@@ -735,11 +810,11 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
   }
 
   @override
-  void setTaxEnabled(bool value) {
+  void setTaxInclusiveRestaurant(bool value) {
     final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
-        name: '_SetupWizardStore.setTaxEnabled');
+        name: '_SetupWizardStore.setTaxInclusiveRestaurant');
     try {
-      return super.setTaxEnabled(value);
+      return super.setTaxInclusiveRestaurant(value);
     } finally {
       _$_SetupWizardStoreActionController.endAction(_$actionInfo);
     }
@@ -751,6 +826,28 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
         name: '_SetupWizardStore.setTaxInclusive');
     try {
       return super.setTaxInclusive(value);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setIsRegisteredForTax(bool value) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setIsRegisteredForTax');
+    try {
+      return super.setIsRegisteredForTax(value);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setTaxEnabled(bool value) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setTaxEnabled');
+    try {
+      return super.setTaxEnabled(value);
     } finally {
       _$_SetupWizardStoreActionController.endAction(_$actionInfo);
     }
@@ -830,6 +927,7 @@ isLoading: ${isLoading},
 errorMessage: ${errorMessage},
 selectedBusinessTypeId: ${selectedBusinessTypeId},
 selectedBusinessTypeName: ${selectedBusinessTypeName},
+selectedRetailStoreType: ${selectedRetailStoreType},
 storeName: ${storeName},
 ownerName: ${ownerName},
 phone: ${phone},
@@ -842,8 +940,10 @@ state: ${state},
 country: ${country},
 pincode: ${pincode},
 isSetupComplete: ${isSetupComplete},
-taxEnabled: ${taxEnabled},
+taxInclusiveRestaurant: ${taxInclusiveRestaurant},
 taxInclusive: ${taxInclusive},
+isRegisteredForTax: ${isRegisteredForTax},
+taxEnabled: ${taxEnabled},
 taxRate: ${taxRate},
 taxName: ${taxName},
 taxPlaceOfSupply: ${taxPlaceOfSupply},
@@ -853,6 +953,8 @@ taxRates: ${taxRates},
 logoByte: ${logoByte},
 hasBusinessType: ${hasBusinessType},
 hasStoreDetails: ${hasStoreDetails},
+needsRetailStoreType: ${needsRetailStoreType},
+hasRetailStoreType: ${hasRetailStoreType},
 canProceedFromBusinessType: ${canProceedFromBusinessType},
 canProceedFromStoreDetails: ${canProceedFromStoreDetails},
 progressPercentage: ${progressPercentage},

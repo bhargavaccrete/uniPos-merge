@@ -62,6 +62,12 @@ class RetailPrinterSettingsService {
     await _saveSettings();
   }
 
+  /// Thermal receipt layout. Has no effect on A4, whose layout is fixed.
+  Future<void> setBillTemplate(BillTemplate template) async {
+    _settings = _settings.copyWith(billTemplate: template);
+    await _saveSettings();
+  }
+
   // ==================== LOGO SETTINGS ====================
 
   Future<void> setShowLogo(bool show) async {

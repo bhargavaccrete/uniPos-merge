@@ -10,10 +10,6 @@ class RouteNames {
 
   // Restaurant - Auth
   static const restaurantLogin = '/restaurant-login';
-  static const restaurantAdminLogin = '/restaurant-admin-login';
-  static const restaurantCashierWaiter = '/restaurant-cashier-waiter';
-  static const restaurantSignup = '/restaurant-signup';
-  static const restaurantAuthSelection = '/restaurant-auth-selection';
 
   // Restaurant - Home & Dashboard
   static const restaurantHome = '/restaurant-home';
@@ -112,7 +108,6 @@ class RouteNames {
 
   // Restaurant - Other
   static const restaurantNeedHelp = '/restaurant-need-help';
-  static const restaurantSupport = '/restaurant-support';
   static const restaurantCustomizationDrawer = '/restaurant-customization';
   static const restaurantTestData = '/restaurant-testdatascreen';
   static const restaurantAddPrinter = '/restaurant-addprinter';
@@ -133,6 +128,8 @@ class RouteNames {
   static const parkedSales = '/parked-sales';
 
   // Retail – Inventory
+  /// Catalog hub: Products + Categories + Attributes tabs.
+  static const productManagement = '/product-management';
   static const inventory = '/inventory';
   static const addProduct = '/add-product';
   static const categories = '/categories';
@@ -145,13 +142,14 @@ class RouteNames {
   // Retail – Purchasing
   static const suppliers = '/suppliers';
   static const purchaseOrders = '/purchase-orders';
-  static const addPurchase = '/add-purchase';
-  static const purchaseHistory = '/purchase-history';
+  static const damagedGoods = '/damaged-goods';
+  static const purchaseReturns = '/purchase-returns';
+  static const supplierClaims = '/supplier-claims';
+  static const inventoryLosses = '/inventory-losses';
 
   // Retail – Reports
   static const reports = '/reports';
   static const salesHistory = '/sales-history';
-  static const eodReport = '/eod-report';
   static const gstReport = '/gst-report';
 
   // Retail – Settings

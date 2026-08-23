@@ -3,6 +3,8 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 import 'package:billberrylite/stores/setup_wizard_store.dart';
@@ -261,10 +263,52 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
             padding: AppResponsive.screenPadding(context),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: [_phaseContent(context)],
+              children: [
+                _phaseContent(context),
+                if (_showSkip) _skipAction(context),
+              ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// Retail-only testing escape from the licence step. Hidden once a licence
+  /// actually exists, so it can never sit next to an activated state.
+  bool get _showSkip =>
+      AppConfig.isRetail &&
+      AppConfig.retailLicenseSkipForTesting &&
+      !_license.isLicensed;
+
+  /// Advances the wizard WITHOUT activating. No fake licence, no bypass flag —
+  /// `licenseInfo` stays null, which is exactly the state retail is in today,
+  /// so every gate keeps bypassing (see `PlanEnforce._bypassed`).
+  Widget _skipAction(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(top: AppResponsive.mediumSpacing(context)),
+      child: Column(
+        children: [
+          TextButton(
+            onPressed: widget.onNext,
+            child: Text(
+              'Skip for now',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          Text(
+            'Testing only — retail licensing is not live yet',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.captionFontSize(context),
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -353,9 +397,9 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
         SizedBox(height: AppResponsive.smallSpacing(context)),
         Text(
           expired ? 'Code expired' : 'Code expires in $_remainingLabel',
-          style: TextStyle(
+          style: GoogleFonts.poppins(
             fontSize: AppResponsive.smallFontSize(context),
-            color: expired ? AppColors.danger : Colors.grey[600],
+            color: expired ? AppColors.danger : AppColors.textSecondary,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -368,7 +412,7 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
             _resendCooldownSeconds > 0
                 ? "Resend code in ${_resendCooldownSeconds}s"
                 : "Didn't get it? Resend code",
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.smallFontSize(context),
               color: (_loading || _resendCooldownSeconds > 0)
                   ? AppColors.textSecondary
@@ -442,7 +486,7 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
         SizedBox(height: AppResponsive.largeSpacing(context)),
         Text(title,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.getValue(context,
                   mobile: 20.0, tablet: 24.0, desktop: 28.0),
               fontWeight: FontWeight.bold,
@@ -451,9 +495,9 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
         SizedBox(height: AppResponsive.smallSpacing(context)),
         Text(subtitle,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: GoogleFonts.poppins(
                 fontSize: AppResponsive.bodyFontSize(context),
-                color: Colors.grey[600])),
+                color: AppColors.textSecondary)),
       ],
     );
   }
@@ -471,7 +515,7 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
         child: Text(label,
-            style: TextStyle(
+            style: GoogleFonts.poppins(
                 fontSize: AppResponsive.buttonFontSize(context),
                 fontWeight: FontWeight.w600,
                 color: Colors.white)),
@@ -485,9 +529,9 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
       child: TextButton(
         onPressed: _loading ? null : onPressed,
         child: Text('Back',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
                 fontSize: AppResponsive.smallFontSize(context),
-                color: Colors.grey[600])),
+                color: AppColors.textSecondary)),
       ),
     );
   }
@@ -498,7 +542,7 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
       child: Align(
         alignment: Alignment.centerLeft,
         child: Text(msg,
-            style: const TextStyle(fontSize: 12, color: AppColors.danger)),
+            style: GoogleFonts.poppins(fontSize: 12, color: AppColors.danger)),
       ),
     );
   }

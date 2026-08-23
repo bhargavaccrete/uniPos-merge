@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/di/service_locator.dart';
+import '../../services/retail/variant_attribute_mapper.dart';
 
 // Retail Models
 import '../../../data/models/retail/hive_model/product_model_200.dart';
@@ -98,6 +99,12 @@ abstract class _AddProductFormStore with Store {
 
   @observable
   ObservableList<VariantFormData> retailVariants = ObservableList<VariantFormData>();
+
+  /// Descriptor values for a SIMPLE product, keyed by attribute NAME
+  /// (Settings → Simple Product Fields). Variable products carry their
+  /// descriptors on each generated variant instead.
+  @observable
+  ObservableMap<String, String> simpleFieldValues = ObservableMap<String, String>();
 
   // ==================== RESTAURANT-SPECIFIC FIELDS ====================
 
@@ -275,6 +282,19 @@ abstract class _AddProductFormStore with Store {
       retailVariants.clear();
       selectedAttributeIds.clear();
       selectedAttributeValues.clear();
+    } else {
+      // Variable products describe themselves per generated variant.
+      simpleFieldValues.clear();
+    }
+  }
+
+  @action
+  void setSimpleFieldValue(String attributeName, String value) {
+    final v = value.trim();
+    if (v.isEmpty) {
+      simpleFieldValues.remove(attributeName);
+    } else {
+      simpleFieldValues[attributeName] = v;
     }
   }
 
@@ -339,8 +359,13 @@ abstract class _AddProductFormStore with Store {
         attributes: Map.fromEntries(
           combo.entries.map((e) => MapEntry(e.key, e.value.value)),
         ),
+        // Keyed by attributeId, NOT by name — every reader
+        // (AttributeStore.attributesOf, VariantPickerDialog) resolves the key
+        // with getAttributeById. A name key silently resolved to null, which
+        // dropped these variants to the frozen customAttributes fallback so a
+        // renamed attribute value never reached them.
         attributeValueIds: Map.fromEntries(
-          combo.entries.map((e) => MapEntry(e.key, e.value.valueId)),
+          combo.entries.map((e) => MapEntry(e.value.attributeId, e.value.valueId)),
         ),
         price: price,
         costPrice: costPrice,
@@ -515,6 +540,23 @@ abstract class _AddProductFormStore with Store {
     }
   }
 
+  /// Resolves the display name of [selectedCategoryId], used as the SKU
+  /// prefix. Returns null if no category is selected/found (the generator
+  /// falls back to a generic prefix in that case).
+  String? get _selectedCategoryName {
+    for (final c in categoryStore.categories) {
+      if (c.id == selectedCategoryId) return c.name;
+    }
+    return null;
+  }
+
+  /// Auto-generates a SKU only when [currentSku] is blank — an existing SKU
+  /// (user-typed or previously generated) is never touched.
+  Future<String> _skuOrGenerated(String currentSku) async {
+    if (currentSku.trim().isNotEmpty) return currentSku;
+    return skuGeneratorService.generate(_selectedCategoryName);
+  }
+
   Future<void> _submitRetailProduct() async {
     final productStore = locator<ProductStore>();
     final productId = _uuid.v4();
@@ -539,18 +581,16 @@ abstract class _AddProductFormStore with Store {
 
     await productStore.addProduct(product);
 
-    // Create variants
+    // Create variants — every variant gets its own SKU (auto-generated only
+    // when left blank; each call advances the shared global sequence).
     if (isVariableProduct) {
       for (final variantData in retailVariants) {
         final variant = VarianteModel.create(
           varianteId: variantData.id,
           productId: productId,
-          sku: variantData.sku,
+          sku: await _skuOrGenerated(variantData.sku),
           barcode: variantData.barcode,
-          size: variantData.attributes['Size'],
-          color: variantData.attributes['Color'],
-          weight: variantData.attributes['Weight'],
-          customAttributes: variantData.attributes,
+          customAttributes: mergeVariantAttributes(variantData.attributes),
           attributeValueIds: variantData.attributeValueIds,
           mrp: variantData.mrp,
           costPrice: variantData.costPrice,
@@ -559,14 +599,20 @@ abstract class _AddProductFormStore with Store {
           minStock: minStock,
           taxRate: taxRate > 0 ? taxRate : null,
         );
-        await productStore.addVariant(variant);
+        // A refused variant must not pass silently — the product is already
+        // written, so ignoring this would leave it with no variant at all.
+        // `submit()` catches and reports via errorMessage.
+        final result = await productStore.addVariant(variant);
+        if (!result.success) {
+          throw StateError(result.errorMessage ?? 'Could not save variant.');
+        }
       }
     } else {
       // Create default variant for simple product
       final variant = VarianteModel.create(
         varianteId: _uuid.v4(),
         productId: productId,
-        sku: sku,
+        sku: await _skuOrGenerated(sku),
         barcode: barcode,
         mrp: mrp,
         costPrice: costPrice,
@@ -575,8 +621,12 @@ abstract class _AddProductFormStore with Store {
         minStock: minStock,
         isDefault: true,
         taxRate: taxRate > 0 ? taxRate : null,
+        customAttributes: mergeVariantAttributes(Map.of(simpleFieldValues)),
       );
-      await productStore.addVariant(variant);
+      final result = await productStore.addVariant(variant);
+      if (!result.success) {
+        throw StateError(result.errorMessage ?? 'Could not save variant.');
+      }
     }
   }
 

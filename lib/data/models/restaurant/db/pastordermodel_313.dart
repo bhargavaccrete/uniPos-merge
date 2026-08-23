@@ -121,7 +121,7 @@ class PastOrderModel extends HiveObject{
   final String? refundedBy; // Staff name/role who processed the refund
 
   @HiveField(33)
-  final String? customerId; // Links to RestaurantCustomer for loyalty point restoration
+  final String? customerId; // Links to Customer for loyalty point restoration
 
   @HiveField(34)
   final double? serviceCharge; // Computed service/delivery charge amount at settlement time

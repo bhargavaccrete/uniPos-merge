@@ -1,11 +1,19 @@
+import 'package:flutter/foundation.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
+import 'package:billberrylite/util/common/loyalty_points.dart';
 import 'package:uuid/uuid.dart';
 
 
 /// Service for handling sale returns and refunds
 /// Manages stock adjustments, negative sales entries, and customer updates
+///
+/// NOTE ON MONEY: a return deliberately does NOT go through
+/// `RetailBillingService`. It refunds what was actually charged, so every figure
+/// is derived from the original sale's STORED values (pro-rated by the returned
+/// quantity). Recomputing would refund a different amount than was taken if a
+/// tax rate or the tax mode changed since the sale.
 class ReturnService {
   static const _uuid = Uuid();
 
@@ -60,12 +68,32 @@ class ReturnService {
         size: item.size,
         color: item.color,
         weight: item.weight,
+        attributes: item.attributes,
+        // The CHARGED price, which already includes any override — a refund
+        // must return what was taken, never today's catalogue price.
         price: item.price,
         qty: item.qty, // Keep positive for stock restoration
         discountAmount: item.discountAmount,
         gstRate: item.gstRate,
         barcode: item.barcode,
         hsnCode: item.hsnCode,
+        // Carry the ORIGINAL line's cost, never today's. A return has to cancel
+        // out against the sale it reverses, and it can only do that if both
+        // sides are costed identically.
+        costPrice: item.costPrice,
+        // Mirror the override audit onto the return line, so a refund below
+        // list carries the same explanation as the sale it reverses.
+        originalPrice: item.originalPrice,
+        overrideReason: item.overrideReason,
+        overrideNote: item.overrideNote,
+        // Line-discount audit, mirrored so a credit note can print the same
+        // split as the sale it reverses. A full return reverses the whole line,
+        // so the amount carries across unchanged.
+        lineDiscountType: item.lineDiscountType,
+        lineDiscountValue: item.lineDiscountValue,
+        lineDiscountAmount: item.lineDiscountAmount,
+        lineDiscountReason: item.lineDiscountReason,
+        lineDiscountNote: item.lineDiscountNote,
       );
       returnItems.add(returnItem);
     }
@@ -83,13 +111,21 @@ class ReturnService {
 
     // 6. Update customer points (deduct points if customer exists)
     if (originalSale.customerId != null) {
-      final pointsToDeduct = (originalSale.totalAmount / 10).floor();
-      await customerStoreRestail.updateAfterPurchase(
+      // Deduct exactly what this amount granted, using the shared earn rule —
+      // a local `/10` here silently drifts if the rate ever changes.
+      final pointsToDeduct = LoyaltyPoints.earnedFor(originalSale.totalAmount);
+      await customerStore.updateAfterPurchase(
         originalSale.customerId!,
         -originalSale.totalAmount, // Negative amount
         -pointsToDeduct, // Negative points
       );
     }
+
+    await _recordCashRefundMovement(
+      refundMethod: refundMethod,
+      amount: originalSale.totalAmount,
+      returnSaleId: returnSaleId,
+    );
 
     return returnSaleId;
   }
@@ -172,12 +208,30 @@ class ReturnService {
         size: originalItem.size,
         color: originalItem.color,
         weight: originalItem.weight,
+        attributes: originalItem.attributes,
         price: originalItem.price,
         qty: returnQty,
         discountAmount: itemDiscount,
         gstRate: originalItem.gstRate,
         barcode: originalItem.barcode,
         hsnCode: originalItem.hsnCode,
+        // See the full-return path: a partial return must be costed exactly as
+        // the line it reverses.
+        costPrice: originalItem.costPrice,
+        originalPrice: originalItem.originalPrice,
+        overrideReason: originalItem.overrideReason,
+        overrideNote: originalItem.overrideNote,
+        // Pro-rated by the returned quantity, exactly like itemDiscount above,
+        // so a flat line discount on a qty-2 line refunds half when one unit
+        // comes back.
+        lineDiscountType: originalItem.lineDiscountType,
+        lineDiscountValue: originalItem.lineDiscountValue,
+        lineDiscountAmount: originalItem.lineDiscountAmount == null
+            ? null
+            : originalItem.lineDiscountAmount! *
+                (returnQty / originalItem.qty),
+        lineDiscountReason: originalItem.lineDiscountReason,
+        lineDiscountNote: originalItem.lineDiscountNote,
       );
 
       returnItems.add(returnItem);
@@ -212,12 +266,27 @@ class ReturnService {
         size: item.size,
         color: item.color,
         weight: item.weight,
+        attributes: item.attributes,
         price: item.price,
         qty: item.qty,
         discountAmount: item.discountAmount,
         gstRate: item.gstRate,
         barcode: item.barcode,
         hsnCode: item.hsnCode,
+        costPrice: item.costPrice,
+        // Mirror the override audit onto the return line, so a refund below
+        // list carries the same explanation as the sale it reverses.
+        originalPrice: item.originalPrice,
+        overrideReason: item.overrideReason,
+        overrideNote: item.overrideNote,
+        // Line-discount audit, mirrored so a credit note can print the same
+        // split as the sale it reverses. A full return reverses the whole line,
+        // so the amount carries across unchanged.
+        lineDiscountType: item.lineDiscountType,
+        lineDiscountValue: item.lineDiscountValue,
+        lineDiscountAmount: item.lineDiscountAmount,
+        lineDiscountReason: item.lineDiscountReason,
+        lineDiscountNote: item.lineDiscountNote,
       );
     }).toList();
 
@@ -234,15 +303,58 @@ class ReturnService {
 
     // 8. Update customer points (deduct proportional points)
     if (originalSale.customerId != null) {
-      final pointsToDeduct = (returnTotal / 10).floor();
-      await customerStoreRestail.updateAfterPurchase(
+      final pointsToDeduct = LoyaltyPoints.earnedFor(returnTotal);
+      await customerStore.updateAfterPurchase(
         originalSale.customerId!,
         -returnTotal, // Negative amount
         -pointsToDeduct, // Negative points
       );
     }
 
+    await _recordCashRefundMovement(
+      refundMethod: refundMethod,
+      amount: returnTotal,
+      returnSaleId: returnSaleId,
+    );
+
     return returnSaleId;
+  }
+
+
+  /// Cash refund method that physically empties the drawer. Everything else
+  /// (card, UPI, and any method added later) settles outside the till.
+  static const String cashRefundMethod = 'cash';
+
+  /// Movement type used ONLY for refund audit rows.
+  ///
+  /// Deliberately not 'out': every existing consumer filters movements by
+  /// exact type equality (`m.type == 'in' / 'out' / 'opening' / 'adjustment'`),
+  /// so a distinct type is invisible to all of them. The drawer and EOD derive
+  /// their refund figure from the return SALES instead, and skip these rows —
+  /// that is what stops a refund being counted twice.
+  static const String refundMovementType = 'refund';
+
+  /// Audit-only trail for a cash refund. Never blocks the return: the money has
+  /// already been handed back and the totals are derived from the return sale,
+  /// so a failure here loses the audit row, not the figure.
+  Future<void> _recordCashRefundMovement({
+    required String refundMethod,
+    required double amount,
+    required String returnSaleId,
+  }) async {
+    if (refundMethod.toLowerCase().trim() != cashRefundMethod) return;
+    if (amount <= 0) return;
+
+    try {
+      await cashMovementStore.addMovement(
+        type: refundMovementType,
+        amount: amount,
+        reason: 'Sale Refund',
+        note: 'Return $returnSaleId',
+      );
+    } catch (e) {
+      debugPrint('Cash refund movement not recorded: $e');
+    }
   }
 
   /// Check if a sale can be returned

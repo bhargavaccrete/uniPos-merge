@@ -30,13 +30,21 @@ class SaleRepository {
     return _saleBox.get(saleId);
   }
 
-  /// Get sales by date range
-  /// Uses createdAt timestamp for accurate filtering (includes time, not just date)
+  /// Sales in a window: inclusive start, **exclusive** end, filtered on
+  /// `createdAt`.
+  ///
+  /// Exclusive end matches `ReportService._inWindow`. They used to disagree —
+  /// this was inclusive on both ends and callers bounded the day at 23:59:59,
+  /// so a sale rung up in that final second landed in the Daily Sales report
+  /// but not in EOD or the dashboard's "Today's Sales".
+  ///
+  /// An unparseable `createdAt` is skipped rather than thrown, so one bad row
+  /// can't take out the whole query.
   Future<List<SaleModel>> getSalesByDateRange(DateTime startDate, DateTime endDate) async {
     return _saleBox.values.where((sale) {
-      final saleCreatedAt = DateTime.parse(sale.createdAt); // Use actual creation timestamp
-      return (saleCreatedAt.isAfter(startDate) || saleCreatedAt.isAtSameMomentAs(startDate)) &&
-             (saleCreatedAt.isBefore(endDate) || saleCreatedAt.isAtSameMomentAs(endDate));
+      final saleCreatedAt = DateTime.tryParse(sale.createdAt);
+      if (saleCreatedAt == null) return false;
+      return !saleCreatedAt.isBefore(startDate) && saleCreatedAt.isBefore(endDate);
     }).toList();
   }
 
@@ -49,7 +57,9 @@ class SaleRepository {
   Future<List<SaleModel>> getTodaySales() async {
     final today = DateTime.now();
     final startOfDay = DateTime(today.year, today.month, today.day);
-    final endOfDay = DateTime(today.year, today.month, today.day, 23, 59, 59);
+    // Start of tomorrow, not 23:59:59 — the range is exclusive at the end, and
+    // the old bound silently dropped the last second of the day.
+    final endOfDay = startOfDay.add(const Duration(days: 1));
     return getSalesByDateRange(startOfDay, endOfDay);
   }
 

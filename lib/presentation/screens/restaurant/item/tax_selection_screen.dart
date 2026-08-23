@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
-import 'package:billberrylite/data/models/restaurant/db/taxmodel_314.dart';
+import 'package:billberrylite/data/models/common/taxmodel_314.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:uuid/uuid.dart';
 import 'package:billberrylite/core/di/service_locator.dart';

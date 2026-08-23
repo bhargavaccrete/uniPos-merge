@@ -6,7 +6,7 @@ import 'package:billberrylite/util/common/app_responsive.dart';
 
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
-import '../../../../data/models/restaurant/db/taxmodel_314.dart';
+import '../../../../data/models/common/taxmodel_314.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../util/common/currency_helper.dart';
 import '../../../../util/restaurant/staticswitch.dart';

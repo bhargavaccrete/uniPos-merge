@@ -10,14 +10,14 @@ import 'package:billberrylite/core/init/hive_init.dart';
 import 'package:billberrylite/data/models/restaurant/db/cartmodel_308.dart';
 import 'package:billberrylite/data/models/restaurant/db/ordermodel_309.dart';
 import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
-import 'package:billberrylite/data/models/restaurant/db/staffModel_310.dart';
+import 'package:billberrylite/data/models/common/staffModel_310.dart';
 import 'package:billberrylite/data/models/restaurant/db/table_Model_311.dart';
-import 'package:billberrylite/data/models/restaurant/db/taxmodel_314.dart';
-import 'package:billberrylite/data/models/restaurant/db/customer_model_125.dart';
+import 'package:billberrylite/data/models/common/taxmodel_314.dart';
+import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/restaurant/db/shift_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/cash_movement_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/cash_handover_model.dart';
-import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
+import 'package:billberrylite/data/models/common/categorymodel_300.dart';
 import 'package:billberrylite/data/models/restaurant/db/variantmodel_305.dart';
 import 'package:billberrylite/data/models/restaurant/db/choicemodel_306.dart';
 import 'package:billberrylite/data/models/restaurant/db/choiceoptionmodel_307.dart';
@@ -347,11 +347,11 @@ void main() {
   // RESTAURANTCUSTOMER — Customer records with loyalty
   // ════════════════════════════════════════════════════════════════════════
 
-  group('Hive: RestaurantCustomer', () {
+  group('Hive: Customer', () {
     test('save and read customer with loyalty points', () async {
-      final box = await Hive.openBox<RestaurantCustomer>('test_customers');
+      final box = await Hive.openBox<Customer>('test_customers');
 
-      final original = RestaurantCustomer(
+      final original = Customer(
         customerId: 'cust-1',
         name: 'Rahul Sharma',
         phone: '9876543210',

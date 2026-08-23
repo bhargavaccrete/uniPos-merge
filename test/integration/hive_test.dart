@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:billberrylite/core/constants/hive_type_ids.dart';
 import 'package:billberrylite/data/models/restaurant/db/cartmodel_308.dart';
-import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
+import 'package:billberrylite/data/models/common/categorymodel_300.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:billberrylite/data/models/restaurant/db/saved_printer_model.dart';
@@ -35,7 +35,7 @@ void main() {
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantCart)) {
       Hive.registerAdapter(CartItemAdapter());
     }
-    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantCategory)) {
+    if (!Hive.isAdapterRegistered(HiveTypeIds.category)) {
       Hive.registerAdapter(CategoryAdapter());
     }
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantItem)) {

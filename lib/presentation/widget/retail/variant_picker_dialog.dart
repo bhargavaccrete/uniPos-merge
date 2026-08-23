@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
 import 'package:billberrylite/domain/store/retail/attribute_store.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 
@@ -93,9 +95,9 @@ class _VariantPickerDialogState extends State<VariantPickerDialog> {
       }
 
       // From legacy fields (size, color, weight)
-      _addLegacyAttribute('size', 'Size', variant.size);
-      _addLegacyAttribute('color', 'Color', variant.color);
-      _addLegacyAttribute('weight', 'Weight', variant.weight);
+      // _addLegacyAttribute('size', 'Size', variant.size);
+      // _addLegacyAttribute('color', 'Color', variant.color);
+      // _addLegacyAttribute('weight', 'Weight', variant.weight);
 
       // From custom attributes
       if (variant.customAttributes != null) {
@@ -152,9 +154,9 @@ class _VariantPickerDialogState extends State<VariantPickerDialog> {
 
         // Check legacy fields
         String? variantValue;
-        if (attributeId == 'size') variantValue = variant.size;
-        if (attributeId == 'color') variantValue = variant.color;
-        if (attributeId == 'weight') variantValue = variant.weight;
+        // if (attributeId == 'size') variantValue = variant.size;
+        // if (attributeId == 'color') variantValue = variant.color;
+        // if (attributeId == 'weight') variantValue = variant.weight;
 
         // Check custom attributes
         if (variant.customAttributes != null) {
@@ -172,11 +174,6 @@ class _VariantPickerDialogState extends State<VariantPickerDialog> {
       }
       return true;
     }).toList();
-
-    // Auto-select if only one variant matches
-    if (_filteredVariants.length == 1) {
-      widget.onVariantSelected(_filteredVariants.first);
-    }
   }
 
   void _clearFilters() {
@@ -190,103 +187,95 @@ class _VariantPickerDialogState extends State<VariantPickerDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) -
+                    AppResponsive.dialogWidth(context)) /
+                2)
+            .clamp(40.0, 200.0)
+        : 20.0;
+    final hasActiveFilter = _selectedFilters.values.any((v) => v != null);
+
     return Dialog(
-      child: Container(
-        width: 500,
+      insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
+      backgroundColor: AppColors.white,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.9,
+          maxHeight: AppResponsive.screenHeight(context) * 0.85,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.product.productName,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          'Select variant',
-                          style: TextStyle(color: Colors.grey[600]),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-
-            // Attribute Filters
-            if (_attributeOptions.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.all(16),
+            _buildHeader(context),
+            if (_attributeOptions.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: _attributeOptions.entries.map((entry) {
                     return _AttributeFilterRow(
-                      attributeId: entry.key,
-                      attributeName: entry.value.firstOrNull?.attributeName ?? entry.key,
+                      attributeName:
+                          entry.value.firstOrNull?.attributeName ?? entry.key,
                       values: entry.value,
                       selectedValueId: _selectedFilters[entry.key],
-                      onValueSelected: (valueId) => _updateFilters(entry.key, valueId),
+                      onValueSelected: (valueId) =>
+                          _updateFilters(entry.key, valueId),
                     );
                   }).toList(),
                 ),
               ),
+              Divider(height: 1, thickness: 1, color: AppColors.divider),
+            ],
 
-            // Filter Summary & Clear
-            if (_selectedFilters.values.any((v) => v != null))
+            // Result count + clear — only while a filter is active
+            if (hasActiveFilter)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.fromLTRB(20, 10, 12, 0),
                 child: Row(
                   children: [
                     Text(
-                      '${_filteredVariants.length} variant(s) match',
-                      style: TextStyle(color: Colors.grey[600]),
+                      '${_filteredVariants.length} of ${widget.variants.length} match',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12.5,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     const Spacer(),
-                    TextButton(
+                    TextButton.icon(
                       onPressed: _clearFilters,
-                      child: const Text('Clear Filters'),
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
+                      label: Text(
+                        'Clear',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        minimumSize: const Size(0, 32),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
 
-            const Divider(),
-
-            // Variant List
+            // Variant list
             Flexible(
               child: _filteredVariants.isEmpty
-                  ? const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Text('No variants match the selected filters'),
-                      ),
-                    )
-                  : ListView.builder(
+                  ? _buildEmptyState()
+                  : ListView.separated(
                       shrinkWrap: true,
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
                       itemCount: _filteredVariants.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
                       itemBuilder: (context, index) {
                         final variant = _filteredVariants[index];
                         return _VariantListItem(
@@ -301,17 +290,97 @@ class _VariantPickerDialogState extends State<VariantPickerDialog> {
       ),
     );
   }
+
+  Widget _buildHeader(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.06),
+        border: Border(
+          bottom: BorderSide(color: AppColors.primary.withValues(alpha: 0.10)),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.style_outlined,
+                color: AppColors.primary, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  widget.product.productName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    fontSize: 16.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Select a variant to add',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close_rounded),
+            color: AppColors.textSecondary,
+            iconSize: 22,
+            tooltip: 'Close',
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.search_off_rounded,
+              size: 40, color: AppColors.textSecondary.withValues(alpha: 0.5)),
+          const SizedBox(height: 12),
+          Text(
+            'No variants match the selected filters',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(
+              fontSize: 13.5,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _AttributeFilterRow extends StatelessWidget {
-  final String attributeId;
   final String attributeName;
   final List<AttributeValueInfo> values;
   final String? selectedValueId;
   final Function(String?) onValueSelected;
 
   const _AttributeFilterRow({
-    required this.attributeId,
     required this.attributeName,
     required this.values,
     required this.selectedValueId,
@@ -324,13 +393,18 @@ class _AttributeFilterRow extends StatelessWidget {
         attributeName.toLowerCase().contains('colour');
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            attributeName,
-            style: const TextStyle(fontWeight: FontWeight.w500),
+            attributeName.toUpperCase(),
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.6,
+              color: AppColors.textSecondary,
+            ),
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -375,44 +449,53 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color? chipColor;
+    Color? swatch;
     if (colorCode != null) {
       try {
         final hex = colorCode!.replaceAll('#', '');
-        chipColor = Color(int.parse('FF$hex', radix: 16));
+        swatch = Color(int.parse('FF$hex', radix: 16));
       } catch (_) {}
     }
 
+    final radius = BorderRadius.circular(10);
+
     return Material(
-      color: isSelected
-          ? AppColors.primary
-          : (chipColor?.withOpacity(0.2) ?? Colors.grey[200]),
-      borderRadius: BorderRadius.circular(20),
+      color: isSelected ? AppColors.primary : AppColors.surfaceLight,
+      borderRadius: radius,
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: radius,
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            border: Border.all(
+              color: isSelected ? AppColors.primary : AppColors.divider,
+            ),
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (chipColor != null) ...[
+              if (swatch != null) ...[
                 Container(
-                  width: 16,
-                  height: 16,
+                  width: 14,
+                  height: 14,
                   decoration: BoxDecoration(
-                    color: chipColor,
+                    color: swatch,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.grey[400]!),
+                    border: Border.all(
+                      color: isSelected ? AppColors.white : AppColors.divider,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
               ],
               Text(
                 label,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.black87,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  color: isSelected ? AppColors.white : AppColors.textPrimary,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                 ),
               ),
             ],
@@ -435,91 +518,78 @@ class _VariantListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isOutOfStock = variant.stockQty <= 0;
+    final stockColor = isOutOfStock ? AppColors.danger : AppColors.success;
+    final radius = BorderRadius.circular(12);
 
-    return Card(
+    return Material(
+      color: AppColors.white,
+      borderRadius: radius,
       child: InkWell(
         onTap: isOutOfStock ? null : onTap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: radius,
         child: Opacity(
-          opacity: isOutOfStock ? 0.5 : 1.0,
-          child: Padding(
+          opacity: isOutOfStock ? 0.55 : 1.0,
+          child: Container(
             padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: radius,
+              border: Border.all(color: AppColors.divider),
+            ),
             child: Row(
               children: [
-                // Variant Image (if available)
-                if (variant.imagePath != null)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      variant.imagePath!,
-                      width: 50,
-                      height: 50,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        width: 50,
-                        height: 50,
-                        color: Colors.grey[200],
-                        child: const Icon(Icons.image),
-                      ),
-                    ),
-                  )
-                else
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.inventory_2_outlined,
-                      color: Colors.grey[400],
-                    ),
-                  ),
+                // Variant image (network path) or placeholder tile
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: variant.imagePath != null
+                      ? Image.network(
+                          variant.imagePath!,
+                          width: 46,
+                          height: 46,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => _placeholderTile(),
+                        )
+                      : _placeholderTile(),
+                ),
 
                 const SizedBox(width: 12),
 
-                // Variant Info
+                // Variant info
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         variant.shortDescription,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w500,
-                          fontSize: 16,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14.5,
+                          color: AppColors.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          if (variant.sku != null)
-                            Text(
-                              'SKU: ${variant.sku}',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 12,
-                              ),
-                            ),
-                          if (variant.barcode != null) ...[
-                            if (variant.sku != null)
-                              const Text(' • ', style: TextStyle(color: Colors.grey)),
-                            Text(
-                              variant.barcode!,
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
+                      if (variant.sku != null || variant.barcode != null) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          [
+                            if (variant.sku != null) 'SKU: ${variant.sku}',
+                            if (variant.barcode != null) variant.barcode!,
+                          ].join('  •  '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.poppins(
+                            color: AppColors.textSecondary,
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
 
-                // Stock & Price
+                const SizedBox(width: 8),
+
+                // Price & stock
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -530,31 +600,36 @@ class _VariantListItem extends StatelessWidget {
                           valueListenable: DecimalSettings.precisionNotifier,
                           builder: (context, precision, child) {
                             final symbol = CurrencyHelper.currentSymbol;
-                            final formattedPrice = variant.effectivePrice.toStringAsFixed(precision);
+                            final formattedPrice =
+                                variant.effectivePrice.toStringAsFixed(precision);
                             return Text(
                               '$symbol$formattedPrice',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                                color: AppColors.textPrimary,
                               ),
                             );
                           },
                         );
                       },
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 5),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: isOutOfStock ? Colors.red[100] : Colors.green[100],
-                        borderRadius: BorderRadius.circular(12),
+                        color: stockColor.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        isOutOfStock ? 'Out of Stock' : 'Stock: ${variant.stockQty}',
-                        style: TextStyle(
-                          color: isOutOfStock ? Colors.red[700] : Colors.green[700],
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
+                        isOutOfStock
+                            ? 'Out of Stock'
+                            : 'Stock: ${variant.stockQty}',
+                        style: GoogleFonts.poppins(
+                          color: stockColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -567,6 +642,17 @@ class _VariantListItem extends StatelessWidget {
       ),
     );
   }
+
+  Widget _placeholderTile() => Container(
+        width: 46,
+        height: 46,
+        color: AppColors.surfaceMedium,
+        child: Icon(
+          Icons.inventory_2_outlined,
+          size: 22,
+          color: AppColors.textSecondary.withValues(alpha: 0.6),
+        ),
+      );
 }
 
 /// Helper class to store attribute value info

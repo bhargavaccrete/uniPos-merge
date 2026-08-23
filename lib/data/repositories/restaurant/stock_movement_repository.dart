@@ -23,4 +23,8 @@ class StockMovementRepository {
     list.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return list;
   }
+
+  /// Every movement in the box, unsorted — callers sort for their own view.
+  /// Used by retail's stock-adjustment history, which spans all products.
+  List<StockMovementModel> allMovements() => _box.values.toList();
 }

@@ -46,6 +46,7 @@ class EntKeys {
   static const manageMenuChoices = 'manage_menu.choices';
   static const manageMenuExtras = 'manage_menu.extras';
 
+
   // Reports — one submodule per report (flat under `reports`)
   static const reportsTotalSale = 'reports.total_sale';
   static const reportsSaleByItem = 'reports.sale_by_item';

@@ -72,6 +72,18 @@ class ReportTable extends StatelessWidget {
                 headingRowHeight: AppResponsive.tableHeadingHeight(context),
                 dataRowMinHeight: AppResponsive.tableRowMinHeight(context),
                 dataRowMaxHeight: AppResponsive.tableRowMaxHeight(context),
+                // Everything else about this table scaled with the breakpoint
+                // except the cell text, which fell back to Flutter's fixed
+                // default — so on a tablet the header row and row heights grew
+                // while the values inside them stayed phone-sized.
+                //
+                // Only a default: a cell that passes its own `style` still
+                // wins, so screens that colour a value (negative revenue, a
+                // status) or bold it are untouched.
+                dataTextStyle: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  color: AppColors.textPrimary,
+                ),
                 columns: columns,
                 rows: rows,
               ),

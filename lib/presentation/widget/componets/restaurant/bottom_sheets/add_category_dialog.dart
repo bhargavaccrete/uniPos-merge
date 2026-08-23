@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:uuid/uuid.dart';
-import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
+import '../../../../../data/models/common/categorymodel_300.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/color.dart';

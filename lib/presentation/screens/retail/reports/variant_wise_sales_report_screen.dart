@@ -1,67 +1,95 @@
 import 'package:flutter/material.dart';
+
+import 'package:billberrylite/domain/services/common/report_export_service.dart';
 import 'package:billberrylite/domain/services/retail/report_service.dart';
+import 'package:billberrylite/presentation/screens/retail/reports/report_page_scaffold.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_summary_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_table.dart';
+import 'package:billberrylite/util/color.dart';
 
-class VariantWiseSalesReportScreen extends StatefulWidget {
+/// Units and revenue per product variant (size / colour / attribute combo).
+class VariantWiseSalesReportScreen extends StatelessWidget {
   const VariantWiseSalesReportScreen({super.key});
-  @override
-  State<VariantWiseSalesReportScreen> createState() => _VariantWiseSalesReportScreenState();
-}
-
-class _VariantWiseSalesReportScreenState extends State<VariantWiseSalesReportScreen> {
-  final ReportService _reportService = ReportService();
-  List<Map<String, dynamic>> _reportData = [];
-  bool _isLoading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadReport();
-  }
-
-  Future<void> _loadReport() async {
-    setState(() => _isLoading = true);
-    final data = await _reportService.getVariantWiseSalesReport();
-    setState(() {
-      _reportData = data;
-      _isLoading = false;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(title: const Text('Variant-wise Sales'), centerTitle: true, backgroundColor: Colors.white, elevation: 0),
-      body: _isLoading ? const Center(child: CircularProgressIndicator()) : _reportData.isEmpty ? const Center(child: Text('No data')) : ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _reportData.length,
-        itemBuilder: (context, index) {
-          final item = _reportData[index];
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFE8E8E8))),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(item['productName'], style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                if (item['size'] != null || item['color'] != null)
-                  Text('${item['size'] ?? ''} ${item['color'] ?? ''}'.trim(), style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B))),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Icon(Icons.inventory, size: 16, color: Colors.blue),
-                    const SizedBox(width: 4),
-                    Text('Qty: ${item['totalQuantity']}', style: const TextStyle(fontSize: 13)),
-                    const SizedBox(width: 16),
-                    Icon(Icons.currency_rupee, size: 16, color: Colors.green),
-                    const SizedBox(width: 4),
-                    Text('₹${(item['totalRevenue'] as double).toStringAsFixed(0)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  ],
+    final service = ReportService();
+
+    return ReportPageScaffold(
+      title: 'Variant-wise Sales',
+      subtitle: 'Revenue by variant',
+      featureNoun: 'sales',
+      exportFileName: 'variant_wise_sales',
+      rowUnit: 'variants',
+      emptyIcon: Icons.tune_rounded,
+      emptyTitle: 'No sales',
+      emptyMessage: 'No variants were sold in this period.',
+      loader: (start, end) =>
+          service.getVariantWiseSalesReport(startDate: start, endDate: end),
+      summaryCards: (rows) => [
+        ReportSummaryCard(
+          title: 'Revenue',
+          value: formatMoney(
+            rows.fold<double>(0, (s, r) => s + (r['totalRevenue'] as double)),
+          ),
+          subtitle: '${rows.length} variants',
+          icon: Icons.payments_rounded,
+          color: AppColors.success,
+        ),
+        ReportSummaryCard(
+          title: 'Units Sold',
+          value:
+              '${rows.fold<int>(0, (s, r) => s + (r['totalQuantity'] as int))}',
+          subtitle: 'across all variants',
+          icon: Icons.inventory_2_rounded,
+          color: AppColors.primary,
+        ),
+      ],
+      columns: (context) => [
+        ReportTable.column(context, 'Product'),
+        ReportTable.column(context, 'Variant'),
+        ReportTable.column(context, 'Qty', numeric: true),
+        ReportTable.column(context, 'Discount', numeric: true),
+        ReportTable.column(context, 'Revenue', numeric: true),
+      ],
+      rowBuilder: (context, row) => DataRow(
+        cells: [
+          DataCell(Text(row['productName'] as String)),
+          DataCell(Text(row['variantLabel'] as String)),
+          DataCell(Text('${row['totalQuantity']}')),
+          DataCell(Text(formatMoney(row['totalDiscount'] as double))),
+          DataCell(Text(formatMoney(row['totalRevenue'] as double))),
+        ],
+      ),
+      exportData: (rows) => ReportExportData(
+        headers: const [
+          'Product',
+          'Variant',
+          'Qty',
+          'Discount',
+          'Tax',
+          'Revenue',
+        ],
+        rows: rows
+            .map(
+              (r) => [
+                r['productName'],
+                r['variantLabel'],
+                r['totalQuantity'],
+                ReportExportService.formatCurrency(
+                  r['totalDiscount'] as double,
                 ),
+                ReportExportService.formatCurrency(r['totalTax'] as double),
+                ReportExportService.formatCurrency(r['totalRevenue'] as double),
               ],
-            ),
-          );
+            )
+            .toList(),
+        summary: {
+          'Variants': rows.length,
+          'Total Revenue': ReportExportService.formatCurrency(
+            rows.fold<double>(0, (s, r) => s + (r['totalRevenue'] as double)),
+          ),
         },
       ),
     );

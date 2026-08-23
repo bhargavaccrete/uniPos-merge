@@ -1,4 +1,12 @@
 import 'dart:io';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/core/plan/mode_keys.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -6,13 +14,9 @@ import 'package:path/path.dart' as path;
 import '../../../../data/models/retail/printer_settings_model.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../domain/services/retail/retail_printer_settings_service.dart';
-import '../../../../domain/services/retail/print_service.dart';
-import '../../../../domain/services/retail/store_settings_service.dart';
-import '../../../../data/models/retail/hive_model/sale_model_203.dart';
-import '../../../../data/models/retail/hive_model/sale_item_model_204.dart';
 
 class PrinterSettingsScreen extends StatefulWidget {
-  const PrinterSettingsScreen({Key? key}) : super(key: key);
+  const PrinterSettingsScreen({super.key});
 
   @override
   State<PrinterSettingsScreen> createState() => _PrinterSettingsScreenState();
@@ -22,10 +26,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   final _printerService = RetailPrinterSettingsService();
   late RetailPrinterSettings _settings;
 
-  final _headerController = TextEditingController();
   final _footerController = TextEditingController();
-  final _termsController = TextEditingController();
-  final _poweredByController = TextEditingController();
 
   @override
   void initState() {
@@ -37,724 +38,548 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     await _printerService.initialize();
     setState(() {
       _settings = _printerService.settings;
-      _headerController.text = _settings.headerText;
       _footerController.text = _settings.footerText;
-      _termsController.text = _settings.termsAndConditionsText;
-      _poweredByController.text = _settings.poweredByText;
     });
   }
 
   @override
   void dispose() {
-    _headerController.dispose();
     _footerController.dispose();
-    _termsController.dispose();
-    _poweredByController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = !AppResponsive.isMobile(context);
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Printer Settings'),
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        titleWidget: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Printer Settings',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontSize: AppResponsive.headingFontSize(context),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Text(
+              'Configure receipt fields',
+              style: GoogleFonts.poppins(
+                color: Colors.white.withValues(alpha: 0.9),
+                fontSize: AppResponsive.smallFontSize(context),
+              ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.restore),
+            icon: const Icon(Icons.refresh, color: Colors.white),
             tooltip: 'Reset to Defaults',
             onPressed: _resetToDefaults,
           ),
-          IconButton(
-            icon: const Icon(Icons.print),
-            tooltip: 'Test Print',
-            onPressed: _testPrint,
+          const SizedBox(width: 4),
+        ],
+      ),
+      // topCenter, not Center: Center aligns on BOTH axes, so on a short
+      // settings list (A4 paper hides the template section) the whole page
+      // would float in the vertical middle.
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: AppResponsive.maxCardWidth(context),
           ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // _buildPaperSizeSection(),
-          const SizedBox(height: 24),
-          _buildLogoSection(),
-          const SizedBox(height: 24),
-          _buildHeaderSection(),
-          const SizedBox(height: 24),
-          _buildInvoiceDetailsSection(),
-          const SizedBox(height: 24),
-          _buildItemDetailsSection(),
-          const SizedBox(height: 24),
-          _buildPricingSection(),
-          const SizedBox(height: 24),
-          _buildPaymentSection(),
-          const SizedBox(height: 24),
-          _buildFooterSection(),
-          const SizedBox(height: 24),
-          _buildPrintBehaviorSection(),
-          const SizedBox(height: 24),
-          _buildFormattingSection(),
-        ],
-      ),
-    );
-  }
+          child: SingleChildScrollView(
+            padding: AppResponsive.padding(context),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Bill template — restaurant leads with this too. Thermal only;
+                // an A4 invoice has a fixed layout.
+                if (_settings.paperSize != PaperSize.a4) ...[
+                  _buildTemplateSection(context, isTablet),
+                  const SizedBox(height: 24),
+                ],
 
-  // ==================== PAPER SIZE SECTION ====================
-/*  Widget _buildPaperSizeSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Paper Configuration',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            const Text('Paper Size', style: TextStyle(fontWeight: FontWeight.w500)),
-            const SizedBox(height: 8),
-            SegmentedButton<PaperSize>(
-              segments: const [
-                ButtonSegment(
-                  value: PaperSize.mm58,
-                  label: Text('58mm'),
-                  icon: Icon(Icons.receipt),
-                ),
-                ButtonSegment(
-                  value: PaperSize.mm80,
-                  label: Text('80mm'),
-                  icon: Icon(Icons.receipt_long),
-                ),
-                ButtonSegment(
-                  value: PaperSize.a4,
-                  label: Text('A4'),
-                  icon: Icon(Icons.description),
-                ),
-              ],
-              selected: {_settings.paperSize},
-              onSelectionChanged: (Set<PaperSize> newSelection) {
-                _printerService.setPaperSize(newSelection.first);
-                _loadSettings();
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }*/
+                _sectionHeader(context, 'Store Logo'),
+                const SizedBox(height: 10),
+                _buildLogoCard(context, isTablet),
+                const SizedBox(height: 24),
 
-  // ==================== LOGO SECTION ====================
-  Widget _buildLogoSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Logo Settings',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            SwitchListTile(
-              title: const Text('Show Logo'),
-              subtitle: const Text('Display store logo on invoice'),
-              value: _settings.showLogo,
-              onChanged: (value) {
-                _printerService.setShowLogo(value);
-                _loadSettings();
-              },
-            ),
-            if (_settings.showLogo) ...[
-              const SizedBox(height: 16),
-              // Logo Preview
-              if (_settings.logoPath != null) ...[
+                // Toggle groups, all but Branding — that goes last so the
+                // "Powered By" lock reads as a footnote, as restaurant does.
+                ..._toggleGroups().entries
+                    .where((g) => g.key != 'Branding')
+                    .map(
+                      (g) =>
+                          _buildToggleGroup(context, g.key, g.value, isTablet),
+                    ),
+
+                // Footer message, immediately before Branding — restaurant's
+                // ordering exactly.
+                _buildTextCard(
+                  context,
+                  icon: Icons.chat_bubble_outline_rounded,
+                  title: 'Footer Message',
+                  description: 'The thank-you note at the bottom of every bill',
+                  controller: _footerController,
+                  hint: 'e.g. Visit Again!',
+                  onChanged: _printerService.setFooterText,
+                ),
+                const SizedBox(height: 24),
+
+                ..._toggleGroups().entries
+                    .where((g) => g.key == 'Branding')
+                    .map(
+                      (g) =>
+                          _buildToggleGroup(context, g.key, g.value, isTablet),
+                    ),
+
                 Center(
                   child: Container(
-                    width: 150,
-                    height: 150,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(8),
+                      color: AppColors.surfaceMedium,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.divider),
                     ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.file(
-                        File(_settings.logoPath!),
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.broken_image, size: 48, color: Colors.grey),
-                                SizedBox(height: 8),
-                                Text('Unable to load image', style: TextStyle(color: Colors.grey)),
-                              ],
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.cloud_done,
+                          color: AppColors.success,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Settings auto-save',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.captionFontSize(context),
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ==================== TOGGLE GROUPS ====================
+
+  /// Exactly the fields restaurant's Print Customization offers, mapped onto
+  /// retail's settings.
+  ///
+  /// Typed getters and setters rather than restaurant's stringly-keyed map —
+  /// retail's settings model is a real class and there is no reason to give
+  /// that up to match a layout.
+  ///
+  /// Three of restaurant's fifteen have no retail counterpart and are omitted
+  /// rather than faked: Order Type (retail has no dine-in/takeaway) and the two
+  /// UPI QR options (no field on RetailPrinterSettings).
+  Map<String, List<_PrintToggle>> _toggleGroups() {
+    final s = _settings;
+    return {
+      'Store Information': [
+        _PrintToggle(
+          'Store Logo',
+          Icons.image_outlined,
+          'Show store logo at the top of receipts',
+          s.showLogo,
+          _printerService.setShowLogo,
+        ),
+        _PrintToggle(
+          'Store Name',
+          Icons.storefront_outlined,
+          'Show store name on receipts',
+          s.showStoreName,
+          _printerService.setShowStoreName,
+        ),
+        _PrintToggle(
+          'Store Address',
+          Icons.location_on_outlined,
+          'Show store address',
+          s.showStoreAddress,
+          _printerService.setShowStoreAddress,
+        ),
+        _PrintToggle(
+          'Store Mobile No',
+          Icons.phone_outlined,
+          'Show contact number',
+          s.showStorePhone,
+          _printerService.setShowStorePhone,
+        ),
+      ],
+      'Invoice Details': [
+        _PrintToggle(
+          'Invoice Number',
+          Icons.numbers,
+          'Show invoice/bill number',
+          s.showInvoiceNumber,
+          _printerService.setShowInvoiceNumber,
+        ),
+        // Restaurant has a single "Ordered Time"; retail stores date and time
+        // as two fields, so one switch drives both rather than exposing a
+        // split restaurant does not have.
+        _PrintToggle(
+          'Invoice Time',
+          Icons.access_time,
+          'Show invoice date and time',
+          s.showInvoiceDate && s.showInvoiceTime,
+          _setInvoiceDateTime,
+        ),
+        _PrintToggle(
+          'Customer Name',
+          Icons.person_outline,
+          'Show customer name if available',
+          s.showCustomerDetails,
+          _printerService.setShowCustomerDetails,
+        ),
+      ],
+      'Payment & Pricing': [
+        _PrintToggle(
+          'Payment Type',
+          Icons.payment,
+          'Show payment method (Cash/Card/UPI)',
+          s.showPaymentMethod,
+          _printerService.setShowPaymentMethod,
+        ),
+        _PrintToggle(
+          'Tax',
+          Icons.percent,
+          'Show GST/tax breakdown',
+          s.showTax,
+          _printerService.setShowTax,
+        ),
+        _PrintToggle(
+          'Subtotal',
+          Icons.calculate_outlined,
+          'Show subtotal before tax',
+          s.showSubtotal,
+          _printerService.setShowSubtotal,
+        ),
+        _PrintToggle(
+          'Payment Paid',
+          Icons.money,
+          'Show cash received and change',
+          s.showAmountReceived,
+          _printerService.setShowAmountReceived,
+        ),
+      ],
+      'Branding': [
+        _PrintToggle(
+          'Powered By',
+          Icons.verified_outlined,
+          'Show "Powered by Bill Berry Lite" at the bottom of the bill',
+          s.showPoweredBy,
+          _printerService.setShowPoweredBy,
+        ),
+      ],
+    };
+  }
+
+  /// Date and time move together — restaurant exposes one control for both.
+  Future<void> _setInvoiceDateTime(bool value) async {
+    await _printerService.setShowInvoiceDate(value);
+    await _printerService.setShowInvoiceTime(value);
+  }
+
+  Widget _buildToggleGroup(
+    BuildContext context,
+    String title,
+    List<_PrintToggle> toggles,
+    bool isTablet,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader(context, title),
+        const SizedBox(height: 12),
+        ...toggles.map((t) => _buildToggleCard(context, t, isTablet)),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  Widget _buildToggleCard(
+    BuildContext context,
+    _PrintToggle toggle,
+    bool isTablet,
+  ) {
+    // "Powered By" is forced ON while the admin keeps `billing.invoice.print`;
+    // when that flag is off the user controls it. `shown` drives the visuals,
+    // `locked` disables input. Same rule as restaurant.
+    final bool locked =
+        toggle.label == 'Powered By' &&
+        PlanEnforce.allows(ModeKeys.billingInvoicePrint);
+    final bool shown = locked ? true : toggle.value;
+
+    Future<void> setValue(bool value) async {
+      await toggle.onChanged(value);
+      await _loadSettings();
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: shown
+              ? AppColors.primary.withValues(alpha: 0.3)
+              : AppColors.divider,
+          width: shown ? 1.5 : 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () {
+            if (locked) {
+              NotificationService.instance.showInfo(
+                'Upgrade to Premium to remove the "Powered by Bill Berry Lite" footer.',
+              );
+              return;
+            }
+            setValue(!toggle.value);
+          },
+          child: Padding(
+            padding: AppResponsive.cardPadding(context),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: shown
+                        ? AppColors.primary.withValues(alpha: 0.1)
+                        : AppColors.surfaceMedium,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    toggle.icon,
+                    color: shown ? AppColors.primary : AppColors.textSecondary,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              toggle.label,
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.bodyFontSize(context),
+                                fontWeight: FontWeight.w600,
+                                color: shown
+                                    ? AppColors.textPrimary
+                                    : AppColors.textSecondary,
+                              ),
                             ),
-                          );
-                        },
+                          ),
+                          if (locked) ...[
+                            const SizedBox(width: 6),
+                            const Icon(
+                              Icons.lock_rounded,
+                              size: 14,
+                              color: AppColors.textSecondary,
+                            ),
+                          ],
+                        ],
                       ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              // Action Buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: _pickLogoImage,
-                    icon: Icon(_settings.logoPath == null ? Icons.add_photo_alternate : Icons.edit),
-                    label: Text(_settings.logoPath == null ? 'Select Logo' : 'Change Logo'),
-                  ),
-                  if (_settings.logoPath != null) ...[
-                    const SizedBox(width: 12),
-                    OutlinedButton.icon(
-                      onPressed: _removeLogoImage,
-                      icon: const Icon(Icons.delete_outline, color: Colors.red),
-                      label: const Text('Remove', style: TextStyle(color: Colors.red)),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Colors.red),
+                      const SizedBox(height: 3),
+                      Text(
+                        locked
+                            ? 'Required by your plan — cannot be turned off'
+                            : toggle.description,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.captionFontSize(context),
+                          color: AppColors.textSecondary,
+                        ),
                       ),
-                    ),
-                  ],
-                ],
-              ),
-              if (_settings.logoPath == null)
-                const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: Center(
-                    child: Text(
-                      'Using default logo',
-                      style: TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
+                    ],
                   ),
                 ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ==================== HEADER SECTION ====================
-  Widget _buildHeaderSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Header Settings',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            SwitchListTile(
-              title: const Text('Show Header'),
-              value: _settings.showHeader,
-              onChanged: (value) {
-                _printerService.setShowHeader(value);
-                _loadSettings();
-              },
-            ),
-            if (_settings.showHeader) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: TextField(
-                  controller: _headerController,
-                  decoration: const InputDecoration(
-                    labelText: 'Custom Header Text',
-                    hintText: 'e.g., Welcome to our store!',
-                    border: OutlineInputBorder(),
+                Transform.scale(
+                  scale: 0.9,
+                  child: Switch(
+                    value: shown,
+                    onChanged: locked ? null : setValue,
+                    activeThumbColor: AppColors.primary,
                   ),
-                  onChanged: (value) => _printerService.setHeaderText(value),
                 ),
-              ),
-              SwitchListTile(
-                title: const Text('Store Name'),
-                value: _settings.showStoreName,
-                onChanged: (value) {
-                  _printerService.setShowStoreName(value);
-                  _loadSettings();
-                },
-              ),
-              SwitchListTile(
-                title: const Text('Store Address'),
-                value: _settings.showStoreAddress,
-                onChanged: (value) {
-                  _printerService.setShowStoreAddress(value);
-                  _loadSettings();
-                },
-              ),
-              SwitchListTile(
-                title: const Text('Store Phone'),
-                value: _settings.showStorePhone,
-                onChanged: (value) {
-                  _printerService.setShowStorePhone(value);
-                  _loadSettings();
-                },
-              ),
-              SwitchListTile(
-                title: const Text('Store Email'),
-                value: _settings.showStoreEmail,
-                onChanged: (value) {
-                  _printerService.setShowStoreEmail(value);
-                  _loadSettings();
-                },
-              ),
-              SwitchListTile(
-                title: const Text('GST Number'),
-                value: _settings.showGSTNumber,
-                onChanged: (value) {
-                  _printerService.setShowGSTNumber(value);
-                  _loadSettings();
-                },
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ==================== INVOICE DETAILS SECTION ====================
-  Widget _buildInvoiceDetailsSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Invoice Details',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            SwitchListTile(
-              title: const Text('Invoice Number'),
-              value: _settings.showInvoiceNumber,
-              onChanged: (value) {
-                _printerService.setShowInvoiceNumber(value);
-                _loadSettings();
-              },
-            ),
-            SwitchListTile(
-              title: const Text('Invoice Date'),
-              value: _settings.showInvoiceDate,
-              onChanged: (value) {
-                _printerService.setShowInvoiceDate(value);
-                _loadSettings();
-              },
-            ),
-            SwitchListTile(
-              title: const Text('Invoice Time'),
-              value: _settings.showInvoiceTime,
-              onChanged: (value) {
-                _printerService.setShowInvoiceTime(value);
-                _loadSettings();
-              },
-            ),
-            SwitchListTile(
-              title: const Text('Customer Details'),
-              value: _settings.showCustomerDetails,
-              onChanged: (value) {
-                _printerService.setShowCustomerDetails(value);
-                _loadSettings();
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ==================== ITEM DETAILS SECTION ====================
-  Widget _buildItemDetailsSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Item Details',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            SwitchListTile(
-              title: const Text('Variant Details'),
-              subtitle: const Text('Size, Color, Weight'),
-              value: _settings.showVariantDetails,
-              onChanged: (value) {
-                _printerService.setShowVariantDetails(value);
-                _loadSettings();
-              },
-            ),
-            SwitchListTile(
-              title: const Text('HSN Code'),
-              value: _settings.showHSNCode,
-              onChanged: (value) {
-                _printerService.setShowHSNCode(value);
-                _loadSettings();
-              },
-            ),
-            SwitchListTile(
-              title: const Text('Barcode'),
-              value: _settings.showBarcode,
-              onChanged: (value) {
-                _printerService.setShowBarcode(value);
-                _loadSettings();
-              },
-            ),
-            SwitchListTile(
-              title: const Text('Item Discount'),
-              value: _settings.showItemDiscount,
-              onChanged: (value) {
-                _printerService.setShowItemDiscount(value);
-                _loadSettings();
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ==================== PRICING SECTION ====================
-  Widget _buildPricingSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Pricing & Tax',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            SwitchListTile(
-              title: const Text('MRP'),
-              value: _settings.showMRP,
-              onChanged: (value) {
-                _printerService.setShowMRP(value);
-                _loadSettings();
-              },
-            ),
-            SwitchListTile(
-              title: const Text('Subtotal'),
-              value: _settings.showSubtotal,
-              onChanged: (value) {
-                _printerService.setShowSubtotal(value);
-                _loadSettings();
-              },
-            ),
-            SwitchListTile(
-              title: const Text('Discount'),
-              value: _settings.showDiscount,
-              onChanged: (value) {
-                _printerService.setShowDiscount(value);
-                _loadSettings();
-              },
-            ),
-            SwitchListTile(
-              title: const Text('Tax'),
-              value: _settings.showTax,
-              onChanged: (value) {
-                _printerService.setShowTax(value);
-                _loadSettings();
-              },
-            ),
-            if (_settings.showTax)
-              Padding(
-                padding: const EdgeInsets.only(left: 16),
-                child: SwitchListTile(
-                  title: const Text('Tax Breakdown'),
-                  subtitle: const Text('Show CGST/SGST separately'),
-                  value: _settings.showTaxBreakdown,
-                  onChanged: (value) {
-                    _printerService.setShowTaxBreakdown(value);
-                    _loadSettings();
-                  },
-                ),
-              ),
-            SwitchListTile(
-              title: const Text('Grand Total'),
-              value: _settings.showGrandTotal,
-              onChanged: (value) {
-                _printerService.setShowGrandTotal(value);
-                _loadSettings();
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ==================== PAYMENT SECTION ====================
-  Widget _buildPaymentSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Payment Details',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            SwitchListTile(
-              title: const Text('Payment Method'),
-              value: _settings.showPaymentMethod,
-              onChanged: (value) {
-                _printerService.setShowPaymentMethod(value);
-                _loadSettings();
-              },
-            ),
-            SwitchListTile(
-              title: const Text('Split Payment'),
-              subtitle: const Text('Show multiple payment methods'),
-              value: _settings.showSplitPayment,
-              onChanged: (value) {
-                _printerService.setShowSplitPayment(value);
-                _loadSettings();
-              },
-            ),
-            SwitchListTile(
-              title: const Text('Amount Received'),
-              value: _settings.showAmountReceived,
-              onChanged: (value) {
-                _printerService.setShowAmountReceived(value);
-                _loadSettings();
-              },
-            ),
-            SwitchListTile(
-              title: const Text('Change Given'),
-              value: _settings.showChangeGiven,
-              onChanged: (value) {
-                _printerService.setShowChangeGiven(value);
-                _loadSettings();
-              },
-            ),
-            SwitchListTile(
-              title: const Text('Loyalty Points'),
-              value: _settings.showLoyaltyPoints,
-              onChanged: (value) {
-                _printerService.setShowLoyaltyPoints(value);
-                _loadSettings();
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ==================== FOOTER SECTION ====================
-  Widget _buildFooterSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Footer Settings',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            SwitchListTile(
-              title: const Text('Show Footer'),
-              value: _settings.showFooter,
-              onChanged: (value) {
-                _printerService.setShowFooter(value);
-                _loadSettings();
-              },
-            ),
-            if (_settings.showFooter) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: TextField(
-                  controller: _footerController,
-                  decoration: const InputDecoration(
-                    labelText: 'Footer Text',
-                    hintText: 'e.g., Thank you, Visit Again!',
-                    border: OutlineInputBorder(),
-                  ),
-                  onChanged: (value) => _printerService.setFooterText(value),
-                ),
-              ),
-            ],
-            SwitchListTile(
-              title: const Text('Terms & Conditions'),
-              value: _settings.showTermsAndConditions,
-              onChanged: (value) {
-                _printerService.setShowTermsAndConditions(value);
-                _loadSettings();
-              },
-            ),
-            if (_settings.showTermsAndConditions)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: TextField(
-                  controller: _termsController,
-                  decoration: const InputDecoration(
-                    labelText: 'Terms & Conditions',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                  onChanged: (value) => _printerService.setTermsAndConditionsText(value),
-                ),
-              ),
-            SwitchListTile(
-              title: const Text('Powered By'),
-              value: _settings.showPoweredBy,
-              onChanged: (value) {
-                _printerService.setShowPoweredBy(value);
-                _loadSettings();
-              },
-            ),
-            if (_settings.showPoweredBy)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: TextField(
-                  controller: _poweredByController,
-                  decoration: const InputDecoration(
-                    labelText: 'Powered By Text',
-                    hintText: 'e.g., Powered by YourCompany',
-                    border: OutlineInputBorder(),
-                  ),
-                  onChanged: (value) => _printerService.setPoweredByText(value),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ==================== PRINT BEHAVIOR SECTION ====================
-  Widget _buildPrintBehaviorSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Print Behavior',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            SwitchListTile(
-              title: const Text('Auto Print After Sale'),
-              subtitle: const Text('Automatically print invoice after checkout'),
-              value: _settings.autoPrintAfterSale,
-              onChanged: (value) {
-                _printerService.setAutoPrintAfterSale(value);
-                _loadSettings();
-              },
-            ),
-            SwitchListTile(
-              title: const Text('Show Print Dialog'),
-              subtitle: const Text('Show preview before printing'),
-              value: _settings.showPrintDialog,
-              onChanged: (value) {
-                _printerService.setShowPrintDialog(value);
-                _loadSettings();
-              },
-            ),
-            ListTile(
-              title: const Text('Number of Copies'),
-              subtitle: Text('${_settings.numberOfCopies} ${_settings.numberOfCopies == 1 ? "copy" : "copies"}'),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.remove),
-                    onPressed: _settings.numberOfCopies > 1
-                        ? () {
-                            _printerService.setNumberOfCopies(_settings.numberOfCopies - 1);
-                            _loadSettings();
-                          }
-                        : null,
-                  ),
-                  Text('${_settings.numberOfCopies}'),
-                  IconButton(
-                    icon: const Icon(Icons.add),
-                    onPressed: _settings.numberOfCopies < 5
-                        ? () {
-                            _printerService.setNumberOfCopies(_settings.numberOfCopies + 1);
-                            _loadSettings();
-                          }
-                        : null,
-                  ),
-                ],
-              ),
-            ),
-            SwitchListTile(
-              title: const Text('Open Cash Drawer'),
-              subtitle: const Text('Open cash drawer after printing'),
-              value: _settings.openCashDrawer,
-              onChanged: (value) {
-                _printerService.setOpenCashDrawer(value);
-                _loadSettings();
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ==================== FORMATTING SECTION ====================
-  Widget _buildFormattingSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Formatting',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            const Text('Font Size', style: TextStyle(fontWeight: FontWeight.w500)),
-            const SizedBox(height: 8),
-            SegmentedButton<FontSize>(
-              segments: const [
-                ButtonSegment(value: FontSize.small, label: Text('Small')),
-                ButtonSegment(value: FontSize.medium, label: Text('Medium')),
-                ButtonSegment(value: FontSize.large, label: Text('Large')),
               ],
-              selected: {_settings.fontSize},
-              onSelectionChanged: (Set<FontSize> newSelection) {
-                _printerService.setFontSize(newSelection.first);
-                _loadSettings();
-              },
             ),
-            const SizedBox(height: 16),
-            SwitchListTile(
-              title: const Text('Bold Product Names'),
-              value: _settings.boldProductNames,
-              onChanged: (value) {
-                _printerService.setBoldProductNames(value);
-                _loadSettings();
-              },
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Accent bar + title, the same section header restaurant uses.
+  Widget _sectionHeader(BuildContext context, String title) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 18,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          title,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.subheadingFontSize(context),
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+            letterSpacing: 0.3,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _card({required Widget child}) => Container(
+    width: double.infinity,
+    decoration: BoxDecoration(
+      color: AppColors.white,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: AppColors.divider),
+    ),
+    child: child,
+  );
+
+  Widget _buildTemplateSection(BuildContext context, bool isTablet) {
+    final current = _settings.billTemplate;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader(context, 'Bill Receipt Template'),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _templateCard(
+                context,
+                title: 'Simple Invoice',
+                subtitle: 'Clean, professional & structured layout',
+                icon: Icons.receipt_long_outlined,
+                isSelected: current == BillTemplate.simple,
+                onTap: () => _setTemplate(BillTemplate.simple),
+              ),
             ),
-            SwitchListTile(
-              title: const Text('Show Borders'),
-              value: _settings.showBorders,
-              onChanged: (value) {
-                _printerService.setShowBorders(value);
-                _loadSettings();
-              },
+            const SizedBox(width: 12),
+            Expanded(
+              child: _templateCard(
+                context,
+                title: 'Paper Saver',
+                subtitle: 'Compact layout to save roll paper',
+                icon: Icons.compress_outlined,
+                isSelected: current == BillTemplate.paperSaver,
+                onTap: () => _setTemplate(BillTemplate.paperSaver),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _setTemplate(BillTemplate template) async {
+    await _printerService.setBillTemplate(template);
+    await _loadSettings();
+  }
+
+  Widget _templateCard(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(12),
+        height: 110,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.primary.withValues(alpha: 0.04)
+              : AppColors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.divider,
+            width: isSelected ? 1.8 : 1.0,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Icon(
+                  icon,
+                  color: isSelected
+                      ? AppColors.primary
+                      : AppColors.textSecondary,
+                  size: 20,
+                ),
+                if (isSelected)
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    color: AppColors.primary,
+                    size: 16,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: isSelected ? AppColors.primary : AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Expanded(
+              child: Text(
+                subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.captionFontSize(context),
+                  color: AppColors.textSecondary,
+                ),
+              ),
             ),
           ],
         ),
@@ -762,7 +587,172 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     );
   }
 
-  // ==================== IMAGE PICKER ====================
+  /// The logo image itself. Its on/off toggle lives in the Store Information
+  /// group below, matching restaurant.
+  Widget _buildLogoCard(BuildContext context, bool isTablet) {
+    final hasLogo =
+        _settings.logoPath != null && File(_settings.logoPath!).existsSync();
+
+    return _card(
+      child: Padding(
+        padding: AppResponsive.cardPadding(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.divider),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: hasLogo
+                      ? Image.file(
+                          File(_settings.logoPath!),
+                          fit: BoxFit.contain,
+                        )
+                      : const Icon(
+                          Icons.storefront_outlined,
+                          color: AppColors.textSecondary,
+                          size: 28,
+                        ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _pickLogoImage,
+                          icon: const Icon(Icons.upload_outlined, size: 18),
+                          label: Text(
+                            hasLogo ? 'Change' : 'Add Logo',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.smallFontSize(context),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.primary,
+                            side: const BorderSide(color: AppColors.primary),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (hasLogo) ...[
+                        const SizedBox(width: 10),
+                        IconButton(
+                          onPressed: _removeLogoImage,
+                          icon: const Icon(Icons.delete_outline_rounded),
+                          color: AppColors.danger,
+                          tooltip: 'Remove logo',
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (!_settings.showLogo && hasLogo) ...[
+              const SizedBox(height: 10),
+              Text(
+                'Logo printing is turned off below — this image will not appear '
+                'on receipts.',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.captionFontSize(context),
+                  color: AppColors.warning,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextCard(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String description,
+    required TextEditingController controller,
+    required String hint,
+    required Future<void> Function(String) onChanged,
+    int maxLines = 2,
+  }) {
+    return _card(
+      child: Padding(
+        padding: AppResponsive.cardPadding(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _cardHeading(context, icon, title, description),
+            const SizedBox(height: 14),
+            AppTextField(
+              controller: controller,
+              hint: hint,
+              icon: Icons.edit_note_rounded,
+              maxLines: maxLines,
+              minLines: 1,
+              maxLength: 200,
+              onChanged: (v) => onChanged(v),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _cardHeading(
+    BuildContext context,
+    IconData icon,
+    String title,
+    String description,
+  ) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: AppColors.primary, size: 22),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                description,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.captionFontSize(context),
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
   Future<void> _pickLogoImage() async {
     try {
@@ -776,20 +766,22 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
 
       if (image != null) {
         final bytes = await image.readAsBytes();
-        
+
         // Validate image size (max 2MB)
         if (bytes.length > 2 * 1024 * 1024) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Image is too large. Please select an image under 2MB.'),
+                content: Text(
+                  'Image is too large. Please select an image under 2MB.',
+                ),
                 backgroundColor: Colors.red,
               ),
             );
           }
           return;
         }
-        
+
         // Get app's documents directory
         final Directory appDir = await getApplicationDocumentsDirectory();
         final String logoDir = '${appDir.path}/logos';
@@ -809,7 +801,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
             }
           } catch (e) {
             // Ignore error if old file can't be deleted
-            print('Error deleting old logo: $e');
+            debugPrint('Error deleting old logo: $e');
           }
         }
 
@@ -834,25 +826,18 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   }
 
   Future<void> _removeLogoImage() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppConfirmDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove Logo?'),
-        content: const Text('This will remove the custom logo and use the default logo.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
+      title: 'Remove Logo?',
+      message:
+          'The logo will no longer print on receipts. '
+          'You can add it again anytime.',
+      confirmLabel: 'Remove',
+      accent: AppColors.danger,
+      icon: Icons.delete_outline_rounded,
     );
 
-    if (confirmed == true) {
+    if (confirmed) {
       // Delete the logo file if it exists
       if (_settings.logoPath != null) {
         try {
@@ -861,7 +846,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
             await logoFile.delete();
           }
         } catch (e) {
-          print('Error deleting logo file: $e');
+          debugPrint('Error deleting logo file: \$e');
         }
       }
 
@@ -876,25 +861,18 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   // ==================== ACTIONS ====================
 
   Future<void> _resetToDefaults() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppConfirmDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reset to Defaults?'),
-        content: const Text('This will reset all printer settings to default values.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Reset'),
-          ),
-        ],
-      ),
+      title: 'Reset Settings?',
+      message:
+          'This will restore every print setting to its default value, '
+          'including paper size and template.',
+      confirmLabel: 'Reset',
+      accent: AppColors.danger,
+      icon: Icons.refresh_rounded,
     );
 
-    if (confirmed == true) {
+    if (confirmed) {
       await _printerService.resetToDefaults();
       _loadSettings();
       if (mounted) {
@@ -902,72 +880,20 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
       }
     }
   }
+}
 
-  Future<void> _testPrint() async {
-    try {
-      const sampleSaleId = 'TEST-PRINT';
+class _PrintToggle {
+  final String label;
+  final IconData icon;
+  final String description;
+  final bool value;
+  final Future<void> Function(bool) onChanged;
 
-      // Sample line items for the test receipt — never saved to the database.
-      final sampleItems = _buildTestPrintItems(sampleSaleId);
-      if (sampleItems.isEmpty) return;
-
-      // Totals are derived from what the items computed (price + GST), so the
-      // sample receipt's math is internally consistent like a real sale.
-      final subtotal =
-          sampleItems.fold<double>(0, (s, i) => s + (i.taxableAmount ?? 0));
-      final gst = sampleItems.fold<double>(0, (s, i) => s + (i.gstAmount ?? 0));
-      final grandTotal = sampleItems.fold<double>(0, (s, i) => s + i.total);
-
-      final sampleSale = SaleModel.create(
-        saleId: sampleSaleId,
-        totalItems: sampleItems.length,
-        subtotal: subtotal,
-        taxAmount: gst,
-        totalAmount: grandTotal,
-        paymentType: 'cash',
-      );
-
-      // Reuse the same PrintService that prints real invoices, so the test
-      // exercises the actual printer + current printer settings.
-      await PrintService().printReceipt(
-        context: context,
-        sale: sampleSale,
-        items: sampleItems,
-        format: ReceiptFormat.thermal,
-        storeName: await StoreSettingsService().getStoreName(),
-      );
-    } catch (e) {
-      if (mounted) {
-        NotificationService.instance.showError('Test print failed: $e');
-      }
-    }
-  }
-
-  /// Builds the sample line items printed by [_testPrint].
-  /// Two rows with different GST rates + a qty > 1 so the receipt exercises the
-  /// item table, quantity column, and CGST/SGST tax breakdown. Tweak freely.
-  List<SaleItemModel> _buildTestPrintItems(String saleId) {
-    return [
-      SaleItemModel.create(
-        saleId: saleId,
-        varianteId: 'TEST-V1',
-        productId: 'TEST-P1',
-        productName: 'Sample Item A',
-        price: 100,
-        qty: 2,
-        gstRate: 18,
-        hsnCode: '0000',
-      ),
-      SaleItemModel.create(
-        saleId: saleId,
-        varianteId: 'TEST-V2',
-        productId: 'TEST-P2',
-        productName: 'Sample Item B',
-        price: 50,
-        qty: 1,
-        gstRate: 5,
-        hsnCode: '0000',
-      ),
-    ];
-  }
+  const _PrintToggle(
+    this.label,
+    this.icon,
+    this.description,
+    this.value,
+    this.onChanged,
+  );
 }
