@@ -218,6 +218,28 @@ class HiveBoxNames {
   /// Item-level cancellation audit (items cancelled from a placed order, with reason)
   static const String restaurantItemCancellations = 'restaurantItemCancellationsBox';
 
+  /// Recipes (Bill of Materials) — what a Semi-Finished/Recipe-Based item is made of
+  static const String restaurantRecipes = 'restaurantRecipesBox';
+
+  /// "Batch produced" log for Semi-Finished items (raw materials -> prepped stock)
+  static const String restaurantRecipeProductions = 'restaurantRecipeProductionsBox';
+
+  /// Restaurant raw-material suppliers (mirrors retail's suppliers box, own box per mode)
+  static const String restaurantSuppliers = 'restaurantSuppliersBox';
+
+  /// Restaurant purchase orders (raw-material procurement)
+  static const String restaurantPurchaseOrders = 'restaurantPurchaseOrdersBox';
+
+  /// Restaurant purchase order line items
+  static const String restaurantPurchaseOrderItems = 'restaurantPurchaseOrderItemsBox';
+
+  /// Restaurant GRNs (Goods Receipt Notes) — confirming a GRN is the only
+  /// place raw-material stock increments, mirrors retail's GRN pattern
+  static const String restaurantGrns = 'restaurantGrnsBox';
+
+  /// Restaurant GRN line items
+  static const String restaurantGrnItems = 'restaurantGrnItemsBox';
+
   // ==================== HELPER METHODS ====================
 
   /// Get the appropriate EOD box name based on business mode
@@ -312,6 +334,13 @@ class HiveBoxNames {
     restaurantAttendance,
     restaurantNotifications,
     restaurantItemCancellations,
+    restaurantRecipes,
+    restaurantRecipeProductions,
+    restaurantSuppliers,
+    restaurantPurchaseOrders,
+    restaurantPurchaseOrderItems,
+    restaurantGrns,
+    restaurantGrnItems,
   ];
 
   /// All common box names (shared between retail and restaurant)

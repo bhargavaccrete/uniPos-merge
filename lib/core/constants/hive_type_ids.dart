@@ -73,6 +73,20 @@ class HiveTypeIds {
   static const int restaurantAppNotification = 133; // AppNotificationModel — persisted notifications
   static const int restaurantItemCancellation = 134; // ItemCancellationModel — item-level cancel audit
 
+  // Recipe / BOM (135-137) — see docs/inventory_recipe_system_plan.md
+  static const int restaurantRecipe = 135; // RecipeModel — header: what an item is made of
+  static const int restaurantRecipeIngredient = 136; // RecipeIngredientModel — embedded line in RecipeModel.ingredients
+  static const int restaurantRecipeProduction = 137; // RecipeProductionModel — "batch produced" log for Semi-Finished items
+
+  // Restaurant Purchase Order / GRN (138-142) — raw-material procurement,
+  // mirrors retail's Supplier/PurchaseOrder/GRN pattern (150-164) but scoped
+  // to restaurant's Items model, per docs/inventory_recipe_system_plan.md §6.
+  static const int restaurantSupplier = 138;
+  static const int restaurantPurchaseOrder = 139;
+  static const int restaurantPurchaseOrderItem = 140;
+  static const int restaurantGrn = 141;
+  static const int restaurantGrnItem = 142;
+
   // ==================== RETAIL MODELS (150-223) ====================
   static const int retailProduct = 150;
   static const int retailVariant = 151;
@@ -208,5 +222,13 @@ class HiveTypeIds {
     restaurantAttendance,
     restaurantAppNotification,
     restaurantItemCancellation,
+    restaurantRecipe,
+    restaurantRecipeIngredient,
+    restaurantRecipeProduction,
+    restaurantSupplier,
+    restaurantPurchaseOrder,
+    restaurantPurchaseOrderItem,
+    restaurantGrn,
+    restaurantGrnItem,
   ];
 }

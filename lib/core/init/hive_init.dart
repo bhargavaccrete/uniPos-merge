@@ -44,6 +44,14 @@ import 'package:billberrylite/data/models/retail/hive_model/billing_tab_model_17
 // Restaurant Models
 import 'package:billberrylite/data/models/common/categorymodel_300.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
+import 'package:billberrylite/data/models/restaurant/db/recipe_ingredient_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/recipe_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/recipe_production_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_supplier_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_order_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_order_item_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_grn_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_grn_item_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/extramodel_303.dart';
 import 'package:billberrylite/data/models/restaurant/db/toppingmodel_304.dart';
 import 'package:billberrylite/data/models/restaurant/db/variantmodel_305.dart';
@@ -626,6 +634,39 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantItemCancellation)) {
       Hive.registerAdapter(ItemCancellationModelAdapter());
     }
+    // RecipeIngredientModel - 136: embedded line in RecipeModel.ingredients
+    // (registered before RecipeModel since RecipeModel embeds it)
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantRecipeIngredient)) {
+      Hive.registerAdapter(RecipeIngredientModelAdapter());
+    }
+    // RecipeModel - 135: Bill of Materials for Semi-Finished/Recipe-Based items
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantRecipe)) {
+      Hive.registerAdapter(RecipeModelAdapter());
+    }
+    // RecipeProductionModel - 137: "batch produced" log for Semi-Finished items
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantRecipeProduction)) {
+      Hive.registerAdapter(RecipeProductionModelAdapter());
+    }
+    // RestaurantSupplierModel - 138: raw-material suppliers
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantSupplier)) {
+      Hive.registerAdapter(RestaurantSupplierModelAdapter());
+    }
+    // RestaurantPurchaseOrderModel - 139
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantPurchaseOrder)) {
+      Hive.registerAdapter(RestaurantPurchaseOrderModelAdapter());
+    }
+    // RestaurantPurchaseOrderItemModel - 140
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantPurchaseOrderItem)) {
+      Hive.registerAdapter(RestaurantPurchaseOrderItemModelAdapter());
+    }
+    // RestaurantGRNModel - 141
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantGrn)) {
+      Hive.registerAdapter(RestaurantGRNModelAdapter());
+    }
+    // RestaurantGRNItemModel - 142
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantGrnItem)) {
+      Hive.registerAdapter(RestaurantGRNItemModelAdapter());
+    }
   }
 
   /// Open all restaurant Hive boxes
@@ -691,6 +732,17 @@ class HiveInit {
     await Hive.openBox<AppNotificationModel>(HiveBoxNames.restaurantNotifications);
     // Item-level cancellation audit
     await Hive.openBox<ItemCancellationModel>(HiveBoxNames.restaurantItemCancellations);
+
+    // Recipes (BOM) and batch-production log — see docs/inventory_recipe_system_plan.md
+    await Hive.openBox<RecipeModel>(HiveBoxNames.restaurantRecipes);
+    await Hive.openBox<RecipeProductionModel>(HiveBoxNames.restaurantRecipeProductions);
+
+    // Restaurant Purchase Order / GRN pipeline (raw-material procurement)
+    await Hive.openBox<RestaurantSupplierModel>(HiveBoxNames.restaurantSuppliers);
+    await Hive.openBox<RestaurantPurchaseOrderModel>(HiveBoxNames.restaurantPurchaseOrders);
+    await Hive.openBox<RestaurantPurchaseOrderItemModel>(HiveBoxNames.restaurantPurchaseOrderItems);
+    await Hive.openBox<RestaurantGRNModel>(HiveBoxNames.restaurantGrns);
+    await Hive.openBox<RestaurantGRNItemModel>(HiveBoxNames.restaurantGrnItems);
 
     _areRestaurantBoxesOpen = true;
   }

@@ -38,6 +38,11 @@ import 'package:billberrylite/domain/store/retail/supplier_store.dart';
 // ==================== RESTAURANT IMPORTS ====================
 import 'package:billberrylite/data/repositories/common/category_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/item_repository.dart';
+import 'package:billberrylite/data/repositories/restaurant/recipe_repository.dart';
+import 'package:billberrylite/data/repositories/restaurant/recipe_production_repository.dart';
+import 'package:billberrylite/data/repositories/restaurant/restaurant_supplier_repository.dart';
+import 'package:billberrylite/data/repositories/restaurant/restaurant_purchase_order_repository.dart';
+import 'package:billberrylite/data/repositories/restaurant/restaurant_grn_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/variant_repository.dart' as restaurant;
 import 'package:billberrylite/data/repositories/restaurant/choice_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/extra_repository.dart';
@@ -59,6 +64,7 @@ import 'package:billberrylite/data/repositories/restaurant/printer_repository.da
 
 import 'package:billberrylite/domain/store/common/category_store.dart';
 import 'package:billberrylite/domain/store/restaurant/item_store.dart';
+import 'package:billberrylite/domain/store/restaurant/restaurant_purchase_order_store.dart';
 import 'package:billberrylite/domain/store/restaurant/variant_store.dart';
 import 'package:billberrylite/domain/store/restaurant/choice_store.dart';
 import 'package:billberrylite/domain/store/restaurant/extra_store.dart';
@@ -296,6 +302,15 @@ Future<void> _registerRestaurantDependencies() async {
   // ==================== RESTAURANT REPOSITORIES ====================
   locator.registerLazySingleton<CategoryRepository>(() => CategoryRepository());
   locator.registerLazySingleton<ItemRepository>(() => ItemRepository());
+  locator.registerLazySingleton<RecipeRepository>(() => RecipeRepository());
+  locator.registerLazySingleton<RecipeProductionRepository>(
+    () => RecipeProductionRepository(),
+  );
+  locator.registerLazySingleton<RestaurantSupplierRepository>(() => RestaurantSupplierRepository());
+  locator.registerLazySingleton<RestaurantPurchaseOrderRepository>(() => RestaurantPurchaseOrderRepository());
+  locator.registerLazySingleton<RestaurantPurchaseOrderItemRepository>(() => RestaurantPurchaseOrderItemRepository());
+  locator.registerLazySingleton<RestaurantGRNRepository>(() => RestaurantGRNRepository());
+  locator.registerLazySingleton<RestaurantGRNItemRepository>(() => RestaurantGRNItemRepository());
   locator.registerLazySingleton<VariantRepositoryRes>(() => restaurant.VariantRepositoryRes());
   locator.registerLazySingleton<ChoiceRepository>(() => ChoiceRepository());
   locator.registerLazySingleton<ExtraRepository>(() => ExtraRepository());
@@ -325,6 +340,9 @@ Future<void> _registerRestaurantDependencies() async {
   );
   locator.registerLazySingleton<ItemStore>(
     () => ItemStore(locator<ItemRepository>()),
+  );
+  locator.registerLazySingleton<RestaurantPurchaseOrderStore>(
+    () => RestaurantPurchaseOrderStore(),
   );
   locator.registerLazySingleton<VariantStore>(
     () => VariantStore(locator<restaurant.VariantRepositoryRes>()),
@@ -471,6 +489,8 @@ AttributeRepository get attributeRepository => locator<AttributeRepository>();
 /// Restaurant Stores
 CategoryStore get categoryStore => locator<CategoryStore>();
 ItemStore get itemStore => locator<ItemStore>();
+RestaurantPurchaseOrderStore get restaurantPurchaseOrderStore =>
+    locator<RestaurantPurchaseOrderStore>();
 VariantStore get variantStore => locator<VariantStore>();
 ChoiceStore get choiceStore => locator<ChoiceStore>();
 ExtraStore get extraStore => locator<ExtraStore>();
@@ -496,6 +516,14 @@ LicenseStore get licenseStore => locator<LicenseStore>();
 /// Restaurant Repositories
 CategoryRepository get categoryRepository => locator<CategoryRepository>();
 ItemRepository get itemRepository => locator<ItemRepository>();
+RecipeRepository get recipeRepository => locator<RecipeRepository>();
+RecipeProductionRepository get recipeProductionRepository =>
+    locator<RecipeProductionRepository>();
+RestaurantSupplierRepository get restaurantSupplierRepository => locator<RestaurantSupplierRepository>();
+RestaurantPurchaseOrderRepository get restaurantPurchaseOrderRepository => locator<RestaurantPurchaseOrderRepository>();
+RestaurantPurchaseOrderItemRepository get restaurantPurchaseOrderItemRepository => locator<RestaurantPurchaseOrderItemRepository>();
+RestaurantGRNRepository get restaurantGrnRepository => locator<RestaurantGRNRepository>();
+RestaurantGRNItemRepository get restaurantGrnItemRepository => locator<RestaurantGRNItemRepository>();
 restaurant.VariantRepositoryRes get restaurantVariantRepository => locator<restaurant.VariantRepositoryRes>();
 ChoiceRepository get choiceRepository => locator<ChoiceRepository>();
 ExtraRepository get extraRepository => locator<ExtraRepository>();

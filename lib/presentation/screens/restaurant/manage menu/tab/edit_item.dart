@@ -39,6 +39,10 @@ import '../../item/choice_selection_screen.dart';
 import '../../item/extra_selection_screen.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../data/models/restaurant/db/variantmodel_305.dart';
+import '../../../../../data/models/restaurant/db/product_type.dart';
+import '../../../../../data/models/restaurant/db/recipe_model.dart';
+import '../../../../widget/componets/restaurant/recipe_builder_widget.dart';
+import '../../../../widget/componets/restaurant/componets/dropdown.dart';
 
 // Helper class to hold all the data needed for the screen
 class EditScreenData {
@@ -96,6 +100,10 @@ class _EdititemScreenState extends State<EdititemScreen> {
   String allowOutOfStockFilter = 'YES';
   String _lowStockAlertFilter = 'NO';
   bool _isSaving = false;
+
+  // Product Type + Recipe (BOM) — see docs/inventory_recipe_system_plan.md
+  String _productType = ProductType.finishedGood;
+  RecipeModel? _currentRecipe;
 
   // Live option catalogs (mutable so options created via "+ New" appear
   // immediately without re-loading and discarding in-progress edits).
@@ -160,6 +168,9 @@ class _EdititemScreenState extends State<EdititemScreen> {
 
     selectedFilter = widget.items.trackInventory == true ? 'YES' : 'NO';
     allowOutOfStockFilter = widget.items.allowOrderWhenOutOfStock == true ? 'YES' : 'NO';
+
+    _productType = widget.items.effectiveProductType;
+    _currentRecipe = recipeRepository.getRecipeForItem(widget.items.id);
 
     _loadDataFuture = _loadInitialData();
   }
@@ -402,12 +413,18 @@ class _EdititemScreenState extends State<EdititemScreen> {
       isSoldByWeight: _sellingMethod == SellingMethod.byWeight,
       unit: _sellingMethod == SellingMethod.byWeight ? _selectedUnit : null,
       itemCode: itemCode,
+      productType: _productType,
     );
 
     // Set tax directly (not via copyWith) so selecting "No Tax" (null) actually
     // clears it — copyWith's `?? this.taxRate` would otherwise keep the old rate.
     updateItem.taxRate = selectedTaxRate;
     updateItem.taxIds = selectedTaxIds;
+
+    // recipeId: same "can't clear via copyWith" issue as taxRate above — set
+    // directly so switching away from a recipe-having type actually detaches it.
+    updateItem.recipeId =
+        ProductType.hasRecipe(_productType) ? _currentRecipe?.id : null;
 
     // Low-stock alert (only meaningful when inventory tracking is on).
     // Set directly so turning tracking/alert off clears the override.
@@ -434,6 +451,13 @@ class _EdititemScreenState extends State<EdititemScreen> {
     AuditTrailHelper.trackEdit(updateItem, editedBy: RestaurantSession.staffName ?? RestaurantSession.effectiveRole);
 
     await itemStore.updateItem(updateItem);
+
+    // Persist (or drop) the recipe alongside the item — see design doc §4.
+    if (ProductType.hasRecipe(_productType) && _currentRecipe != null) {
+      await recipeRepository.saveRecipe(_currentRecipe!.copyWith(itemId: updateItem.id));
+    } else {
+      await recipeRepository.deleteRecipeForItem(updateItem.id);
+    }
 
     // Log any variant stock changes so the history & running balance stay honest.
     for (final adj in pendingAdjustments) {
@@ -592,6 +616,28 @@ class _EdititemScreenState extends State<EdititemScreen> {
           ),
           const SizedBox(height: 25),
 
+          // Product Type — determines whether this item is stocked directly,
+          // made from a recipe, or both. See docs/inventory_recipe_system_plan.md §3/§8.1.
+          _buildSectionHeader('Product Type', Icons.category_rounded),
+          const SizedBox(height: 15),
+          Dropdown(
+            items: ProductType.all.map(ProductType.displayName).toList(),
+            selectedItem: ProductType.displayName(_productType),
+            onChanged: (label) {
+              final type = ProductType.all.firstWhere(
+                (t) => ProductType.displayName(t) == label,
+                orElse: () => ProductType.finishedGood,
+              );
+              setState(() {
+                _productType = type;
+                // Switching away from a recipe type drops the in-progress
+                // recipe rather than silently keeping stale ingredients.
+                if (!ProductType.hasRecipe(type)) _currentRecipe = null;
+              });
+            },
+          ),
+          const SizedBox(height: 25),
+
           // Tax Section
           if (TaxFeature.enabled) ...[
             _buildSectionHeader('Tax', Icons.percent_rounded),
@@ -627,7 +673,11 @@ class _EdititemScreenState extends State<EdititemScreen> {
 
           // Inventory Management — stock module. InventoryToggle hides itself
           // when the plan excludes `inventory`, so guard the header/fields to match.
-          if (PlanEnforce.allows(EntKeys.inventory)) ...[
+          // Recipe-Based items have no stock of their own — their availability is
+          // derived live from the recipe's ingredients (§7 of the design doc), so
+          // this whole module is replaced by an "Available to Make" readout below.
+          if (PlanEnforce.allows(EntKeys.inventory) &&
+              _productType != ProductType.recipeBased) ...[
             _buildSectionHeader('Inventory Management', Icons.inventory_2_outlined),
             const SizedBox(height: 15),
             InventoryToggle(
@@ -656,6 +706,26 @@ class _EdititemScreenState extends State<EdititemScreen> {
               const SizedBox(height: 14),
               _buildLowStockSection(),
             ],
+            const SizedBox(height: 25),
+          ],
+          if (_productType == ProductType.recipeBased) ...[
+            _buildSectionHeader('Availability', Icons.inventory_2_outlined),
+            const SizedBox(height: 15),
+            _buildAvailableToMakeCard(),
+            const SizedBox(height: 25),
+          ],
+
+          // Recipe (Bill of Materials) — Semi-Finished items describe what
+          // they're prepped FROM; Recipe-Based items describe what they're
+          // assembled FROM at sale time. See design doc §3/§4/§8.2.
+          if (ProductType.hasRecipe(_productType)) ...[
+            RecipeBuilderWidget(
+              itemId: widget.items.id,
+              allItems: itemStore.items.where((i) => i.id != widget.items.id).toList(),
+              initialRecipe: _currentRecipe,
+              sellingPrice: double.tryParse(_itemPriceController.text.trim()),
+              onChanged: (recipe) => setState(() => _currentRecipe = recipe),
+            ),
             const SizedBox(height: 25),
           ],
 
@@ -840,6 +910,78 @@ class _EdititemScreenState extends State<EdititemScreen> {
           }),
         ],
       ],
+    );
+  }
+
+  /// Live "N can be made" readout for a Recipe-Based item, computed from the
+  /// IN-PROGRESS [_currentRecipe] (not the last-saved one) against current
+  /// ingredient stock — updates as the user edits the recipe below, before
+  /// saving. Mirrors InventoryService.calculateAvailableToMake's formula.
+  /// See docs/inventory_recipe_system_plan.md §7.
+  Widget _buildAvailableToMakeCard() {
+    final recipe = _currentRecipe;
+    double? available;
+    if (recipe != null && recipe.hasIngredients) {
+      double? minBatches;
+      for (final line in recipe.ingredients) {
+        if (line.effectiveQuantity <= 0) continue;
+        Items? ingredient;
+        try {
+          ingredient = itemStore.items.firstWhere((i) => i.id == line.ingredientItemId);
+        } catch (_) {
+          minBatches = 0;
+          break;
+        }
+        if (!ingredient.trackInventory) continue;
+        final batches = ingredient.stockQuantity / line.effectiveQuantity;
+        minBatches = minBatches == null ? batches : (batches < minBatches ? batches : minBatches);
+      }
+      final yieldQty = recipe.yieldQty > 0 ? recipe.yieldQty : 1.0;
+      available = minBatches == null ? double.infinity : (minBatches * yieldQty).floorToDouble();
+    }
+
+    final color = available == null
+        ? AppColors.textSecondary
+        : available <= 0
+            ? AppColors.danger
+            : available <= 5
+                ? Colors.orange
+                : AppColors.success;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.restaurant_menu_rounded, color: color, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  available == null
+                      ? 'Add ingredients below to see availability'
+                      : available == double.infinity
+                          ? 'Unlimited (no tracked ingredients)'
+                          : '${available.toStringAsFixed(0)} can be made right now',
+                  style: GoogleFonts.poppins(
+                      fontSize: 14, fontWeight: FontWeight.w600, color: color),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Stock is derived from the recipe\'s ingredients — selling this item deducts them, not a stock count of its own.',
+                  style: GoogleFonts.poppins(fontSize: 11.5, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
