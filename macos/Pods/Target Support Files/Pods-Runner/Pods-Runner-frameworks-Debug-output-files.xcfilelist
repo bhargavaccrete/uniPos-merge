@@ -1,0 +1,5 @@
+${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/device_info_plus.framework
+${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/flutter_local_notifications.framework
+${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/flutter_thermal_printer.framework
+${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/flutter_timezone.framework
+${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/printing.framework

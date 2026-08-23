@@ -20,6 +20,7 @@ import 'util/restaurant/order_settings.dart';
 import 'domain/services/retail/retail_printer_settings_service.dart';
 import 'domain/services/restaurant/auto_backup_service.dart';
 import 'domain/services/common/local_notification_service.dart';
+import 'domain/services/common/firebase_messaging_service.dart';
 import 'domain/services/restaurant/notification_sync_service.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 final appStore = AppStore();
@@ -210,6 +211,17 @@ Future<void> _initializeApp() async {
       print('   ✅ Local notifications ready');
     } catch (e) {
       print('   ⚠️  Local notifications init failed (non-fatal): $e');
+    }
+
+    // Firebase Cloud Messaging (push). Runs after local notifications because
+    // foreground pushes are rendered through that plugin's channels. Wrapped so
+    // a missing/invalid Firebase config can never break startup. No-op on
+    // desktop/web (no google-services config in this project).
+    try {
+      await FirebaseMessagingService.instance.init();
+      print('   ✅ Firebase push notifications ready');
+    } catch (e) {
+      print('   ⚠️  Firebase messaging init failed (non-fatal): $e');
     }
 
   } else if (AppConfig.isRetail) {

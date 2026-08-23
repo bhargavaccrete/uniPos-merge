@@ -1,6 +1,8 @@
 plugins {
     id("com.android.application")
     id("kotlin-android")
+    // The Google services Gradle plugin (processes google-services.json for Firebase).
+    id("com.google.gms.google-services")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -59,6 +61,15 @@ android {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // Import the Firebase BoM — pins compatible versions for all Firebase libs.
+    implementation(platform("com.google.firebase:firebase-bom:34.16.0"))
+
+    // When using the BoM, don't specify versions in Firebase dependencies.
+    implementation("com.google.firebase:firebase-analytics")
+
+    // Add other desired Firebase products here (versions omitted — managed by the BoM):
+    // https://firebase.google.com/docs/android/setup#available-libraries
 }
 
 flutter {
