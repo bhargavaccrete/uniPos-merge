@@ -132,10 +132,17 @@ class RecipeReportService {
 
     final byItem = <String, IngredientUsageRow>{};
     for (final m in movements) {
-      double costPerUnit = 0.0;
-      try {
-        costPerUnit = itemStore.items.firstWhere((i) => i.id == m.itemId).lastPurchaseCost ?? 0.0;
-      } catch (_) {}
+      // Prefer the cost that was actually in effect when this movement was
+      // recorded (StockMovementModel.unitCost) over today's live cost, so a
+      // report for last month prices last month's ingredients correctly even
+      // if the purchase cost has since changed. Movements logged before this
+      // field existed fall back to the item's current cost.
+      double costPerUnit = m.unitCost ?? 0.0;
+      if (m.unitCost == null) {
+        try {
+          costPerUnit = itemStore.items.firstWhere((i) => i.id == m.itemId).lastPurchaseCost ?? 0.0;
+        } catch (_) {}
+      }
 
       final existing = byItem[m.itemId];
       if (existing == null) {
@@ -179,10 +186,13 @@ class RecipeReportService {
 
     final byItem = <String, WastageRow>{};
     for (final m in movements) {
-      double costPerUnit = 0.0;
-      try {
-        costPerUnit = itemStore.items.firstWhere((i) => i.id == m.itemId).lastPurchaseCost ?? 0.0;
-      } catch (_) {}
+      // Same historical-cost preference as ingredientUsageReport — see there.
+      double costPerUnit = m.unitCost ?? 0.0;
+      if (m.unitCost == null) {
+        try {
+          costPerUnit = itemStore.items.firstWhere((i) => i.id == m.itemId).lastPurchaseCost ?? 0.0;
+        } catch (_) {}
+      }
 
       final existing = byItem[m.itemId];
       if (existing == null) {

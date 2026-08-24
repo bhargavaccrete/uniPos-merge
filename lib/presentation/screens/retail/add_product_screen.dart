@@ -9,11 +9,14 @@ import 'package:billberrylite/data/models/common/taxmodel_314.dart';
 import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
 import 'package:billberrylite/data/models/retail/hive_model/attribute_model_219.dart';
+import 'package:billberrylite/data/models/retail/hive_model/bundle_model.dart';
+import 'package:billberrylite/data/models/retail/hive_model/bundle_component_model.dart';
 import 'package:billberrylite/domain/services/retail/simple_product_fields_service.dart';
 import 'package:billberrylite/domain/services/retail/variant_attribute_mapper.dart';
 import 'package:billberrylite/presentation/screens/retail/category_management_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/scanner_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/simple_product_fields_screen.dart';
+import 'package:billberrylite/presentation/widget/retail/bundle_builder_widget.dart';
 import 'package:billberrylite/presentation/widget/retail/product_attribute_selector.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -154,6 +157,20 @@ class VariantFormData {
   }
 }
 
+/// One entry in the bundle/repack variant selector — see
+/// `_AddProductScreenState._buildBundleSection`.
+class _BundleVariantOption {
+  final String key;
+  final String label;
+  final double? sellingPrice;
+
+  const _BundleVariantOption({
+    required this.key,
+    required this.label,
+    this.sellingPrice,
+  });
+}
+
 class _AddProductScreenState extends State<AddProductScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
@@ -215,6 +232,34 @@ class _AddProductScreenState extends State<AddProductScreen> {
   /// Editing an existing product rather than creating one.
   bool get _isEditing => widget.product != null;
 
+  // ── Bundle / Repack (stock mode) ──────────────────────────────────────
+  // See docs/retail_inventory_system_plan.md §3.2. `stockMode` is a
+  // separate field from `productType` (simple/variable) — see the doc
+  // comment on ProductModel.stockMode.
+  //
+  // Bundle/repack products can now have multiple variants (e.g. a "Combo
+  // Meal" in Small/Medium/Large), each with its OWN component list — so
+  // staging is keyed per variant rather than a single shared list. The key
+  // is: the variant's real `varianteId` when editing an existing product or
+  // configuring an attribute-generated variant, or the manual variant row's
+  // local [VariantFormData.id] before it has a real id (create flow only).
+  //
+  // Writes land here continuously as the user edits (BundleBuilderWidget's
+  // onChanged fires on every keystroke), so switching which variant is being
+  // configured never loses in-progress edits — see [_buildBundleBuilderFor].
+  String _stockMode = 'standard'; // 'standard' | 'bundle' | 'repack'
+  final Map<String, List<BundleComponentModel>> _bundleComponentsByVariant =
+      {};
+
+  /// Existing bundle row id/createdAt per variant key, reused across saves
+  /// so re-editing doesn't orphan the previous bundle row.
+  final Map<String, String> _bundleRowIdByVariant = {};
+  final Map<String, String> _bundleRowCreatedAtByVariant = {};
+
+  /// Which variant's components the builder is currently showing. Only
+  /// surfaced via a selector once there are 2+ variants.
+  String? _selectedBundleVariantKey;
+
   @override
   void initState() {
     super.initState();
@@ -232,6 +277,23 @@ class _AddProductScreenState extends State<AddProductScreen> {
       // silently replace it while editing.
       _taxManuallyChanged = true;
       _imageBytes = product.imageBytes;
+      _stockMode = product.effectiveStockMode;
+      if (product.needsBundleComponents) {
+        // Load each variant's own bundle row, if any — see the field docs
+        // above for why staging is per-variant.
+        final existingVariants = productStore.variantsFor(product.productId);
+        for (final variant in existingVariants) {
+          final bundle =
+              bundleRepository.getBundleForVariant(variant.varianteId);
+          if (bundle != null) {
+            _bundleRowIdByVariant[variant.varianteId] = bundle.id;
+            _bundleRowCreatedAtByVariant[variant.varianteId] =
+                bundle.createdAt;
+            _bundleComponentsByVariant[variant.varianteId] =
+                List.of(bundle.components);
+          }
+        }
+      }
     }
     _loadCategories();
     // Load attributes
@@ -363,6 +425,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
     }
 
     final existing = widget.product!;
+
+    // Bundle/repack products need at least one variant to attach components
+    // to — block the save rather than silently persisting a stockMode the
+    // product can't support.
+    if (_stockMode != 'standard') {
+      final variantCount = productStore.variantCountFor(existing.productId);
+      if (variantCount == 0) {
+        NotificationService.instance.showError(
+          'Add a variant to this product before setting it as Bundle or Repack/Kit.',
+        );
+        return;
+      }
+    }
+
     final taxRate = _taxRateFor(_selectedTaxId);
     final brand = _brandController.text.trim();
     final description = _descriptionController.text.trim();
@@ -385,9 +461,35 @@ class _AddProductScreenState extends State<AddProductScreen> {
       clearTax: _selectedTaxId == null,
       imageBytes: _imageBytes,
       clearImage: _imageCleared,
+      stockMode: _stockMode == 'standard' ? null : _stockMode,
+      clearStockMode: _stockMode == 'standard',
     );
 
     await productStore.updateProduct(updated);
+
+    // Bundle/repack component persistence — one RetailBundleModel per
+    // variant, saved when it has at least one component, otherwise cleared
+    // (covers a mode switch back to standard, and a variant whose
+    // components were removed). See docs/retail_inventory_system_plan.md §3.2.
+    final existingVariants = productStore.variantsFor(existing.productId);
+    for (final variant in existingVariants) {
+      final variantId = variant.varianteId;
+      final components = _bundleComponentsByVariant[variantId] ?? const [];
+      if (_stockMode != 'standard' && components.isNotEmpty) {
+        final now = DateTime.now().toIso8601String();
+        await bundleRepository.saveBundle(RetailBundleModel(
+          id: _bundleRowIdByVariant[variantId] ?? _uuid.v4(),
+          productId: existing.productId,
+          variantId: variantId,
+          components: components,
+          createdAt: _bundleRowCreatedAtByVariant[variantId] ?? now,
+          updatedAt: now,
+        ));
+      } else {
+        await bundleRepository.deleteBundleForVariant(variantId);
+      }
+    }
+
     if (!mounted) return;
     NotificationService.instance.showSuccess('${updated.productName} updated');
     Navigator.pop(context);
@@ -521,6 +623,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           : _hsnCodeController.text.trim(),
       taxId: _selectedTaxId,
       imageBytes: _imageBytes,
+      stockMode: _stockMode == 'standard' ? null : _stockMode,
     );
 
     await productStore.addProduct(product);
@@ -535,15 +638,24 @@ class _AddProductScreenState extends State<AddProductScreen> {
           taxId: _selectedTaxId,
         ),
       );
+      // The generated variant's own varianteId was already used as its
+      // bundle-staging key (see _addModeBundleVariantOptions), so it doubles
+      // as both the staging key and the real variant id here.
+      await _persistBundleForNewVariant(
+        stagingKey: variant.varianteId,
+        productId: productId,
+        variantId: variant.varianteId,
+      );
     }
 
     // Manually entered variants.
     for (final variantData in manualVariants) {
       final fieldValues = _mapFieldValues(variantData);
+      final variantId = _uuid.v4();
 
       await productStore.addVariant(
         VarianteModel.create(
-          varianteId: _uuid.v4(),
+          varianteId: variantId,
           productId: productId,
           sku: variantData.skuController.text.trim().isEmpty
               ? null
@@ -569,6 +681,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
           customAttributes: fieldValues,
         ),
       );
+      // Manual rows are keyed by their local form id while staging (see
+      // _addModeBundleVariantOptions) — translate to the real variant id
+      // just minted above.
+      await _persistBundleForNewVariant(
+        stagingKey: variantData.id,
+        productId: productId,
+        variantId: variantId,
+      );
     }
 
     if (mounted) {
@@ -577,6 +697,29 @@ class _AddProductScreenState extends State<AddProductScreen> {
       );
       Navigator.pop(context);
     }
+  }
+
+  /// Saves the bundle row staged under [stagingKey] (see
+  /// [_addModeBundleVariantOptions]) against the real [variantId] just
+  /// created — only when there's something to save; an empty component list
+  /// just means "not configured yet" for that variant.
+  Future<void> _persistBundleForNewVariant({
+    required String stagingKey,
+    required String productId,
+    required String variantId,
+  }) async {
+    if (_stockMode == 'standard') return;
+    final components = _bundleComponentsByVariant[stagingKey];
+    if (components == null || components.isEmpty) return;
+    final now = DateTime.now().toIso8601String();
+    await bundleRepository.saveBundle(RetailBundleModel(
+      id: _bundleRowIdByVariant[stagingKey] ?? _uuid.v4(),
+      productId: productId,
+      variantId: variantId,
+      components: components,
+      createdAt: now,
+      updatedAt: now,
+    ));
   }
 
   /// Descriptor inputs for one variant, laid out two per row like the fields
@@ -757,6 +900,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 ],
                 const SizedBox(height: 16),
 
+                // ── Stock Mode ────────────────────────────────────────────
+                // See docs/retail_inventory_system_plan.md §3.2. Shown for
+                // both create and edit — editing hides the variants section
+                // below (variants are managed on the product's own screen)
+                // but a product's stock mode is still a product-level field.
+                _buildSectionHeader('Stock Mode'),
+                const SizedBox(height: 10),
+                _buildStockModeSection(),
+                const SizedBox(height: 16),
+
                 // Editing touches product fields only — variants are managed on
                 // the product's own screen, which is where you came from.
                 if (!_isEditing) ...[
@@ -789,6 +942,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     return _buildVariantCard(variant, index);
                   }),
 
+                  // Bundle/repack products can have multiple variants too
+                  // (e.g. a "Combo Meal" in Small/Medium/Large) — "Add
+                  // variant" and bulk-generate work exactly like a standard
+                  // product; each variant gets its own component list below.
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
@@ -828,6 +985,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     const SizedBox(height: 12),
                     _buildGeneratedVariantsList(),
                   ],
+                ],
+
+                // ── Bundle / Repack components ───────────────────────────
+                if (_stockMode != 'standard') ...[
+                  const SizedBox(height: 8),
+                  _buildBundleSection(),
                 ],
 
                 const SizedBox(height: 32),
@@ -1242,6 +1405,275 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
     if (trailing == null) return text;
     return Row(children: [text, const Spacer(), trailing]);
+  }
+
+  // ── Stock Mode (Standard / Bundle / Repack) ───────────────────────────
+  // See docs/retail_inventory_system_plan.md §3.2.
+
+  Widget _buildStockModeSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildStockModeCard(
+          value: 'standard',
+          icon: Icons.inventory_2_outlined,
+          title: 'Standard',
+          subtitle: "This product's own variant stock is what's sold",
+        ),
+        const SizedBox(height: 10),
+        _buildStockModeCard(
+          value: 'bundle',
+          icon: Icons.widgets_rounded,
+          title: 'Bundle',
+          subtitle:
+              "No stock of its own — selling it deducts each component's stock",
+        ),
+        const SizedBox(height: 10),
+        _buildStockModeCard(
+          value: 'repack',
+          icon: Icons.build_circle_outlined,
+          title: 'Repack / Kit',
+          subtitle: 'Has its own stock, replenished by assembling components',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStockModeCard({
+    required String value,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    final isSelected = _stockMode == value;
+    return InkWell(
+      onTap: () => setState(() => _stockMode = value),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.primary.withValues(alpha: 0.06)
+              : AppColors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.divider,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: (isSelected ? AppColors.primary : AppColors.textSecondary)
+                    .withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                icon,
+                size: 18,
+                color: isSelected ? AppColors.primary : AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              isSelected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked,
+              color: isSelected ? AppColors.primary : AppColors.textSecondary,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The Bundle Builder — one per variant. A product with a single variant
+  /// (the common case) shows the builder exactly as before, with no extra
+  /// chrome; 2+ variants get a chip selector above it so each one's
+  /// component list can be configured independently.
+  Widget _buildBundleSection() {
+    final options = _isEditing
+        ? productStore
+              .variantsFor(widget.product!.productId)
+              .map(
+                (v) => _BundleVariantOption(
+                  key: v.varianteId,
+                  label: v.displayName,
+                  sellingPrice: v.sellingPrice ?? v.mrp,
+                ),
+              )
+              .toList()
+        : _addModeBundleVariantOptions();
+
+    if (options.isEmpty) {
+      return _bundleNoVariantWarning();
+    }
+
+    // Keep the selection valid — falls back to the first option on the
+    // initial build, and again if the previously selected variant was
+    // removed (e.g. its row was deleted).
+    var selectedKey = _selectedBundleVariantKey;
+    if (selectedKey == null || options.every((o) => o.key != selectedKey)) {
+      selectedKey = options.first.key;
+    }
+    _selectedBundleVariantKey = selectedKey;
+    final selected = options.firstWhere((o) => o.key == selectedKey);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (options.length > 1) ...[
+          _buildBundleVariantSelector(options, selectedKey),
+          const SizedBox(height: 10),
+        ],
+        // Keyed by the selected variant so switching remounts the builder
+        // with THAT variant's components — its own `initialComponents`,
+        // read fresh from the staging map below. Edits already made to the
+        // variant being left behind are never lost: BundleBuilderWidget's
+        // onChanged fires on every keystroke/add/remove, so the map is kept
+        // continuously up to date rather than only "on switch".
+        BundleBuilderWidget(
+          key: ValueKey('bundle_variant_$selectedKey'),
+          currentProductId:
+              _isEditing ? widget.product!.productId : _draftProductId,
+          stockMode: _stockMode,
+          initialComponents: _bundleComponentsByVariant[selectedKey] ?? const [],
+          sellingPrice: selected.sellingPrice,
+          onChanged: (components) =>
+              _bundleComponentsByVariant[selectedKey!] = components,
+        ),
+      ],
+    );
+  }
+
+  /// Chip strip for picking which variant's components are being edited.
+  Widget _buildBundleVariantSelector(
+    List<_BundleVariantOption> options,
+    String selectedKey,
+  ) {
+    return SizedBox(
+      height: 38,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: options.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final option = options[index];
+          final isSelected = option.key == selectedKey;
+          return ChoiceChip(
+            label: Text(option.label),
+            selected: isSelected,
+            onSelected: (_) =>
+                setState(() => _selectedBundleVariantKey = option.key),
+            labelStyle: GoogleFonts.poppins(
+              fontSize: 12.5,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              color: isSelected ? AppColors.primary : AppColors.textPrimary,
+            ),
+            backgroundColor: AppColors.white,
+            selectedColor: AppColors.primary.withValues(alpha: 0.1),
+            side: BorderSide(
+              color: isSelected ? AppColors.primary : AppColors.divider,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Candidate variants for the bundle/repack builder while creating a new
+  /// product: every manual row (keyed by its stable local id, so a row can
+  /// be staged before it's even filled in) plus every attribute-generated
+  /// variant (keyed by its real varianteId). `_variants` always has at least
+  /// one row — see [_removeVariant] — so this is never empty in create mode.
+  List<_BundleVariantOption> _addModeBundleVariantOptions() {
+    return [
+      for (var i = 0; i < _variants.length; i++)
+        _BundleVariantOption(
+          key: _variants[i].id,
+          label: _manualVariantLabel(_variants[i], i),
+          sellingPrice:
+              double.tryParse(_variants[i].priceController.text.trim()),
+        ),
+      for (final v in _generatedVariants)
+        _BundleVariantOption(
+          key: v.varianteId,
+          label: v.displayName,
+          sellingPrice: v.sellingPrice,
+        ),
+    ];
+  }
+
+  /// Short label for a manual variant row in the bundle variant selector —
+  /// its configured descriptor values (e.g. "Small"), falling back to its
+  /// SKU, falling back to a positional label.
+  String _manualVariantLabel(VariantFormData variant, int index) {
+    final parts = <String>[];
+    for (final field in _simpleFields) {
+      final value = variant.fieldControllers[field.attributeId]?.text.trim();
+      if (value != null && value.isNotEmpty) parts.add(value);
+    }
+    if (parts.isNotEmpty) return parts.join(' • ');
+    final sku = variant.skuController.text.trim();
+    if (sku.isNotEmpty) return sku;
+    return 'Variant ${index + 1}';
+  }
+
+  Widget _bundleNoVariantWarning() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: AppColors.warning),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Add a variant to this product before configuring it as a Bundle or Repack/Kit.',
+              style: GoogleFonts.poppins(
+                fontSize: 12.5,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildTextField({

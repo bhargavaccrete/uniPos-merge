@@ -53,6 +53,7 @@ class _IngredientRow {
   final TextEditingController qtyController;
   final TextEditingController unitController;
   final TextEditingController wastageController;
+  final TextEditingController conversionController;
   bool showAdvanced;
 
   _IngredientRow({
@@ -60,13 +61,15 @@ class _IngredientRow {
     required this.qtyController,
     required this.unitController,
     required this.wastageController,
+    TextEditingController? conversionController,
     this.showAdvanced = false,
-  });
+  }) : conversionController = conversionController ?? TextEditingController(text: '1');
 
   void dispose() {
     qtyController.dispose();
     unitController.dispose();
     wastageController.dispose();
+    conversionController.dispose();
   }
 }
 
@@ -95,6 +98,8 @@ class _RecipeBuilderWidgetState extends State<RecipeBuilderWidget> {
         unitController: TextEditingController(text: line.unit ?? ''),
         wastageController:
             TextEditingController(text: _trimNum(line.wastagePercent)),
+        conversionController:
+            TextEditingController(text: _trimNum(line.conversionFactor)),
         showAdvanced: line.wastagePercent != 0,
       ));
     }
@@ -120,10 +125,27 @@ class _RecipeBuilderWidgetState extends State<RecipeBuilderWidget> {
 
   Items? _ingredientFor(String id) => _itemsById[id];
 
+  /// Whether this row's typed [_IngredientRow.unitController] text differs
+  /// from the selected ingredient item's own stock unit — the trigger for
+  /// showing the conversion-factor input. Matching (or a blank line unit)
+  /// means no conversion is needed, so the input stays hidden.
+  bool _needsConversion(_IngredientRow row) {
+    final lineUnit = row.unitController.text.trim();
+    if (lineUnit.isEmpty) return false;
+    final itemUnit = _ingredientFor(row.ingredientItemId)?.unit?.trim() ?? '';
+    if (itemUnit.isEmpty) return false;
+    return lineUnit.toLowerCase() != itemUnit.toLowerCase();
+  }
+
+  double _conversionFactorFor(_IngredientRow row) {
+    if (!_needsConversion(row)) return 1.0;
+    return double.tryParse(row.conversionController.text.trim()) ?? 1.0;
+  }
+
   double _lineEffectiveQty(_IngredientRow row) {
     final qty = double.tryParse(row.qtyController.text.trim()) ?? 0;
     final wastage = double.tryParse(row.wastageController.text.trim()) ?? 0;
-    return qty * (1 + wastage / 100);
+    return qty * _conversionFactorFor(row) * (1 + wastage / 100);
   }
 
   double _lineCost(_IngredientRow row) {
@@ -148,6 +170,7 @@ class _RecipeBuilderWidgetState extends State<RecipeBuilderWidget> {
             ? null
             : row.unitController.text.trim(),
         wastagePercent: double.tryParse(row.wastageController.text.trim()) ?? 0,
+        conversionFactor: _conversionFactorFor(row),
       ));
     }
 
@@ -512,6 +535,7 @@ class _RecipeBuilderWidgetState extends State<RecipeBuilderWidget> {
               ),
             ],
           ),
+          if (_needsConversion(row)) _buildConversionFactorField(row, ingredient),
           const SizedBox(height: 6),
           InkWell(
             onTap: () => setState(() => row.showAdvanced = !row.showAdvanced),
@@ -553,6 +577,47 @@ class _RecipeBuilderWidgetState extends State<RecipeBuilderWidget> {
                 onChanged: (_) => _onFieldChanged(),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  /// Shown only when this row's [_needsConversion] is true — i.e. the typed
+  /// [_IngredientRow.unitController] text doesn't match the selected
+  /// ingredient's own stock unit. Lets staff say how many stock units
+  /// (kg, L, pcs…) one line unit (g, ml…) equals, so deduction always moves
+  /// the ingredient item's stock in its own unit.
+  Widget _buildConversionFactorField(_IngredientRow row, Items? ingredient) {
+    final lineUnit = row.unitController.text.trim();
+    final itemUnit = ingredient?.unit?.trim() ?? '';
+    final factorText = row.conversionController.text.trim();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppTextField(
+            controller: row.conversionController,
+            label: 'Conversion factor',
+            hint: '1',
+            icon: Icons.swap_horiz_rounded,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+            ],
+            onChanged: (_) => _onFieldChanged(),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '1 $lineUnit of ${ingredient?.name ?? 'this ingredient'} = '
+            '${factorText.isEmpty ? '?' : factorText} $itemUnit '
+            '(item\'s stock unit)',
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              color: AppColors.textSecondary,
+            ),
+          ),
         ],
       ),
     );

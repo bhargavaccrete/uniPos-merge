@@ -74,6 +74,19 @@ class ProductModel extends HiveObject {
   @HiveField(17)
   final Uint8List? imageBytes;
 
+  /// Stock behavior: `'standard'` (default — this product's own variant
+  /// stock is what's sold), `'bundle'` (no stock of its own; selling it
+  /// cascades into deducting its `RetailBundleModel` components), or
+  /// `'repack'` (has its own stock, replenished by assembling from a source
+  /// variant rather than a GRN). Deliberately a SEPARATE field from
+  /// [productType] above — that field already means simple-vs-variable
+  /// (variant shape) and is checked as `productType == 'variable'` in
+  /// several places, so overloading it with new values would silently break
+  /// that logic. Null means `'standard'` — additive/backward-compatible, no
+  /// migration. See docs/retail_inventory_system_plan.md §3.2.
+  @HiveField(18)
+  final String? stockMode;
+
   ProductModel({
     required this.productId,
     required this.productName,
@@ -93,6 +106,7 @@ class ProductModel extends HiveObject {
     this.defaultCostPrice,
     this.taxId,
     this.imageBytes,
+    this.stockMode,
   });
 
   /// Check if this is a variable product
@@ -100,6 +114,15 @@ class ProductModel extends HiveObject {
 
   /// Check if this is a simple product
   bool get isSimple => productType == 'simple' && !hasVariants;
+
+  String get effectiveStockMode => stockMode ?? 'standard';
+  bool get isBundle => effectiveStockMode == 'bundle';
+  bool get isRepack => effectiveStockMode == 'repack';
+  bool get isStandardStock => effectiveStockMode == 'standard';
+
+  /// True for either composite type — the two cases that need a
+  /// [RetailBundleModel] component list configured.
+  bool get needsBundleComponents => isBundle || isRepack;
 
   // Convert from simple Product to ProductModel
   factory ProductModel.fromProduct({
@@ -119,6 +142,7 @@ class ProductModel extends HiveObject {
     double? defaultCostPrice,
     String? taxId,
     Uint8List? imageBytes,
+    String? stockMode,
   }) {
     final now = DateTime.now().toIso8601String();
     return ProductModel(
@@ -140,6 +164,7 @@ class ProductModel extends HiveObject {
       defaultCostPrice: defaultCostPrice,
       taxId: taxId,
       imageBytes: imageBytes,
+      stockMode: stockMode,
     );
   }
 
@@ -165,6 +190,7 @@ class ProductModel extends HiveObject {
       'taxId': taxId,
       // List<int> so the backup JSON stays serialisable, matching Items.toMap.
       'imageBytes': imageBytes?.toList(),
+      'stockMode': stockMode,
     };
   }
 
@@ -189,6 +215,7 @@ class ProductModel extends HiveObject {
       defaultCostPrice: (map['defaultCostPrice'] as num?)?.toDouble(),
       taxId: map['taxId'] as String?,
       imageBytes: _bytesFrom(map['imageBytes']),
+      stockMode: map['stockMode'] as String?,
     );
   }
 
@@ -220,6 +247,7 @@ class ProductModel extends HiveObject {
     double? defaultCostPrice,
     String? taxId,
     Uint8List? imageBytes,
+    String? stockMode,
     // `x ?? this.x` can never put a nullable field back to null, so an edit
     // form has no way to clear an optional value. These say so explicitly,
     // instead of forcing callers to hand-build the model.
@@ -228,6 +256,7 @@ class ProductModel extends HiveObject {
     bool clearHsnCode = false,
     bool clearTax = false,
     bool clearImage = false,
+    bool clearStockMode = false,
   }) {
     return ProductModel(
       productId: productId ?? this.productId,
@@ -248,6 +277,7 @@ class ProductModel extends HiveObject {
       defaultCostPrice: defaultCostPrice ?? this.defaultCostPrice,
       taxId: clearTax ? null : (taxId ?? this.taxId),
       imageBytes: clearImage ? null : (imageBytes ?? this.imageBytes),
+      stockMode: clearStockMode ? null : (stockMode ?? this.stockMode),
     );
   }
 }

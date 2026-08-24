@@ -87,6 +87,19 @@ class HiveTypeIds {
   static const int restaurantGrn = 141;
   static const int restaurantGrnItem = 142;
 
+  // Restaurant damaged-goods/loss/stock-take chain (143-149) — mirrors
+  // retail's PurchaseReturn/SupplierClaim/InventoryLoss/StockTake pattern
+  // (174-181), scoped to restaurant's Items model. Exhausts the reserved
+  // restaurant range (100-149) — any future restaurant model needs a new
+  // range carved out.
+  static const int restaurantPurchaseReturn = 143;
+  static const int restaurantPurchaseReturnItem = 144;
+  static const int restaurantSupplierClaim = 145;
+  static const int restaurantSupplierClaimItem = 146;
+  static const int restaurantInventoryLoss = 147;
+  static const int restaurantStockTake = 148;
+  static const int restaurantStockTakeItem = 149;
+
   // ==================== RETAIL MODELS (150-223) ====================
   static const int retailProduct = 150;
   static const int retailVariant = 151;
@@ -139,6 +152,17 @@ class HiveTypeIds {
   static const int retailStockTake = 180;
   static const int retailStockTakeItem = 181;
 
+  /// Bundle/kit products — see docs/retail_inventory_system_plan.md §3.2.
+  /// A bundle has no stock of its own and cascades a sale into its
+  /// components; a repack/kit variant is stocked directly but replenished by
+  /// assembling it from a source variant rather than a GRN.
+  static const int retailBundle = 182;
+  static const int retailBundleComponent = 183;
+
+  /// Append-only "assembled a batch" log for repack/kit variants — mirrors
+  /// restaurant's RecipeProductionModel.
+  static const int retailKitAssembly = 184;
+
   // ==================== HELPER METHODS ====================
 
   /// Check if a typeId belongs to retail models
@@ -183,7 +207,10 @@ class HiveTypeIds {
     retailAttribute,
     retailAttributeValue,
     retailProductAttribute,
-    retailBillingTab
+    retailBillingTab,
+    retailBundle,
+    retailBundleComponent,
+    retailKitAssembly
   ];
 
   /// Get all restaurant model IDs

@@ -15,6 +15,7 @@ import 'package:billberrylite/presentation/widget/componets/common/app_dialog.da
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/gradient_hero_header.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 
@@ -130,29 +131,47 @@ class _ProductionScreenState extends State<ProductionScreen> {
         builder: (_) {
           final semiFinishedItems = _semiFinishedItems;
 
-          if (semiFinishedItems.isEmpty) {
-            return const AppEmptyState(
-              icon: Icons.outdoor_grill_rounded,
-              title: 'No semi-finished items yet',
-              message:
-                  'Mark an item Semi-Finished to start producing batches here.',
-            );
-          }
-
-          return SingleChildScrollView(
-            padding: AppResponsive.padding(context),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildItemPicker(context),
-                if (_selectedItem != null) ...[
-                  const SizedBox(height: 16),
-                  _buildRecipeCard(context),
-                  const SizedBox(height: 20),
-                  _buildRecentBatches(context),
+          return Column(
+            children: [
+              GradientHeroHeader(
+                title: 'Production',
+                subtitle:
+                    'Batch-prep semi-finished items straight from their recipes',
+                icon: Icons.outdoor_grill_rounded,
+                accent: AppColors.secondary,
+                stats: [
+                  HeroStat(
+                    icon: Icons.soup_kitchen_rounded,
+                    value: '${semiFinishedItems.length}',
+                    label: 'Semi-Finished Items',
+                  ),
                 ],
-              ],
-            ),
+              ),
+              Expanded(
+                child: semiFinishedItems.isEmpty
+                    ? const AppEmptyState(
+                        icon: Icons.outdoor_grill_rounded,
+                        title: 'No semi-finished items yet',
+                        message:
+                            'Mark an item Semi-Finished to start producing batches here.',
+                      )
+                    : SingleChildScrollView(
+                        padding: AppResponsive.padding(context),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildItemPicker(context),
+                            if (_selectedItem != null) ...[
+                              const SizedBox(height: 16),
+                              _buildRecipeCard(context),
+                              const SizedBox(height: 20),
+                              _buildRecentBatches(context),
+                            ],
+                          ],
+                        ),
+                      ),
+              ),
+            ],
           );
         },
       ),

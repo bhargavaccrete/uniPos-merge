@@ -30,13 +30,14 @@ class StockMovementModelAdapter extends TypeAdapter<StockMovementModel> {
       unit: fields[10] as String,
       staffName: fields[11] as String,
       sessionId: fields[12] as String?,
+      unitCost: fields[13] as double?,
     );
   }
 
   @override
   void write(BinaryWriter writer, StockMovementModel obj) {
     writer
-      ..writeByte(13)
+      ..writeByte(14)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -62,7 +63,9 @@ class StockMovementModelAdapter extends TypeAdapter<StockMovementModel> {
       ..writeByte(11)
       ..write(obj.staffName)
       ..writeByte(12)
-      ..write(obj.sessionId);
+      ..write(obj.sessionId)
+      ..writeByte(13)
+      ..write(obj.unitCost);
   }
 
   @override

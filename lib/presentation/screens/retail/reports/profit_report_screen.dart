@@ -23,6 +23,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
   List<Map<String, dynamic>> _profitPerDay = [];
   List<Map<String, dynamic>> _profitPerItem = [];
   List<Map<String, dynamic>> _profitPerSale = [];
+  List<Map<String, dynamic>> _bundleMargin = [];
   bool _isLoading = false;
   late TabController _tabController;
 
@@ -36,7 +37,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _loadAllReports();
   }
 
@@ -94,11 +95,15 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
       startDate: start,
       endDate: end,
     );
+    // Not window-bound — a bundle's margin is a current-catalogue pricing
+    // question, not a sales-history one (see ReportService.getBundleMarginReport).
+    final bundleMarginFuture = _reportService.getBundleMarginReport();
 
     final overallData = await overallFuture;
     final perDayData = await perDayFuture;
     final perItemData = await perItemFuture;
     final perSaleData = await perSaleFuture;
+    final bundleMarginData = await bundleMarginFuture;
 
     if (!mounted || token != _loadToken) return;
     setState(() {
@@ -106,6 +111,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
       _profitPerDay = perDayData;
       _profitPerItem = perItemData;
       _profitPerSale = perSaleData;
+      _bundleMargin = bundleMarginData;
       _isLoading = false;
     });
   }
@@ -165,6 +171,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
             Tab(text: 'Daily Trend'),
             Tab(text: 'By Item'),
             Tab(text: 'By Sale'),
+            Tab(text: 'Bundles'),
           ],
         ),
       ),
@@ -185,6 +192,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
                     _buildDailyTrendTab(),
                     _buildProfitPerItemTab(),
                     _buildProfitPerSaleTab(),
+                    _buildBundleMarginTab(),
                   ],
                 ),
         ),
@@ -698,6 +706,144 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
                 child: _buildSmallStat(
                   'Items',
                   '${sale['totalItems']}',
+                  Colors.orange,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Bundle/repack margin — not affected by the date filter, since it reads
+  /// the current catalogue rather than a sales window (see
+  /// ReportService.getBundleMarginReport).
+  Widget _buildBundleMarginTab() {
+    if (_bundleMargin.isEmpty) {
+      return const Center(
+        child: Text('No bundle or repack products configured yet'),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text(
+          'Bundle & Repack Margin',
+          style: TextStyle(
+            fontSize: AppResponsive.subheadingFontSize(context),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Selling price vs. summed component cost — current catalogue, not a sales window.',
+          style: TextStyle(
+            fontSize: AppResponsive.captionFontSize(context),
+            color: const Color(0xFF6B6B6B),
+          ),
+        ),
+        const SizedBox(height: 8),
+        ..._bundleMargin.map((row) => _buildBundleMarginCard(row)),
+      ],
+    );
+  }
+
+  Widget _buildBundleMarginCard(Map<String, dynamic> row) {
+    final margin = row['margin'] as double;
+    final marginPercent = row['marginPercent'] as double;
+    final isRepack = row['isRepack'] == true;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE8E8E8)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        row['productName'] as String? ?? 'Unknown',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: AppResponsive.bodyFontSize(context),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        isRepack ? 'Repack' : 'Bundle',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.blue.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: margin >= 0 ? Colors.green.shade50 : Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '${marginPercent.toStringAsFixed(1)}%',
+                  style: TextStyle(
+                    color: margin >= 0
+                        ? Colors.green.shade700
+                        : Colors.red.shade700,
+                    fontSize: AppResponsive.captionFontSize(context),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildSmallStat(
+                  'Margin',
+                  formatMoney(margin),
+                  margin >= 0 ? Colors.green : Colors.red,
+                ),
+              ),
+              Expanded(
+                child: _buildSmallStat(
+                  'Selling Price',
+                  formatMoney((row['sellingPrice'] as double)),
+                  Colors.blue,
+                ),
+              ),
+              Expanded(
+                child: _buildSmallStat(
+                  'Component Cost',
+                  formatMoney((row['componentCost'] as double)),
                   Colors.orange,
                 ),
               ),

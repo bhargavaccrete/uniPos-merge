@@ -9,6 +9,7 @@ import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/gradient_hero_header.dart';
 import '../manage menu/tab/edit_item.dart';
 
 /// Read-only list of every Raw Material item — mirrors the visual style of
@@ -50,6 +51,26 @@ class _RawMaterialsScreenState extends State<RawMaterialsScreen> {
       appBar: buildPrimaryAppBar(title: 'Raw Materials'),
       body: Column(
         children: [
+          Observer(
+            builder: (_) {
+              final count =
+                  itemStore.items.where((i) => i.isRawMaterial).length;
+              return GradientHeroHeader(
+                title: 'Raw Materials',
+                subtitle:
+                    'Track ingredient stock feeding your recipes & production',
+                icon: Icons.grass_rounded,
+                accent: AppColors.success,
+                stats: [
+                  HeroStat(
+                    icon: Icons.inventory_2_rounded,
+                    value: '$count',
+                    label: 'Raw Materials',
+                  ),
+                ],
+              );
+            },
+          ),
           Container(
             color: AppColors.white,
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -194,7 +215,7 @@ class _RawMaterialTile extends StatelessWidget {
     final unit = item.unit ?? (isWeightBased ? 'kg' : 'pcs');
 
     return InkWell(
-      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+      borderRadius: BorderRadius.circular(16),
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => EdititemScreen(items: item)),
@@ -204,22 +225,34 @@ class _RawMaterialTile extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius: BorderRadius.circular(
-            AppResponsive.borderRadius(context),
-          ),
-          border: Border.all(color: AppColors.divider),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.success.withValues(alpha: 0.14)),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.success.withValues(alpha: 0.12),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(9),
               decoration: BoxDecoration(
-                color: AppColors.secondary.withValues(alpha: 0.1),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.success.withValues(alpha: 0.18),
+                    AppColors.success.withValues(alpha: 0.08),
+                  ],
+                ),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
-                Icons.grain_rounded,
-                color: AppColors.secondary,
+                Icons.grass_rounded,
+                color: AppColors.success,
                 size: 20,
               ),
             ),

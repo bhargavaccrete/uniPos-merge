@@ -84,6 +84,15 @@ import 'package:billberrylite/data/models/retail/hive_model/attribute_model_219.
 import 'package:billberrylite/data/models/retail/hive_model/attribute_value_model_220.dart';
 import 'package:billberrylite/data/models/retail/hive_model/product_attribute_model_221.dart';
 import 'package:billberrylite/data/models/retail/hive_model/billing_tab_model_173.dart';
+import 'package:billberrylite/data/models/retail/hive_model/bundle_model.dart';
+import 'package:billberrylite/data/models/retail/hive_model/kit_assembly_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/recipe_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/recipe_production_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_supplier_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_order_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_order_item_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_grn_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_grn_item_model.dart';
 
 /// Unified Backup Service - Works for both Restaurant and Retail modes
 ///
@@ -894,6 +903,64 @@ class UnifiedBackupService {
         exportMap["restaurantAttendance"] = [];
       }
 
+      // Recipes (BOM) & Recipe Productions — inventory/recipe management
+      try {
+        exportMap["recipes"] = Hive.box<RecipeModel>(HiveBoxNames.restaurantRecipes).values.map((e) => e.toMap()).toList();
+        debugPrint("📦 Recipes exported: ${exportMap["recipes"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Recipes box error: $e");
+        exportMap["recipes"] = [];
+      }
+
+      try {
+        exportMap["recipeProductions"] = Hive.box<RecipeProductionModel>(HiveBoxNames.restaurantRecipeProductions).values.map((e) => e.toMap()).toList();
+        debugPrint("📦 Recipe Productions exported: ${exportMap["recipeProductions"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Recipe Productions box error: $e");
+        exportMap["recipeProductions"] = [];
+      }
+
+      // Restaurant Suppliers, Purchase Orders & GRNs
+      try {
+        exportMap["restaurantSuppliers"] = Hive.box<RestaurantSupplierModel>(HiveBoxNames.restaurantSuppliers).values.map((e) => e.toMap()).toList();
+        debugPrint("📦 Restaurant Suppliers exported: ${exportMap["restaurantSuppliers"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Restaurant Suppliers box error: $e");
+        exportMap["restaurantSuppliers"] = [];
+      }
+
+      try {
+        exportMap["restaurantPurchaseOrders"] = Hive.box<RestaurantPurchaseOrderModel>(HiveBoxNames.restaurantPurchaseOrders).values.map((e) => e.toMap()).toList();
+        debugPrint("📦 Restaurant Purchase Orders exported: ${exportMap["restaurantPurchaseOrders"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Restaurant Purchase Orders box error: $e");
+        exportMap["restaurantPurchaseOrders"] = [];
+      }
+
+      try {
+        exportMap["restaurantPurchaseOrderItems"] = Hive.box<RestaurantPurchaseOrderItemModel>(HiveBoxNames.restaurantPurchaseOrderItems).values.map((e) => e.toMap()).toList();
+        debugPrint("📦 Restaurant Purchase Order Items exported: ${exportMap["restaurantPurchaseOrderItems"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Restaurant Purchase Order Items box error: $e");
+        exportMap["restaurantPurchaseOrderItems"] = [];
+      }
+
+      try {
+        exportMap["restaurantGrns"] = Hive.box<RestaurantGRNModel>(HiveBoxNames.restaurantGrns).values.map((e) => e.toMap()).toList();
+        debugPrint("📦 Restaurant GRNs exported: ${exportMap["restaurantGrns"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Restaurant GRNs box error: $e");
+        exportMap["restaurantGrns"] = [];
+      }
+
+      try {
+        exportMap["restaurantGrnItems"] = Hive.box<RestaurantGRNItemModel>(HiveBoxNames.restaurantGrnItems).values.map((e) => e.toMap()).toList();
+        debugPrint("📦 Restaurant GRN Items exported: ${exportMap["restaurantGrnItems"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Restaurant GRN Items box error: $e");
+        exportMap["restaurantGrnItems"] = [];
+      }
+
     } else if (AppConfig.isRetail) {
       debugPrint("📦 Collecting RETAIL data...");
 
@@ -1136,6 +1203,23 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ GRN Items box error: $e");
         exportMap["grnItems"] = [];
+      }
+
+      // ✅ Bundles & Kit Assemblies (bundle/repack inventory)
+      try {
+        exportMap["bundles"] = Hive.box<RetailBundleModel>(HiveBoxNames.bundles).values.map((e) => e.toMap()).toList();
+        debugPrint("📦 Bundles exported: ${exportMap["bundles"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Bundles box error: $e");
+        exportMap["bundles"] = [];
+      }
+
+      try {
+        exportMap["kitAssemblies"] = Hive.box<RetailKitAssemblyModel>(HiveBoxNames.kitAssemblies).values.map((e) => e.toMap()).toList();
+        debugPrint("📦 Kit Assemblies exported: ${exportMap["kitAssemblies"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Kit Assemblies box error: $e");
+        exportMap["kitAssemblies"] = [];
       }
 
       // ✅ Categories — shared box (restaurant + retail). Restaurant's export
@@ -2146,6 +2230,83 @@ class UnifiedBackupService {
     } catch (e) {
       debugPrint("⚠️ Error restoring restaurant attendance: $e");
     }
+
+    try {
+      await restoreBoxWithId(
+        "recipes",
+        Hive.box<RecipeModel>(HiveBoxNames.restaurantRecipes),
+        (m) => RecipeModel.fromMap(m),
+        (r) => r.id,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring recipes: $e");
+    }
+
+    try {
+      await restoreBoxWithId(
+        "recipeProductions",
+        Hive.box<RecipeProductionModel>(HiveBoxNames.restaurantRecipeProductions),
+        (m) => RecipeProductionModel.fromMap(m),
+        (p) => p.id,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring recipe productions: $e");
+    }
+
+    try {
+      await restoreBoxWithId(
+        "restaurantSuppliers",
+        Hive.box<RestaurantSupplierModel>(HiveBoxNames.restaurantSuppliers),
+        (m) => RestaurantSupplierModel.fromMap(m),
+        (s) => s.supplierId,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring restaurant suppliers: $e");
+    }
+
+    try {
+      await restoreBoxWithId(
+        "restaurantPurchaseOrders",
+        Hive.box<RestaurantPurchaseOrderModel>(HiveBoxNames.restaurantPurchaseOrders),
+        (m) => RestaurantPurchaseOrderModel.fromMap(m),
+        (po) => po.poId,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring restaurant purchase orders: $e");
+    }
+
+    try {
+      await restoreBoxWithId(
+        "restaurantPurchaseOrderItems",
+        Hive.box<RestaurantPurchaseOrderItemModel>(HiveBoxNames.restaurantPurchaseOrderItems),
+        (m) => RestaurantPurchaseOrderItemModel.fromMap(m),
+        (poi) => poi.poItemId,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring restaurant purchase order items: $e");
+    }
+
+    try {
+      await restoreBoxWithId(
+        "restaurantGrns",
+        Hive.box<RestaurantGRNModel>(HiveBoxNames.restaurantGrns),
+        (m) => RestaurantGRNModel.fromMap(m),
+        (g) => g.grnId,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring restaurant GRNs: $e");
+    }
+
+    try {
+      await restoreBoxWithId(
+        "restaurantGrnItems",
+        Hive.box<RestaurantGRNItemModel>(HiveBoxNames.restaurantGrnItems),
+        (m) => RestaurantGRNItemModel.fromMap(m),
+        (gi) => gi.grnItemId,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring restaurant GRN items: $e");
+    }
   }
 
   /// ---------------------------
@@ -2440,6 +2601,19 @@ class UnifiedBackupService {
       await restoreBoxTypedWithId("grnItems", Hive.box<GRNItemModel>(HiveBoxNames.grnItems), (m) => GRNItemModel.fromMap(m), (gi) => gi.grnItemId);
     } catch (e) {
       debugPrint("⚠️ Error restoring GRN items: $e");
+    }
+
+    // ✅ Restore Bundles & Kit Assemblies (with ID keys)
+    try {
+      await restoreBoxTypedWithId("bundles", Hive.box<RetailBundleModel>(HiveBoxNames.bundles), (m) => RetailBundleModel.fromMap(m), (b) => b.id);
+    } catch (e) {
+      debugPrint("⚠️ Error restoring bundles: $e");
+    }
+
+    try {
+      await restoreBoxTypedWithId("kitAssemblies", Hive.box<RetailKitAssemblyModel>(HiveBoxNames.kitAssemblies), (m) => RetailKitAssemblyModel.fromMap(m), (k) => k.id);
+    } catch (e) {
+      debugPrint("⚠️ Error restoring kit assemblies: $e");
     }
 
     // ✅ Restore Categories — shared box (restaurant + retail). Restaurant's

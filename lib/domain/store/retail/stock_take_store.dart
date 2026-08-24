@@ -5,7 +5,7 @@ import '../../../data/models/retail/hive_model/stock_take_item_model_181.dart';
 import '../../../data/models/retail/hive_model/stock_take_model_180.dart';
 import '../../../data/models/retail/hive_model/variante_model_201.dart';
 import '../../../data/repositories/retail/stock_take_repository.dart';
-import '../../services/retail/document_number_service.dart';
+import '../../services/common/document_number_service.dart';
 import '../../services/retail/stock_adjustment_reason.dart';
 import '../../services/retail/stock_adjustment_service.dart';
 

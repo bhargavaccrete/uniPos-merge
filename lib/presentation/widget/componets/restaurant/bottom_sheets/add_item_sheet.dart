@@ -13,6 +13,7 @@ import '../../../../../util/color.dart';
 import '../../../../../util/common/app_responsive.dart';
 import '../../../../../util/restaurant/staticswitch.dart';
 import '../../../../../domain/services/restaurant/stock_adjust_service.dart';
+import '../../../../../data/models/restaurant/db/product_type.dart';
 import '../../../../screens/restaurant/item/add_more_info_screen.dart';
 import 'tax_selector_sheet.dart';
 import 'add_category_dialog.dart';
@@ -410,11 +411,14 @@ class _AddItemSheetState extends State<AddItemSheet> {
   // ── Shared Form Fields ────────────────────────────────────────────────────
 
   List<Widget> _formFields() {
+    final isRecipeBased = _formState.productType == ProductType.recipeBased;
     return [
       _buildItemNameField(),
       const SizedBox(height: 14),
       _buildItemCodeField(),
-      const SizedBox(height: 14),
+      const SizedBox(height: 18),
+      _buildProductTypeSelector(),
+      const SizedBox(height: 18),
       _buildSellingMethodSelector(),
       const SizedBox(height: 14),
       _buildPriceField(),
@@ -429,18 +433,24 @@ class _AddItemSheetState extends State<AddItemSheet> {
       const SizedBox(height: 14),
       _buildDescriptionField(),
       const SizedBox(height: 14),
-      _buildInventoryToggle(),
-      if (_formState.trackInventory) ...[
-        if (_formState.selectedVariants.isEmpty) ...[
+      // Recipe-Based items have no stock of their own — availability is derived
+      // live from their ingredients, so the stock module is replaced by a note.
+      if (isRecipeBased)
+        _buildRecipeBasedStockNote()
+      else ...[
+        _buildInventoryToggle(),
+        if (_formState.trackInventory) ...[
+          if (_formState.selectedVariants.isEmpty) ...[
+            const SizedBox(height: 14),
+            _buildCurrentStockField(),
+          ] else ...[
+            const SizedBox(height: 10),
+            Text('Stock is set per variant in More Info.',
+                style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
+          ],
           const SizedBox(height: 14),
-          _buildCurrentStockField(),
-        ] else ...[
-          const SizedBox(height: 10),
-          Text('Stock is set per variant in More Info.',
-              style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
+          _buildLowStockSection(),
         ],
-        const SizedBox(height: 14),
-        _buildLowStockSection(),
       ],
       const SizedBox(height: 16),
       _buildImageUploader(),
@@ -483,27 +493,299 @@ class _AddItemSheetState extends State<AddItemSheet> {
     );
   }
 
-  Widget _buildPriceField() {
-    return AppTextField(
-      controller: _formState.priceController,
-      focusNode: _priceFocusNode,
-      label: 'Price',
-      hint: '0.00',
-      prefixWidget: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        child: Text('₹',
-            style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primary)),
-      ),
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      inputFormatters: [
-        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+  // ── Product Type selector ─────────────────────────────────────────────────
+
+  static const List<
+      ({
+        String type,
+        IconData icon,
+        Color color,
+        String label,
+        String desc,
+      })> _productTypeOptions = [
+    (
+      type: ProductType.finishedGood,
+      icon: Icons.inventory_2_rounded,
+      color: AppColors.info,
+      label: 'Finished Good',
+      desc: 'Ready to sell as-is',
+    ),
+    (
+      type: ProductType.recipeBased,
+      icon: Icons.lunch_dining_rounded,
+      color: AppColors.accent,
+      label: 'Recipe-Based',
+      desc: 'Assembled from a recipe when sold',
+    ),
+    (
+      type: ProductType.rawMaterial,
+      icon: Icons.grass_rounded,
+      color: AppColors.success,
+      label: 'Raw Material',
+      desc: 'Ingredient — bought & stocked',
+    ),
+    (
+      type: ProductType.semiFinished,
+      icon: Icons.soup_kitchen_rounded,
+      color: AppColors.secondary,
+      label: 'Semi-Finished',
+      desc: 'Prepped in batches',
+    ),
+  ];
+
+  Widget _buildProductTypeSelector() {
+    final hasRecipe = ProductType.hasRecipe(_formState.productType);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.category_rounded, size: 18, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Text('Product Type',
+                style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            const gap = 10.0;
+            final cardWidth = (constraints.maxWidth - gap) / 2;
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: _productTypeOptions
+                  .map((o) => SizedBox(
+                        width: cardWidth,
+                        child: _productTypeCard(o),
+                      ))
+                  .toList(),
+            );
+          },
+        ),
+        if (hasRecipe) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.accent.withValues(alpha: 0.12),
+                  AppColors.accent.withValues(alpha: 0.04),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border:
+                  Border.all(color: AppColors.accent.withValues(alpha: 0.25)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.auto_awesome_rounded,
+                    size: 16, color: AppColors.accent),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Save the item first, then open it to build its recipe (ingredients, yield & live food cost).',
+                    style: GoogleFonts.poppins(
+                        fontSize: 11.5,
+                        color: AppColors.textPrimary,
+                        height: 1.3),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
-      textInputAction: TextInputAction.next,
-      // Skip the Category/Tax/Veg buttons (not text fields) → jump to Description.
-      onFieldSubmitted: (_) => _descriptionFocusNode.requestFocus(),
+    );
+  }
+
+  Widget _productTypeCard(
+      ({
+        String type,
+        IconData icon,
+        Color color,
+        String label,
+        String desc,
+      }) o) {
+    final bool selected = _formState.productType == o.type;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => setState(() => _formState.setProductType(o.type)),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.all(11),
+          decoration: BoxDecoration(
+            color: selected
+                ? o.color.withValues(alpha: 0.10)
+                : AppColors.surfaceLight,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected ? o.color : AppColors.divider,
+              width: selected ? 1.5 : 1,
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: o.color.withValues(alpha: 0.18),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          o.color,
+                          Color.lerp(o.color, Colors.black, 0.2) ?? o.color,
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: Icon(o.icon, size: 15, color: Colors.white),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    selected
+                        ? Icons.check_circle_rounded
+                        : Icons.circle_outlined,
+                    size: 18,
+                    color: selected ? o.color : AppColors.divider,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 9),
+              Text(
+                o.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? o.color : AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                o.desc,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  fontSize: 10.5,
+                  height: 1.25,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Shown in place of the stock module for Recipe-Based items — they hold no
+  /// stock of their own; availability is derived from their ingredients.
+  Widget _buildRecipeBasedStockNote() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.info.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.info.withValues(alpha: 0.20)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.blender_rounded, size: 18, color: AppColors.info),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              "No stock is tracked here — a Recipe-Based item's availability is calculated live from its ingredients.",
+              style: GoogleFonts.poppins(
+                  fontSize: 12, color: AppColors.textPrimary, height: 1.35),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPriceField() {
+    final isRaw = _formState.productType == ProductType.rawMaterial;
+    final bool required = _formState.isMenuType;
+    final String label = isRaw
+        ? 'Cost Price'
+        : (_formState.productType == ProductType.recipeBased
+            ? 'Selling Price'
+            : 'Price');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AppTextField(
+          controller: _formState.priceController,
+          focusNode: _priceFocusNode,
+          label: label,
+          required: required,
+          hint: '0.00',
+          prefixWidget: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            child: Text('₹',
+                style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary)),
+          ),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+          ],
+          textInputAction: TextInputAction.next,
+          // Skip the Category/Tax/Veg buttons (not text fields) → jump to Description.
+          onFieldSubmitted: (_) => _descriptionFocusNode.requestFocus(),
+        ),
+        if (!required) ...[
+          const SizedBox(height: 6),
+          _fieldHint(
+            isRaw
+                ? 'Optional — the real cost is captured automatically at goods-receiving.'
+                : 'Optional for back-of-house prep items.',
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// Small muted helper line shown beneath a field.
+  Widget _fieldHint(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline_rounded,
+              size: 13, color: AppColors.textSecondary),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Text(text,
+                style: GoogleFonts.poppins(
+                    fontSize: 11, color: AppColors.textSecondary, height: 1.3)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -556,9 +838,19 @@ class _AddItemSheetState extends State<AddItemSheet> {
                 .map((c) => c.name)
                 .firstOrNull
             : null;
-        return CategorySelectorButton(
-          selectedCategoryName: liveName ?? _formState.selectedCategoryName,
-          onTap: _selectCategory,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CategorySelectorButton(
+              selectedCategoryName: liveName ?? _formState.selectedCategoryName,
+              onTap: _selectCategory,
+            ),
+            if (!_formState.isMenuType) ...[
+              const SizedBox(height: 6),
+              _fieldHint(
+                  'Optional — ingredients & prep items are grouped by Product Type, not a menu category.'),
+            ],
+          ],
         );
       },
     );

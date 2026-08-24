@@ -185,6 +185,7 @@ class InventoryService {
       unit: item.unit ?? (item.isSoldByWeight ? 'kg' : 'pcs'),
       staffName: staffName,
       sessionId: sessionId,
+      unitCost: item.lastPurchaseCost,
     ));
 
     if (type != 'out') return; // low-stock alerts only make sense for deductions
@@ -331,6 +332,7 @@ class InventoryService {
         unit: ingredient.unit ?? (ingredient.isSoldByWeight ? 'kg' : 'pcs'),
         staffName: staffName,
         sessionId: sessionId,
+        unitCost: ingredient.lastPurchaseCost,
       ));
       movementIds.add(movementId);
 
@@ -364,6 +366,18 @@ class InventoryService {
     await _restoreItemStock(semiFinishedItem, batchQty);
     final producedBalance = semiFinishedItem.stockQuantity;
     final producedMovementId = const Uuid().v4();
+    // Priced at what this batch actually cost to make, not the semi-finished
+    // item's own (usually unset) lastPurchaseCost — it was produced, not
+    // bought. Feeds RecipeReportService.foodCostReport's historical pricing.
+    final producedUnitCost = recipe.estimatedCostPerUnit((id) {
+      Items? ing;
+      try {
+        ing = items.firstWhere((i) => i.id == id);
+      } catch (_) {
+        return 0.0;
+      }
+      return ing.lastPurchaseCost ?? 0.0;
+    });
     await stockRepo.saveMovement(StockMovementModel(
       id: producedMovementId,
       timestamp: DateTime.now(),
@@ -377,6 +391,7 @@ class InventoryService {
       unit: semiFinishedItem.unit ?? (semiFinishedItem.isSoldByWeight ? 'kg' : 'pcs'),
       staffName: staffName,
       sessionId: sessionId,
+      unitCost: producedUnitCost,
     ));
     movementIds.add(producedMovementId);
 
@@ -709,6 +724,7 @@ class InventoryService {
           unit: existingItem.unit ?? (existingItem.isSoldByWeight ? 'kg' : 'pcs'),
           staffName: staffName,
           sessionId: sessionId,
+          unitCost: existingItem.lastPurchaseCost,
         ));
 
         // Restock raises stock back up — retire any low-stock notification.
@@ -765,6 +781,7 @@ class InventoryService {
         unit: ingredient.unit ?? (ingredient.isSoldByWeight ? 'kg' : 'pcs'),
         staffName: staffName,
         sessionId: sessionId,
+        unitCost: ingredient.lastPurchaseCost,
       ));
 
       await notificationStore.resolve('low_stock', 'item', _lowStockSubjectId(ingredient.id, null));

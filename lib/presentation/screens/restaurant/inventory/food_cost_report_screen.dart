@@ -12,6 +12,7 @@ import 'package:billberrylite/presentation/widget/componets/common/app_empty_sta
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_summary_card.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_summary_row.dart';
+import 'package:billberrylite/presentation/widget/componets/common/gradient_hero_header.dart';
 
 /// Phase 6 capstone report — food-cost %, recipe margin %, ingredient usage,
 /// and wastage, all sourced from [RecipeReportService]. Reached the same way
@@ -129,9 +130,64 @@ class _FoodCostReportScreenState extends State<FoodCostReportScreen> {
             ],
           ),
         ),
-        body: TabBarView(
+        body: Column(
           children: [
-            _FoodCostMarginTab(),
+            Observer(
+              builder: (_) {
+                // Reads itemStore so live recipe/cost numbers refresh the hero.
+                // ignore: unused_local_variable
+                final _ = itemStore.items.length;
+                final rows = RecipeReportService.foodCostReport();
+                final priced =
+                    rows.where((r) => r.foodCostPercent != null).toList();
+                final avgFoodCost = priced.isEmpty
+                    ? null
+                    : priced.map((r) => r.foodCostPercent!).reduce((a, b) => a + b) /
+                        priced.length;
+                final avgMargin = priced.isEmpty
+                    ? null
+                    : priced
+                            .where((r) => r.marginPercent != null)
+                            .map((r) => r.marginPercent!)
+                            .fold(0.0, (a, b) => a + b) /
+                        (priced.where((r) => r.marginPercent != null).isEmpty
+                            ? 1
+                            : priced.where((r) => r.marginPercent != null).length);
+
+                return GradientHeroHeader(
+                  title: 'Food Cost Report',
+                  subtitle:
+                      'Recipe cost %, margin, ingredient usage & wastage at a glance',
+                  icon: Icons.query_stats_rounded,
+                  accent: AppColors.primary,
+                  stats: [
+                    HeroStat(
+                      icon: Icons.receipt_long_rounded,
+                      value: '${rows.length}',
+                      label: 'Recipes Tracked',
+                    ),
+                    HeroStat(
+                      icon: Icons.pie_chart_rounded,
+                      value: avgFoodCost == null
+                          ? '—'
+                          : '${avgFoodCost.toStringAsFixed(0)}%',
+                      label: 'Avg Food Cost',
+                    ),
+                    HeroStat(
+                      icon: Icons.trending_up_rounded,
+                      value: avgMargin == null
+                          ? '—'
+                          : '${avgMargin.toStringAsFixed(0)}%',
+                      label: 'Avg Margin',
+                    ),
+                  ],
+                );
+              },
+            ),
+            Expanded(
+              child: TabBarView(
+                children: [
+                  _FoodCostMarginTab(),
             _IngredientUsageTab(
               rangeLabel: _rangeLabel,
               selectedRange: _selectedRange,
@@ -155,6 +211,9 @@ class _FoodCostReportScreenState extends State<FoodCostReportScreen> {
                 }
               },
               range: _effectiveRange,
+            ),
+                ],
+              ),
             ),
           ],
         ),

@@ -51,6 +51,15 @@ class RestaurantGRNItemModel extends HiveObject {
   @HiveField(12)
   final String createdAt;
 
+  /// How a damaged line is being handled: `'returnToSupplier'` (raises a
+  /// `RestaurantPurchaseReturnModel`), `'keepForClaim'` (raises a
+  /// `RestaurantSupplierClaimModel`), or `'writeOff'` (raises a
+  /// `RestaurantInventoryLossModel` directly). Null when [damagedQty] is
+  /// null/zero — mirrors retail's `DamagedHandling` enum, stored as a plain
+  /// string here since restaurant has no shared enum module to import it from.
+  @HiveField(13)
+  final String? damagedHandling;
+
   RestaurantGRNItemModel({
     required this.grnItemId,
     required this.grnId,
@@ -65,6 +74,7 @@ class RestaurantGRNItemModel extends HiveObject {
     this.totalAmount,
     this.remarks,
     required this.createdAt,
+    this.damagedHandling,
   });
 
   factory RestaurantGRNItemModel.create({
@@ -78,6 +88,7 @@ class RestaurantGRNItemModel extends HiveObject {
     double? damagedQty,
     double? costPrice,
     String? remarks,
+    String? damagedHandling,
   }) {
     return RestaurantGRNItemModel(
       grnItemId: _uuid.v4(),
@@ -93,6 +104,7 @@ class RestaurantGRNItemModel extends HiveObject {
       totalAmount: costPrice != null ? acceptedQty * costPrice : null,
       remarks: remarks,
       createdAt: DateTime.now().toIso8601String(),
+      damagedHandling: damagedHandling,
     );
   }
 
@@ -113,6 +125,7 @@ class RestaurantGRNItemModel extends HiveObject {
         'totalAmount': totalAmount,
         'remarks': remarks,
         'createdAt': createdAt,
+        'damagedHandling': damagedHandling,
       };
 
   factory RestaurantGRNItemModel.fromMap(Map<String, dynamic> map) {
@@ -130,6 +143,7 @@ class RestaurantGRNItemModel extends HiveObject {
       totalAmount: (map['totalAmount'] as num?)?.toDouble(),
       remarks: map['remarks'] as String?,
       createdAt: map['createdAt'] as String,
+      damagedHandling: map['damagedHandling'] as String?,
     );
   }
 }

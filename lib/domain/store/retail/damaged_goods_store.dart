@@ -12,7 +12,7 @@ import '../../../data/repositories/retail/inventory_loss_repository.dart';
 import '../../../data/repositories/retail/purchase_return_repository.dart';
 import '../../../data/repositories/retail/supplier_claim_repository.dart';
 import '../../../core/di/service_locator.dart';
-import '../../services/retail/document_number_service.dart';
+import '../../services/common/document_number_service.dart';
 
 part 'damaged_goods_store.g.dart';
 

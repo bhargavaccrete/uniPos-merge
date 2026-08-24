@@ -1,5 +1,5 @@
 import 'package:hive/hive.dart';
-import '../../../domain/services/retail/document_number_service.dart';
+import '../../../domain/services/common/document_number_service.dart';
 import '../../models/retail/hive_model/grn_model_213.dart';
 
 class GRNRepository {

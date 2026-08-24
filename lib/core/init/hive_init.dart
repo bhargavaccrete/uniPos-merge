@@ -25,6 +25,9 @@ import 'package:billberrylite/data/models/retail/hive_model/supplier_claim_item_
 import 'package:billberrylite/data/models/retail/hive_model/inventory_loss_model_178.dart';
 import 'package:billberrylite/data/models/retail/hive_model/supplier_ledger_entry_model_179.dart';
 import 'package:billberrylite/data/models/retail/hive_model/stock_take_model_180.dart';
+import 'package:billberrylite/data/models/retail/hive_model/bundle_model.dart';
+import 'package:billberrylite/data/models/retail/hive_model/bundle_component_model.dart';
+import 'package:billberrylite/data/models/retail/hive_model/kit_assembly_model.dart';
 import 'package:billberrylite/data/models/retail/hive_model/stock_take_item_model_181.dart';
 import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/retail/hive_model/hold_sale_model_209.dart';
@@ -52,6 +55,13 @@ import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_orde
 import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_order_item_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_grn_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_grn_item_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_return_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_return_item_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_supplier_claim_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_supplier_claim_item_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_inventory_loss_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_stock_take_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_stock_take_item_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/extramodel_303.dart';
 import 'package:billberrylite/data/models/restaurant/db/toppingmodel_304.dart';
 import 'package:billberrylite/data/models/restaurant/db/variantmodel_305.dart';
@@ -270,6 +280,16 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailStockTakeItem)) {
       Hive.registerAdapter(StockTakeItemModelAdapter());
     }
+    // Bundle/kit products - 182/183/184: see docs/retail_inventory_system_plan.md §3.2.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.retailBundle)) {
+      Hive.registerAdapter(RetailBundleModelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(HiveTypeIds.retailBundleComponent)) {
+      Hive.registerAdapter(BundleComponentModelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(HiveTypeIds.retailKitAssembly)) {
+      Hive.registerAdapter(RetailKitAssemblyModelAdapter());
+    }
     // Customer - shared with restaurant (typeId 125, see restaurant section
     // below) — same adapter, retail's own box.
     if (!Hive.isAdapterRegistered(HiveTypeIds.customer)) {
@@ -437,6 +457,8 @@ class HiveInit {
     await Hive.openBox<InventoryLossModel>(HiveBoxNames.inventoryLosses);
     await Hive.openBox<StockTakeModel>(HiveBoxNames.stockTakes);
     await Hive.openBox<StockTakeItemModel>(HiveBoxNames.stockTakeItems);
+    await Hive.openBox<RetailBundleModel>(HiveBoxNames.bundles);
+    await Hive.openBox<RetailKitAssemblyModel>(HiveBoxNames.kitAssemblies);
     await Hive.openBox<Customer>(HiveBoxNames.customer);
     await Hive.openBox<HoldSaleModel>(HiveBoxNames.holdSales);
     await Hive.openBox<HoldSaleItemModel>(HiveBoxNames.holdSaleItems);
@@ -667,6 +689,34 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantGrnItem)) {
       Hive.registerAdapter(RestaurantGRNItemModelAdapter());
     }
+    // RestaurantPurchaseReturnModel - 143
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantPurchaseReturn)) {
+      Hive.registerAdapter(RestaurantPurchaseReturnModelAdapter());
+    }
+    // RestaurantPurchaseReturnItemModel - 144
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantPurchaseReturnItem)) {
+      Hive.registerAdapter(RestaurantPurchaseReturnItemModelAdapter());
+    }
+    // RestaurantSupplierClaimModel - 145
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantSupplierClaim)) {
+      Hive.registerAdapter(RestaurantSupplierClaimModelAdapter());
+    }
+    // RestaurantSupplierClaimItemModel - 146
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantSupplierClaimItem)) {
+      Hive.registerAdapter(RestaurantSupplierClaimItemModelAdapter());
+    }
+    // RestaurantInventoryLossModel - 147
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantInventoryLoss)) {
+      Hive.registerAdapter(RestaurantInventoryLossModelAdapter());
+    }
+    // RestaurantStockTakeModel - 148
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantStockTake)) {
+      Hive.registerAdapter(RestaurantStockTakeModelAdapter());
+    }
+    // RestaurantStockTakeItemModel - 149
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantStockTakeItem)) {
+      Hive.registerAdapter(RestaurantStockTakeItemModelAdapter());
+    }
   }
 
   /// Open all restaurant Hive boxes
@@ -743,6 +793,15 @@ class HiveInit {
     await Hive.openBox<RestaurantPurchaseOrderItemModel>(HiveBoxNames.restaurantPurchaseOrderItems);
     await Hive.openBox<RestaurantGRNModel>(HiveBoxNames.restaurantGrns);
     await Hive.openBox<RestaurantGRNItemModel>(HiveBoxNames.restaurantGrnItems);
+
+    // Damaged-goods/loss/stock-take chain (returns, claims, write-offs, counts)
+    await Hive.openBox<RestaurantPurchaseReturnModel>(HiveBoxNames.restaurantPurchaseReturns);
+    await Hive.openBox<RestaurantPurchaseReturnItemModel>(HiveBoxNames.restaurantPurchaseReturnItems);
+    await Hive.openBox<RestaurantSupplierClaimModel>(HiveBoxNames.restaurantSupplierClaims);
+    await Hive.openBox<RestaurantSupplierClaimItemModel>(HiveBoxNames.restaurantSupplierClaimItems);
+    await Hive.openBox<RestaurantInventoryLossModel>(HiveBoxNames.restaurantInventoryLosses);
+    await Hive.openBox<RestaurantStockTakeModel>(HiveBoxNames.restaurantStockTakes);
+    await Hive.openBox<RestaurantStockTakeItemModel>(HiveBoxNames.restaurantStockTakeItems);
 
     _areRestaurantBoxesOpen = true;
   }

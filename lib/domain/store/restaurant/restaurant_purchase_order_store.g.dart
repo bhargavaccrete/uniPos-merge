@@ -184,6 +184,7 @@ mixin _$RestaurantPurchaseOrderStore on _RestaurantPurchaseOrderStore, Store {
               ({
                 double acceptedQty,
                 double? costPrice,
+                String? damagedHandling,
                 double? damagedQty,
                 String itemId,
                 String itemName,

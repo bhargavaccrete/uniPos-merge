@@ -6,6 +6,7 @@ import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_order_item_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_order_model.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/domain/store/restaurant/restaurant_damaged_goods_store.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -21,6 +22,11 @@ class _ReceiveLine {
   double receivedQty;
   double damagedQty;
   double costPrice;
+
+  /// `'returnToSupplier'` / `'keepForClaim'` / `'writeOff'` — null until a
+  /// damaged quantity is entered and a handling picked. Threaded into
+  /// `GRNReceiptLine.damagedHandling` on confirm.
+  String? damagedHandling;
 
   _ReceiveLine({
     required this.poItem,
@@ -112,6 +118,7 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
         TextEditingController(text: _fmt(line.receivedQty));
     final damagedController = TextEditingController(text: _fmt(line.damagedQty));
     final priceController = TextEditingController(text: line.costPrice.toStringAsFixed(2));
+    String? selectedHandling = line.damagedHandling;
 
     showDialog<void>(
       context: context,
@@ -156,7 +163,49 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
                     validator: (_) =>
                         overDamaged ? 'Cannot exceed received quantity' : null,
                   ),
-                  const SizedBox(height: 12),
+                  if (damaged > 0) ...[
+                    const SizedBox(height: 14),
+                    Text(
+                      'WHAT HAPPENS TO THE DAMAGED UNITS',
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.6,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Radio-style tiles instead of a dropdown: each option
+                    // creates a different document, so the consequence is
+                    // worth spelling out rather than hiding in a menu.
+                    _handlingTile(
+                      handling: 'returnToSupplier',
+                      selected: selectedHandling,
+                      label: 'Return to Supplier',
+                      caption: 'Raises a purchase return',
+                      color: AppColors.info,
+                      onTap: (v) => setDialogState(() => selectedHandling = v),
+                    ),
+                    const SizedBox(height: 6),
+                    _handlingTile(
+                      handling: 'keepForClaim',
+                      selected: selectedHandling,
+                      label: 'Keep for Claim',
+                      caption: 'Opens a supplier claim',
+                      color: AppColors.warning,
+                      onTap: (v) => setDialogState(() => selectedHandling = v),
+                    ),
+                    const SizedBox(height: 6),
+                    _handlingTile(
+                      handling: 'writeOff',
+                      selected: selectedHandling,
+                      label: 'Write Off as Loss',
+                      caption: 'Records an inventory loss',
+                      color: AppColors.danger,
+                      onTap: (v) => setDialogState(() => selectedHandling = v),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
                   AppTextField(
                     controller: priceController,
                     label: 'Cost Price per Unit',
@@ -199,9 +248,15 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
                           'Damaged quantity cannot exceed received quantity');
                       return;
                     }
+                    if (damaged > 0 && selectedHandling == null) {
+                      NotificationService.instance.showError(
+                          'Please select handling method for damaged units');
+                      return;
+                    }
                     setState(() {
                       line.receivedQty = received;
                       line.damagedQty = damaged;
+                      line.damagedHandling = damaged > 0 ? selectedHandling : null;
                       line.costPrice = double.tryParse(priceController.text) ?? 0;
                     });
                     Navigator.pop(dialogContext);
@@ -210,6 +265,70 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+
+  /// One damaged-handling choice. Selecting it decides whether a purchase
+  /// return, a supplier claim or an inventory loss gets created once the GRN
+  /// is confirmed (see `RestaurantDamagedGoodsStore.recordFromGRN`).
+  Widget _handlingTile({
+    required String handling,
+    required String? selected,
+    required String label,
+    required String caption,
+    required Color color,
+    required ValueChanged<String> onTap,
+  }) {
+    final isSelected = selected == handling;
+
+    return InkWell(
+      onTap: () => onTap(handling),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withValues(alpha: 0.07) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? color : AppColors.divider,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isSelected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              size: 19,
+              color: isSelected ? color : AppColors.textSecondary,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? color : AppColors.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    caption,
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -226,9 +345,21 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
       return;
     }
 
+    // Every damaged line needs a handling method chosen — it's what decides
+    // whether a purchase return, supplier claim or write-off is raised.
+    final hasUnhandledDamage = _lines.any(
+      (l) =>
+          l.receivedQty > 0 && l.damagedQty > 0 && l.damagedHandling == null,
+    );
+    if (hasUnhandledDamage) {
+      NotificationService.instance
+          .showError('Please select handling method for damaged units');
+      return;
+    }
+
     setState(() => _saving = true);
     try {
-      await restaurantPurchaseOrderStore.confirmGRN(
+      final grnItems = await restaurantPurchaseOrderStore.confirmGRN(
         poId: widget.purchaseOrder.poId,
         poNumber: widget.purchaseOrder.poNumber,
         supplierId: widget.purchaseOrder.supplierId,
@@ -251,13 +382,33 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
               acceptedQty: line.acceptedQty,
               damagedQty: line.damagedQty > 0 ? line.damagedQty : null,
               costPrice: line.costPrice > 0 ? line.costPrice : null,
+              damagedHandling: line.damagedQty > 0 ? line.damagedHandling : null,
             ),
         ],
       );
 
+      // Raise the purchase return / supplier claim / write-off documents for
+      // whatever was marked damaged. confirmGRN only returns the line items;
+      // the GRN header it just saved is looked up by id so recordFromGRN gets
+      // both without confirmGRN's signature having to change.
+      RestaurantDamagedGoodsOutcome outcome = const RestaurantDamagedGoodsOutcome();
+      if (grnItems.isNotEmpty) {
+        final grn = restaurantGrnRepository.getGRNById(grnItems.first.grnId);
+        if (grn != null) {
+          outcome = await restaurantDamagedGoodsStore.recordFromGRN(
+            grn: grn,
+            items: grnItems,
+          );
+        }
+      }
+
       if (!mounted) return;
       Navigator.pop(context, true);
-      NotificationService.instance.showSuccess('Goods received and stock updated');
+      NotificationService.instance.showSuccess(
+        outcome.isEmpty
+            ? 'Goods received and stock updated'
+            : 'Goods received — ${outcome.summary} raised for damaged units',
+      );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -491,6 +642,23 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
                   _qtyChip('Received', line.receivedQty, AppColors.success),
                   if (hasDamage)
                     _qtyChip('Damaged', line.damagedQty, AppColors.danger),
+                  if (hasDamage && line.damagedHandling != null)
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        _handlingLabel(line.damagedHandling!),
+                        style: TextStyle(
+                          fontSize: AppResponsive.captionFontSize(context),
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.warning,
+                        ),
+                      ),
+                    ),
                   Text(formatMoney(line.acceptedQty * line.costPrice),
                       style: TextStyle(
                           fontSize: AppResponsive.bodyFontSize(context),
@@ -503,6 +671,19 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
         ),
       ),
     );
+  }
+
+  String _handlingLabel(String handling) {
+    switch (handling) {
+      case 'returnToSupplier':
+        return 'Return to Supplier';
+      case 'keepForClaim':
+        return 'Keep for Claim';
+      case 'writeOff':
+        return 'Write Off';
+      default:
+        return handling;
+    }
   }
 
   Widget _qtyChip(String label, double qty, Color color) {

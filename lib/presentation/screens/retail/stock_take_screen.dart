@@ -58,6 +58,10 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
 
   /// Variants matching the search box, excluding ones already counted — a
   /// counted line is edited in the list below, not added again.
+  ///
+  /// Bundle products are excluded entirely — a bundle carries no physical
+  /// stock of its own (its availability is computed live from components),
+  /// so counting it would be meaningless and would confuse staff.
   List<VarianteModel> get _searchResults {
     final query = _searchController.text.trim().toLowerCase();
     if (query.isEmpty) return const [];
@@ -70,6 +74,7 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
       final product = productStore.products
           .where((p) => p.productId == v.productId)
           .firstOrNull;
+      if (product?.isBundle ?? false) return false;
       final name = (product?.productName ?? '').toLowerCase();
       final sku = (v.sku ?? '').toLowerCase();
       final barcode = (v.barcode ?? '').toLowerCase();
@@ -94,6 +99,17 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
       NotificationService.instance.showError('No product for that barcode.');
       return;
     }
+
+    final product = productStore.products
+        .where((p) => p.productId == variant.productId)
+        .firstOrNull;
+    if (product?.isBundle ?? false) {
+      NotificationService.instance.showError(
+        'Bundles have no physical stock of their own — nothing to count.',
+      );
+      return;
+    }
+
     await _promptCount(variant);
   }
 
@@ -427,13 +443,24 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
               .firstOrNull;
           return ListTile(
             dense: true,
-            title: Text(
-              product?.productName ?? 'Product',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.smallFontSize(context),
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
+            title: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    product?.productName ?? 'Product',
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                if (product?.isRepack ?? false) ...[
+                  const SizedBox(width: 6),
+                  const _KitBadge(),
+                ],
+              ],
             ),
             subtitle: Text(
               variant.hasAttributes
@@ -479,6 +506,10 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
     final color = variance == 0
         ? AppColors.textSecondary
         : (variance > 0 ? AppColors.success : AppColors.danger);
+    final product = productStore.products
+        .where((p) => p.productId == line.productId)
+        .firstOrNull;
+    final isRepack = product?.isRepack ?? false;
 
     return Container(
       margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
@@ -500,15 +531,25 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      line.productName ?? 'Unknown product',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.bodyFontSize(context),
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            line.productName ?? 'Unknown product',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.bodyFontSize(context),
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        if (isRepack) ...[
+                          const SizedBox(width: 6),
+                          const _KitBadge(),
+                        ],
+                      ],
                     ),
                     if (line.variantInfo?.isNotEmpty ?? false)
                       Text(
@@ -781,6 +822,44 @@ class _CountEntryDialogState extends State<_CountEntryDialog> {
         const SizedBox(width: 12),
         appDialogPrimaryButton(label: 'Save Count', onPressed: _submit),
       ],
+    );
+  }
+}
+
+/// Marks a row as an assembled/kit item — its stock is real (unlike a
+/// bundle), but it is normally replenished by assembling components, not by
+/// a purchase. Counting staff should know a shortage here is not restocked
+/// the usual way. Visual style matches `_StockModeBadge` in bundles_screen.
+class _KitBadge extends StatelessWidget {
+  const _KitBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.info.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.build_circle_outlined,
+            size: 13,
+            color: AppColors.info,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            'Kit',
+            style: GoogleFonts.poppins(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: AppColors.info,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -22,11 +22,16 @@ import 'raw_materials_screen.dart';
 import 'purchase_order/purchase_order_list_screen.dart';
 import 'production_screen.dart';
 import 'food_cost_report_screen.dart';
+import 'inventory_loss_list_screen.dart';
+import 'stock_take_list_screen.dart';
+import 'damaged_goods/restaurant_damaged_goods_hub_screen.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dashboard_menu_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/gradient_hero_header.dart';
 import 'stock_history_screen.dart';
 
 class ManageInventory extends StatefulWidget {
@@ -671,6 +676,19 @@ class _ManageInventoryState extends State<ManageInventory> {
         unit: unit,
       );
 
+      // Loss-bearing reasons (wastage, theft, samples) also cost the
+      // business money, not just units — record that separately so it
+      // reaches the food-cost/wastage reports.
+      if (StockAdjustService.isLossReason(reasonData.reason)) {
+        await StockAdjustService.recordLoss(
+          item: item,
+          variant: variant,
+          quantity: stockToRemove,
+          reason: reasonData.reason,
+          note: reasonData.note,
+        );
+      }
+
       controller.clear();
 
       if (mounted) {
@@ -1083,6 +1101,235 @@ class _ManageInventoryState extends State<ManageInventory> {
     );
   }
 
+  // ── Hub: quick-access module grid ─────────────────────────────────────────
+  // Groups everything that used to be a wall of app-bar icons into one
+  // clearly-labelled "Manage Inventory" section, separate from the item-level
+  // "Stock Levels" list below it.
+  List<({String title, String subtitle, IconData icon, Color color, VoidCallback onTap})>
+      _hubActions(BuildContext context) => [
+            (
+              title: 'Recipes',
+              subtitle: 'Build BOMs for composed items',
+              icon: Icons.receipt_long_rounded,
+              color: AppColors.secondary,
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const RecipesScreen())),
+            ),
+            (
+              title: 'Raw Materials',
+              subtitle: 'Ingredients & stock levels',
+              icon: Icons.grass_rounded,
+              color: AppColors.success,
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const RawMaterialsScreen())),
+            ),
+            (
+              title: 'Purchase Orders',
+              subtitle: 'Order & receive from suppliers',
+              icon: Icons.local_shipping_rounded,
+              color: AppColors.info,
+              onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const PurchaseOrderListScreen())),
+            ),
+            (
+              title: 'Production',
+              subtitle: 'Batch-prep semi-finished items',
+              icon: Icons.outdoor_grill_rounded,
+              color: AppColors.accent,
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const ProductionScreen())),
+            ),
+            (
+              title: 'Stock Take',
+              subtitle: 'Physical count reconciliation',
+              icon: Icons.fact_check_rounded,
+              color: AppColors.warning,
+              onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) =>
+                          const RestaurantStockTakeListScreen())),
+            ),
+            (
+              title: 'Inventory Losses',
+              subtitle: 'Wastage, theft & write-offs',
+              icon: Icons.money_off_rounded,
+              color: AppColors.danger,
+              onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) =>
+                          const RestaurantInventoryLossListScreen())),
+            ),
+            (
+              title: 'Damaged Goods',
+              subtitle: 'Supplier returns & claims',
+              icon: Icons.assignment_return_rounded,
+              color: AppColors.orange,
+              onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) =>
+                          const RestaurantDamagedGoodsHubScreen())),
+            ),
+            (
+              title: 'Food Cost Report',
+              subtitle: 'Margins, usage & wastage %',
+              icon: Icons.query_stats_rounded,
+              color: AppColors.primary,
+              onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const FoodCostReportScreen())),
+            ),
+          ];
+
+  Widget _buildSectionHeading(String title, String subtitle) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0),
+        20,
+        16,
+        10,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHubGrid(BuildContext context) {
+    final actions = _hubActions(context);
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.getValue(
+          context,
+          mobile: 16.0,
+          tablet: 20.0,
+          desktop: 24.0,
+        ),
+      ),
+      child: GridView.count(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisCount: AppResponsive.gridColumns(context),
+        crossAxisSpacing: AppResponsive.gridSpacing(context),
+        mainAxisSpacing: AppResponsive.gridSpacing(context),
+        childAspectRatio: AppResponsive.getValue(
+          context,
+          mobile: 1.02,
+          tablet: 1.15,
+          desktop: 1.25,
+        ),
+        children: actions
+            .map((a) => DashboardMenuCard(
+                  title: a.title,
+                  subtitle: a.subtitle,
+                  icon: a.icon,
+                  color: a.color,
+                  compact: AppResponsive.isMobile(context),
+                  onTap: a.onTap,
+                ))
+            .toList(),
+      ),
+    );
+  }
+
+  /// Gradient hero banner with live "at a glance" counters — Tracked / Low /
+  /// Out — flowing straight out of the flat app bar.
+  Widget _buildHero(int tracked, int low, int outOfStock) {
+    return GradientHeroHeader(
+      title: 'Inventory Control',
+      subtitle: 'Recipes, purchasing, production & live stock — all in one place',
+      icon: Icons.inventory_2_rounded,
+      accent: AppColors.secondary,
+      stats: [
+        HeroStat(
+          icon: Icons.check_circle_rounded,
+          value: '$tracked',
+          label: 'Tracked',
+        ),
+        HeroStat(
+          icon: Icons.trending_down_rounded,
+          value: '$low',
+          label: 'Low Stock',
+        ),
+        HeroStat(
+          icon: Icons.remove_shopping_cart_rounded,
+          value: '$outOfStock',
+          label: 'Out of Stock',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+    Widget? action,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 40, color: color),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            if (action != null) ...[const SizedBox(height: 18), action],
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1143,247 +1390,241 @@ class _ManageInventoryState extends State<ManageInventory> {
               );
             },
           ),
-          IconButton(
-            tooltip: 'Recipes',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const RecipesScreen()),
-            ),
-            icon: const Icon(Icons.receipt_long_rounded, color: Colors.white),
-          ),
-          IconButton(
-            tooltip: 'Raw Materials',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const RawMaterialsScreen()),
-            ),
-            icon: const Icon(Icons.grass_rounded, color: Colors.white),
-          ),
-          IconButton(
-            tooltip: 'Purchase Orders',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const PurchaseOrderListScreen(),
-              ),
-            ),
-            icon: const Icon(
-              Icons.local_shipping_rounded,
-              color: Colors.white,
-            ),
-          ),
-          IconButton(
-            tooltip: 'Production',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ProductionScreen()),
-            ),
-            icon: const Icon(Icons.outdoor_grill_rounded, color: Colors.white),
-          ),
-          IconButton(
-            tooltip: 'Food Cost Report',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const FoodCostReportScreen()),
-            ),
-            icon: const Icon(Icons.query_stats_rounded, color: Colors.white),
-          ),
         ],
       ),
-      body: Column(
-        children: [
-          // Search
-          Container(
-            color: AppColors.white,
-            padding: EdgeInsets.fromLTRB(16, 12, 16, 12),
-            child: AppTextField(
-              controller: _searchController,
-              onChanged: (v) =>
-                  setState(() => _searchQuery = v.trim().toLowerCase()),
-              hint: 'Search items...',
-              icon: Icons.search_rounded,
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: Icon(
-                        Icons.close_rounded,
-                        size: 18,
-                        color: AppColors.textSecondary,
+      body: Observer(
+        builder: (context) {
+          final categories = categoryStore.categories.toList();
+          final items = itemStore.items.toList();
+
+          // Check if there are any items with inventory tracking enabled
+          final inventoryItems =
+              items.where((item) => item.trackInventory == true).toList();
+          final lowCount = inventoryItems.where(_isAlertItem).length;
+          final outCount =
+              inventoryItems.where((item) => !item.isInStock).length;
+
+          final horizontalPad = AppResponsive.getValue(
+            context,
+            mobile: 16.0,
+            tablet: 20.0,
+            desktop: 24.0,
+          );
+
+          return CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: _buildHero(inventoryItems.length, lowCount, outCount),
+              ),
+              SliverToBoxAdapter(
+                child: _buildSectionHeading(
+                  'Manage Inventory',
+                  'Recipes, purchasing, production & reports',
+                ),
+              ),
+              SliverToBoxAdapter(child: _buildHubGrid(context)),
+              SliverToBoxAdapter(
+                child: _buildSectionHeading(
+                  'Stock Levels',
+                  'Track and adjust stock for individual menu items',
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                      horizontalPad, 0, horizontalPad, 10),
+                  child: Column(
+                    children: [
+                      AppTextField(
+                        controller: _searchController,
+                        onChanged: (v) => setState(
+                            () => _searchQuery = v.trim().toLowerCase()),
+                        hint: 'Search items...',
+                        icon: Icons.search_rounded,
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: Icon(
+                                  Icons.close_rounded,
+                                  size: 18,
+                                  color: AppColors.textSecondary,
+                                ),
+                                onPressed: () => setState(() {
+                                  _searchController.clear();
+                                  _searchQuery = '';
+                                }),
+                              )
+                            : null,
                       ),
-                      onPressed: () => setState(() {
-                        _searchController.clear();
-                        _searchQuery = '';
-                      }),
-                    )
-                  : null,
-            ),
-          ),
-
-          SizedBox(height: 8),
-          // Inventory List
-          Expanded(
-            child: Observer(
-              builder: (context) {
-                final categories = categoryStore.categories.toList();
-                final items = itemStore.items.toList();
-
-                // Check if there are any items with inventory tracking enabled
-                final inventoryItems = items
-                    .where((item) => item.trackInventory == true)
-                    .toList();
-
-                if (categories.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.category_rounded,
-                          size: 48,
-                          color: AppColors.divider,
-                        ),
-                        SizedBox(height: 12),
-                        Text(
-                          'No Categories Found',
-                          style: GoogleFonts.poppins(
-                            fontSize: 15,
-                            color: AppColors.textSecondary,
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: FilterChip(
+                          label: Text(
+                            'Low stock only',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: _showLowStockOnly
+                                  ? Colors.white
+                                  : AppColors.textPrimary,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                if (inventoryItems.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.inventory_2_outlined,
-                          size: 48,
-                          color: AppColors.divider,
-                        ),
-                        SizedBox(height: 12),
-                        Text(
-                          'No items with inventory tracking',
-                          style: GoogleFonts.poppins(
-                            fontSize: 15,
-                            color: AppColors.textSecondary,
+                          avatar: Icon(
+                            Icons.warning_amber_rounded,
+                            size: 16,
+                            color: _showLowStockOnly
+                                ? Colors.white
+                                : AppColors.warning,
                           ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          "Enable 'Manage Inventory' on items to track stock",
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
+                          selected: _showLowStockOnly,
+                          onSelected: (v) =>
+                              setState(() => _showLowStockOnly = v),
+                          selectedColor: AppColors.warning,
+                          backgroundColor: AppColors.warning.withValues(alpha: 0.08),
+                          side: BorderSide(
+                            color: AppColors.warning
+                                .withValues(alpha: _showLowStockOnly ? 1 : 0.3),
                           ),
+                          showCheckmark: false,
                         ),
-                      ],
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  padding: EdgeInsets.all(
-                    AppResponsive.getValue(
-                      context,
-                      mobile: 12.0,
-                      tablet: 16.0,
-                      desktop: 20.0,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (categories.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _buildEmptyState(
+                    icon: Icons.category_rounded,
+                    color: AppColors.textSecondary,
+                    title: 'No categories yet',
+                    subtitle: 'Create a menu category before tracking stock.',
+                  ),
+                )
+              else if (inventoryItems.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _buildEmptyState(
+                    icon: Icons.inventory_2_outlined,
+                    color: AppColors.primary,
+                    title: 'No items with inventory tracking',
+                    subtitle:
+                        "Enable 'Manage Inventory' on a menu item to track its stock here.",
+                    action: OutlinedButton.icon(
+                      onPressed: () => Navigator.pushNamed(
+                          context, '/restaurant-manage-menu'),
+                      icon: const Icon(Icons.restaurant_menu_rounded, size: 16),
+                      label: Text('Go to Menu Management',
+                          style: GoogleFonts.poppins(
+                              fontSize: 12.5, fontWeight: FontWeight.w600)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
                     ),
                   ),
-                  itemCount: categories.length,
-                  itemBuilder: (context, index) {
-                    final category = categories[index];
-                    final categoryItems = items
-                        .where(
-                          (item) =>
-                              item.categoryOfItem == category.id &&
-                              item.trackInventory == true &&
-                              (!_showLowStockOnly || _isAlertItem(item)) &&
-                              (_searchQuery.isEmpty ||
-                                  item.name.toLowerCase().contains(
-                                    _searchQuery,
-                                  ) ||
-                                  (item.itemCode != null &&
-                                      item.itemCode!.toLowerCase().contains(
-                                        _searchQuery,
-                                      ))),
-                        )
-                        .toList();
+                )
+              else
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(
+                      horizontalPad, 0, horizontalPad, horizontalPad),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final category = categories[index];
+                        final categoryItems = items
+                            .where(
+                              (item) =>
+                                  item.categoryOfItem == category.id &&
+                                  item.trackInventory == true &&
+                                  (!_showLowStockOnly || _isAlertItem(item)) &&
+                                  (_searchQuery.isEmpty ||
+                                      item.name.toLowerCase().contains(
+                                            _searchQuery,
+                                          ) ||
+                                      (item.itemCode != null &&
+                                          item.itemCode!
+                                              .toLowerCase()
+                                              .contains(_searchQuery))),
+                            )
+                            .toList();
 
-                    if (categoryItems.isEmpty) {
-                      return SizedBox.shrink();
-                    }
+                        if (categoryItems.isEmpty) {
+                          return const SizedBox.shrink();
+                        }
 
-                    // Auto-expand when searching or filtering to low stock
-                    final isExpanded =
-                        (_searchQuery.isNotEmpty || _showLowStockOnly)
-                        ? true
-                        : (_expandedCategories[category.id] ?? false);
+                        // Auto-expand when searching or filtering to low stock
+                        final isExpanded =
+                            (_searchQuery.isNotEmpty || _showLowStockOnly)
+                                ? true
+                                : (_expandedCategories[category.id] ?? false);
 
-                    return Container(
-                      margin: EdgeInsets.only(bottom: 8),
-                      decoration: BoxDecoration(
-                        color: AppColors.white,
-                        borderRadius: BorderRadius.circular(
-                          AppResponsive.borderRadius(context),
-                        ),
-                        border: Border.all(color: AppColors.divider),
-                      ),
-                      child: Theme(
-                        data: Theme.of(
-                          context,
-                        ).copyWith(dividerColor: Colors.transparent),
-                        child: ExpansionTile(
-                          // Key includes isExpanded so toggling search / low-stock
-                          // filter rebuilds the tile and re-applies initiallyExpanded
-                          // (ExpansionTile ignores initiallyExpanded changes otherwise).
-                          key: ValueKey('${category.id}_$isExpanded'),
-                          tilePadding: EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 2,
+                        return Container(
+                          margin: EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            color: AppColors.white,
+                            borderRadius: BorderRadius.circular(
+                              AppResponsive.borderRadius(context),
+                            ),
+                            border: Border.all(color: AppColors.divider),
                           ),
-                          childrenPadding: EdgeInsets.only(bottom: 8),
-                          leading: Icon(
-                            Icons.category_rounded,
-                            color: AppColors.primary,
-                            size: 20,
-                          ),
-                          title: Text(
-                            category.name,
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w500,
-                              fontSize: 14,
+                          child: Theme(
+                            data: Theme.of(context)
+                                .copyWith(dividerColor: Colors.transparent),
+                            child: ExpansionTile(
+                              // Key includes isExpanded so toggling search / low-stock
+                              // filter rebuilds the tile and re-applies initiallyExpanded
+                              // (ExpansionTile ignores initiallyExpanded changes otherwise).
+                              key: ValueKey('${category.id}_$isExpanded'),
+                              tilePadding: EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 2,
+                              ),
+                              childrenPadding: EdgeInsets.only(bottom: 8),
+                              leading: Icon(
+                                Icons.category_rounded,
+                                color: AppColors.primary,
+                                size: 20,
+                              ),
+                              title: Text(
+                                category.name,
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              subtitle: Text(
+                                '${categoryItems.length} item${categoryItems.length != 1 ? 's' : ''}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              initiallyExpanded: isExpanded,
+                              onExpansionChanged: (expanded) {
+                                setState(() {
+                                  _expandedCategories[category.id] = expanded;
+                                });
+                              },
+                              children: categoryItems.map((item) {
+                                return _buildItemTile(item);
+                              }).toList(),
                             ),
                           ),
-                          subtitle: Text(
-                            '${categoryItems.length} item${categoryItems.length != 1 ? 's' : ''}',
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          initiallyExpanded: isExpanded,
-                          onExpansionChanged: (expanded) {
-                            setState(() {
-                              _expandedCategories[category.id] = expanded;
-                            });
-                          },
-                          children: categoryItems.map((item) {
-                            return _buildItemTile(item);
-                          }).toList(),
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
+                        );
+                      },
+                      childCount: categories.length,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }

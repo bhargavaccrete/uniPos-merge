@@ -10,6 +10,7 @@ import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
 import 'package:billberrylite/data/repositories/retail/grn_item_repository.dart';
+import 'package:billberrylite/domain/services/retail/inventory_service.dart';
 import 'package:billberrylite/domain/services/retail/stock_adjustment_service.dart';
 import 'package:billberrylite/util/restaurant/report_history_window.dart';
 import 'package:billberrylite/util/retail/sale_revenue_filter.dart';
@@ -546,14 +547,23 @@ class ReportService {
         // productStore.reorderPointFor — otherwise the Stock Alerts card and
         // the inventory colouring would disagree about the same variant.
         final reorderPoint = variant.minStock ?? threshold;
-        if (variant.stockQty <= reorderPoint) {
+        // Bundle-type variants have no stock of their own — `variant.stockQty`
+        // is meaningless for them. "How many can actually be sold" (bounded by
+        // component stock) is what the reorder threshold should compare
+        // against instead. See docs/retail_inventory_system_plan.md §3.3.
+        final isBundle = product.isBundle;
+        final effectiveStock = isBundle
+            ? RetailInventoryService.calculateAvailableToSell(product, variant)
+            : variant.stockQty;
+        if (effectiveStock <= reorderPoint) {
           lowStockItems.add({
             'productId': product.productId,
             'productName': product.productName,
             'variantId': variant.varianteId,
             'variantLabel':
                 attributeStore.describeAttributes(attributeStore.attributesOf(variant)),
-            'currentStock': variant.stockQty,
+            'currentStock': effectiveStock,
+            'isBundle': isBundle,
             'reorderPoint': reorderPoint,
             'costPrice': variant.costPrice,
             'mrp': variant.mrp,
@@ -886,6 +896,52 @@ class ReportService {
       ..sort((a, b) => (b['totalProfit'] as double).compareTo(a['totalProfit'] as double));
 
     return statsList;
+  }
+
+  // ==================== Bundle Margin Report ====================
+
+  /// Margin for each bundle/repack product: its effective selling price
+  /// against the summed cost of its components. Unlike the other profit
+  /// reports this is NOT tied to a sales window — a bundle's margin is a
+  /// pricing question about the current catalogue, not a sales-history one
+  /// (mirrors how [getLowStockReport] is also window-less). See
+  /// docs/retail_inventory_system_plan.md §3.3.
+  Future<List<Map<String, dynamic>>> getBundleMarginReport() async {
+    final costByVariantId = <String, double>{
+      for (final v in productStore.variants) v.varianteId: v.costPrice ?? 0.0,
+    };
+
+    final rows = <Map<String, dynamic>>[];
+    for (final product in productStore.products) {
+      if (!product.needsBundleComponents) continue;
+      final variant = productStore.primaryVariantFor(product.productId);
+      if (variant == null) continue;
+      final bundle = bundleRepository.getBundleForVariant(variant.varianteId);
+      if (bundle == null || !bundle.hasComponents) continue;
+
+      final componentCost =
+          bundle.estimatedCost((id) => costByVariantId[id] ?? 0.0);
+      final sellingPrice = variant.sellingPrice ?? variant.mrp ?? 0.0;
+      final margin = sellingPrice - componentCost;
+      final marginPercent =
+          sellingPrice != 0 ? (margin / sellingPrice) * 100 : 0.0;
+
+      rows.add({
+        'productId': product.productId,
+        'productName': product.productName,
+        'variantId': variant.varianteId,
+        'isRepack': product.isRepack,
+        'sellingPrice': sellingPrice,
+        'componentCost': componentCost,
+        'margin': margin,
+        'marginPercent': marginPercent,
+        'componentCount': bundle.components.length,
+      });
+    }
+
+    rows.sort((a, b) =>
+        (a['marginPercent'] as double).compareTo(b['marginPercent'] as double));
+    return rows;
   }
 
   // ==================== Profit Per Sale Report ====================

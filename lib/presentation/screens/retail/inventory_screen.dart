@@ -23,6 +23,8 @@ import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 import 'package:billberrylite/domain/services/retail/stock_adjustment_service.dart';
 import 'package:billberrylite/presentation/screens/retail/stock_take_list_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/assemble_kit_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/bundles_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   /// True when hosted as a tab of ProductManagementScreen — the host owns the
@@ -301,6 +303,24 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
+  /// Repack/kit products are replenished by an explicit "Assemble" action
+  /// rather than a PO/GRN — see docs/retail_inventory_system_plan.md §3.2.
+  void _openAssembleKit() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AssembleKitScreen()),
+    );
+  }
+
+  /// Card grid over every Bundle/Repack product — see
+  /// docs/retail_inventory_system_plan.md §3.2.
+  void _openBundles() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const BundlesScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -319,6 +339,16 @@ class _InventoryScreenState extends State<InventoryScreen>
                     onPressed: _openStockTakes,
                     tooltip: 'Stock Takes',
                   ),
+                IconButton(
+                  icon: const Icon(Icons.inventory_rounded),
+                  onPressed: _openAssembleKit,
+                  tooltip: 'Assemble Kit',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.widgets_outlined),
+                  onPressed: _openBundles,
+                  tooltip: 'Bundles',
+                ),
                 IconButton(
                   icon: const Icon(Icons.add),
                   onPressed: () => openAddProductScreen(context),

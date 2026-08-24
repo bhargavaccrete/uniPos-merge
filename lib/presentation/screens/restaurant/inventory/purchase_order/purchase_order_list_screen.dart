@@ -12,6 +12,7 @@ import 'package:billberrylite/presentation/widget/componets/common/app_dialog.da
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/gradient_hero_header.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 
@@ -112,22 +113,60 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
           builder: (context) {
             final pos = restaurantPurchaseOrderStore.purchaseOrders.toList();
 
-            if (pos.isEmpty) {
-              return AppEmptyState(
-                icon: Icons.assignment_outlined,
-                title: 'No purchase orders yet',
-                message: 'Create your first PO using the + button',
-                action: appEmptyStateAction(
-                  label: 'Create Purchase Order',
-                  onPressed: _navigateToAdd,
-                ),
-              );
-            }
+            final openCount = pos
+                .where((p) =>
+                    p.statusEnum == RestaurantPOStatus.sent ||
+                    p.statusEnum == RestaurantPOStatus.partiallyReceived)
+                .length;
+            final draftCount = pos
+                .where((p) => p.statusEnum == RestaurantPOStatus.draft)
+                .length;
 
-            return ListView.builder(
-              padding: AppResponsive.padding(context),
-              itemCount: pos.length,
-              itemBuilder: (context, index) => _buildPOCard(pos[index]),
+            return Column(
+              children: [
+                GradientHeroHeader(
+                  title: 'Purchase Orders',
+                  subtitle:
+                      'Order raw materials from suppliers and receive them in',
+                  icon: Icons.local_shipping_rounded,
+                  accent: AppColors.info,
+                  stats: [
+                    HeroStat(
+                      icon: Icons.receipt_long_rounded,
+                      value: '${pos.length}',
+                      label: 'Total POs',
+                    ),
+                    HeroStat(
+                      icon: Icons.pending_actions_rounded,
+                      value: '$openCount',
+                      label: 'Awaiting Receipt',
+                    ),
+                    HeroStat(
+                      icon: Icons.edit_note_rounded,
+                      value: '$draftCount',
+                      label: 'Drafts',
+                    ),
+                  ],
+                ),
+                Expanded(
+                  child: pos.isEmpty
+                      ? AppEmptyState(
+                          icon: Icons.assignment_outlined,
+                          title: 'No purchase orders yet',
+                          message: 'Create your first PO using the + button',
+                          action: appEmptyStateAction(
+                            label: 'Create Purchase Order',
+                            onPressed: _navigateToAdd,
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: AppResponsive.padding(context),
+                          itemCount: pos.length,
+                          itemBuilder: (context, index) =>
+                              _buildPOCard(pos[index]),
+                        ),
+                ),
+              ],
             );
           },
         ),
@@ -141,15 +180,23 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
   }
 
   Widget _buildPOCard(RestaurantPurchaseOrderModel po) {
-    final radius = AppResponsive.smallBorderRadius(context);
+    final radius = 16.0;
     final status = po.statusEnum;
+    final statusColor = poStatusColor(status);
 
     return Container(
       margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: AppColors.divider, width: 0.5),
+        border: Border.all(color: statusColor.withValues(alpha: 0.16)),
+        boxShadow: [
+          BoxShadow(
+            color: statusColor.withValues(alpha: 0.12),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: InkWell(
         onTap: () => _showDetail(po),
@@ -175,17 +222,17 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
                   ),
                   Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: poStatusColor(status).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      color: statusColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(9),
                     ),
                     child: Text(
                       poStatusLabel(status),
                       style: TextStyle(
                         fontSize: AppResponsive.captionFontSize(context),
-                        fontWeight: FontWeight.w600,
-                        color: poStatusColor(status),
+                        fontWeight: FontWeight.w700,
+                        color: statusColor,
                       ),
                     ),
                   ),

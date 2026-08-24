@@ -22,13 +22,14 @@ class RecipeIngredientModelAdapter extends TypeAdapter<RecipeIngredientModel> {
       unit: fields[2] as String?,
       wastagePercent: fields[3] == null ? 0.0 : fields[3] as double,
       note: fields[4] as String?,
+      conversionFactor: fields[5] == null ? 1.0 : fields[5] as double,
     );
   }
 
   @override
   void write(BinaryWriter writer, RecipeIngredientModel obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(6)
       ..writeByte(0)
       ..write(obj.ingredientItemId)
       ..writeByte(1)
@@ -38,7 +39,9 @@ class RecipeIngredientModelAdapter extends TypeAdapter<RecipeIngredientModel> {
       ..writeByte(3)
       ..write(obj.wastagePercent)
       ..writeByte(4)
-      ..write(obj.note);
+      ..write(obj.note)
+      ..writeByte(5)
+      ..write(obj.conversionFactor);
   }
 
   @override

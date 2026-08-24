@@ -36,6 +36,7 @@ typedef GRNReceiptLine = ({
   double acceptedQty,
   double? damagedQty,
   double? costPrice,
+  String? damagedHandling,
 });
 
 /// Restaurant-scoped Purchase Order / GRN pipeline store — mirrors retail's
@@ -244,6 +245,7 @@ abstract class _RestaurantPurchaseOrderStore with Store {
           acceptedQty: line.acceptedQty,
           damagedQty: line.damagedQty,
           costPrice: line.costPrice,
+          damagedHandling: line.damagedHandling,
         );
         await restaurantGrnItemRepository.saveItem(grnItem);
         grnItems.add(grnItem);
@@ -277,6 +279,22 @@ abstract class _RestaurantPurchaseOrderStore with Store {
       }
 
       await restaurantGrnRepository.saveGRN(grn);
+
+      // Accrue the GRN's full received value as a payable against the
+      // supplier — mirrors retail's GRN confirm, which bills the supplier for
+      // the invoice regardless of what's later returned/claimed. Purchase
+      // returns and supplier claims credit this balance back down when their
+      // own credit events land (see RestaurantDamagedGoodsStore).
+      if (totalAmount > 0) {
+        final supplier = restaurantSupplierRepository.getSupplierById(supplierId);
+        if (supplier != null) {
+          await restaurantSupplierRepository.saveSupplier(
+            supplier.copyWith(
+              currentBalance: supplier.currentBalance + totalAmount,
+            ),
+          );
+        }
+      }
 
       // Roll the receiving progress up to the PO's status.
       final po = restaurantPurchaseOrderRepository.getPurchaseOrderById(poId);

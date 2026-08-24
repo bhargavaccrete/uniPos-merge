@@ -22,8 +22,10 @@ class RecipeIngredientModel extends HiveObject {
   @HiveField(1)
   final double quantity;
 
-  /// Unit label, expected to match the ingredient item's own `unit` (no
-  /// conversion table in v1 — see docs/inventory_recipe_system_plan.md §9.2).
+  /// Unit this line's [quantity] is expressed in. When it differs from the
+  /// ingredient item's own stock unit (e.g. a recipe calls for 250 `g` of an
+  /// ingredient stocked in `kg`), [conversionFactor] converts between them —
+  /// see that field's doc. Purely a display label when the two units match.
   @HiveField(2)
   final String? unit;
 
@@ -34,16 +36,32 @@ class RecipeIngredientModel extends HiveObject {
   @HiveField(4)
   final String? note;
 
+  /// How many of the ingredient item's native stock unit equal one [unit] of
+  /// this line — e.g. `0.001` when [unit] is `'g'` and the ingredient is
+  /// stocked in `'kg'` (1 g = 0.001 kg). [effectiveQuantity] multiplies by
+  /// this before deduction, so stock always moves in the item's own unit
+  /// regardless of what unit the recipe was written in.
+  ///
+  /// Defaults to `1.0` — no conversion, [unit] is assumed to already match
+  /// the ingredient's stock unit. Every recipe saved before this field
+  /// existed deserializes with `1.0`, so existing deduction math is
+  /// unchanged unless a conversion is deliberately set.
+  @HiveField(5, defaultValue: 1.0)
+  final double conversionFactor;
+
   RecipeIngredientModel({
     required this.ingredientItemId,
     required this.quantity,
     this.unit,
     this.wastagePercent = 0.0,
     this.note,
+    this.conversionFactor = 1.0,
   });
 
-  /// Effective quantity consumed per batch, wastage included.
-  double get effectiveQuantity => quantity * (1 + wastagePercent / 100);
+  /// Effective quantity consumed per batch, in the ingredient item's own
+  /// stock unit — wastage and unit conversion both folded in.
+  double get effectiveQuantity =>
+      quantity * conversionFactor * (1 + wastagePercent / 100);
 
   RecipeIngredientModel copyWith({
     String? ingredientItemId,
@@ -51,6 +69,7 @@ class RecipeIngredientModel extends HiveObject {
     String? unit,
     double? wastagePercent,
     String? note,
+    double? conversionFactor,
   }) {
     return RecipeIngredientModel(
       ingredientItemId: ingredientItemId ?? this.ingredientItemId,
@@ -58,6 +77,7 @@ class RecipeIngredientModel extends HiveObject {
       unit: unit ?? this.unit,
       wastagePercent: wastagePercent ?? this.wastagePercent,
       note: note ?? this.note,
+      conversionFactor: conversionFactor ?? this.conversionFactor,
     );
   }
 
@@ -67,6 +87,7 @@ class RecipeIngredientModel extends HiveObject {
         'unit': unit,
         'wastagePercent': wastagePercent,
         'note': note,
+        'conversionFactor': conversionFactor,
       };
 
   factory RecipeIngredientModel.fromMap(Map<String, dynamic> map) {
@@ -76,6 +97,7 @@ class RecipeIngredientModel extends HiveObject {
       unit: map['unit'] as String?,
       wastagePercent: (map['wastagePercent'] as num?)?.toDouble() ?? 0.0,
       note: map['note'] as String?,
+      conversionFactor: (map['conversionFactor'] as num?)?.toDouble() ?? 1.0,
     );
   }
 }
