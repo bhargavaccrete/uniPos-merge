@@ -12,6 +12,7 @@ import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.
 import '../../../core/di/service_locator.dart';
 import '../../../core/plan/plan_enforcement.dart';
 import '../../../core/plan/retail_entitlement_keys.dart';
+import '../../../domain/services/retail/return_math.dart';
 import '../../../domain/services/retail/return_service.dart';
 
 class SaleReturnScreen extends StatefulWidget {
@@ -28,6 +29,11 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
 
   SaleModel? _sale;
   List<SaleItemModel> _saleItems = [];
+
+  /// Units of each variant that may STILL be returned, after any earlier
+  /// returns. Every quantity control on this screen is capped by it.
+  Map<String, int> _remaining = {};
+
   bool _isLoading = true;
   bool _isProcessing = false;
 
@@ -49,10 +55,12 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
     try {
       final sale = await saleStore.getSaleById(widget.saleId);
       final items = await saleStore.getItemsForSale(widget.saleId);
+      final remaining = await _returnService.remainingReturnable(widget.saleId);
 
       setState(() {
         _sale = sale;
         _saleItems = items;
+        _remaining = remaining;
         _isLoading = false;
       });
     } catch (e) {
@@ -61,6 +69,53 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
         NotificationService.instance.showError('Error loading sale: $e');
       }
     }
+  }
+
+  int _remainingFor(SaleItemModel item) => _remaining[item.varianteId] ?? 0;
+
+  /// Lines that still have something left to give back.
+  List<SaleItemModel> get _returnableItems =>
+      _saleItems.where((i) => _remainingFor(i) > 0).toList();
+
+  /// True once an earlier return already took some of this sale.
+  bool get _hasEarlierReturn =>
+      _saleItems.any((i) => _remainingFor(i) < i.qty);
+
+  /// What the current selection actually returns.
+  ///
+  /// A full return means everything STILL outstanding — not the original
+  /// quantities, which would refund earlier returns a second time.
+  Map<String, int> get _effectiveSelection {
+    if (_returnType == 'full') {
+      return {
+        for (final item in _saleItems)
+          if (_remainingFor(item) > 0) item.varianteId: _remainingFor(item),
+      };
+    }
+    return _selectedItems;
+  }
+
+  /// The refund, computed by the SAME pure helper the service uses when it
+  /// writes. Calling it here rather than repeating the arithmetic is what stops
+  /// the figure shown to the cashier drifting from the figure actually paid.
+  ReturnFigures get _figures {
+    final sale = _sale;
+    if (sale == null) return ReturnFigures.empty;
+    return RetailReturnMath.compute(
+      sale: sale,
+      soldLines: _saleItems,
+      returnQtyByVariantId: _effectiveSelection,
+    );
+  }
+
+  /// How the refund splits when the original invoice is still unpaid: the due
+  /// is written down first and only the excess leaves the till.
+  ({double appliedToDue, double refunded}) get _split {
+    final total = _figures.totalAmount;
+    final due = _sale?.dueAmount ?? 0;
+    if (due <= 0) return (appliedToDue: 0, refunded: total);
+    final applied = total < due ? total : due;
+    return (appliedToDue: applied, refunded: total - applied);
   }
 
   Future<void> _processReturn() async {
@@ -76,17 +131,32 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
     }
 
     final isFull = _returnType == 'full';
-    final refundAmount = isFull
-        ? _sale!.totalAmount
-        : _calculatePartialReturnAmount();
+
+    if (_effectiveSelection.isEmpty) {
+      NotificationService.instance.showError(
+        isFull
+            ? 'This sale has already been fully returned.'
+            : 'Select at least one item to return.',
+      );
+      return;
+    }
+
+    final split = _split;
+
+    // Spell out the credit offset. The cashier must not expect to hand over
+    // cash that is being written off a debt instead.
+    final message = split.appliedToDue > 0
+        ? '${formatMoney(split.appliedToDue)} comes off the outstanding due'
+              '${split.refunded > 0 ? ', and ${formatMoney(split.refunded)} is refunded via ${_refundMethod.toUpperCase()}' : ' — nothing is paid out'}. '
+              'Stock goes back in. This cannot be undone.'
+        : 'Refund ${formatMoney(split.refunded)} via '
+              '${_refundMethod.toUpperCase()}. Stock goes back in. '
+              'This cannot be undone.';
 
     final confirmed = await showAppConfirmDialog(
       context: context,
       title: isFull ? 'Return whole sale?' : 'Return selected items?',
-      message:
-          'Refund ${formatMoney(refundAmount)} via '
-          '${_refundMethod.toUpperCase()}. Stock goes back in and the sale is '
-          'marked returned. This cannot be undone.',
+      message: message,
       confirmLabel: 'Confirm Return',
       accent: AppColors.danger,
       icon: Icons.assignment_return_rounded,
@@ -127,22 +197,6 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
       setState(() => _isProcessing = false);
       NotificationService.instance.showError('Error processing return: $e');
     }
-  }
-
-  double _calculatePartialReturnAmount() {
-    double total = 0;
-    for (var entry in _selectedItems.entries) {
-      final variantId = entry.key;
-      final returnQty = entry.value;
-
-      final item = _saleItems.firstWhere((i) => i.varianteId == variantId);
-      final itemSubtotal = item.price * returnQty;
-      final itemDiscount = (item.discountAmount ?? 0) * (returnQty / item.qty);
-      final itemTax = (item.taxAmount ?? 0) * (returnQty / item.qty);
-
-      total += (itemSubtotal - itemDiscount + itemTax);
-    }
-    return total;
   }
 
   @override
@@ -319,7 +373,11 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                 child: _returnTypeTile(
                   value: 'full',
                   label: 'Full Return',
-                  caption: 'Return all items',
+                  // After an earlier return, "full" means everything still
+                  // outstanding — say so rather than implying all items.
+                  caption: _hasEarlierReturn
+                      ? 'Return what is left'
+                      : 'Return all items',
                 ),
               ),
               const SizedBox(width: 8),
@@ -490,7 +548,10 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
             ),
           ),
           SizedBox(height: AppResponsive.mediumSpacing(context)),
-          ..._saleItems.map((item) => _buildItemTile(item)),
+          // Fully-returned lines are dropped rather than shown disabled: there
+          // is nothing left to pick, and the "already returned" caption on the
+          // remaining lines carries the history.
+          ..._returnableItems.map((item) => _buildItemTile(item)),
         ],
       ),
     );
@@ -498,7 +559,11 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
 
   Widget _buildItemTile(SaleItemModel item) {
     final isSelected = _selectedItems.containsKey(item.varianteId);
-    final returnQty = _selectedItems[item.varianteId] ?? 1;
+    final remaining = _remainingFor(item);
+    final alreadyReturned = item.qty - remaining;
+    // Cap at what is left, never at the originally sold quantity — that is the
+    // guard that stops the same units being refunded twice.
+    final returnQty = (_selectedItems[item.varianteId] ?? 1).clamp(1, remaining);
 
     return Container(
       margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
@@ -565,6 +630,19 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                           color: AppColors.textSecondary,
                         ),
                       ),
+                    // Say what is left, so a part-returned line explains itself
+                    // rather than just refusing at a lower number.
+                    if (alreadyReturned > 0)
+                      Text(
+                        '$alreadyReturned of ${item.qty} already returned',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: AppResponsive.captionFontSize(context),
+                          color: AppColors.warning,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -601,7 +679,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                   ),
                 ),
                 Text(
-                  '$returnQty / ${item.qty}',
+                  '$returnQty / $remaining',
                   style: TextStyle(
                     fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w600,
@@ -609,7 +687,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.add_circle_outline),
-                  onPressed: returnQty < item.qty
+                  onPressed: returnQty < remaining
                       ? () => setState(
                           () => _selectedItems[item.varianteId] = returnQty + 1,
                         )
@@ -629,9 +707,10 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
   }
 
   Widget _buildSummaryCard() {
-    final returnAmount = _returnType == 'full'
-        ? _sale!.totalAmount
-        : _calculatePartialReturnAmount();
+    final split = _split;
+    // Headline the figure that actually leaves the till. On an unpaid invoice
+    // most or all of the return writes down the debt instead.
+    final returnAmount = split.refunded;
 
     return Container(
       margin: AppResponsive.padding(context),
@@ -649,7 +728,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
       child: Column(
         children: [
           Text(
-            'Refund Amount',
+            split.appliedToDue > 0 ? 'Cash Back to Customer' : 'Refund Amount',
             style: TextStyle(
               color: Colors.white70,
               fontSize: AppResponsive.bodyFontSize(context),
@@ -674,10 +753,22 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
               ),
             ),
           ),
+          if (split.appliedToDue > 0) ...[
+            SizedBox(height: AppResponsive.smallSpacing(context)),
+            Text(
+              '${formatMoney(_figures.totalAmount)} returned · '
+              '${formatMoney(split.appliedToDue)} off the outstanding due',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: AppResponsive.smallFontSize(context),
+              ),
+            ),
+          ],
           if (_returnType == 'partial') ...[
             SizedBox(height: AppResponsive.smallSpacing(context)),
             Text(
-              '${_selectedItems.values.fold(0, (sum, qty) => sum + qty)} items selected',
+              '${_effectiveSelection.values.fold(0, (sum, qty) => sum + qty)} items selected',
               maxLines: 1,
               style: TextStyle(
                 color: Colors.white70,

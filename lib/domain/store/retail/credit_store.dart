@@ -432,7 +432,7 @@ abstract class _CreditStore with Store {
     final today = DateTime.now();
     final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
     return payments
-        .where((p) => p.date.startsWith(todayStr) && !(p.isWriteOff ?? false))
+        .where((p) => p.date.startsWith(todayStr) && p.isCollection)
         .fold<double>(0.0, (sum, p) => sum + p.amount);
   }
 }

@@ -17,9 +17,10 @@ class CashDrawerLedger {
   /// A split bill contributes only its cash leg; a card/UPI bill contributes
   /// nothing even though it is revenue.
   static double cashComponentOf(SaleModel sale) {
-    if (sale.isSplitPayment == true &&
-        sale.paymentListJson != null &&
-        sale.paymentListJson!.isNotEmpty) {
+    // Keyed off the stored legs, not `isSplitPayment` — an exchange writes
+    // legs while remaining a single-method sale, and its cash leg is only the
+    // difference, never the whole replacement value.
+    if (sale.paymentListJson != null && sale.paymentListJson!.isNotEmpty) {
       return sale.paymentList
           .where((p) => (p['method'] as String? ?? '').toLowerCase() == 'cash')
           .fold(0.0, (a, p) => a + ((p['amount'] as num?)?.toDouble() ?? 0.0));
@@ -35,6 +36,18 @@ class CashDrawerLedger {
   /// Return headers store a negative `totalAmount`, hence the `abs()`.
   static double cashRefundOf(SaleModel sale) {
     if (sale.isReturn != true) return 0.0;
+
+    // An exchange return's header is the whole value of the goods handed back,
+    // most of which went across to the replacement rather than into anyone's
+    // hand. Only its cash leg left the till. Legs are stored negative to match
+    // the negated header, hence the `abs()`.
+    if (sale.paymentListJson != null && sale.paymentListJson!.isNotEmpty) {
+      return sale.paymentList
+          .where((p) => (p['method'] as String? ?? '').toLowerCase() == 'cash')
+          .fold(0.0, (a, p) => a + ((p['amount'] as num?)?.toDouble() ?? 0.0))
+          .abs();
+    }
+
     if (sale.paymentType.toLowerCase().trim() != 'cash') return 0.0;
     return sale.totalAmount.abs();
   }

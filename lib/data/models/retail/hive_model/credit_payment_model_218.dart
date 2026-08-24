@@ -88,8 +88,25 @@ class CreditPaymentModel extends HiveObject {
     );
   }
 
+  /// [paymentMode] for a row raised by a RETURN offsetting an unpaid invoice.
+  ///
+  /// It writes a receivable down without any money arriving, so it is NOT a
+  /// collection — see [isCollection].
+  static const String returnAdjustmentMode = 'return_adjustment';
+
   /// Check if payment is a write-off
   bool get isDebtWriteOff => isWriteOff ?? false;
+
+  /// True when this row is a credit note offsetting the invoice, not a payment.
+  bool get isReturnAdjustment =>
+      paymentMode.toLowerCase().trim() == returnAdjustmentMode;
+
+  /// True when real money actually came in against the debt.
+  ///
+  /// **The one place that decides what counts as collected.** A write-off
+  /// forgives a debt and a return adjustment cancels one; neither puts money in
+  /// the till, so counting either as a collection overstates takings.
+  bool get isCollection => !isDebtWriteOff && !isReturnAdjustment;
 
   /// Get payment mode display text
   String get paymentModeDisplayText {

@@ -119,7 +119,11 @@ class CreditPaymentRepository {
     };
 
     for (var payment in payments) {
-      if (!(payment.isWriteOff ?? false)) {
+      // `isCollection` excludes write-offs AND return adjustments. The per-mode
+      // buckets were already safe (a credit note's mode is not one of them),
+      // but `total` summed every non-write-off row — so a return offsetting an
+      // unpaid invoice was reported as money collected.
+      if (payment.isCollection) {
         final mode = payment.paymentMode.toLowerCase();
         if (result.containsKey(mode)) {
           result[mode] = result[mode]! + payment.amount;

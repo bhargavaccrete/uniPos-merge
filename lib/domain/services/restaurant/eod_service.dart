@@ -443,23 +443,35 @@ class EODService {
     final allSales = await saleStore.getSalesByDateRange(startTime, endTime);
 
 
-    // Debug: Print each sale's timestamp to verify filtering
-    if (allSales.isNotEmpty) {
-      for (var sale in allSales) {
-      }
-    }
-
     // Filter out returns for count-based stats, but include them in financial calculations
     final activeSales = allSales.where((sale) => sale.isReturn != true).toList();
 
-    // Calculate payment summaries (Cash, Card, UPI, Credit, Split)
-    final paymentSummaries = _calculateRetailPaymentSummaries(activeSales);
+    // Calculate payment summaries (Cash, Card, UPI, Credit, Split).
+    //
+    // Forward sales PLUS exchange returns. An exchange return carries signed
+    // money legs describing what actually went back to the customer, so
+    // including it makes the buckets show the real difference rather than the
+    // whole value of the goods swapped. Its exchange-credit leg is suppressed
+    // by the summariser. Plain returns stay excluded, keeping the long-standing
+    // gross-of-refunds convention and the separate `cashRefunds` term that
+    // already accounts for them.
+    final exchangeReturns = allSales
+        .where((s) => s.isReturn == true && s.exchangeGroupId != null)
+        .toList();
+    final paymentSummaries = _calculateRetailPaymentSummaries(
+      [...activeSales, ...exchangeReturns],
+    );
 
-    // Calculate totals
-    final totalSales = allSales.fold<double>(0.0, (sum, sale) {
-      // Returns have negative amounts
-      return sum + (sale.isReturn == true ? -sale.totalAmount : sale.totalAmount);
-    });
+    // Calculate totals.
+    //
+    // A return header is ALREADY stored negated (`return_service.dart`), so it
+    // nets by simply being summed. Negating it here made `-(-1000)` positive
+    // and ADDED every refund to the day's sales — a double swing on the figure
+    // the shop closes its day against. The invariant is documented in
+    // `util/retail/sale_revenue_filter.dart`, which `ReportService` follows;
+    // this is the line that used to disagree with it.
+    final totalSales =
+        allSales.fold<double>(0.0, (sum, sale) => sum + sale.totalAmount);
 
     final totalDiscount = allSales.fold<double>(0.0, (sum, sale) => sum + sale.discountAmount);
     final totalTax = allSales.fold<double>(0.0, (sum, sale) => sum + (sale.totalGstAmount ?? sale.taxAmount));
@@ -467,10 +479,15 @@ class EODService {
     // Calculate tax summaries (CGST/SGST breakdown)
     final taxSummaries = _calculateRetailTaxSummaries(allSales);
 
-    // Calculate total returns
+    // Calculate total returns.
+    //
+    // POSITIVE, matching the field's contract on the restaurant side (`:96`)
+    // and what every consumer expects — `eod_report_detail_screen` renders the
+    // Refunds row behind `if (report.totalRefunds > 0)`, so the raw negative
+    // sum meant the row never appeared at all.
     final totalRefunds = allSales
         .where((sale) => sale.isReturn == true)
-        .fold<double>(0.0, (sum, sale) => sum + sale.totalAmount);
+        .fold<double>(0.0, (sum, sale) => sum + sale.totalAmount.abs());
 
     final totalSaleCount = activeSales.length;
 
@@ -613,8 +630,11 @@ class EODService {
     double totalTaxableAmount = 0.0;
 
     for (final sale in sales) {
-      if (sale.isReturn == true) continue; // Skip returns
-
+      // Returns are NETTED, not skipped. Their CGST/SGST/taxable are stored
+      // already negated, so summing them straight nets the credit note out.
+      // Skipping them left CGST + SGST unable to reconcile with `totalTax`
+      // above, which does net returns — the two disagreed on any day with a
+      // refund.
       if (sale.totalCgstAmount != null && sale.totalSgstAmount != null) {
         totalCgst += sale.totalCgstAmount!;
         totalSgst += sale.totalSgstAmount!;

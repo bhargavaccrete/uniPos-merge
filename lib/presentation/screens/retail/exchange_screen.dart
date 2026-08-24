@@ -1,0 +1,805 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
+import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
+import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
+import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
+import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/domain/services/retail/exchange_service.dart';
+import 'package:billberrylite/domain/services/retail/return_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/retail/exchange_summary_card.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/short_ref.dart';
+
+/// Take one item back from a settled sale and give a different one out.
+///
+/// One generic flow for every retail store type — there is deliberately no
+/// Garment/Footwear/Sports variation.
+///
+/// V1 is one returned line and one replacement variant. The screen never does
+/// money maths of its own: it asks [ExchangeService.quote] for the figures, so
+/// what the cashier is shown is exactly what will be written.
+class ExchangeScreen extends StatefulWidget {
+  final String saleId;
+
+  const ExchangeScreen({super.key, required this.saleId});
+
+  @override
+  State<ExchangeScreen> createState() => _ExchangeScreenState();
+}
+
+class _ExchangeScreenState extends State<ExchangeScreen> {
+  final ExchangeService _exchangeService = ExchangeService();
+  final ReturnService _returnService = ReturnService();
+
+  SaleModel? _sale;
+  List<SaleItemModel> _saleItems = [];
+
+  /// Units of each variant still returnable — every quantity control is capped
+  /// by this, so the same goods can never come back twice.
+  Map<String, int> _remaining = {};
+
+  SaleItemModel? _returnedItem;
+  int _returnQty = 1;
+  VarianteModel? _replacement;
+
+  String _paymentMethod = 'cash';
+
+  /// The live quote. Recomputed whenever a choice changes, never derived here.
+  ExchangeQuote? _quote;
+  String? _quoteError;
+
+  bool _isLoading = true;
+  bool _isProcessing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _isLoading = true);
+    try {
+      final sale = await saleStore.getSaleById(widget.saleId);
+      final items = await saleStore.getItemsForSale(widget.saleId);
+      final remaining = await _returnService.remainingReturnable(widget.saleId);
+
+      // Preselect when only one line can be exchanged — the common case.
+      final returnable =
+          items.where((i) => (remaining[i.varianteId] ?? 0) > 0).toList();
+
+      setState(() {
+        _sale = sale;
+        _saleItems = items;
+        _remaining = remaining;
+        _returnedItem = returnable.length == 1 ? returnable.first : null;
+        _returnQty = 1;
+        _isLoading = false;
+      });
+
+      if (_returnedItem != null) await _refreshQuote();
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        NotificationService.instance.showError('Error loading sale: $e');
+      }
+    }
+  }
+
+  int _remainingFor(SaleItemModel item) => _remaining[item.varianteId] ?? 0;
+
+  List<SaleItemModel> get _returnableItems =>
+      _saleItems.where((i) => _remainingFor(i) > 0).toList();
+
+  bool get _ready => _returnedItem != null && _replacement != null;
+
+  /// Ask the service to price the current selection. The screen holds no
+  /// pricing logic of its own — that is what stops the displayed figure
+  /// drifting from the committed one.
+  Future<void> _refreshQuote() async {
+    if (!_ready) {
+      setState(() {
+        _quote = null;
+        _quoteError = null;
+      });
+      return;
+    }
+
+    try {
+      final q = await _exchangeService.quote(
+        originalSaleId: widget.saleId,
+        returnedVariantId: _returnedItem!.varianteId,
+        returnQty: _returnQty,
+        replacementVariantId: _replacement!.varianteId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _quote = q;
+        _quoteError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _quote = null;
+        _quoteError = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _pickReturnedItem() async {
+    final picked = await showDialog<SaleItemModel>(
+      context: context,
+      builder: (_) => _ReturnedItemPicker(
+        items: _returnableItems,
+        remaining: _remaining,
+      ),
+    );
+    if (picked == null) return;
+    setState(() {
+      _returnedItem = picked;
+      _returnQty = 1;
+    });
+    await _refreshQuote();
+  }
+
+  Future<void> _pickReplacement() async {
+    final picked = await showDialog<VarianteModel>(
+      context: context,
+      builder: (_) => const _ReplacementPicker(),
+    );
+    if (picked == null) return;
+    setState(() => _replacement = picked);
+    await _refreshQuote();
+  }
+
+  Future<void> _setQty(int qty) async {
+    setState(() => _returnQty = qty);
+    await _refreshQuote();
+  }
+
+  Future<void> _complete() async {
+    final quote = _quote;
+    if (quote == null || _isProcessing) return;
+
+    // Plan gate — an exchange is a return plus a sale, so it rides the same
+    // entitlement returns do. No-op until a retail manifest is present.
+    if (!PlanEnforce.allows(RetailEntKeys.billingReturns)) {
+      NotificationService.instance.showError(
+        'Exchanges aren’t included in your current plan.',
+      );
+      return;
+    }
+
+    final confirmed = await showAppConfirmDialog(
+      context: context,
+      title: 'Complete exchange?',
+      message: _confirmMessage(quote),
+      confirmLabel: 'Complete Exchange',
+      accent: AppColors.primary,
+      icon: Icons.swap_horiz_rounded,
+    );
+    if (!confirmed || !mounted) return;
+
+    setState(() => _isProcessing = true);
+
+    final result = await _exchangeService.processExchange(
+      originalSaleId: widget.saleId,
+      returnedVariantId: _returnedItem!.varianteId,
+      returnQty: _returnQty,
+      replacementVariantId: _replacement!.varianteId,
+      paymentMethod: _paymentMethod,
+    );
+
+    if (!mounted) return;
+
+    if (!result.success) {
+      setState(() => _isProcessing = false);
+      NotificationService.instance.showError(result.error ?? 'Exchange failed');
+      return;
+    }
+
+    Navigator.pop(context, true);
+    NotificationService.instance.showSuccess(
+      'Exchange complete • ${result.exchangeGroupId}',
+    );
+  }
+
+  String _confirmMessage(ExchangeQuote quote) {
+    final buffer = StringBuffer();
+    if (quote.customerPays) {
+      buffer.write(
+        'Collect ${formatMoney(quote.differenceAmount)} '
+        'by ${_paymentMethod.toUpperCase()}. ',
+      );
+    } else if (quote.customerRefunded) {
+      buffer.write(
+        'Refund ${formatMoney(quote.differenceAmount)} '
+        'by ${_paymentMethod.toUpperCase()}. ',
+      );
+    } else {
+      buffer.write('Nothing to collect or refund. ');
+    }
+
+    if (quote.appliedToDue > 0) {
+      buffer.write(
+        '${formatMoney(quote.appliedToDue)} of the return comes off the '
+        'outstanding due. ',
+      );
+    }
+
+    buffer.write('Stock moves both ways. This cannot be undone.');
+    return buffer.toString();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: 'Exchange',
+        titleFontSize: AppResponsive.subheadingFontSize(context),
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _sale == null
+              ? _error('Sale not found')
+              : _returnableItems.isEmpty
+                  ? _error('Everything on this sale has already been returned')
+                  : SingleChildScrollView(
+                      child: _capped(
+                        Column(
+                          children: [
+                            _originalCard(),
+                            _returningCard(),
+                            _replacementCard(),
+                            if (_quoteError != null) _errorBanner(_quoteError!),
+                            if (_quote != null) ...[
+                              ExchangeSummaryCard(quote: _quote!),
+                              if (!_quote!.isEven) _paymentCard(),
+                            ],
+                            SizedBox(
+                                height: AppResponsive.largeSpacing(context)),
+                          ],
+                        ),
+                      ),
+                    ),
+      bottomNavigationBar:
+          _sale != null && !_isLoading && _returnableItems.isNotEmpty
+              ? _completeButton()
+              : null,
+    );
+  }
+
+  /// Caps content width on large screens, matching the Return screen.
+  Widget _capped(Widget child) {
+    final maxWidth = AppResponsive.maxCardWidth(context);
+    if (maxWidth == double.infinity) return child;
+    return Align(
+      alignment: Alignment.topCenter,
+      heightFactor: 1,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: child,
+      ),
+    );
+  }
+
+  Widget _error(String message) => Center(
+        child: Padding(
+          padding: AppResponsive.padding(context),
+          child: AppEmptyState(
+            icon: Icons.swap_horiz_rounded,
+            title: message,
+          ),
+        ),
+      );
+
+  Widget _card({required Widget child}) => Container(
+        margin: AppResponsive.padding(context),
+        padding: AppResponsive.padding(context),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius:
+              BorderRadius.circular(AppResponsive.borderRadius(context)),
+          border: Border.all(color: AppColors.divider),
+        ),
+        child: child,
+      );
+
+  Widget _sectionTitle(String text) => Text(
+        text,
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.bodyFontSize(context),
+          fontWeight: FontWeight.w600,
+        ),
+      );
+
+  Widget _originalCard() => _card(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _sectionTitle('Original Sale'),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
+            _row('Bill', shortRef(_sale!.saleId, length: 13)),
+            _row('Paid By', _sale!.paymentType.toUpperCase()),
+            _row('Amount', formatMoney(_sale!.totalAmount)),
+            if (_sale!.dueAmount > 0)
+              _row('Outstanding', formatMoney(_sale!.dueAmount),
+                  accent: AppColors.warning),
+          ],
+        ),
+      );
+
+  Widget _returningCard() {
+    final item = _returnedItem;
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: _sectionTitle('Returning')),
+              if (_returnableItems.length > 1)
+                TextButton(
+                  onPressed: _pickReturnedItem,
+                  child: Text(item == null ? 'Select' : 'Change'),
+                ),
+            ],
+          ),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+          if (item == null)
+            _placeholder('Choose the item coming back', _pickReturnedItem)
+          else ...[
+            Text(
+              item.productName ?? 'Item',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            _attributes(item),
+            SizedBox(height: AppResponsive.smallSpacing(context)),
+            _qtyStepper(item),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _replacementCard() {
+    final variant = _replacement;
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: _sectionTitle('Replacement')),
+              if (variant != null)
+                TextButton(
+                  onPressed: _pickReplacement,
+                  child: const Text('Change'),
+                ),
+            ],
+          ),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+          if (variant == null)
+            _placeholder('Choose any item to give out', _pickReplacement)
+          else ...[
+            Text(
+              productStore.getProductById(variant.productId)?.productName ??
+                  'Item',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (variant.variantDescription.isNotEmpty)
+              Text(
+                variant.variantDescription,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            SizedBox(height: AppResponsive.smallSpacing(context)),
+            Text(
+              '${formatMoney(variant.effectivePrice)} · '
+              '${variant.stockQty} in stock',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _placeholder(String label, VoidCallback onTap) => InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.divider),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.add_circle_outline,
+                  size: 18, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  label,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  Widget _attributes(SaleItemModel item) {
+    final text = attributeStore.describeAttributes(
+      item.attributes,
+      size: item.size,
+      color: item.color,
+      labelled: false,
+    );
+    if (text.isEmpty) return const SizedBox.shrink();
+    return Text(
+      text,
+      style: GoogleFonts.poppins(
+        fontSize: AppResponsive.smallFontSize(context),
+        color: AppColors.textSecondary,
+      ),
+    );
+  }
+
+  Widget _qtyStepper(SaleItemModel item) {
+    final max = _remainingFor(item);
+    final alreadyReturned = item.qty - max;
+
+    return Row(
+      children: [
+        Text('Qty',
+            style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context))),
+        const SizedBox(width: 8),
+        IconButton(
+          icon: const Icon(Icons.remove_circle_outline),
+          onPressed: _returnQty > 1 ? () => _setQty(_returnQty - 1) : null,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+        ),
+        Text(
+          '$_returnQty / $max',
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.add_circle_outline),
+          onPressed: _returnQty < max ? () => _setQty(_returnQty + 1) : null,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+        ),
+        if (alreadyReturned > 0) ...[
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '$alreadyReturned already returned',
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.captionFontSize(context),
+                color: AppColors.warning,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _paymentCard() => _card(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _sectionTitle(
+              _quote!.customerPays ? 'Collect By' : 'Refund By',
+            ),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
+            Wrap(
+              spacing: 8,
+              children: [
+                _methodChip('cash', '💵 Cash'),
+                _methodChip('card', '💳 Card'),
+                _methodChip('upi', '📱 UPI'),
+              ],
+            ),
+          ],
+        ),
+      );
+
+  Widget _methodChip(String value, String label) => ChoiceChip(
+        label: Text(label),
+        labelStyle:
+            TextStyle(fontSize: AppResponsive.bodyFontSize(context)),
+        selected: _paymentMethod == value,
+        onSelected: (_) => setState(() => _paymentMethod = value),
+      );
+
+  Widget _errorBanner(String message) => Container(
+        margin: AppResponsive.padding(context),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.danger.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.danger),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline, size: 18, color: AppColors.danger),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  color: AppColors.danger,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _row(String label, String value, {Color? accent}) => Padding(
+        padding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label,
+                style: GoogleFonts.poppins(
+                  color: AppColors.textSecondary,
+                  fontSize: AppResponsive.bodyFontSize(context),
+                )),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w600,
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  color: accent,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _completeButton() {
+    final enabled = _quote != null && !_isProcessing;
+    return SafeArea(
+      child: Padding(
+        padding: AppResponsive.padding(context),
+        child: SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: ElevatedButton.icon(
+            onPressed: enabled ? _complete : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            icon: _isProcessing
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.swap_horiz_rounded),
+            label: Text(
+              _isProcessing ? 'Processing…' : 'Complete Exchange',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Which line of the bill is coming back. Only shown when more than one is
+/// still returnable.
+class _ReturnedItemPicker extends StatelessWidget {
+  final List<SaleItemModel> items;
+  final Map<String, int> remaining;
+
+  const _ReturnedItemPicker({required this.items, required this.remaining});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppDialogShell(
+      title: 'Item Being Returned',
+      accent: AppColors.primary,
+      icon: Icons.assignment_return_rounded,
+      body: SizedBox(
+        width: double.maxFinite,
+        height: MediaQuery.of(context).size.height * 0.5,
+        child: ListView.separated(
+          itemCount: items.length,
+          separatorBuilder: (_, _) => const Divider(height: 1),
+          itemBuilder: (context, index) {
+            final item = items[index];
+            final left = remaining[item.varianteId] ?? 0;
+            return ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                item.productName ?? 'Item',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+              subtitle: Text(
+                '$left of ${item.qty} still returnable · '
+                '${formatMoney(item.price)} each',
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              onTap: () => Navigator.pop(context, item),
+            );
+          },
+        ),
+      ),
+      actions: [appDialogCancelButton(context, label: 'Close')],
+    );
+  }
+}
+
+/// Any active variant with stock. Search matches product name, variant
+/// description, SKU and barcode, so a scanned code finds its item.
+class _ReplacementPicker extends StatefulWidget {
+  const _ReplacementPicker();
+
+  @override
+  State<_ReplacementPicker> createState() => _ReplacementPickerState();
+}
+
+class _ReplacementPickerState extends State<_ReplacementPicker> {
+  final _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  /// Only what can actually be sold: active, in stock, priced.
+  List<VarianteModel> get _candidates {
+    final query = _query.toLowerCase().trim();
+    return productStore.variants.where((v) {
+      if (v.status.toLowerCase().trim() != 'active') return false;
+      if (v.stockQty <= 0) return false;
+      if (v.effectivePrice <= 0) return false;
+      if (query.isEmpty) return true;
+
+      final name =
+          productStore.getProductById(v.productId)?.productName ?? '';
+      return name.toLowerCase().contains(query) ||
+          v.variantDescription.toLowerCase().contains(query) ||
+          (v.sku ?? '').toLowerCase().contains(query) ||
+          (v.barcode ?? '').toLowerCase().contains(query);
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final candidates = _candidates;
+
+    return AppDialogShell(
+      title: 'Replacement Item',
+      accent: AppColors.primary,
+      icon: Icons.swap_horiz_rounded,
+      body: SizedBox(
+        width: double.maxFinite,
+        height: MediaQuery.of(context).size.height * 0.55,
+        child: Column(
+          children: [
+            AppTextField(
+              controller: _searchController,
+              hint: 'Search or scan a barcode…',
+              icon: Icons.search_rounded,
+              autofocus: true,
+              onChanged: (v) => setState(() => _query = v),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: candidates.isEmpty
+                  ? const AppEmptyState(
+                      dense: true,
+                      icon: Icons.search_off_rounded,
+                      title: 'Nothing in stock matches',
+                    )
+                  : ListView.separated(
+                      itemCount: candidates.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final v = candidates[index];
+                        final name = productStore
+                                .getProductById(v.productId)
+                                ?.productName ??
+                            'Item';
+                        final description = v.variantDescription;
+
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            description.isEmpty
+                                ? name
+                                : '$name · $description',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                          subtitle: Text(
+                            '${formatMoney(v.effectivePrice)} · '
+                            '${v.stockQty} in stock',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          onTap: () => Navigator.pop(context, v),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+      actions: [appDialogCancelButton(context, label: 'Close')],
+    );
+  }
+}

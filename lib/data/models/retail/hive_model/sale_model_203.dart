@@ -134,6 +134,19 @@ class SaleModel extends HiveObject {
   @HiveField(31)
   final double? lineDiscountTotal;
 
+  /// Links the two halves of an EXCHANGE: the return document and the
+  /// replacement sale both carry the same `EXC-YYYYMMDD-NNN`.
+  ///
+  /// An exchange is deliberately NOT its own accounting document — it is an
+  /// ordinary return plus an ordinary sale, so every report, EOD aggregate and
+  /// ledger already understands both halves without being taught anything. This
+  /// field is the only thing that says they belong together.
+  ///
+  /// Null on every sale that is not part of an exchange, which is also how all
+  /// pre-existing records read back.
+  @HiveField(32)
+  final String? exchangeGroupId;
+
   SaleModel({
     required this.saleId,
     this.customerId,
@@ -167,6 +180,7 @@ class SaleModel extends HiveObject {
     this.roundOff,
     this.isTaxInclusive,
     this.lineDiscountTotal,
+    this.exchangeGroupId,
   })  : isReturn = isReturn ?? false,
         paidAmount = paidAmount ?? totalAmount,
         dueAmount = dueAmount ?? 0.0,
@@ -275,6 +289,8 @@ class SaleModel extends HiveObject {
     double? roundOff,
     bool? isTaxInclusive,
     double? lineDiscountTotal,
+    /// Set when this sale is the replacement half of an exchange.
+    String? exchangeGroupId,
     /// When the customer tenders less than [grandTotal], pass what was actually
     /// collected. The remainder is recorded as due and the sale is marked
     /// partially paid rather than paid.
@@ -328,6 +344,7 @@ class SaleModel extends HiveObject {
       roundOff: roundOff,
       isTaxInclusive: isTaxInclusive,
       lineDiscountTotal: lineDiscountTotal,
+      exchangeGroupId: exchangeGroupId,
       paidAmount: collected,
       dueAmount: isShort ? due : 0.0,
       status: isShort ? SaleStatus.partiallyPaid : SaleStatus.paid,
@@ -371,6 +388,7 @@ class SaleModel extends HiveObject {
     double? roundOff,
     bool? isTaxInclusive,
     double? lineDiscountTotal,
+    String? exchangeGroupId,
   }) {
     final now = DateTime.now().toIso8601String();
     final cgst = double.parse((totalGstAmount / 2).toStringAsFixed(2));
@@ -409,6 +427,7 @@ class SaleModel extends HiveObject {
       roundOff: roundOff,
       isTaxInclusive: isTaxInclusive,
       lineDiscountTotal: lineDiscountTotal,
+      exchangeGroupId: exchangeGroupId,
     );
   }
 
@@ -466,6 +485,7 @@ class SaleModel extends HiveObject {
     double? roundOff,
     bool? isTaxInclusive,
     double? lineDiscountTotal,
+    String? exchangeGroupId,
   }) {
     return SaleModel(
       saleId: saleId ?? this.saleId,
@@ -505,6 +525,7 @@ class SaleModel extends HiveObject {
       roundOff: roundOff ?? this.roundOff,
       isTaxInclusive: isTaxInclusive ?? this.isTaxInclusive,
       lineDiscountTotal: lineDiscountTotal ?? this.lineDiscountTotal,
+      exchangeGroupId: exchangeGroupId ?? this.exchangeGroupId,
     );
   }
 
@@ -549,6 +570,7 @@ class SaleModel extends HiveObject {
       'roundOff': roundOff,
       'isTaxInclusive': isTaxInclusive,
       'lineDiscountTotal': lineDiscountTotal,
+      'exchangeGroupId': exchangeGroupId,
     };
   }
 
@@ -599,6 +621,7 @@ class SaleModel extends HiveObject {
       isTaxInclusive: map['isTaxInclusive'] as bool?,
       lineDiscountTotal:
           (map['lineDiscountTotal'] as num?)?.toDouble(),
+      exchangeGroupId: map['exchangeGroupId'] as String?,
     );
   }
 }

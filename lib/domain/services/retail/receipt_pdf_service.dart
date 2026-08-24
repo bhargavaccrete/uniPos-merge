@@ -57,7 +57,13 @@ double receiptLineDiscountTotal(List<SaleItemModel> items) =>
 /// Clamped at zero — the per-line and total figures are rounded independently,
 /// so the residual can land a paisa negative.
 double receiptBillDiscountRemainder(SaleModel sale, List<SaleItemModel> items) {
-  final remainder = sale.discountAmount - receiptLineDiscountTotal(items);
+  // Compared as MAGNITUDES so a credit note keeps its Bill Discount row.
+  // A return stores its header negated while its lines stay positive, so the
+  // raw subtraction was always negative there and the clamp below silently
+  // deleted the row from every credit note. Stored signs are untouched — this
+  // is a PRINTING concern only.
+  final remainder =
+      sale.discountAmount.abs() - receiptLineDiscountTotal(items).abs();
   return remainder > 0 ? remainder : 0;
 }
 
@@ -460,10 +466,12 @@ class ReceiptPdfService {
             ),
           ),
           pw.SizedBox(height: 2),
-          // INVOICE heading (only for bills, not KOTs)
+          // INVOICE heading (only for bills, not KOTs). A return prints as a
+          // CREDIT NOTE — the A4 invoice already did this; thermal did not, so
+          // a refund slip was indistinguishable from a sale.
           if (data.kotNumber == null) ...[
             pw.Text(
-              'INVOICE',
+              data.sale.isReturn == true ? 'CREDIT NOTE' : 'INVOICE',
               style: pw.TextStyle(
                 fontSize: headerBadgeSize,
                 fontWeight: pw.FontWeight.bold,
@@ -471,6 +479,16 @@ class ReceiptPdfService {
               textAlign: pw.TextAlign.center,
             ),
             pw.SizedBox(height: 2),
+            // Both halves of an exchange print their shared reference, so a
+            // customer holding one slip can be tied to the other.
+            if (data.sale.exchangeGroupId != null) ...[
+              pw.Text(
+                'EXCHANGE ${data.sale.exchangeGroupId}',
+                style: pw.TextStyle(fontSize: bodySize),
+                textAlign: pw.TextAlign.center,
+              ),
+              pw.SizedBox(height: 2),
+            ],
           ],
         ],
         if (showStoreAddress) ...[
@@ -707,8 +725,13 @@ class ReceiptPdfService {
           () {
             // Derive the tax mode from the order totals (the stored flag can be
             // stale and mismatch how THIS order was priced).
-            final bool fallbackInclusive = AppConfig.isRestaurant &&
-                (data.isTaxInclusive ?? AppSettings.isTaxInclusive);
+            // Retail must fall back to the mode STORED on the sale. Gating the
+            // whole expression on `isRestaurant` made this always false in
+            // retail, so a tax-inclusive credit note — where the detector below
+            // cannot run, its gross being negative — printed exclusive labels.
+            final bool fallbackInclusive = AppConfig.isRestaurant
+                ? (data.isTaxInclusive ?? AppSettings.isTaxInclusive)
+                : (data.isTaxInclusive ?? false);
             // Per-rate base for the GST table — the same figure the Amount
             // column prints, so rows and the tax table can never disagree.
             double lineGross(SaleItemModel it) => receiptLineGross(it);
@@ -1053,6 +1076,17 @@ class ReceiptPdfService {
                     ),
                   ),
                 ),
+                // Both halves of an exchange print their shared reference.
+                if (data.sale.exchangeGroupId != null) ...[
+                  pw.SizedBox(height: 6),
+                  pw.Text(
+                    'EXCHANGE ${data.sale.exchangeGroupId}',
+                    style: pw.TextStyle(
+                      fontSize: 11,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ],
                 if (showInvoiceNumber || showInvoiceDate) pw.SizedBox(height: 8),
                 if (showInvoiceNumber)
                   pw.Text(

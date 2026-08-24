@@ -215,6 +215,23 @@ abstract class _CustomerStore with Store {
     await loadCustomers();
   }
 
+  /// Reverse a purchase after a return (retail). Pass NEGATIVE [amount] and
+  /// [points].
+  ///
+  /// Deliberately not [updateAfterPurchase] with negatives: that also calls
+  /// `incrementVisitCount`, so every refund inflated the customer's visit
+  /// count. A return is not a visit.
+  ///
+  /// Credit balances are NOT touched here — the return path settles those
+  /// against the specific invoice via `reduceCredit`, because only it knows how
+  /// much of the return offsets an outstanding due.
+  @action
+  Future<void> updateAfterReturn(String customerId, double amount, int points) async {
+    await _repository.updatePurchaseAmount(customerId, amount);
+    await _repository.addLoyaltyPoints(customerId, points);
+    await loadCustomers();
+  }
+
   @action
   Future<bool> addLoyaltyPoints(String customerId, int points) async {
     try {

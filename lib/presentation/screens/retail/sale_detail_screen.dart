@@ -12,6 +12,10 @@ import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/domain/services/retail/receipt_pdf_service.dart'
     show receiptLineDiscount, receiptLineDiscountTotal, receiptBillDiscountRemainder;
 import 'package:billberrylite/presentation/screens/retail/sale_return_screen.dart';
+import 'package:billberrylite/domain/services/retail/return_service.dart';
+import 'package:billberrylite/domain/services/retail/exchange_service.dart';
+import 'package:billberrylite/util/retail/payment_mode_summary.dart';
+import 'package:billberrylite/presentation/screens/retail/exchange_screen.dart';
 import 'package:billberrylite/domain/services/retail/print_service.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
@@ -26,11 +30,26 @@ class SaleDetailScreen extends StatefulWidget {
 }
 
 class _SaleDetailScreenState extends State<SaleDetailScreen> {
+  final ReturnService _returnService = ReturnService();
+  final ExchangeService _exchangeService = ExchangeService();
+
   SaleModel? _sale;
   List<SaleItemModel> _saleItems = [];
   Customer? _customer;
   bool _isLoading = true;
-  bool _hasBeenRefunded = false;
+
+  /// Every sold unit has come back. Only then is the sale closed to returns.
+  bool _isFullyReturned = false;
+
+  /// Some, but not all, has come back — the rest is still returnable.
+  bool _isPartiallyReturned = false;
+
+  bool get _hasBeenRefunded => _isFullyReturned || _isPartiallyReturned;
+
+  /// This sale's exchange lost its replacement half — surfaced rather than
+  /// auto-repaired, because a repair that guesses wrong about money is worse
+  /// than a visible flag.
+  bool _exchangeIncomplete = false;
 
   @override
   void initState() {
@@ -56,20 +75,32 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
         customer = await customerStore.getCustomerById(sale!.customerId!);
       }
 
-      // Check if this sale has been refunded (look for return transactions)
-      bool hasRefund = false;
-      if (sale != null) {
-        final allSales = await saleStore.getAllSales();
-        hasRefund = allSales.any(
-          (s) => (s.isReturn ?? false) && s.originalSaleId == widget.saleId,
-        );
+      // How much has come back, by QUANTITY. "Any return exists" used to close
+      // the sale outright, so returning 1 of 3 units made the other 2
+      // permanently unreturnable.
+      var fullyReturned = false;
+      var partiallyReturned = false;
+      if (sale != null && !(sale.isReturn ?? false)) {
+        fullyReturned = await _returnService.isFullyReturned(widget.saleId);
+        partiallyReturned =
+            !fullyReturned && await _returnService.isPartiallyReturned(widget.saleId);
+      }
+
+      // A return stamped with an exchange group whose replacement never landed.
+      var exchangeIncomplete = false;
+      if (sale?.exchangeGroupId != null) {
+        final orphans = await _exchangeService.findIncomplete();
+        exchangeIncomplete =
+            orphans.any((o) => o.exchangeGroupId == sale!.exchangeGroupId);
       }
 
       setState(() {
         _sale = sale;
         _saleItems = items;
         _customer = customer;
-        _hasBeenRefunded = hasRefund;
+        _isFullyReturned = fullyReturned;
+        _isPartiallyReturned = partiallyReturned;
+        _exchangeIncomplete = exchangeIncomplete;
         _isLoading = false;
       });
     } catch (e) {
@@ -189,13 +220,81 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
           ? _buildErrorView()
           : _buildSaleDetail(),
 
+      // Only a FULLY returned sale closes the action. A partial return leaves
+      // the remaining units returnable — gating on "any return exists" stranded
+      // them permanently.
       bottomNavigationBar:
           _sale != null &&
               !(_sale!.isReturn ?? false) &&
-              !_hasBeenRefunded &&
+              !_isFullyReturned &&
               !_isLoading
-          ? _buildReturnButton()
+          ? _buildActionBar()
           : null,
+    );
+  }
+
+  /// Return, plus Exchange when the user is allowed to run one.
+  ///
+  /// Exchange is HIDDEN rather than shown-and-refused for a non-admin — the
+  /// pattern every money-sensitive retail action follows.
+  Widget _buildActionBar() {
+    if (!_exchangeService.canExchange) return _buildReturnButton();
+
+    return Container(
+      padding: AppResponsive.padding(context),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: _capped(
+        context,
+        Row(
+          children: [
+            Expanded(child: _exchangeButton()),
+            const SizedBox(width: 10),
+            Expanded(child: _returnAction(compact: true)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _exchangeButton() {
+    return ElevatedButton.icon(
+      onPressed: () async {
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ExchangeScreen(saleId: widget.saleId),
+          ),
+        );
+        if (result == true && mounted) Navigator.pop(context, true);
+      },
+      icon: Icon(Icons.swap_horiz_rounded,
+          size: AppResponsive.iconSize(context)),
+      label: Text(
+        'Exchange',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(fontSize: AppResponsive.bodyFontSize(context)),
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        padding: EdgeInsets.symmetric(
+          vertical: AppResponsive.largeSpacing(context),
+        ),
+        minimumSize: Size(0, AppResponsive.buttonHeight(context) + 2),
+      ),
     );
   }
 
@@ -212,44 +311,52 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
           ),
         ],
       ),
-      child: _capped(
-        context,
-        ElevatedButton.icon(
-          onPressed: () async {
-            final result = await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => SaleReturnScreen(saleId: widget.saleId),
-              ),
-            );
+      child: _capped(context, _returnAction()),
+    );
+  }
 
-            if (result == true && mounted) {
-              Navigator.pop(context, true); // Go back to sales history
-            }
-          },
-          icon: Icon(
-            Icons.keyboard_return,
-            size: AppResponsive.iconSize(context),
+  /// The Return action itself. [compact] shortens the label and drops the
+  /// full-width minimum so it can sit beside Exchange in a Row.
+  Widget _returnAction({bool compact = false}) {
+    return ElevatedButton.icon(
+      onPressed: () async {
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SaleReturnScreen(saleId: widget.saleId),
           ),
-          label: Text(
-            'Process Return/Refund',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: AppResponsive.subheadingFontSize(context),
-            ),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red,
-            foregroundColor: Colors.white,
-            padding: EdgeInsets.symmetric(
-              vertical: AppResponsive.largeSpacing(context),
-            ),
-            minimumSize: Size(
-              double.infinity,
-              AppResponsive.buttonHeight(context) + 2,
-            ),
-          ),
+        );
+
+        if (result == true && mounted) {
+          Navigator.pop(context, true); // Go back to sales history
+        }
+      },
+      icon: Icon(
+        Icons.keyboard_return,
+        size: AppResponsive.iconSize(context),
+      ),
+      label: Text(
+        compact ? 'Return' : 'Process Return/Refund',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: compact
+              ? AppResponsive.bodyFontSize(context)
+              : AppResponsive.subheadingFontSize(context),
+        ),
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.red,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        padding: EdgeInsets.symmetric(
+          vertical: AppResponsive.largeSpacing(context),
+        ),
+        minimumSize: Size(
+          compact ? 0 : double.infinity,
+          AppResponsive.buttonHeight(context) + 2,
         ),
       ),
     );
@@ -360,12 +467,50 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // An exchange whose replacement half never landed. Shown, not
+          // auto-repaired: the return itself is correct and complete, and
+          // guessing at the missing sale would invent money.
+          if (_exchangeIncomplete) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.warning,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.white,
+                    size: AppResponsive.iconSize(context),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Exchange incomplete — the replacement was never created',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: AppResponsive.smallFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
+          ],
+
           // Refund Status Banner
           if (_hasBeenRefunded) ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.red.shade600,
+                // Amber for a partial return: the sale is not closed and more
+                // can still come back, so it must not read as final.
+                color: _isFullyReturned
+                    ? Colors.red.shade600
+                    : AppColors.warning,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -378,7 +523,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'REFUNDED',
+                      _isFullyReturned ? 'REFUNDED' : 'PARTIALLY RETURNED',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -400,7 +545,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      'Full Return',
+                      _isFullyReturned ? 'Full Return' : 'Items still returnable',
                       maxLines: 1,
                       style: TextStyle(
                         color: Colors.white,
@@ -465,7 +610,11 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      _sale!.paymentType.toUpperCase(),
+                      // Via the shared label so an exchange reads "Exchange"
+                      // or "Exchange + UPI" rather than a bare payment method
+                      // the customer never actually tendered.
+                      RetailPaymentModeSummary.methodLabel(_sale!)
+                          .toUpperCase(),
                       maxLines: 1,
                       style: TextStyle(
                         color: Colors.white,

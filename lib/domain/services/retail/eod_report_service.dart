@@ -28,9 +28,14 @@ class EODReportService {
   ///
   /// Positively matches `'cash'`, so card, UPI and any refund method added
   /// later are excluded automatically rather than needing a deny-list.
+  /// EXCHANGE returns are excluded: their cash leg already appears in the
+  /// payment summaries as a signed movement, so counting it here as well would
+  /// subtract the same refund from expected cash twice. Their header is also
+  /// the whole returned value, not the cash that actually left the till.
   static double cashRefundsIn(List<SaleModel> sales) => sales
       .where((sale) =>
           sale.isReturn == true &&
+          sale.exchangeGroupId == null &&
           sale.paymentType.toLowerCase().trim() == 'cash')
       .fold<double>(0.0, (sum, sale) => sum + sale.totalAmount.abs());
 

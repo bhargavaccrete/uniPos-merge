@@ -1,5 +1,6 @@
 import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
+import 'package:billberrylite/domain/services/retail/exchange_service.dart';
 
 /// Aggregates retail sales into one [PaymentSummary] per payment method.
 ///
@@ -30,6 +31,13 @@ class RetailPaymentModeSummary {
 
       if (hasLegs) {
         for (final leg in sale.paymentList) {
+          // SUPPRESSED: the exchange-credit leg is an internal accounting
+          // entry, not money. It exists so each document's legs sum to its own
+          // total; counting it here would report the whole value of swapped
+          // goods as though it had been tendered.
+          if (ExchangeService.isExchangeCredit(leg['method'] as String?)) {
+            continue;
+          }
           final method = normalizeMethod(leg['method'] as String?);
           // `as double` used to be a live crash: jsonDecode returns an int for
           // a whole-rupee leg, and an int is not a double.
@@ -80,6 +88,8 @@ class RetailPaymentModeSummary {
       case 'split':
       case 'split payment':
         return 'Split Payment';
+      case ExchangeService.exchangeCreditMethod:
+        return 'Exchange';
       default:
         return m[0].toUpperCase() + m.substring(1);
     }
@@ -87,6 +97,11 @@ class RetailPaymentModeSummary {
 
   /// Per-sale display label: the legs of a split bill joined ("Cash + UPI"), or
   /// the single normalised method.
+  ///
+  /// An exchange reads as "Exchange", or "Exchange + UPI" when real money also
+  /// changed hands. It must NEVER read as a plain "UPI" — the customer did not
+  /// tender the sale's value by UPI; they handed back goods, and only the
+  /// difference (if any) was money.
   static String methodLabel(SaleModel sale) {
     if (sale.paymentListJson != null && sale.paymentListJson!.isNotEmpty) {
       final legs = sale.paymentList

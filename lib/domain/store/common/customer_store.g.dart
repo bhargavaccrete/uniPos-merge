@@ -246,6 +246,15 @@ mixin _$CustomerStore on _CustomerStore, Store {
         .run(() => super.updateAfterPurchase(customerId, amount, points));
   }
 
+  late final _$updateAfterReturnAsyncAction =
+      AsyncAction('_CustomerStore.updateAfterReturn', context: context);
+
+  @override
+  Future<void> updateAfterReturn(String customerId, double amount, int points) {
+    return _$updateAfterReturnAsyncAction
+        .run(() => super.updateAfterReturn(customerId, amount, points));
+  }
+
   late final _$addLoyaltyPointsAsyncAction =
       AsyncAction('_CustomerStore.addLoyaltyPoints', context: context);
 
