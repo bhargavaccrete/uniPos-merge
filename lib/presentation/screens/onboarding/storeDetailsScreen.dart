@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/stores/setup_wizard_store.dart';
 import '../../../presentation/widget/componets/common/app_text_field.dart';
 import '../../../presentation/widget/componets/common/location_dropdown_field.dart';
+import '../../../presentation/widget/componets/retail/retail_store_type_field.dart';
+import '../../../core/config/app_config.dart';
 import '../../../domain/services/common/notification_service.dart';
 import '../../../util/common/country_state_city_data.dart';
 import '../../../util/color.dart';
@@ -533,7 +535,27 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
             SizedBox(height: AppResponsive.smallSpacing(context)),
             _buildLogoUpload(context, height: 160),
           ],
+          // Retail only: what this shop sells. Decides which product fields the
+          // catalogue starts with, nothing else.
+          if (AppConfig.isRetail) ...[
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
+            _buildStoreTypeField(context),
+          ],
         ],
+      ),
+    );
+  }
+
+  // ── Retail store type ─────────────────────────────────────────────────────────
+
+  /// Moved here from the Business Type step: it belongs with the store's
+  /// identity, and `saveBusinessDetails()` (called by Continue) is already what
+  /// persists `retailStoreType`.
+  Widget _buildStoreTypeField(BuildContext context) {
+    return Observer(
+      builder: (_) => RetailStoreTypeField(
+        value: widget.store.selectedRetailStoreType,
+        onChanged: widget.store.selectRetailStoreType,
       ),
     );
   }
@@ -685,6 +707,11 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
     }
     if (_ownerNameController.text.trim().isEmpty) {
       return (focus: _ownerNameFocus, message: 'Owner name is required');
+    }
+    // Retail's store type sits in the Basic section, so it is checked here in
+    // reading order. It is a dropdown, hence no focus node to scroll to.
+    if (AppConfig.isRetail && !widget.store.hasRetailStoreType) {
+      return (focus: null, message: 'Please choose what you sell');
     }
     final phoneErr = _validatePhone(_phoneController.text);
     if (phoneErr != null) return (focus: _phoneFocus, message: phoneErr);

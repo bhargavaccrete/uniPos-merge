@@ -4,7 +4,7 @@ import 'package:billberrylite/domain/store/retail/attribute_store.dart';
 
 void main() {
   group('RetailStoreTypes catalogue', () {
-    test('offers exactly the six approved store types, in order', () {
+    test('offers the six approved store types plus Other, in order', () {
       expect(
         RetailStoreTypes.all.map((t) => t.key).toList(),
         equals([
@@ -14,6 +14,9 @@ void main() {
           'cosmetics_beauty',
           'stationery',
           'gift_general',
+          // Last on purpose: the answer for a shop that recognised itself in
+          // none of the above.
+          'other',
         ]),
       );
     });
@@ -28,6 +31,7 @@ void main() {
           'Cosmetics & Beauty Store',
           'Stationery Store',
           'Gift & General Store',
+          'Other / General Store',
         ]),
       );
     });
@@ -85,6 +89,22 @@ void main() {
       expect(RetailStoreTypes.stationery.defaultAttributeNames,
           equals(['Pack Size']));
       expect(RetailStoreTypes.giftGeneral.defaultAttributeNames, isEmpty);
+      expect(RetailStoreTypes.other.defaultAttributeNames, isEmpty);
+    });
+
+    // The whole point of the Other type: it must seed NOTHING. Declaring its
+    // defaults as `null` instead of `const []` would compile, pass analysis, and
+    // silently seed kBaseAttributeNames (Size/Color/Weight) onto every product.
+    test('Other seeds nothing, and is deliberately empty rather than unknown',
+        () {
+      expect(RetailStoreTypes.isKnown('other'), isTrue);
+      expect(RetailStoreTypes.defaultAttributeNamesFor('other'), isEmpty);
+      expect(RetailStoreTypes.defaultAttributeNamesFor('other'), isNotNull);
+      // Same contract as Gift & General — the two differ only in label.
+      expect(
+        RetailStoreTypes.defaultAttributeNamesFor('other'),
+        equals(RetailStoreTypes.defaultAttributeNamesFor('gift_general')),
+      );
     });
 
     // The distinction the fallback depends on: an unknown key means "no store

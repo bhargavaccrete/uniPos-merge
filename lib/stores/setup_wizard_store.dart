@@ -148,7 +148,9 @@ abstract class _SetupWizardStore with Store {
   @computed
   bool get hasStoreDetails => storeName.isNotEmpty && ownerName.isNotEmpty && phone.isNotEmpty;
 
-  /// Retail must also say WHICH kind of retail store before moving on.
+  /// Retail must also say WHICH kind of retail store — asked on **Store
+  /// Details**, not here, so it sits with the rest of the store's identity and
+  /// with the save that already persists it.
   @computed
   bool get needsRetailStoreType => selectedBusinessTypeId == 'retail';
 
@@ -157,11 +159,11 @@ abstract class _SetupWizardStore with Store {
       RetailStoreTypes.isKnown(selectedRetailStoreType);
 
   @computed
-  bool get canProceedFromBusinessType =>
-      hasBusinessType && (!needsRetailStoreType || hasRetailStoreType);
+  bool get canProceedFromBusinessType => hasBusinessType;
 
   @computed
-  bool get canProceedFromStoreDetails => hasStoreDetails;
+  bool get canProceedFromStoreDetails =>
+      hasStoreDetails && (!needsRetailStoreType || hasRetailStoreType);
 
   @computed
   double get progressPercentage => (currentStep + 1) / 10;

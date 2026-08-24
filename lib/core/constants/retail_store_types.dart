@@ -94,7 +94,20 @@ class RetailStoreTypes {
     defaultAttributeNames: [],
   );
 
-  /// Display order in the setup wizard.
+  static const RetailStoreType other = RetailStoreType(
+    key: 'other',
+    name: 'Other / General Store',
+    description: 'Something else — set up your own fields',
+    iconName: 'other',
+    // Empty, NOT null: this type genuinely wants no attributes, so
+    // `defaultAttributeNamesFor` must not fall back to `kBaseAttributeNames`.
+    // A shop that fits none of the six above configures its own fields in
+    // Settings rather than starting with someone else's.
+    defaultAttributeNames: [],
+  );
+
+  /// Display order in the setup wizard. `other` sits last — it is the answer for
+  /// a shop that recognised itself in none of the above.
   static const List<RetailStoreType> all = [
     garment,
     footwear,
@@ -102,6 +115,7 @@ class RetailStoreTypes {
     cosmeticsBeauty,
     stationery,
     giftGeneral,
+    other,
   ];
 
   /// Resolve a persisted key back to its entry, or null when the key is
@@ -127,7 +141,8 @@ class RetailStoreTypes {
   /// Returns null — not an empty list — when the key is absent or unknown, so
   /// a caller can tell "this business has no store type, use the app-wide
   /// fallback" apart from "this store type genuinely wants no attributes"
-  /// (Gift & General).
+  /// (Gift & General, Other). Both of those return `[]`, and returning `null`
+  /// for them instead would silently seed the fallback set onto every product.
   static List<String>? defaultAttributeNamesFor(String? key) =>
       byKey(key)?.defaultAttributeNames;
 }
