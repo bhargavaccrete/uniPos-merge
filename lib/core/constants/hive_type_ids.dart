@@ -73,6 +73,33 @@ class HiveTypeIds {
   static const int restaurantAppNotification = 133; // AppNotificationModel — persisted notifications
   static const int restaurantItemCancellation = 134; // ItemCancellationModel — item-level cancel audit
 
+  // Recipe / BOM (135-137) — see docs/inventory_recipe_system_plan.md
+  static const int restaurantRecipe = 135; // RecipeModel — header: what an item is made of
+  static const int restaurantRecipeIngredient = 136; // RecipeIngredientModel — embedded line in RecipeModel.ingredients
+  static const int restaurantRecipeProduction = 137; // RecipeProductionModel — "batch produced" log for Semi-Finished items
+
+  // Restaurant Purchase Order / GRN (138-142) — raw-material procurement,
+  // mirrors retail's Supplier/PurchaseOrder/GRN pattern (150-164) but scoped
+  // to restaurant's Items model, per docs/inventory_recipe_system_plan.md §6.
+  static const int restaurantSupplier = 138;
+  static const int restaurantPurchaseOrder = 139;
+  static const int restaurantPurchaseOrderItem = 140;
+  static const int restaurantGrn = 141;
+  static const int restaurantGrnItem = 142;
+
+  // Restaurant damaged-goods/loss/stock-take chain (143-149) — mirrors
+  // retail's PurchaseReturn/SupplierClaim/InventoryLoss/StockTake pattern
+  // (174-181), scoped to restaurant's Items model. Exhausts the reserved
+  // restaurant range (100-149) — any future restaurant model needs a new
+  // range carved out.
+  static const int restaurantPurchaseReturn = 143;
+  static const int restaurantPurchaseReturnItem = 144;
+  static const int restaurantSupplierClaim = 145;
+  static const int restaurantSupplierClaimItem = 146;
+  static const int restaurantInventoryLoss = 147;
+  static const int restaurantStockTake = 148;
+  static const int restaurantStockTakeItem = 149;
+
   // ==================== RETAIL MODELS (150-223) ====================
   static const int retailProduct = 150;
   static const int retailVariant = 151;
@@ -125,6 +152,17 @@ class HiveTypeIds {
   static const int retailStockTake = 180;
   static const int retailStockTakeItem = 181;
 
+  /// Bundle/kit products — see docs/retail_inventory_system_plan.md §3.2.
+  /// A bundle has no stock of its own and cascades a sale into its
+  /// components; a repack/kit variant is stocked directly but replenished by
+  /// assembling it from a source variant rather than a GRN.
+  static const int retailBundle = 182;
+  static const int retailBundleComponent = 183;
+
+  /// Append-only "assembled a batch" log for repack/kit variants — mirrors
+  /// restaurant's RecipeProductionModel.
+  static const int retailKitAssembly = 184;
+
   // ==================== HELPER METHODS ====================
 
   /// Check if a typeId belongs to retail models
@@ -169,7 +207,10 @@ class HiveTypeIds {
     retailAttribute,
     retailAttributeValue,
     retailProductAttribute,
-    retailBillingTab
+    retailBillingTab,
+    retailBundle,
+    retailBundleComponent,
+    retailKitAssembly
   ];
 
   /// Get all restaurant model IDs
@@ -208,5 +249,13 @@ class HiveTypeIds {
     restaurantAttendance,
     restaurantAppNotification,
     restaurantItemCancellation,
+    restaurantRecipe,
+    restaurantRecipeIngredient,
+    restaurantRecipeProduction,
+    restaurantSupplier,
+    restaurantPurchaseOrder,
+    restaurantPurchaseOrderItem,
+    restaurantGrn,
+    restaurantGrnItem,
   ];
 }

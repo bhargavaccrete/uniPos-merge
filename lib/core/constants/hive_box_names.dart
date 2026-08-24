@@ -88,6 +88,12 @@ class HiveBoxNames {
   static const String stockTakes = 'stockTakes';
   static const String stockTakeItems = 'stockTakeItems';
 
+  /// Bundle/kit product definitions — see docs/retail_inventory_system_plan.md §3.2.
+  static const String bundles = 'bundles';
+
+  /// Append-only "assembled a batch" log for repack/kit variants.
+  static const String kitAssemblies = 'kitAssemblies';
+
   /// Purchase order items box
   static const String purchaseOrderItems = 'purchaseOrderItems';
 
@@ -218,6 +224,49 @@ class HiveBoxNames {
   /// Item-level cancellation audit (items cancelled from a placed order, with reason)
   static const String restaurantItemCancellations = 'restaurantItemCancellationsBox';
 
+  /// Recipes (Bill of Materials) — what a Semi-Finished/Recipe-Based item is made of
+  static const String restaurantRecipes = 'restaurantRecipesBox';
+
+  /// "Batch produced" log for Semi-Finished items (raw materials -> prepped stock)
+  static const String restaurantRecipeProductions = 'restaurantRecipeProductionsBox';
+
+  /// Restaurant raw-material suppliers (mirrors retail's suppliers box, own box per mode)
+  static const String restaurantSuppliers = 'restaurantSuppliersBox';
+
+  /// Restaurant purchase orders (raw-material procurement)
+  static const String restaurantPurchaseOrders = 'restaurantPurchaseOrdersBox';
+
+  /// Restaurant purchase order line items
+  static const String restaurantPurchaseOrderItems = 'restaurantPurchaseOrderItemsBox';
+
+  /// Restaurant GRNs (Goods Receipt Notes) — confirming a GRN is the only
+  /// place raw-material stock increments, mirrors retail's GRN pattern
+  static const String restaurantGrns = 'restaurantGrnsBox';
+
+  /// Restaurant GRN line items
+  static const String restaurantGrnItems = 'restaurantGrnItemsBox';
+
+  /// Restaurant purchase returns (damaged raw material sent back to supplier)
+  static const String restaurantPurchaseReturns = 'restaurantPurchaseReturnsBox';
+
+  /// Restaurant purchase return line items
+  static const String restaurantPurchaseReturnItems = 'restaurantPurchaseReturnItemsBox';
+
+  /// Restaurant supplier claims (damaged raw material kept on site pending compensation)
+  static const String restaurantSupplierClaims = 'restaurantSupplierClaimsBox';
+
+  /// Restaurant supplier claim line items
+  static const String restaurantSupplierClaimItems = 'restaurantSupplierClaimItemsBox';
+
+  /// Restaurant inventory losses (write-offs — damaged/rejected/adjusted stock)
+  static const String restaurantInventoryLosses = 'restaurantInventoryLossesBox';
+
+  /// Restaurant physical stock take sessions
+  static const String restaurantStockTakes = 'restaurantStockTakesBox';
+
+  /// Restaurant stock take line items
+  static const String restaurantStockTakeItems = 'restaurantStockTakeItemsBox';
+
   // ==================== HELPER METHODS ====================
 
   /// Get the appropriate EOD box name based on business mode
@@ -264,6 +313,8 @@ class HiveBoxNames {
     inventoryLosses,
     stockTakes,
     stockTakeItems,
+    bundles,
+    kitAssemblies,
     purchaseOrderItems,
     grns,
     grnItems,
@@ -312,6 +363,20 @@ class HiveBoxNames {
     restaurantAttendance,
     restaurantNotifications,
     restaurantItemCancellations,
+    restaurantRecipes,
+    restaurantRecipeProductions,
+    restaurantSuppliers,
+    restaurantPurchaseOrders,
+    restaurantPurchaseOrderItems,
+    restaurantGrns,
+    restaurantGrnItems,
+    restaurantPurchaseReturns,
+    restaurantPurchaseReturnItems,
+    restaurantSupplierClaims,
+    restaurantSupplierClaimItems,
+    restaurantInventoryLosses,
+    restaurantStockTakes,
+    restaurantStockTakeItems,
   ];
 
   /// All common box names (shared between retail and restaurant)

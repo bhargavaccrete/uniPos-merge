@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "953792858448",
+    "project_id": "billberry-lite",
+    "storage_bucket": "billberry-lite.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:953792858448:android:b6f979d62f9125428b8455",
+        "android_client_info": {
+          "package_name": "com.accrete.billberrylite"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCuYE5Mf6VX0EIwEv5BpYK1cS2k_hfdrOw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

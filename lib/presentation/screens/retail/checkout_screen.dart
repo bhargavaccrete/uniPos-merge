@@ -10,6 +10,7 @@ import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/domain/services/retail/gst_service.dart';
 import 'package:billberrylite/domain/services/retail/retail_billing_service.dart';
+import 'package:billberrylite/domain/services/retail/inventory_service.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 import 'package:billberrylite/presentation/screens/retail/customer_selection_screen.dart';
 import 'package:billberrylite/presentation/widget/componets/common/split_payment_widget.dart';
@@ -482,16 +483,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }).toList();
   }
 
-  /// Deduct stock for sold items
+  /// Deduct stock for sold items, logging a StockMovementModel audit row per
+  /// line — see `RetailInventoryService.deductStockForSale`.
   Future<void> _deductStock() async {
-    for (var item in cartStore.items) {
-      final variant = await productStore.getVariantById(item.variantId);
-      if (variant != null) {
-        final newStock = variant.stockQty - item.qty;
-        final finalStock = (newStock < 0 ? 0 : newStock).toInt();
-        await productStore.updateVariantStock(item.variantId, finalStock);
-      }
-    }
+    await RetailInventoryService.deductStockForSale(cartStore.items);
   }
 
   Future<void> _processCheckout() async {

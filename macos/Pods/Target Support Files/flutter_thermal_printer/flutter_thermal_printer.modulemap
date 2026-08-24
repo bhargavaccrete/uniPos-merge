@@ -1,0 +1,6 @@
+framework module flutter_thermal_printer {
+  umbrella header "flutter_thermal_printer-umbrella.h"
+
+  export *
+  module * { export * }
+}

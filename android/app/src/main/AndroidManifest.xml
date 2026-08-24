@@ -52,6 +52,13 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <!-- FCM: channel used for background/terminated *notification* messages
+             that don't specify their own channel. Must match a channel created
+             in LocalNotificationService (see NotificationChannels.orders). -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="orders" />
+
         <!-- Disable Impeller on Android to prevent Vulkan viewport startup freezes/deadlocks on Mali/Adreno GPUs during debugging/foreground-service starts -->
         <meta-data
             android:name="io.flutter.embedding.android.EnableImpeller"

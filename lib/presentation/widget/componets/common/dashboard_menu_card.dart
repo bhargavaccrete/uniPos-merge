@@ -27,6 +27,12 @@ class DashboardMenuCard extends StatelessWidget {
   /// Tighter padding/icon/text. Defaults to [AppResponsive.isMobile].
   final bool? compact;
 
+  /// Optional secondary line. When provided the card switches to the richer
+  /// left-aligned layout (gradient icon medallion + title + subtitle + a soft
+  /// coloured glow); when null the card keeps its original centred layout, so
+  /// existing callers are visually unchanged.
+  final String? subtitle;
+
   const DashboardMenuCard({
     super.key,
     required this.title,
@@ -35,11 +41,13 @@ class DashboardMenuCard extends StatelessWidget {
     required this.onTap,
     this.badge,
     this.compact,
+    this.subtitle,
   });
 
   @override
   Widget build(BuildContext context) {
     final isCompact = compact ?? AppResponsive.isMobile(context);
+    if (subtitle != null) return _buildRich(context, isCompact);
 
     return Material(
       color: Colors.transparent,
@@ -90,6 +98,106 @@ class DashboardMenuCard extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Richer variant: left-aligned, gradient icon medallion, title + subtitle,
+  /// a hairline coloured accent bar and a soft tinted glow so the module colour
+  /// reads at a glance.
+  Widget _buildRich(BuildContext context, bool isCompact) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: EdgeInsets.all(isCompact ? 12 : 15),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: color.withValues(alpha: 0.14), width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.12),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(isCompact ? 11 : 13),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              color,
+                              Color.lerp(color, Colors.black, 0.18) ?? color,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: color.withValues(alpha: 0.35),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          icon,
+                          size: isCompact ? 24 : 28,
+                          color: Colors.white,
+                        ),
+                      ),
+                      if (badge != null)
+                        Positioned(right: -6, top: -6, child: badge!),
+                    ],
+                  ),
+                  Icon(
+                    Icons.arrow_outward_rounded,
+                    size: 18,
+                    color: color.withValues(alpha: 0.55),
+                  ),
+                ],
+              ),
+              SizedBox(height: isCompact ? 12 : 16),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  fontSize: isCompact ? 14 : 15.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                subtitle!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  height: 1.25,
+                  color: AppColors.textSecondary,
                 ),
               ),
             ],

@@ -5,6 +5,9 @@ import '../../../core/constants/hive_box_names.dart';
 ///
 /// Backed by a monotonic per-day counter in the shared `appCounters` box, the
 /// same mechanism as `SkuGeneratorService` and `CustomerIdGeneratorService`.
+/// Mode-agnostic — both retail and restaurant documents (PO, GRN, purchase
+/// return, supplier claim, inventory loss, stock take) share this one
+/// counter box, so numbers never collide across modes.
 ///
 /// **Why not count existing records.** The previous
 /// `todayRecords.length + 1` was only safe because nothing could delete a PO.

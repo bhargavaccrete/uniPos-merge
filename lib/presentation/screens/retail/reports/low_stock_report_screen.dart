@@ -203,11 +203,28 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
   DataRow _buildRow(Map<String, dynamic> item) {
     final stock = item['currentStock'] as int;
     final costPrice = (item['costPrice'] as num?)?.toDouble();
+    final isBundle = item['isBundle'] == true;
     final color = _severityColor(stock);
 
     return DataRow(
       cells: [
-        DataCell(Text(item['productName'] as String? ?? 'Unknown Product')),
+        DataCell(
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  item['productName'] as String? ?? 'Unknown Product',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (isBundle) ...[
+                const SizedBox(width: 6),
+                _bundleBadge(),
+              ],
+            ],
+          ),
+        ),
         DataCell(
           Text(
             (item['variantLabel'] as String?)?.isNotEmpty == true
@@ -216,14 +233,40 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
           ),
         ),
         DataCell(
-          Text(
-            '$stock',
-            style: TextStyle(fontWeight: FontWeight.w700, color: color),
+          Tooltip(
+            message: isBundle
+                ? 'Available to sell (bundle — bounded by component stock)'
+                : 'Current stock',
+            child: Text(
+              '$stock',
+              style: TextStyle(fontWeight: FontWeight.w700, color: color),
+            ),
           ),
         ),
         DataCell(Text('${item['reorderPoint']}')),
         DataCell(Text(costPrice == null ? '—' : formatMoney(costPrice))),
       ],
+    );
+  }
+
+  /// Marks a row whose "Stock" figure is actually "Available to Sell" — a
+  /// bundle has no stock of its own, so the number means something different
+  /// from every other row's. See docs/retail_inventory_system_plan.md §3.3.
+  Widget _bundleBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.info.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        'Bundle',
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: AppColors.info,
+        ),
+      ),
     );
   }
 

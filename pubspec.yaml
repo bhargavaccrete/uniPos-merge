@@ -110,6 +110,8 @@ dependencies:
   timezone: ^0.9.4 # <- zoned scheduling for closed-app reminders
   flutter_timezone: ^3.0.1 # <- resolves device local timezone
   url_launcher: ^6.3.0 # <- launch phone/email/chat from Need Help
+  firebase_core: ^4.12.1
+  firebase_messaging: ^16.4.3
 
 
 

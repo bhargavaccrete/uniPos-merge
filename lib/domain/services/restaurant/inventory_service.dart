@@ -3,6 +3,8 @@ import 'package:uuid/uuid.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../data/models/restaurant/db/itemmodel_302.dart';
+import '../../../data/models/restaurant/db/recipe_model.dart';
+import '../../../data/models/restaurant/db/recipe_production_model.dart';
 import '../../../util/restaurant/staticswitch.dart';
 import '../../../data/models/restaurant/db/stock_movement_model.dart';
 import '../../../data/repositories/restaurant/stock_movement_repository.dart';
@@ -39,6 +41,22 @@ class InventoryService {
         }
       }
 
+      // Recipe-Based items aren't stocked themselves — cascade the deduction
+      // into their recipe's ingredients instead. See
+      // docs/inventory_recipe_system_plan.md §5.
+      if (item.isRecipeBased) {
+        await _deductRecipeIngredients(
+          recipeItem: item,
+          saleQty: cartItem.quantity.toDouble(),
+          items: items,
+          stockRepo: stockRepo,
+          staffName: staffName,
+          sessionId: sessionId,
+          lowStockAlerts: lowStockAlerts,
+        );
+        continue;
+      }
+
       if (!item.trackInventory) continue;
 
       final double stockAfter;
@@ -67,50 +85,19 @@ class InventoryService {
           ? "${item.name} (${cartItem.variantName})"
           : item.name;
 
-      // Log the sale deduction to the per-item stock history.
-      await stockRepo.saveMovement(StockMovementModel(
-        id: const Uuid().v4(),
-        timestamp: DateTime.now(),
-        itemId: item.id,
-        variantId: variantId,
-        itemName: label,
+      await _logMovementAndAlert(
+        stockRepo: stockRepo,
+        item: item,
+        label: label,
         type: 'out',
         quantity: deductedQty,
         balanceAfter: stockAfter,
         reason: 'Sale',
-        unit: item.unit ?? (item.isSoldByWeight ? 'kg' : 'pcs'),
+        variantId: variantId,
         staffName: staffName,
         sessionId: sessionId,
-      ));
-      final lowAlertsOn =
-          item.lowStockAlertEnabled && AppSettings.lowStockAlertsEnabled;
-      final subjectId = _lowStockSubjectId(item.id, variantId);
-      if (stockAfter <= 0) {
-        lowStockAlerts.add("$label is out of stock");
-        if (lowAlertsOn) {
-          await notificationStore.raiseEvent(
-            eventCode: 'low_stock',
-            subjectType: 'item',
-            subjectId: subjectId,
-            data: {'name': label, 'remaining': 0, 'unit': item.unit ?? 'units'},
-          );
-        }
-      } else if (lowAlertsOn && stockAfter <= item.effectiveLowStockThreshold) {
-        lowStockAlerts.add("$label: ${stockAfter.toStringAsFixed(0)} ${item.unit ?? "units"} left");
-        await notificationStore.raiseEvent(
-          eventCode: 'low_stock',
-          subjectType: 'item',
-          subjectId: subjectId,
-          data: {
-            'name': label,
-            'remaining': stockAfter,
-            'unit': item.unit ?? 'units',
-          },
-        );
-      } else {
-        // Stock healthy again — retire any prior low-stock notification.
-        await notificationStore.resolve('low_stock', 'item', subjectId);
-      }
+        lowStockAlerts: lowStockAlerts,
+      );
     }
 
     if (lowStockAlerts.isNotEmpty) {
@@ -118,6 +105,316 @@ class InventoryService {
         "Low Stock - ${lowStockAlerts.join(" | ")}",
       );
     }
+  }
+
+  /// Expands a Recipe-Based item's sale into deductions against its recipe's
+  /// ingredients (one level deep — an ingredient must be Raw Material or
+  /// Semi-Finished, never itself Recipe-Based). Logs one StockMovementModel
+  /// per ingredient with a reason that traces back to the finished item, so
+  /// the existing per-item stock history explains "why did bun stock drop" as
+  /// "linked to Burger sales" with zero new audit UI. See
+  /// docs/inventory_recipe_system_plan.md §5.
+  static Future<void> _deductRecipeIngredients({
+    required Items recipeItem,
+    required double saleQty,
+    required List<Items> items,
+    required StockMovementRepository stockRepo,
+    required String staffName,
+    required String? sessionId,
+    required List<String> lowStockAlerts,
+  }) async {
+    final RecipeModel? recipe = recipeRepository.getRecipeForItem(recipeItem.id);
+    if (recipe == null || !recipe.hasIngredients) return; // unconfigured recipe — nothing to deduct
+    final yieldQty = recipe.yieldQty > 0 ? recipe.yieldQty : 1.0;
+    final batches = saleQty / yieldQty;
+
+    for (final line in recipe.ingredients) {
+      Items? ingredient;
+      try {
+        ingredient = items.firstWhere((i) => i.id == line.ingredientItemId);
+      } catch (_) {
+        continue; // ingredient item was deleted — skip rather than crash the sale
+      }
+      if (!ingredient.trackInventory) continue;
+
+      final deductQty = batches * line.effectiveQuantity;
+      final stockAfter = await _deductItemStock(ingredient, deductQty);
+
+      await _logMovementAndAlert(
+        stockRepo: stockRepo,
+        item: ingredient,
+        label: ingredient.name,
+        type: 'out',
+        quantity: deductQty,
+        balanceAfter: stockAfter,
+        reason: 'Sale (recipe: ${recipeItem.name})',
+        variantId: null,
+        staffName: staffName,
+        sessionId: sessionId,
+        lowStockAlerts: lowStockAlerts,
+      );
+    }
+  }
+
+  /// Shared by every stock deduction path (direct item, variant, and
+  /// recipe-ingredient cascade): writes the audit-trail movement row and
+  /// raises/resolves the low-stock notification for [item].
+  static Future<void> _logMovementAndAlert({
+    required StockMovementRepository stockRepo,
+    required Items item,
+    required String label,
+    required String type,
+    required double quantity,
+    required double balanceAfter,
+    required String reason,
+    required String? variantId,
+    required String staffName,
+    required String? sessionId,
+    required List<String> lowStockAlerts,
+  }) async {
+    await stockRepo.saveMovement(StockMovementModel(
+      id: const Uuid().v4(),
+      timestamp: DateTime.now(),
+      itemId: item.id,
+      variantId: variantId,
+      itemName: label,
+      type: type,
+      quantity: quantity,
+      balanceAfter: balanceAfter,
+      reason: reason,
+      unit: item.unit ?? (item.isSoldByWeight ? 'kg' : 'pcs'),
+      staffName: staffName,
+      sessionId: sessionId,
+      unitCost: item.lastPurchaseCost,
+    ));
+
+    if (type != 'out') return; // low-stock alerts only make sense for deductions
+
+    final lowAlertsOn = item.lowStockAlertEnabled && AppSettings.lowStockAlertsEnabled;
+    final subjectId = _lowStockSubjectId(item.id, variantId);
+    if (balanceAfter <= 0) {
+      lowStockAlerts.add("$label is out of stock");
+      if (lowAlertsOn) {
+        await notificationStore.raiseEvent(
+          eventCode: 'low_stock',
+          subjectType: 'item',
+          subjectId: subjectId,
+          data: {'name': label, 'remaining': 0, 'unit': item.unit ?? 'units'},
+        );
+      }
+    } else if (lowAlertsOn && balanceAfter <= item.effectiveLowStockThreshold) {
+      lowStockAlerts.add("$label: ${balanceAfter.toStringAsFixed(0)} ${item.unit ?? "units"} left");
+      await notificationStore.raiseEvent(
+        eventCode: 'low_stock',
+        subjectType: 'item',
+        subjectId: subjectId,
+        data: {
+          'name': label,
+          'remaining': balanceAfter,
+          'unit': item.unit ?? 'units',
+        },
+      );
+    } else {
+      // Stock healthy again — retire any prior low-stock notification.
+      await notificationStore.resolve('low_stock', 'item', subjectId);
+    }
+  }
+
+  /// Live "N can be made" count for a Recipe-Based item — the minimum, across
+  /// its recipe's ingredients, of how many batches current ingredient stock
+  /// supports. Recipe-Based items have no stored stock (see
+  /// [Items.isStockDerivedFromRecipe]), so this replaces the stockQuantity
+  /// badge wherever one would normally show. Returns 0 if the item has no
+  /// recipe or an ingredient is out of stock/untracked-missing.
+  /// See docs/inventory_recipe_system_plan.md §7.
+  static double calculateAvailableToMake(Items item) {
+    if (!item.isRecipeBased) return item.stockQuantity;
+    final RecipeModel? recipe = recipeRepository.getRecipeForItem(item.id);
+    if (recipe == null || !recipe.hasIngredients) return 0;
+    final yieldQty = recipe.yieldQty > 0 ? recipe.yieldQty : 1.0;
+
+    double? minBatches;
+    for (final line in recipe.ingredients) {
+      if (line.effectiveQuantity <= 0) continue;
+      Items? ingredient;
+      try {
+        ingredient = itemStore.items.firstWhere((i) => i.id == line.ingredientItemId);
+      } catch (_) {
+        return 0; // a required ingredient no longer exists — can't be made
+      }
+      if (!ingredient.trackInventory) continue; // untracked ingredient never limits availability
+      final batchesFromThisIngredient = ingredient.stockQuantity / line.effectiveQuantity;
+      minBatches = minBatches == null
+          ? batchesFromThisIngredient
+          : (batchesFromThisIngredient < minBatches ? batchesFromThisIngredient : minBatches);
+    }
+    if (minBatches == null) return double.infinity; // no tracked ingredients — never limited
+    final available = minBatches * yieldQty;
+    return available < 0 ? 0 : available.floorToDouble();
+  }
+
+  /// Produces one batch of a Semi-Finished item from its recipe: validates
+  /// every ingredient has enough stock (all-or-nothing — no partial
+  /// deduction on shortage), deducts each ingredient, credits the
+  /// Semi-Finished item's own stock by [batchQty], logs a StockMovementModel
+  /// per ingredient plus one for the produced item, and writes an append-only
+  /// [RecipeProductionModel] row linking all of them. Throws [Exception] with
+  /// a user-facing message on validation failure. See
+  /// docs/inventory_recipe_system_plan.md §6.3.
+  static Future<RecipeProductionModel> produceBatch({
+    required Items semiFinishedItem,
+    required double batchQty,
+  }) async {
+    if (batchQty <= 0) {
+      throw Exception('Batch quantity must be greater than zero.');
+    }
+    final RecipeModel? recipe = recipeRepository.getRecipeForItem(semiFinishedItem.id);
+    if (recipe == null || !recipe.hasIngredients) {
+      throw Exception('${semiFinishedItem.name} has no recipe configured.');
+    }
+
+    await itemStore.loadItems();
+    final items = itemStore.items;
+    final yieldQty = recipe.yieldQty > 0 ? recipe.yieldQty : 1.0;
+    final batches = batchQty / yieldQty;
+
+    // Validate stock availability up front so production is all-or-nothing.
+    final List<String> shortages = [];
+    for (final line in recipe.ingredients) {
+      Items? ingredient;
+      try {
+        ingredient = items.firstWhere((i) => i.id == line.ingredientItemId);
+      } catch (_) {
+        shortages.add('a required ingredient no longer exists');
+        continue;
+      }
+      if (!ingredient.trackInventory) continue;
+      final required = batches * line.effectiveQuantity;
+      if (ingredient.stockQuantity < required) {
+        shortages.add(
+          '${ingredient.name} (need ${required.toStringAsFixed(2)}, '
+          'have ${ingredient.stockQuantity.toStringAsFixed(2)})',
+        );
+      }
+    }
+    if (shortages.isNotEmpty) {
+      throw Exception('Insufficient stock: ${shortages.join(', ')}');
+    }
+
+    final stockRepo = StockMovementRepository();
+    final staffName = RestaurantSession.staffName ?? RestaurantSession.effectiveRole;
+    final sessionId = await DayManagementService.getCurrentSessionId();
+    final lowStockAlerts = <String>[];
+    final movementIds = <String>[];
+
+    for (final line in recipe.ingredients) {
+      Items? ingredient;
+      try {
+        ingredient = items.firstWhere((i) => i.id == line.ingredientItemId);
+      } catch (_) {
+        continue;
+      }
+      if (!ingredient.trackInventory) continue;
+
+      final deductQty = batches * line.effectiveQuantity;
+      final stockAfter = await _deductItemStock(ingredient, deductQty);
+      final movementId = const Uuid().v4();
+      await stockRepo.saveMovement(StockMovementModel(
+        id: movementId,
+        timestamp: DateTime.now(),
+        itemId: ingredient.id,
+        variantId: null,
+        itemName: ingredient.name,
+        type: 'out',
+        quantity: deductQty,
+        balanceAfter: stockAfter,
+        reason: 'Production (${semiFinishedItem.name})',
+        unit: ingredient.unit ?? (ingredient.isSoldByWeight ? 'kg' : 'pcs'),
+        staffName: staffName,
+        sessionId: sessionId,
+        unitCost: ingredient.lastPurchaseCost,
+      ));
+      movementIds.add(movementId);
+
+      final lowAlertsOn = ingredient.lowStockAlertEnabled && AppSettings.lowStockAlertsEnabled;
+      final subjectId = _lowStockSubjectId(ingredient.id, null);
+      if (stockAfter <= 0) {
+        lowStockAlerts.add('${ingredient.name} is out of stock');
+        if (lowAlertsOn) {
+          await notificationStore.raiseEvent(
+            eventCode: 'low_stock',
+            subjectType: 'item',
+            subjectId: subjectId,
+            data: {'name': ingredient.name, 'remaining': 0, 'unit': ingredient.unit ?? 'units'},
+          );
+        }
+      } else if (lowAlertsOn && stockAfter <= ingredient.effectiveLowStockThreshold) {
+        lowStockAlerts.add(
+          '${ingredient.name}: ${stockAfter.toStringAsFixed(0)} ${ingredient.unit ?? "units"} left',
+        );
+        await notificationStore.raiseEvent(
+          eventCode: 'low_stock',
+          subjectType: 'item',
+          subjectId: subjectId,
+          data: {'name': ingredient.name, 'remaining': stockAfter, 'unit': ingredient.unit ?? 'units'},
+        );
+      } else {
+        await notificationStore.resolve('low_stock', 'item', subjectId);
+      }
+    }
+
+    await _restoreItemStock(semiFinishedItem, batchQty);
+    final producedBalance = semiFinishedItem.stockQuantity;
+    final producedMovementId = const Uuid().v4();
+    // Priced at what this batch actually cost to make, not the semi-finished
+    // item's own (usually unset) lastPurchaseCost — it was produced, not
+    // bought. Feeds RecipeReportService.foodCostReport's historical pricing.
+    final producedUnitCost = recipe.estimatedCostPerUnit((id) {
+      Items? ing;
+      try {
+        ing = items.firstWhere((i) => i.id == id);
+      } catch (_) {
+        return 0.0;
+      }
+      return ing.lastPurchaseCost ?? 0.0;
+    });
+    await stockRepo.saveMovement(StockMovementModel(
+      id: producedMovementId,
+      timestamp: DateTime.now(),
+      itemId: semiFinishedItem.id,
+      variantId: null,
+      itemName: semiFinishedItem.name,
+      type: 'in',
+      quantity: batchQty,
+      balanceAfter: producedBalance,
+      reason: 'Production batch',
+      unit: semiFinishedItem.unit ?? (semiFinishedItem.isSoldByWeight ? 'kg' : 'pcs'),
+      staffName: staffName,
+      sessionId: sessionId,
+      unitCost: producedUnitCost,
+    ));
+    movementIds.add(producedMovementId);
+
+    final production = RecipeProductionModel(
+      id: const Uuid().v4(),
+      recipeId: recipe.id,
+      itemId: semiFinishedItem.id,
+      itemName: semiFinishedItem.name,
+      batchQty: batchQty,
+      producedTime: DateTime.now(),
+      producedBy: staffName,
+      movementIds: movementIds,
+    );
+    await recipeProductionRepository.saveProduction(production);
+
+    if (lowStockAlerts.isNotEmpty) {
+      NotificationService.instance.showWarning(
+        "Low Stock - ${lowStockAlerts.join(" | ")}",
+      );
+    }
+
+    await itemStore.loadItems();
+    return production;
   }
 
   static Future<double> _deductItemStock(Items item, double quantity) async {
@@ -191,6 +488,19 @@ class InventoryService {
         return false;
       }
 
+
+      // Recipe-Based items derive availability from their ingredients, not
+      // their own (unused) stockQuantity — see §5/§7 of the design doc.
+      if (item.isRecipeBased) {
+        if (!item.allowOrderWhenOutOfStock) {
+          for (final totalQuantity in itemVariantTotals[itemKey]!.values) {
+            if (InventoryService.calculateAvailableToMake(item) < totalQuantity) {
+              return false;
+            }
+          }
+        }
+        continue;
+      }
 
       if (!item.trackInventory) {
         continue;
@@ -352,6 +662,20 @@ class InventoryService {
           }
         }
 
+        // Recipe-Based items have no stock of their own to restore — reverse
+        // the sale-time cascade back into their ingredients instead.
+        if (existingItem.isRecipeBased) {
+          await _restoreRecipeIngredients(
+            recipeItem: existingItem,
+            restoreQty: restockQuantity.toDouble(),
+            items: itemStore.items,
+            stockRepo: stockRepo,
+            staffName: staffName,
+            sessionId: sessionId,
+          );
+          continue;
+        }
+
         if (!existingItem.trackInventory) {
           continue;
         }
@@ -400,6 +724,7 @@ class InventoryService {
           unit: existingItem.unit ?? (existingItem.isSoldByWeight ? 'kg' : 'pcs'),
           staffName: staffName,
           sessionId: sessionId,
+          unitCost: existingItem.lastPurchaseCost,
         ));
 
         // Restock raises stock back up — retire any low-stock notification.
@@ -412,6 +737,54 @@ class InventoryService {
 
     } catch (e) {
       rethrow;
+    }
+  }
+
+  /// Reverses [_deductRecipeIngredients] for a voided/refunded Recipe-Based
+  /// sale — adds each ingredient's consumed quantity back and logs an 'in'
+  /// movement per ingredient, same tracing convention as the deduction path.
+  static Future<void> _restoreRecipeIngredients({
+    required Items recipeItem,
+    required double restoreQty,
+    required List<Items> items,
+    required StockMovementRepository stockRepo,
+    required String staffName,
+    required String? sessionId,
+  }) async {
+    final RecipeModel? recipe = recipeRepository.getRecipeForItem(recipeItem.id);
+    if (recipe == null || !recipe.hasIngredients) return;
+    final yieldQty = recipe.yieldQty > 0 ? recipe.yieldQty : 1.0;
+    final batches = restoreQty / yieldQty;
+
+    for (final line in recipe.ingredients) {
+      Items? ingredient;
+      try {
+        ingredient = items.firstWhere((i) => i.id == line.ingredientItemId);
+      } catch (_) {
+        continue;
+      }
+      if (!ingredient.trackInventory) continue;
+
+      final restoreQtyForLine = batches * line.effectiveQuantity;
+      await _restoreItemStock(ingredient, restoreQtyForLine);
+
+      await stockRepo.saveMovement(StockMovementModel(
+        id: const Uuid().v4(),
+        timestamp: DateTime.now(),
+        itemId: ingredient.id,
+        variantId: null,
+        itemName: ingredient.name,
+        type: 'in',
+        quantity: restoreQtyForLine,
+        balanceAfter: ingredient.stockQuantity,
+        reason: 'Void / Refund return (recipe: ${recipeItem.name})',
+        unit: ingredient.unit ?? (ingredient.isSoldByWeight ? 'kg' : 'pcs'),
+        staffName: staffName,
+        sessionId: sessionId,
+        unitCost: ingredient.lastPurchaseCost,
+      ));
+
+      await notificationStore.resolve('low_stock', 'item', _lowStockSubjectId(ingredient.id, null));
     }
   }
 
