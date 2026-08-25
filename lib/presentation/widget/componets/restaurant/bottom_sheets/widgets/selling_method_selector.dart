@@ -18,16 +18,25 @@ class SellingMethodSheet extends StatefulWidget {
   final SellingMethod currentMethod;
   final String currentUnit;
 
+  /// When true, this is really a "Stock Unit" picker for a back-of-house item
+  /// (Raw Material / Semi-Finished) — the By Unit/By Weight method cards are
+  /// skipped and the unit chips (same list, same widget) render directly,
+  /// since Selling Method is a POS-sale concept that doesn't apply to an
+  /// unsellable ingredient.
+  final bool unitOnly;
+
   const SellingMethodSheet({
     super.key,
     required this.currentMethod,
     required this.currentUnit,
+    this.unitOnly = false,
   });
 
   static Future<SellingMethodResult?> show(
     BuildContext context, {
     required SellingMethod currentMethod,
     required String currentUnit,
+    bool unitOnly = false,
   }) async {
     return showModalBottomSheet<SellingMethodResult>(
       context: context,
@@ -39,6 +48,7 @@ class SellingMethodSheet extends StatefulWidget {
       builder: (_) => SellingMethodSheet(
         currentMethod: currentMethod,
         currentUnit: currentUnit,
+        unitOnly: unitOnly,
       ),
     );
   }
@@ -109,10 +119,13 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Selling Method',
+                    Text(widget.unitOnly ? 'Stock Unit' : 'Selling Method',
                         style: GoogleFonts.poppins(
                             fontSize: 16, fontWeight: FontWeight.w600)),
-                    Text('How is this item measured?',
+                    Text(
+                        widget.unitOnly
+                            ? 'What unit is this item measured and stocked in?'
+                            : 'How is this item measured?',
                         style: GoogleFonts.poppins(
                             fontSize: 12, color: Colors.grey.shade500)),
                   ],
@@ -127,63 +140,29 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
           ),
           const SizedBox(height: 20),
 
-          // ── Method cards ─────────────────────────────────────────────
-          _methodCard(
-            method: SellingMethod.byUnit,
-            label: 'By Unit',
-            subtitle: 'Sold as individual pieces (e.g. burger, pizza)',
-            icon: Icons.countertops_outlined,
-          ),
-          const SizedBox(height: 10),
-          _methodCard(
-            method: SellingMethod.byWeight,
-            label: 'By Weight',
-            subtitle: 'Sold by measurable quantity (e.g. kg, litre)',
-            icon: Icons.scale_outlined,
-          ),
-
-          // ── Unit selector (only for Weight) ──────────────────────────
-          if (_method == SellingMethod.byWeight) ...[
-            const SizedBox(height: 14),
-            Text('Select Unit',
-                style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade600)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _units.map((u) {
-                final isSel = _unit == u;
-                return GestureDetector(
-                  onTap: () => setState(() => _unit = u),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 120),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isSel
-                          ? AppColors.primary
-                          : AppColors.surfaceLight,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color:
-                            isSel ? AppColors.primary : AppColors.divider,
-                      ),
-                    ),
-                    child: Text(u,
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: isSel
-                              ? Colors.white
-                              : AppColors.textSecondary,
-                        )),
-                  ),
-                );
-              }).toList(),
+          // ── Method cards (skipped in Stock Unit mode — Selling Method is
+          // a POS-sale concept that doesn't apply to an unsellable item) ──
+          if (!widget.unitOnly) ...[
+            _methodCard(
+              method: SellingMethod.byUnit,
+              label: 'By Unit',
+              subtitle: 'Sold as individual pieces (e.g. burger, pizza)',
+              icon: Icons.countertops_outlined,
             ),
+            const SizedBox(height: 10),
+            _methodCard(
+              method: SellingMethod.byWeight,
+              label: 'By Weight',
+              subtitle: 'Sold by measurable quantity (e.g. kg, litre)',
+              icon: Icons.scale_outlined,
+            ),
+          ],
+
+          // ── Unit selector — shown for Weight, or unconditionally in
+          // Stock Unit mode ────────────────────────────────────────────
+          if (widget.unitOnly || _method == SellingMethod.byWeight) ...[
+            const SizedBox(height: 14),
+            _unitChips(),
           ],
 
           const SizedBox(height: 20),
@@ -211,6 +190,50 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
           ),
         ],
       ),
+    );
+  }
+
+  /// The unit-chip row — identical whether reached via "By Weight" or via
+  /// Stock Unit mode. Extracted so neither gate duplicates this widget.
+  Widget _unitChips() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Select Unit',
+            style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade600)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _units.map((u) {
+            final isSel = _unit == u;
+            return GestureDetector(
+              onTap: () => setState(() => _unit = u),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isSel ? AppColors.primary : AppColors.surfaceLight,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSel ? AppColors.primary : AppColors.divider,
+                  ),
+                ),
+                child: Text(u,
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isSel ? Colors.white : AppColors.textSecondary,
+                    )),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 
@@ -301,18 +324,27 @@ class SellingMethodButton extends StatelessWidget {
   final String unit;
   final VoidCallback onTap;
 
+  /// See [SellingMethodSheet.unitOnly] — Raw Material/Semi-Finished show this
+  /// as a plain "Stock Unit" picker instead of a Selling Method picker.
+  final bool unitOnly;
+
   const SellingMethodButton({
     super.key,
     required this.method,
     required this.unit,
     required this.onTap,
+    this.unitOnly = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final isByWeight = method == SellingMethod.byWeight;
-    final label = isByWeight ? 'By Weight · $unit' : 'By Unit';
-    final icon = isByWeight ? Icons.scale_outlined : Icons.countertops_outlined;
+    final title = unitOnly ? 'Stock Unit' : 'Selling Method';
+    final label =
+        unitOnly ? unit : (isByWeight ? 'By Weight · $unit' : 'By Unit');
+    final icon = unitOnly
+        ? Icons.straighten_outlined
+        : (isByWeight ? Icons.scale_outlined : Icons.countertops_outlined);
 
     return InkWell(
       onTap: onTap,
@@ -332,7 +364,7 @@ class SellingMethodButton extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Selling Method',
+                  Text(title,
                       style: GoogleFonts.poppins(
                           fontSize: 11,
                           color: AppColors.textSecondary)),

@@ -13,6 +13,12 @@ class RestaurantGRNRepository {
   List<RestaurantGRNModel> getGRNsByPOId(String poId) =>
       _box.values.where((g) => g.poId == poId).toList();
 
+  /// Newest first — drives the supplier detail screen's Documents tab and the
+  /// delete-reference guard.
+  List<RestaurantGRNModel> getGRNsBySupplier(String supplierId) =>
+      _box.values.where((g) => g.supplierId == supplierId).toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
   Future<void> saveGRN(RestaurantGRNModel grn) async {
     await _box.put(grn.grnId, grn);
   }

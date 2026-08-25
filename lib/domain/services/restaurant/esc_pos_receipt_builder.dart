@@ -7,8 +7,11 @@ import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/core/plan/mode_keys.dart';
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/domain/services/restaurant/tax_breakdown.dart';
-import 'package:billberrylite/core/di/service_locator.dart'
-    show taxStore, attributeStore;
+import 'package:billberrylite/core/di/service_locator.dart' show taxStore;
+// describeAttributeMap only — NOT the store, which is retail-only and would
+// throw here. See that function's doc.
+import 'package:billberrylite/domain/store/retail/attribute_store.dart'
+    show describeAttributeMap;
 
 /// Builds raw ESC/POS byte arrays for thermal printers.
 ///
@@ -322,7 +325,7 @@ class EscPosReceiptBuilder {
       // where `size` holds the variant name — those stay bare: "(Large)".
       String name = item.productName ?? 'Item';
       final hasNamedAttributes = item.attributes?.isNotEmpty ?? false;
-      final descriptor = attributeStore.describeAttributes(
+      final descriptor = describeAttributeMap(
         item.attributes,
         size: item.size,
         color: item.color,

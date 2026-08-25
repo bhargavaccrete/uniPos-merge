@@ -9,6 +9,7 @@ import '../../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../../util/restaurant/order_settings.dart';
 import '../../../../../core/plan/plan_enforcement.dart';
 import '../../../../../core/plan/entitlement_keys.dart';
@@ -331,9 +332,12 @@ class _CartScreenState extends State<CartScreen>
           return;
         }
 
-        if (inventoryItem.trackInventory && !inventoryItem.allowOrderWhenOutOfStock) {
+        if (InventoryService.isStockGoverned(inventoryItem) &&
+            !inventoryItem.allowOrderWhenOutOfStock) {
           final requestedQuantity = item.quantity + 1;
-          if (item.variantName != null && inventoryItem.variant != null) {
+          if (!inventoryItem.isRecipeBased &&
+              item.variantName != null &&
+              inventoryItem.variant != null) {
             try {
               final variant = inventoryItem.variant!.firstWhere(
                     (v) => _getVariantName(v.variantId) == item.variantName,
@@ -347,9 +351,11 @@ class _CartScreenState extends State<CartScreen>
               }
             } catch (e) {}
           } else {
-            if (inventoryItem.stockQuantity < requestedQuantity) {
+            final availableStock =
+                InventoryService.effectiveAvailableStock(inventoryItem);
+            if (availableStock.isFinite && availableStock < requestedQuantity) {
               NotificationService.instance.showError(
-                  'Only ${inventoryItem.stockQuantity.toInt()} ${item.title} available in stock');
+                  'Only ${availableStock.toInt()} ${item.title} available in stock');
               return;
             }
           }
@@ -401,8 +407,11 @@ class _CartScreenState extends State<CartScreen>
         } catch (_) {
           return null;
         }
-        if (!inv.trackInventory || inv.allowOrderWhenOutOfStock) return null;
-        if (item.variantName != null && inv.variant != null) {
+        if (!InventoryService.isStockGoverned(inv) ||
+            inv.allowOrderWhenOutOfStock) {
+          return null;
+        }
+        if (!inv.isRecipeBased && item.variantName != null && inv.variant != null) {
           try {
             final v = inv.variant!.firstWhere(
                   (vv) => _getVariantName(vv.variantId) == item.variantName,
@@ -412,7 +421,10 @@ class _CartScreenState extends State<CartScreen>
             return null;
           }
         }
-        return inv.stockQuantity.toInt();
+        final availableStock = InventoryService.effectiveAvailableStock(inv);
+        // Infinite = a Recipe-Based item nothing constrains; "unlimited" is
+        // exactly what null means to this callback.
+        return availableStock.isFinite ? availableStock.toInt() : null;
       },
     );
   }

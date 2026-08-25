@@ -12,6 +12,11 @@ import '../../../util/restaurant/restaurant_session.dart';
 import 'day_management_service.dart';
 import '../common/notification_service.dart';
 
+/// The POS's view of an item's sellability. Mirrors the per-screen enums the
+/// menu and menu-grid already render; they map this onto their own so the
+/// decision itself lives in one place.
+enum PosStockStatus { inStock, orderAvailable, outOfStock, notTracked }
+
 class InventoryService {
   static Future<void> deductStockForOrder(List<CartItem> cartItems) async {
     await itemStore.loadItems();
@@ -125,10 +130,8 @@ class InventoryService {
   }) async {
     final RecipeModel? recipe = recipeRepository.getRecipeForItem(recipeItem.id);
     if (recipe == null || !recipe.hasIngredients) return; // unconfigured recipe — nothing to deduct
-    final yieldQty = recipe.yieldQty > 0 ? recipe.yieldQty : 1.0;
-    final batches = saleQty / yieldQty;
 
-    for (final line in recipe.ingredients) {
+    for (final line in ingredientQuantitiesFor(recipe, saleQty)) {
       Items? ingredient;
       try {
         ingredient = items.firstWhere((i) => i.id == line.ingredientItemId);
@@ -137,7 +140,7 @@ class InventoryService {
       }
       if (!ingredient.trackInventory) continue;
 
-      final deductQty = batches * line.effectiveQuantity;
+      final deductQty = line.quantity;
       final stockAfter = await _deductItemStock(ingredient, deductQty);
 
       await _logMovementAndAlert(
@@ -220,26 +223,51 @@ class InventoryService {
     }
   }
 
-  /// Live "N can be made" count for a Recipe-Based item — the minimum, across
-  /// its recipe's ingredients, of how many batches current ingredient stock
-  /// supports. Recipe-Based items have no stored stock (see
-  /// [Items.isStockDerivedFromRecipe]), so this replaces the stockQuantity
-  /// badge wherever one would normally show. Returns 0 if the item has no
-  /// recipe or an ingredient is out of stock/untracked-missing.
-  /// See docs/inventory_recipe_system_plan.md §7.
-  static double calculateAvailableToMake(Items item) {
-    if (!item.isRecipeBased) return item.stockQuantity;
-    final RecipeModel? recipe = recipeRepository.getRecipeForItem(item.id);
-    if (recipe == null || !recipe.hasIngredients) return 0;
+  /// How much of each ingredient [recipe] consumes to make [outputQty] units
+  /// of its product. One line per recipe row (not merged by ingredient id), so
+  /// a recipe that lists the same ingredient twice still produces two audit
+  /// rows, exactly as before this was extracted.
+  ///
+  /// PURE — no Hive, no service locator. This is the single definition of the
+  /// recipe scaling rule; the sale, void/refund and production paths all call
+  /// it rather than each re-deriving `batches * effectiveQuantity`.
+  static List<({String ingredientItemId, double quantity})> ingredientQuantitiesFor(
+    RecipeModel recipe,
+    double outputQty,
+  ) {
+    final yieldQty = recipe.yieldQty > 0 ? recipe.yieldQty : 1.0;
+    final batches = outputQty / yieldQty;
+    return [
+      for (final line in recipe.ingredients)
+        (
+          ingredientItemId: line.ingredientItemId,
+          quantity: batches * line.effectiveQuantity,
+        ),
+    ];
+  }
+
+  /// The producible quantity [recipe] supports given a stock lookup.
+  ///
+  /// PURE — [lookupIngredient] supplies the ingredient records, so this is
+  /// testable without Hive or the locator. [calculateAvailableToMake] is the
+  /// locator-backed wrapper; both share this one implementation so the POS and
+  /// the Recipes screen can never disagree.
+  ///
+  /// Returns [double.infinity] when no ingredient is inventory-tracked (nothing
+  /// constrains production), and 0 when a referenced ingredient no longer
+  /// exists.
+  static double availableToMakeFrom(
+    RecipeModel recipe,
+    Items? Function(String ingredientItemId) lookupIngredient,
+  ) {
+    if (!recipe.hasIngredients) return 0;
     final yieldQty = recipe.yieldQty > 0 ? recipe.yieldQty : 1.0;
 
     double? minBatches;
     for (final line in recipe.ingredients) {
       if (line.effectiveQuantity <= 0) continue;
-      Items? ingredient;
-      try {
-        ingredient = itemStore.items.firstWhere((i) => i.id == line.ingredientItemId);
-      } catch (_) {
+      final ingredient = lookupIngredient(line.ingredientItemId);
+      if (ingredient == null) {
         return 0; // a required ingredient no longer exists — can't be made
       }
       if (!ingredient.trackInventory) continue; // untracked ingredient never limits availability
@@ -252,6 +280,107 @@ class InventoryService {
     final available = minBatches * yieldQty;
     return available < 0 ? 0 : available.floorToDouble();
   }
+
+  /// Live "N can be made" count for a Recipe-Based item — the minimum, across
+  /// its recipe's ingredients, of how many batches current ingredient stock
+  /// supports. Recipe-Based items have no stored stock (see
+  /// [Items.isStockDerivedFromRecipe]), so this replaces the stockQuantity
+  /// badge wherever one would normally show. Returns 0 if the item has no
+  /// recipe or an ingredient is out of stock/untracked-missing.
+  /// See docs/inventory_recipe_system_plan.md §7.
+  static double calculateAvailableToMake(Items item) {
+    if (!item.isRecipeBased) return item.stockQuantity;
+    final RecipeModel? recipe = recipeRepository.getRecipeForItem(item.id);
+    if (recipe == null) return 0;
+    return availableToMakeFrom(recipe, _lookupItem);
+  }
+
+  static Items? _lookupItem(String id) {
+    try {
+      return itemStore.items.firstWhere((i) => i.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// The availability figure that governs [item], whatever its product type.
+  ///
+  /// Recipe-Based items store no stock of their own, so their availability is
+  /// derived live from ingredients; every other type reports its stored
+  /// [Items.stockQuantity] exactly as before. **This is the only figure the POS
+  /// and the cart guards should compare quantities against** — it keeps the
+  /// recipe calculation in one place instead of scattered through the UI.
+  static double effectiveAvailableStock(Items item) =>
+      item.isRecipeBased ? calculateAvailableToMake(item) : item.stockQuantity;
+
+  /// The POS status implied by an availability figure.
+  ///
+  /// PURE. [available] is whatever [effectiveAvailableStock] returned — a
+  /// stored quantity for directly-stocked items, a derived "can make" count for
+  /// Recipe-Based ones. An infinite [available] means nothing constrains the
+  /// item, which reads the same as untracked.
+  ///
+  /// [allowOrderWhenOutOfStock] is honoured identically for every product
+  /// type: at zero availability it decides between letting the order through
+  /// ([PosStockStatus.orderAvailable]) and blocking it
+  /// ([PosStockStatus.outOfStock]).
+  static PosStockStatus posStatusFromAvailable({
+    required double available,
+    required bool allowOrderWhenOutOfStock,
+  }) {
+    if (available.isInfinite) return PosStockStatus.notTracked;
+    if (available > 0) return PosStockStatus.inStock;
+    return allowOrderWhenOutOfStock
+        ? PosStockStatus.orderAvailable
+        : PosStockStatus.outOfStock;
+  }
+
+  /// Recipe-aware replacement for [Items.isInStock].
+  ///
+  /// The model getter reads the stored `stockQuantity`, which a Recipe-Based
+  /// item never populates — it would report a Burger as out of stock however
+  /// many buns are on the shelf. Every screen that shows stock status should
+  /// call this instead; non-recipe types delegate straight to the model getter,
+  /// so their behaviour is bit-for-bit unchanged.
+  /// [available] overrides the resolved availability — production omits it and
+  /// the figure is looked up; tests supply it so the decision can be exercised
+  /// without Hive or the service locator. One implementation either way.
+  static bool isInStock(Items item, {double? available}) {
+    if (!item.isRecipeBased) return item.isInStock;
+    final a = available ?? effectiveAvailableStock(item);
+    // Infinite = nothing constrains it (no tracked ingredients).
+    return a.isInfinite || a > 0;
+  }
+
+  /// Recipe-aware replacement for [Items.isLowStock].
+  ///
+  /// Applies the same opt-in gates the model getter does (per-item alert flag
+  /// plus the global switch), but measures against how many can be made rather
+  /// than a stored figure. `trackInventory` is deliberately not a gate for
+  /// Recipe-Based items — their ingredients carry their own flags, matching
+  /// [isStockGoverned].
+  /// [available] behaves as it does on [isInStock] — an optional override so
+  /// the decision is testable without the locator.
+  static bool isLowStock(Items item, {double? available}) {
+    if (!item.isRecipeBased) return item.isLowStock;
+    if (!item.lowStockAlertEnabled || !AppSettings.lowStockAlertsEnabled) {
+      return false;
+    }
+    final threshold = item.effectiveLowStockThreshold;
+    if (threshold <= 0) return false;
+    final a = available ?? effectiveAvailableStock(item);
+    if (a.isInfinite) return false;
+    return a > 0 && a <= threshold;
+  }
+
+  /// Whether [item]'s availability is governed by stock at all.
+  ///
+  /// `trackInventory` is the switch for directly-stocked items, but
+  /// Recipe-Based items are always governed — their availability comes from
+  /// ingredients, which have their own tracking flags. Mirrors the branch
+  /// [checkStockAvailability] already applies.
+  static bool isStockGoverned(Items item) =>
+      item.trackInventory || item.isRecipeBased;
 
   /// Produces one batch of a Semi-Finished item from its recipe: validates
   /// every ingredient has enough stock (all-or-nothing — no partial
@@ -275,12 +404,11 @@ class InventoryService {
 
     await itemStore.loadItems();
     final items = itemStore.items;
-    final yieldQty = recipe.yieldQty > 0 ? recipe.yieldQty : 1.0;
-    final batches = batchQty / yieldQty;
+    final requirements = ingredientQuantitiesFor(recipe, batchQty);
 
     // Validate stock availability up front so production is all-or-nothing.
     final List<String> shortages = [];
-    for (final line in recipe.ingredients) {
+    for (final line in requirements) {
       Items? ingredient;
       try {
         ingredient = items.firstWhere((i) => i.id == line.ingredientItemId);
@@ -289,7 +417,7 @@ class InventoryService {
         continue;
       }
       if (!ingredient.trackInventory) continue;
-      final required = batches * line.effectiveQuantity;
+      final required = line.quantity;
       if (ingredient.stockQuantity < required) {
         shortages.add(
           '${ingredient.name} (need ${required.toStringAsFixed(2)}, '
@@ -307,7 +435,7 @@ class InventoryService {
     final lowStockAlerts = <String>[];
     final movementIds = <String>[];
 
-    for (final line in recipe.ingredients) {
+    for (final line in requirements) {
       Items? ingredient;
       try {
         ingredient = items.firstWhere((i) => i.id == line.ingredientItemId);
@@ -316,7 +444,7 @@ class InventoryService {
       }
       if (!ingredient.trackInventory) continue;
 
-      final deductQty = batches * line.effectiveQuantity;
+      final deductQty = line.quantity;
       final stockAfter = await _deductItemStock(ingredient, deductQty);
       final movementId = const Uuid().v4();
       await stockRepo.saveMovement(StockMovementModel(
@@ -366,9 +494,13 @@ class InventoryService {
     await _restoreItemStock(semiFinishedItem, batchQty);
     final producedBalance = semiFinishedItem.stockQuantity;
     final producedMovementId = const Uuid().v4();
-    // Priced at what this batch actually cost to make, not the semi-finished
-    // item's own (usually unset) lastPurchaseCost — it was produced, not
-    // bought. Feeds RecipeReportService.foodCostReport's historical pricing.
+    // Cost per produced unit, from this batch's own recipe cost ÷ yield —
+    // never a manually entered figure. Every downstream cost lookup (a
+    // parent recipe using this Semi-Finished item as an ingredient, Food
+    // Cost Report, ingredient/wastage reports) reads `lastPurchaseCost`, so
+    // it must be written back here or the item's cost stays invisible (₹0)
+    // to all of them. The next production run overwrites it, the same way a
+    // Raw Material's lastPurchaseCost is overwritten by its next GRN.
     final producedUnitCost = recipe.estimatedCostPerUnit((id) {
       Items? ing;
       try {
@@ -378,6 +510,8 @@ class InventoryService {
       }
       return ing.lastPurchaseCost ?? 0.0;
     });
+    semiFinishedItem.lastPurchaseCost = producedUnitCost;
+    await semiFinishedItem.save();
     await stockRepo.saveMovement(StockMovementModel(
       id: producedMovementId,
       timestamp: DateTime.now(),
@@ -493,10 +627,9 @@ class InventoryService {
       // their own (unused) stockQuantity — see §5/§7 of the design doc.
       if (item.isRecipeBased) {
         if (!item.allowOrderWhenOutOfStock) {
+          final available = effectiveAvailableStock(item);
           for (final totalQuantity in itemVariantTotals[itemKey]!.values) {
-            if (InventoryService.calculateAvailableToMake(item) < totalQuantity) {
-              return false;
-            }
+            if (available < totalQuantity) return false;
           }
         }
         continue;
@@ -753,10 +886,8 @@ class InventoryService {
   }) async {
     final RecipeModel? recipe = recipeRepository.getRecipeForItem(recipeItem.id);
     if (recipe == null || !recipe.hasIngredients) return;
-    final yieldQty = recipe.yieldQty > 0 ? recipe.yieldQty : 1.0;
-    final batches = restoreQty / yieldQty;
 
-    for (final line in recipe.ingredients) {
+    for (final line in ingredientQuantitiesFor(recipe, restoreQty)) {
       Items? ingredient;
       try {
         ingredient = items.firstWhere((i) => i.id == line.ingredientItemId);
@@ -765,7 +896,7 @@ class InventoryService {
       }
       if (!ingredient.trackInventory) continue;
 
-      final restoreQtyForLine = batches * line.effectiveQuantity;
+      final restoreQtyForLine = line.quantity;
       await _restoreItemStock(ingredient, restoreQtyForLine);
 
       await stockRepo.saveMovement(StockMovementModel(

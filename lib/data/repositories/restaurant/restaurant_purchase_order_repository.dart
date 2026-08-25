@@ -11,6 +11,12 @@ class RestaurantPurchaseOrderRepository {
 
   RestaurantPurchaseOrderModel? getPurchaseOrderById(String id) => _box.get(id);
 
+  /// Newest first — drives the supplier detail screen's Documents tab and the
+  /// delete-reference guard.
+  List<RestaurantPurchaseOrderModel> getPurchaseOrdersBySupplier(String supplierId) =>
+      _box.values.where((po) => po.supplierId == supplierId).toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
   Future<void> savePurchaseOrder(RestaurantPurchaseOrderModel po) async {
     await _box.put(po.poId, po);
   }

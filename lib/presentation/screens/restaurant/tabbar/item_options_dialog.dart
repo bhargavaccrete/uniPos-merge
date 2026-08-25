@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../../../../constants/restaurant/color.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../data/models/restaurant/db/choiceoptionmodel_307.dart';
@@ -447,14 +448,17 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
           // Bottom: Price + Qty + Add to Cart
           Builder(builder: (_) {
             // Stock check: determine max quantity allowed
-            final bool trackStock = widget.item.trackInventory;
+            final bool trackStock = InventoryService.isStockGoverned(widget.item);
             final bool allowOutOfStock = widget.item.allowOrderWhenOutOfStock;
             double availableStock = 0;
             if (trackStock) {
-              if (_selectedVariant != null) {
+              if (_selectedVariant != null && !widget.item.isRecipeBased) {
                 availableStock = _selectedVariant!.stockQuantity;
               } else {
-                availableStock = widget.item.stockQuantity;
+                // Recipe-Based resolves to "how many can be made" from
+                // ingredients; every other type to its stored stock.
+                availableStock =
+                    InventoryService.effectiveAvailableStock(widget.item);
               }
             }
 
@@ -472,7 +476,11 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
               }
             }
 
-            final bool hasStockLimit = trackStock && !allowOutOfStock;
+            // `availableStock` is infinite for a Recipe-Based item whose
+            // ingredients are all untracked — nothing constrains it, so there
+            // is no ceiling to enforce (and no finite int to clamp against).
+            final bool hasStockLimit =
+                trackStock && !allowOutOfStock && availableStock.isFinite;
             final int maxQty = hasStockLimit ? (availableStock.toInt() - alreadyInCart).clamp(0, 9999) : 9999;
             final bool canIncrease = _quantity < maxQty;
             // Live over-stock check against the selected variant's available qty.

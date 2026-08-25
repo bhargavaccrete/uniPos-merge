@@ -13,6 +13,7 @@ import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../util/restaurant/staticswitch.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../widget/componets/common/app_text_field.dart';
@@ -214,8 +215,24 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
   }
 
   _StockStatus _getStockStatus(Items item) {
-    if (!item.trackInventory) return _StockStatus.notTracked;
+    if (!InventoryService.isStockGoverned(item)) return _StockStatus.notTracked;
     final allowOrderWhenOutOfStock = item.allowOrderWhenOutOfStock;
+    // Recipe-Based: availability comes from ingredients, not a stored figure.
+    if (item.isRecipeBased) {
+      switch (InventoryService.posStatusFromAvailable(
+        available: InventoryService.effectiveAvailableStock(item),
+        allowOrderWhenOutOfStock: allowOrderWhenOutOfStock,
+      )) {
+        case PosStockStatus.inStock:
+          return _StockStatus.inStock;
+        case PosStockStatus.orderAvailable:
+          return _StockStatus.orderAvailable;
+        case PosStockStatus.outOfStock:
+          return _StockStatus.outOfStock;
+        case PosStockStatus.notTracked:
+          return _StockStatus.notTracked;
+      }
+    }
     if (item.variant != null && item.variant!.isNotEmpty) {
       bool hasAnyVariantInStock = false;
       for (var variant in item.variant!) {
@@ -315,7 +332,7 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
     return Observer(
       builder: (_) {
         final enabledItems =
-            itemStore.items.where((i) => i.isEnabled).toList();
+            itemStore.items.where((i) => i.isEnabled && i.sellsAtPos).toList();
         final cats = categoryStore.categoriesWithItems(enabledItems);
         final hasFav = enabledItems.any((i) => i.isFavorite);
         final chips = <Widget>[];
@@ -406,7 +423,7 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
       builder: (_) {
         final cartItems = restaurantCartStore.cartItems.toList();
         final enabledItems =
-            itemStore.items.where((i) => i.isEnabled).toList();
+            itemStore.items.where((i) => i.isEnabled && i.sellsAtPos).toList();
         final categories = categoryStore.categoriesWithItems(enabledItems);
         final q = query.toLowerCase();
 

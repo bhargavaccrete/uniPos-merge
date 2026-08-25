@@ -59,6 +59,10 @@ class AddItemFormState extends ChangeNotifier {
   bool allowOrderWhenOutOfStock = true;
   bool lowStockAlertEnabled = false;
 
+  // POS visibility override — Raw Material only; null follows the type's
+  // default (hidden). See Items.sellDirectlyAtPos.
+  bool? sellDirectlyAtPos;
+
   // Variants, Choices, Extras
   List<Map<String, dynamic>> selectedVariants = [];
   List<String> selectedChoiceIds = [];
@@ -84,6 +88,7 @@ class AddItemFormState extends ChangeNotifier {
     selectedTaxRate = null;
     trackInventory = false;
     allowOrderWhenOutOfStock = true;
+    sellDirectlyAtPos = null;
     selectedVariants.clear();
     selectedChoiceIds.clear();
     selectedExtraIds.clear();
@@ -162,13 +167,24 @@ class AddItemFormState extends ChangeNotifier {
       id: const Uuid().v4(),
       name: itemNameController.text.trim(),
       price: double.tryParse(priceController.text.trim()),
+      // Raw Material only: also seed lastPurchaseCost from the same Cost
+      // Price input, since that's what recipe costing actually reads (B1).
+      lastPurchaseCost: ProductType.seededLastPurchaseCost(
+          productType, double.tryParse(priceController.text.trim())),
       productType: productType,
       description: descriptionController.text.trim(),
       categoryOfItem: selectedCategoryId ?? "",
       imageBytes: selectedImage,
       isVeg: vegCategory,
       isSoldByWeight: sellingMethod == SellingMethod.byWeight,
-      unit: sellingMethod == SellingMethod.byWeight ? selectedUnit : null,
+      // Raw Material/Semi-Finished: this is a stock-keeping unit, independent
+      // of Selling Method (which doesn't apply to an unsellable ingredient),
+      // so it's always persisted. Finished Good/Recipe-Based keep the
+      // original by-weight-only condition, unchanged.
+      unit: (productType == ProductType.rawMaterial ||
+              productType == ProductType.semiFinished)
+          ? selectedUnit
+          : (sellingMethod == SellingMethod.byWeight ? selectedUnit : null),
       // Item-level stock only for simple items; variant items track per variant.
       stockQuantity: (trackInventory && selectedVariants.isEmpty)
           ? (double.tryParse(stockController.text.trim()) ?? 0.0)
@@ -181,6 +197,8 @@ class AddItemFormState extends ChangeNotifier {
           : null,
       trackInventory: trackInventory,
       allowOrderWhenOutOfStock: allowOrderWhenOutOfStock,
+      sellDirectlyAtPos:
+          productType == ProductType.rawMaterial ? sellDirectlyAtPos : null,
       variant: itemVariants,
       choiceIds: selectedChoiceIds,
       extraId: selectedExtraIds,
@@ -261,21 +279,35 @@ class AddItemFormState extends ChangeNotifier {
   /// Set the product type. Back-of-house types are stocked directly, so
   /// inventory tracking is turned on for them by default; a Recipe-Based item
   /// has no stock of its own (it's derived from ingredients), so tracking is
-  /// turned off. All of this stays user-overridable via the toggle.
+  /// turned off. Either way, becoming stock-governed defaults Allow-OOS to
+  /// "block" (matches Edit's existing "enforce limits by default" policy —
+  /// see [setTrackInventory]); Recipe-Based is always stock-governed via its
+  /// ingredients, so it gets the same default. All of this stays
+  /// user-overridable via the toggle/switch.
   void setProductType(String type) {
     productType = type;
     if (type == ProductType.rawMaterial ||
         type == ProductType.semiFinished) {
       trackInventory = true;
+      allowOrderWhenOutOfStock = false;
     } else if (type == ProductType.recipeBased) {
       trackInventory = false;
+      allowOrderWhenOutOfStock = false;
     }
     notifyListeners();
   }
 
-  /// Set track inventory
+  /// Set track inventory. Enabling it defaults Allow-OOS to "block" (NO) —
+  /// matches Edit Item's existing policy so both screens agree.
   void setTrackInventory(bool value) {
     trackInventory = value;
+    if (value) allowOrderWhenOutOfStock = false;
+    notifyListeners();
+  }
+
+  /// Set the Raw Material "Sell directly at POS" override.
+  void setSellDirectlyAtPos(bool value) {
+    sellDirectlyAtPos = value;
     notifyListeners();
   }
 

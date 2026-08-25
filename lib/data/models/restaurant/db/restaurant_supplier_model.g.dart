@@ -26,13 +26,14 @@ class RestaurantSupplierModelAdapter
       currentBalance: fields[5] as double,
       createdAt: fields[6] as String,
       updatedAt: fields[7] as String,
+      openingBalance: fields[8] == null ? 0.0 : fields[8] as double,
     );
   }
 
   @override
   void write(BinaryWriter writer, RestaurantSupplierModel obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.supplierId)
       ..writeByte(1)
@@ -48,7 +49,9 @@ class RestaurantSupplierModelAdapter
       ..writeByte(6)
       ..write(obj.createdAt)
       ..writeByte(7)
-      ..write(obj.updatedAt);
+      ..write(obj.updatedAt)
+      ..writeByte(8)
+      ..write(obj.openingBalance);
   }
 
   @override

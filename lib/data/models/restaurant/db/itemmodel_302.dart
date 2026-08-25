@@ -108,6 +108,9 @@ class Items extends HiveObject {
   @HiveField(30)
   double? lastPurchaseCost; // most recent GRN unit cost — feeds recipe cost calculation
 
+  @HiveField(31)
+  bool? sellDirectlyAtPos; // null = use the per-product-type default (see sellsAtPos)
+
   Items({
     required this.id,
     required this.name,
@@ -140,6 +143,7 @@ class Items extends HiveObject {
     this.productType,
     this.recipeId,
     this.lastPurchaseCost,
+    this.sellDirectlyAtPos,
   });
 
 // --- ADJUSTED HELPER LOGIC ---
@@ -162,6 +166,22 @@ class Items extends HiveObject {
   bool get isStockDerivedFromRecipe =>
       ProductType.isStockDerived(effectiveProductType);
 
+  /// Whether this item appears in the POS sale grid.
+  ///
+  /// Raw Materials are ingredients, not menu items, so they're hidden by
+  /// default; every other product type shows, which is exactly how every
+  /// pre-existing item behaved (they all read as Finished Good). The default
+  /// is overridable per item via [sellDirectlyAtPos] for the rare directly
+  /// sellable raw material — a canned drink bought by the case, say.
+  /// See docs/inventory_recipe_system_plan.md §8.1/§9.1.
+  bool get sellsAtPos => sellDirectlyAtPos ?? !isRawMaterial;
+
+  /// NOTE: [isInStock]/[isLowStock] read the *stored* [stockQuantity], which
+  /// Recipe-Based items never populate. Callers that must be correct for every
+  /// product type should go through `InventoryService.effectiveAvailableStock`
+  /// (or `stockStatusOf`), which resolves recipe availability from ingredients.
+  /// These getters stay stock-field-based so this model has no dependency on
+  /// the service locator.
   bool get isInStock {
     // For variant items, the ITEM's trackInventory governs; stock is read from
     // each variant's own quantity (a variant's own trackInventory flag is
@@ -277,6 +297,7 @@ class Items extends HiveObject {
     String? productType,
     String? recipeId,
     double? lastPurchaseCost,
+    bool? sellDirectlyAtPos,
   }) {
     return Items(
       id: id ?? this.id,
@@ -310,6 +331,7 @@ class Items extends HiveObject {
       productType: productType ?? this.productType,
       recipeId: recipeId ?? this.recipeId,
       lastPurchaseCost: lastPurchaseCost ?? this.lastPurchaseCost,
+      sellDirectlyAtPos: sellDirectlyAtPos ?? this.sellDirectlyAtPos,
     );
   }
 
@@ -347,6 +369,7 @@ class Items extends HiveObject {
       'productType': productType,
       'recipeId': recipeId,
       'lastPurchaseCost': lastPurchaseCost,
+      'sellDirectlyAtPos': sellDirectlyAtPos,
     };
   }
 
@@ -440,6 +463,7 @@ class Items extends HiveObject {
       productType: map['productType'] as String?,
       recipeId: map['recipeId'] as String?,
       lastPurchaseCost: (map['lastPurchaseCost'] as num?)?.toDouble(),
+      sellDirectlyAtPos: map['sellDirectlyAtPos'] as bool?,
     );
   }
 }

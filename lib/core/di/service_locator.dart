@@ -49,6 +49,7 @@ import 'package:billberrylite/data/repositories/restaurant/restaurant_purchase_r
 import 'package:billberrylite/data/repositories/restaurant/restaurant_supplier_claim_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/restaurant_inventory_loss_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/restaurant_stock_take_repository.dart';
+import 'package:billberrylite/data/repositories/restaurant/restaurant_supplier_ledger_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/variant_repository.dart' as restaurant;
 import 'package:billberrylite/data/repositories/restaurant/choice_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/extra_repository.dart';
@@ -73,6 +74,7 @@ import 'package:billberrylite/domain/store/restaurant/item_store.dart';
 import 'package:billberrylite/domain/store/restaurant/restaurant_purchase_order_store.dart';
 import 'package:billberrylite/domain/store/restaurant/restaurant_damaged_goods_store.dart';
 import 'package:billberrylite/domain/store/restaurant/restaurant_stock_take_store.dart';
+import 'package:billberrylite/domain/store/restaurant/restaurant_supplier_store.dart';
 import 'package:billberrylite/domain/store/restaurant/variant_store.dart';
 import 'package:billberrylite/domain/store/restaurant/choice_store.dart';
 import 'package:billberrylite/domain/store/restaurant/extra_store.dart';
@@ -327,6 +329,7 @@ Future<void> _registerRestaurantDependencies() async {
   locator.registerLazySingleton<RestaurantSupplierClaimRepository>(() => RestaurantSupplierClaimRepository());
   locator.registerLazySingleton<RestaurantInventoryLossRepository>(() => RestaurantInventoryLossRepository());
   locator.registerLazySingleton<RestaurantStockTakeRepository>(() => RestaurantStockTakeRepository());
+  locator.registerLazySingleton<RestaurantSupplierLedgerRepository>(() => RestaurantSupplierLedgerRepository());
   locator.registerLazySingleton<VariantRepositoryRes>(() => restaurant.VariantRepositoryRes());
   locator.registerLazySingleton<ChoiceRepository>(() => ChoiceRepository());
   locator.registerLazySingleton<ExtraRepository>(() => ExtraRepository());
@@ -362,6 +365,9 @@ Future<void> _registerRestaurantDependencies() async {
   );
   locator.registerLazySingleton<RestaurantDamagedGoodsStore>(
     () => RestaurantDamagedGoodsStore(),
+  );
+  locator.registerLazySingleton<RestaurantSupplierStore>(
+    () => RestaurantSupplierStore(),
   );
   locator.registerLazySingleton<RestaurantStockTakeStore>(
     () => RestaurantStockTakeStore(),
@@ -519,6 +525,9 @@ RestaurantDamagedGoodsStore get restaurantDamagedGoodsStore =>
     locator<RestaurantDamagedGoodsStore>();
 RestaurantStockTakeStore get restaurantStockTakeStore =>
     locator<RestaurantStockTakeStore>();
+
+RestaurantSupplierStore get restaurantSupplierStore =>
+    locator<RestaurantSupplierStore>();
 VariantStore get variantStore => locator<VariantStore>();
 ChoiceStore get choiceStore => locator<ChoiceStore>();
 ExtraStore get extraStore => locator<ExtraStore>();
@@ -556,6 +565,7 @@ RestaurantPurchaseReturnRepository get restaurantPurchaseReturnRepository => loc
 RestaurantSupplierClaimRepository get restaurantSupplierClaimRepository => locator<RestaurantSupplierClaimRepository>();
 RestaurantInventoryLossRepository get restaurantInventoryLossRepository => locator<RestaurantInventoryLossRepository>();
 RestaurantStockTakeRepository get restaurantStockTakeRepository => locator<RestaurantStockTakeRepository>();
+RestaurantSupplierLedgerRepository get restaurantSupplierLedgerRepository => locator<RestaurantSupplierLedgerRepository>();
 restaurant.VariantRepositoryRes get restaurantVariantRepository => locator<restaurant.VariantRepositoryRes>();
 ChoiceRepository get choiceRepository => locator<ChoiceRepository>();
 ExtraRepository get extraRepository => locator<ExtraRepository>();

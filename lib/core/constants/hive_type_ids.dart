@@ -1,13 +1,35 @@
 /// Hive TypeAdapter IDs for all models in the app
 ///
 /// ID Ranges (MUST be 0-223 due to Hive limitation):
-/// - Common Models: 1-19
-/// - Restaurant Models: 100-149
-/// - Retail Models: 150-223
+/// - Common Models:              1-19
+/// - Restaurant Models:          100-149   ← FULL, do not add here
+/// - Retail Models:              150-184   (assigned so far)
+/// - Restaurant OVERFLOW:        185-199   ← new restaurant models go here
+/// - Retail Models (future):     200-223
 ///
 /// IMPORTANT: Once assigned, these IDs should NEVER be changed
 /// as it will break existing Hive databases.
 /// NOTE: Hive only allows TypeIds from 0 to 223!
+///
+/// ## Why there is a restaurant overflow range
+///
+/// The original layout gave restaurant 100-149 and retail 150-223. Restaurant
+/// filled its 50 slots (the last seven went to the damaged-goods/stock-take
+/// chain, 143-149), so a new restaurant model has nowhere to go inside its
+/// own block.
+///
+/// The 100-149 boundary is a *convention*, not a runtime constraint — verified
+/// before this range was carved out:
+///   - Hive's hard limit is 223; the highest id assigned anywhere was 184.
+///   - All 82 adapters in the app resolve their typeId through this class
+///     (only `paymentMethod`'s literal 6 is inline), and none collide.
+///   - `isRestaurantModel` / `isRetailModel` / `restaurantModelIds` /
+///     `retailModelIds` below have ZERO consumers in lib/ — nothing at runtime
+///     branches on which range an id falls in.
+///
+/// So restaurant continues at 185. Retail's next id must start at **200**, not
+/// 185, or the two modes will collide — that is the only rule this split adds.
+/// Restaurant has 186-199 (14 slots) left; retail has 200-223 (24 slots).
 
 class HiveTypeIds {
   HiveTypeIds._(); // Private constructor to prevent instantiation
@@ -163,6 +185,18 @@ class HiveTypeIds {
   /// restaurant's RecipeProductionModel.
   static const int retailKitAssembly = 184;
 
+  // NOTE: the next RETAIL id is 200, not 185 — 185-199 is the restaurant
+  // overflow range reserved below. See the range map at the top of this file.
+
+  // ============ RESTAURANT OVERFLOW (185-199) ============
+  // The 100-149 restaurant block is full. New restaurant models are assigned
+  // here instead. Next free: 186.
+
+  /// Journal behind `RestaurantSupplierModel.currentBalance`. One row per
+  /// movement so the balance can be explained, not just stated — the same
+  /// contract as retail's `retailSupplierLedgerEntry` (179).
+  static const int restaurantSupplierLedgerEntry = 185;
+
   // ==================== HELPER METHODS ====================
 
   /// Check if a typeId belongs to retail models
@@ -257,5 +291,17 @@ class HiveTypeIds {
     restaurantPurchaseOrderItem,
     restaurantGrn,
     restaurantGrnItem,
+    restaurantPurchaseReturn,
+    restaurantPurchaseReturnItem,
+    restaurantSupplierClaim,
+    restaurantSupplierClaimItem,
+    restaurantInventoryLoss,
+    restaurantStockTake,
+    restaurantStockTakeItem,
+    restaurantSupplierLedgerEntry,
   ];
+
+  /// True for ids in the restaurant overflow range carved out above.
+  static bool isRestaurantOverflowModel(int typeId) =>
+      typeId >= 185 && typeId <= 199;
 }

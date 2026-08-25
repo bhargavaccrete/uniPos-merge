@@ -16,6 +16,56 @@ part 'attribute_store.g.dart';
 /// expose the base class's statics.
 const List<String> kBaseAttributeNames = ['Size', 'Color', 'Weight'];
 
+/// Human-readable descriptor for a stored attribute map, falling back to the
+/// legacy `size`/`color`/`weight` columns for records saved before generic
+/// attributes existed.
+///
+/// [labelled] true → `Size: L · Color: Red`; false → `L · Red`. Returns an
+/// empty string when there is nothing to show, so callers can decide whether to
+/// render a line at all.
+///
+/// **Top-level, not a store method, on purpose.** It reads nothing off
+/// `AttributeStore` — only its arguments — and the receipt builders that call it
+/// run in BOTH modes: restaurant's bill/KOT print reuses retail's
+/// `ReceiptPdfService` and `PrintService`. `AttributeStore` is registered only
+/// by `_registerRetailDependencies()`, so going through the store crashed
+/// restaurant printing with "GetIt: Object/factory with type AttributeStore is
+/// not registered". Restaurant items carry no attribute map and fall through to
+/// the legacy columns, which needs no store at all.
+String describeAttributeMap(
+  Map<String, String>? attributes, {
+  String? size,
+  String? color,
+  String? weight,
+  bool labelled = true,
+  String separator = ' · ',
+}) {
+  final source = <String, String>{};
+
+  if (attributes != null) {
+    attributes.forEach((key, value) {
+      if (key.trim().isNotEmpty && value.trim().isNotEmpty) {
+        source[key] = value.trim();
+      }
+    });
+  }
+
+  if (source.isEmpty) {
+    // Legacy fallback — pre-migration records carry only these three.
+    if (size != null && size.trim().isNotEmpty) source['Size'] = size.trim();
+    if (color != null && color.trim().isNotEmpty) source['Color'] = color.trim();
+    if (weight != null && weight.trim().isNotEmpty) {
+      source['Weight'] = weight.trim();
+    }
+  }
+
+  if (source.isEmpty) return '';
+
+  return source.entries
+      .map((e) => labelled ? '${e.key}: ${e.value}' : e.value)
+      .join(separator);
+}
+
 /// Starter values for every attribute the app knows how to seed, keyed by
 /// attribute name. A name absent from here is still created by
 /// [_AttributeStoreBase.ensureBaseAttributes] — just with no values, which the
@@ -598,6 +648,11 @@ abstract class _AttributeStoreBase with Store {
   /// [labelled] true → `Size: L · Color: Red`; false → `L · Red`.
   /// Returns an empty string when there is nothing to show, so callers can
   /// decide whether to render a line at all.
+  ///
+  /// Thin delegate to [describeAttributeMap] — the logic reads nothing off this
+  /// store, and **code that can run in restaurant mode must call the top-level
+  /// function instead**, because `AttributeStore` is only registered for
+  /// retail. See that function's doc.
   String describeAttributes(
     Map<String, String>? attributes, {
     String? size,
@@ -605,32 +660,15 @@ abstract class _AttributeStoreBase with Store {
     String? weight,
     bool labelled = true,
     String separator = ' · ',
-  }) {
-    final source = <String, String>{};
-
-    if (attributes != null) {
-      attributes.forEach((key, value) {
-        if (key.trim().isNotEmpty && value.trim().isNotEmpty) {
-          source[key] = value.trim();
-        }
-      });
-    }
-
-    if (source.isEmpty) {
-      // Legacy fallback — pre-migration records carry only these three.
-      if (size != null && size.trim().isNotEmpty) source['Size'] = size.trim();
-      if (color != null && color.trim().isNotEmpty) source['Color'] = color.trim();
-      if (weight != null && weight.trim().isNotEmpty) {
-        source['Weight'] = weight.trim();
-      }
-    }
-
-    if (source.isEmpty) return '';
-
-    return source.entries
-        .map((e) => labelled ? '${e.key}: ${e.value}' : e.value)
-        .join(separator);
-  }
+  }) =>
+      describeAttributeMap(
+        attributes,
+        size: size,
+        color: color,
+        weight: weight,
+        labelled: labelled,
+        separator: separator,
+      );
 
   /// Case-insensitive lookup by name.
   AttributeModel? getAttributeByName(String name) {

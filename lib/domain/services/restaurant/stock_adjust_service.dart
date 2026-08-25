@@ -11,6 +11,7 @@ import '../../../util/restaurant/restaurant_session.dart';
 import '../../../util/restaurant/staticswitch.dart';
 import '../common/document_number_service.dart';
 import 'day_management_service.dart';
+import 'inventory_service.dart';
 
 /// Safe variant-name lookup — returns 'Variant' if not found instead of
 /// crashing on an empty catalog (e.g. variant deleted while still on an item).
@@ -86,16 +87,30 @@ class StockAdjustService {
   /// Every item/variant currently low or out of stock (opted-in only).
   /// Used by both the inventory alert badge and the low-stock screen so the
   /// count and the list always agree.
+  ///
+  /// Recipe-Based items are measured on how many their ingredients can make
+  /// (via [InventoryService.effectiveAvailableStock]) rather than on a
+  /// `stockQuantity` they never populate — otherwise a Burger with a full
+  /// pantry would be reported out of stock forever. Their `trackInventory`
+  /// flag is not a gate for the same reason it isn't at the POS: their
+  /// ingredients carry their own tracking flags. Every other product type
+  /// takes exactly the path it took before.
   static List<StockAlertEntry> lowStockEntries() {
     final result = <StockAlertEntry>[];
     for (final item in itemStore.items) {
-      if (!item.trackInventory ||
+      if (!InventoryService.isStockGoverned(item) ||
           !item.lowStockAlertEnabled ||
           !AppSettings.lowStockAlertsEnabled) {
         continue;
       }
       final threshold = item.effectiveLowStockThreshold;
-      if (item.hasVariants) {
+      if (item.isRecipeBased) {
+        final available = InventoryService.effectiveAvailableStock(item);
+        // Infinite = nothing constrains it; never an alert.
+        if (available.isFinite && (available <= 0 || available <= threshold)) {
+          result.add(StockAlertEntry(item: item, stock: available));
+        }
+      } else if (item.hasVariants) {
         for (final v in item.variant!) {
           final qty = v.stockQuantity ?? 0;
           if (qty <= 0 || qty <= threshold) {

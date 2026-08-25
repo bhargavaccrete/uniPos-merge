@@ -103,6 +103,8 @@ class _EdititemScreenState extends State<EdititemScreen> {
 
   // Product Type + Recipe (BOM) — see docs/inventory_recipe_system_plan.md
   String _productType = ProductType.finishedGood;
+  // null = follow the product-type default (Raw Material hidden, rest shown).
+  bool? _sellDirectlyAtPos;
   RecipeModel? _currentRecipe;
 
   // Live option catalogs (mutable so options created via "+ New" appear
@@ -170,6 +172,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
     allowOutOfStockFilter = widget.items.allowOrderWhenOutOfStock == true ? 'YES' : 'NO';
 
     _productType = widget.items.effectiveProductType;
+    _sellDirectlyAtPos = widget.items.sellDirectlyAtPos;
     _currentRecipe = recipeRepository.getRecipeForItem(widget.items.id);
 
     _loadDataFuture = _loadInitialData();
@@ -306,6 +309,21 @@ class _EdititemScreenState extends State<EdititemScreen> {
       return;
     }
 
+    // Menu-facing types (Finished Good, Recipe-Based) need a selling price and
+    // a category — matches Add Item's validate(). Raw Material/Semi-Finished
+    // stay optional, as today.
+    if (ProductType.isMenuType(_productType)) {
+      final priceValue = double.tryParse(_itemPriceController.text.trim());
+      if (priceValue == null || priceValue <= 0) {
+        NotificationService.instance.showError('Please enter a valid selling price');
+        return;
+      }
+      if (selectedCategoryId.isEmpty) {
+        NotificationService.instance.showError('Please select a category');
+        return;
+      }
+    }
+
     if (_isSaving) return;
     setState(() => _isSaving = true);
 
@@ -399,6 +417,10 @@ class _EdititemScreenState extends State<EdititemScreen> {
     final updateItem = widget.items.copyWith(
       name: trimmedName,
       price: double.tryParse(_itemPriceController.text.trim()),
+      // Raw Material only: also seed lastPurchaseCost from the same Cost
+      // Price input, since that's what recipe costing actually reads (B1).
+      lastPurchaseCost: ProductType.seededLastPurchaseCost(
+          _productType, double.tryParse(_itemPriceController.text.trim())),
       description: _descController.text.trim(),
       isVeg: selectedIMGCategory,
       categoryOfItem: selectedCategoryId,
@@ -408,10 +430,16 @@ class _EdititemScreenState extends State<EdititemScreen> {
       defaultChoiceOptionIds: _defaultChoiceOptionIds,
       extraId: selectedExtraId,
       extraConstraints: extraConstraints.isNotEmpty ? extraConstraints : null,
-      trackInventory: selectedFilter.toLowerCase() == 'yes',
       allowOrderWhenOutOfStock: allowOutOfStockFilter.toLowerCase() == 'yes',
       isSoldByWeight: _sellingMethod == SellingMethod.byWeight,
-      unit: _sellingMethod == SellingMethod.byWeight ? _selectedUnit : null,
+      // Raw Material/Semi-Finished: a stock-keeping unit, independent of
+      // Selling Method (a POS-sale concept that doesn't apply to them), so
+      // it's always persisted. Finished Good/Recipe-Based keep the original
+      // by-weight-only condition, unchanged.
+      unit: (_productType == ProductType.rawMaterial ||
+              _productType == ProductType.semiFinished)
+          ? _selectedUnit
+          : (_sellingMethod == SellingMethod.byWeight ? _selectedUnit : null),
       itemCode: itemCode,
       productType: _productType,
     );
@@ -426,6 +454,12 @@ class _EdititemScreenState extends State<EdititemScreen> {
     updateItem.recipeId =
         ProductType.hasRecipe(_productType) ? _currentRecipe?.id : null;
 
+    // sellDirectlyAtPos: same direct-set reason. Only Raw Materials carry an
+    // override; switching to any other type clears it back to null so the item
+    // follows that type's default (all of which are "sellable").
+    updateItem.sellDirectlyAtPos =
+        _productType == ProductType.rawMaterial ? _sellDirectlyAtPos : null;
+
     // Low-stock alert (only meaningful when inventory tracking is on).
     // Set directly so turning tracking/alert off clears the override.
     final lowStockOn =
@@ -436,16 +470,32 @@ class _EdititemScreenState extends State<EdititemScreen> {
 
     // Item-level stock for SIMPLE items (no variants). Variant items keep the
     // item-level quantity at 0 and track stock per-variant instead.
+    final requestedStockQuantity = !_variantCheckedList.contains(true)
+        ? (selectedFilter.toLowerCase() == 'yes'
+            ? (double.tryParse(_stockController.text.trim()) ?? 0.0)
+            : 0.0)
+        : 0.0;
+    // Recipe-Based items derive availability from their recipe and must never
+    // carry over stale tracking/quantity from before a type switch — see
+    // ProductType.resolvePhysicalStock. Every other type passes through
+    // unchanged.
+    final physicalStock = ProductType.resolvePhysicalStock(
+      _productType,
+      requestedTrackInventory: selectedFilter.toLowerCase() == 'yes',
+      requestedStockQuantity: requestedStockQuantity,
+    );
+    updateItem.trackInventory = physicalStock.trackInventory;
     if (!_variantCheckedList.contains(true)) {
       final oldStock = widget.items.stockQuantity;
-      final newStock = selectedFilter.toLowerCase() == 'yes'
-          ? (double.tryParse(_stockController.text.trim()) ?? 0.0)
-          : 0.0;
-      updateItem.stockQuantity = newStock;
+      updateItem.stockQuantity = physicalStock.stockQuantity;
       // Log an adjustment if a tracked item's stock actually changed.
-      if (selectedFilter.toLowerCase() == 'yes' && newStock != oldStock) {
-        pendingSimpleAdjustment = {'old': oldStock, 'new': newStock};
+      if (physicalStock.trackInventory && physicalStock.stockQuantity != oldStock) {
+        pendingSimpleAdjustment = {'old': oldStock, 'new': physicalStock.stockQuantity};
       }
+    } else if (ProductType.isStockDerived(_productType)) {
+      // A variant-having item switched to Recipe-Based must not retain stale
+      // item-level stock either, even though variants normally govern it.
+      updateItem.stockQuantity = 0.0;
     }
 
     AuditTrailHelper.trackEdit(updateItem, editedBy: RestaurantSession.staffName ?? RestaurantSession.effectiveRole);
@@ -575,14 +625,28 @@ class _EdititemScreenState extends State<EdititemScreen> {
           ),
           const SizedBox(height: 25),
 
-          // Selling Method Section
-          _buildSectionHeader('Selling Method', Icons.scale),
-          const SizedBox(height: 15),
-          SellingMethodButton(
-            method: _sellingMethod,
-            unit: _selectedUnit,
-            onTap: _selectSellingMethod,
-          ),
+          // Selling Method Section — Raw Material/Semi-Finished get a plain
+          // Stock Unit picker instead (they aren't sold, so Selling Method
+          // doesn't apply).
+          if (_productType == ProductType.rawMaterial ||
+              _productType == ProductType.semiFinished) ...[
+            _buildSectionHeader('Stock Unit', Icons.straighten_outlined),
+            const SizedBox(height: 15),
+            SellingMethodButton(
+              method: _sellingMethod,
+              unit: _selectedUnit,
+              unitOnly: true,
+              onTap: _selectStockUnit,
+            ),
+          ] else ...[
+            _buildSectionHeader('Selling Method', Icons.scale),
+            const SizedBox(height: 15),
+            SellingMethodButton(
+              method: _sellingMethod,
+              unit: _selectedUnit,
+              onTap: _selectSellingMethod,
+            ),
+          ],
           const SizedBox(height: 25),
 
           // Price
@@ -633,9 +697,35 @@ class _EdititemScreenState extends State<EdititemScreen> {
                 // Switching away from a recipe type drops the in-progress
                 // recipe rather than silently keeping stale ingredients.
                 if (!ProductType.hasRecipe(type)) _currentRecipe = null;
+                // Recipe-Based is always stock-governed via its ingredients —
+                // same "enforce limits by default" policy as enabling
+                // inventory tracking above, so Add and Edit agree.
+                if (type == ProductType.recipeBased) {
+                  allowOutOfStockFilter = 'NO';
+                }
               });
             },
           ),
+          // Raw Materials are ingredients, not menu items, so they stay out of
+          // the POS sale grid unless explicitly opted in. Only shown for that
+          // type — every other type is sellable and has nothing to decide.
+          if (_productType == ProductType.rawMaterial) ...[
+            const SizedBox(height: 6),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: Text('Sell directly at POS',
+                  style: GoogleFonts.poppins(
+                      fontSize: 14, fontWeight: FontWeight.w500)),
+              subtitle: Text(
+                  'Raw materials are hidden from the menu by default. Turn on to sell this one as-is.',
+                  style: GoogleFonts.poppins(
+                      fontSize: 12, color: AppColors.textSecondary)),
+              value: _sellDirectlyAtPos ?? false,
+              activeColor: AppColors.primary,
+              onChanged: (v) => setState(() => _sellDirectlyAtPos = v),
+            ),
+          ],
           const SizedBox(height: 25),
 
           // Tax Section
@@ -712,6 +802,25 @@ class _EdititemScreenState extends State<EdititemScreen> {
             _buildSectionHeader('Availability', Icons.inventory_2_outlined),
             const SizedBox(height: 15),
             _buildAvailableToMakeCard(),
+            const SizedBox(height: 14),
+            // No physical stock for Recipe-Based — this only controls whether
+            // POS may sell when the calculated available-to-make figure is
+            // zero, exactly as InventoryService already enforces.
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: Text('Allow order if out of stock',
+                  style: GoogleFonts.poppins(
+                      fontSize: 14, fontWeight: FontWeight.w500)),
+              subtitle: Text(
+                  'Let staff sell this even when no ingredients remain to make it.',
+                  style: GoogleFonts.poppins(
+                      fontSize: 12, color: AppColors.textSecondary)),
+              value: allowOutOfStockFilter.toLowerCase() == 'yes',
+              activeColor: AppColors.primary,
+              onChanged: (v) =>
+                  setState(() => allowOutOfStockFilter = v ? 'YES' : 'NO'),
+            ),
             const SizedBox(height: 25),
           ],
 
@@ -788,6 +897,21 @@ class _EdititemScreenState extends State<EdititemScreen> {
         _sellingMethod = result.method;
         _selectedUnit = result.unit;
       });
+    }
+  }
+
+  /// Raw Material/Semi-Finished's stock-keeping unit — independent of
+  /// Selling Method, which stays a pure POS-sale concept for menu types.
+  Future<void> _selectStockUnit() async {
+    FocusScope.of(context).unfocus();
+    final result = await SellingMethodSheet.show(
+      context,
+      currentMethod: _sellingMethod,
+      currentUnit: _selectedUnit,
+      unitOnly: true,
+    );
+    if (result != null) {
+      setState(() => _selectedUnit = result.unit);
     }
   }
 

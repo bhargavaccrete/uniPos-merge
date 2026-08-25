@@ -267,6 +267,10 @@ class HiveBoxNames {
   /// Restaurant stock take line items
   static const String restaurantStockTakeItems = 'restaurantStockTakeItemsBox';
 
+  /// Journal behind every restaurant supplier balance movement. One row per
+  /// movement, written only by `RestaurantSupplierStore.recordBalanceMovement`.
+  static const String restaurantSupplierLedger = 'restaurantSupplierLedgerBox';
+
   // ==================== HELPER METHODS ====================
 
   /// Get the appropriate EOD box name based on business mode
@@ -377,6 +381,7 @@ class HiveBoxNames {
     restaurantInventoryLosses,
     restaurantStockTakes,
     restaurantStockTakeItems,
+    restaurantSupplierLedger,
   ];
 
   /// All common box names (shared between retail and restaurant)

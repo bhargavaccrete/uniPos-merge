@@ -14,6 +14,7 @@ import '../../../../../util/common/app_responsive.dart';
 import '../../../../../util/restaurant/staticswitch.dart';
 import '../../../../../domain/services/restaurant/stock_adjust_service.dart';
 import '../../../../../data/models/restaurant/db/product_type.dart';
+import '../../../../../util/common/currency_helper.dart';
 import '../../../../screens/restaurant/item/add_more_info_screen.dart';
 import 'tax_selector_sheet.dart';
 import 'add_category_dialog.dart';
@@ -184,6 +185,13 @@ class _AddItemSheetState extends State<AddItemSheet> {
         return; // keep the sheet open; don't fire onItemAdded / pop
       }
       await StockAdjustService.recordOpeningStock(item);
+      // Semi-Finished/Recipe-Based items are created with no recipe (that's
+      // built in Edit) — make the incomplete state obvious instead of
+      // silently allowing a recipeless item to look fully configured.
+      if (ProductType.hasRecipe(item.productType)) {
+        NotificationService.instance.showWarning(
+            '${item.name} saved — add its recipe in Edit before selling it.');
+      }
       widget.onItemAdded?.call();
       if (mounted) {
         Navigator.pop(context);
@@ -412,14 +420,24 @@ class _AddItemSheetState extends State<AddItemSheet> {
 
   List<Widget> _formFields() {
     final isRecipeBased = _formState.productType == ProductType.recipeBased;
+    final isBackOfHouse = _formState.productType == ProductType.rawMaterial ||
+        _formState.productType == ProductType.semiFinished;
     return [
+      // Product Type drives every other field below it, so it's the first
+      // decision the user makes.
+      _buildProductTypeSelector(),
+      const SizedBox(height: 18),
+      if (_formState.productType == ProductType.rawMaterial) ...[
+        _buildSellDirectlyAtPosToggle(),
+        const SizedBox(height: 14),
+      ],
       _buildItemNameField(),
       const SizedBox(height: 14),
       _buildItemCodeField(),
       const SizedBox(height: 18),
-      _buildProductTypeSelector(),
-      const SizedBox(height: 18),
-      _buildSellingMethodSelector(),
+      // Raw Material/Semi-Finished aren't sold, so Selling Method (a POS
+      // concept) is replaced by a plain Stock Unit picker.
+      isBackOfHouse ? _buildStockUnitSelector() : _buildSellingMethodSelector(),
       const SizedBox(height: 14),
       _buildPriceField(),
       const SizedBox(height: 14),
@@ -434,10 +452,15 @@ class _AddItemSheetState extends State<AddItemSheet> {
       _buildDescriptionField(),
       const SizedBox(height: 14),
       // Recipe-Based items have no stock of their own — availability is derived
-      // live from their ingredients, so the stock module is replaced by a note.
-      if (isRecipeBased)
-        _buildRecipeBasedStockNote()
-      else ...[
+      // live from their ingredients, so the stock module is replaced by a note
+      // plus the one stock-adjacent setting that still applies: Allow Order
+      // When Out of Stock, which the inventory service enforces against the
+      // calculated available-to-make figure, not a physical quantity.
+      if (isRecipeBased) ...[
+        _buildRecipeBasedStockNote(),
+        const SizedBox(height: 14),
+        _buildRecipeBasedAllowOOSToggle(),
+      ] else ...[
         _buildInventoryToggle(),
         if (_formState.trackInventory) ...[
           if (_formState.selectedVariants.isEmpty) ...[
@@ -743,7 +766,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
           hint: '0.00',
           prefixWidget: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            child: Text('₹',
+            child: Text(CurrencyHelper.currentSymbol,
                 style: GoogleFonts.poppins(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -826,6 +849,67 @@ class _AddItemSheetState extends State<AddItemSheet> {
       method: _formState.sellingMethod,
       unit: _formState.selectedUnit,
       onTap: _selectSellingMethod,
+    );
+  }
+
+  Future<void> _selectStockUnit() async {
+    FocusScope.of(context).unfocus();
+    final result = await SellingMethodSheet.show(
+      context,
+      currentMethod: _formState.sellingMethod,
+      currentUnit: _formState.selectedUnit,
+      unitOnly: true,
+    );
+    if (result != null) {
+      setState(() => _formState.setUnit(result.unit));
+    }
+  }
+
+  /// Raw Material/Semi-Finished's stock-keeping unit — independent of
+  /// Selling Method, which stays a pure POS-sale concept for menu types.
+  Widget _buildStockUnitSelector() {
+    return SellingMethodButton(
+      method: _formState.sellingMethod,
+      unit: _formState.selectedUnit,
+      unitOnly: true,
+      onTap: _selectStockUnit,
+    );
+  }
+
+  /// Raw Material only — mirrors Edit Item's identical switch. Default OFF:
+  /// a Raw Material stays hidden from the POS grid unless explicitly opted in.
+  Widget _buildSellDirectlyAtPosToggle() {
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      title: Text('Sell directly at POS',
+          style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
+      subtitle: Text(
+          'Raw materials are hidden from the menu by default. Turn on to sell this one as-is.',
+          style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
+      value: _formState.sellDirectlyAtPos ?? false,
+      activeColor: AppColors.primary,
+      onChanged: (v) => setState(() => _formState.setSellDirectlyAtPos(v)),
+    );
+  }
+
+  /// Recipe-Based items hold no physical stock — this controls only whether
+  /// POS may sell when the calculated available-to-make figure is zero,
+  /// exactly as InventoryService already enforces; it never implies a
+  /// tracked quantity.
+  Widget _buildRecipeBasedAllowOOSToggle() {
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      title: Text('Allow order if out of stock',
+          style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
+      subtitle: Text(
+          'Let staff sell this even when no ingredients remain to make it.',
+          style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
+      value: _formState.allowOrderWhenOutOfStock,
+      activeColor: AppColors.primary,
+      onChanged: (v) =>
+          setState(() => _formState.setAllowOrderWhenOutOfStock(v)),
     );
   }
 

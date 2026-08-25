@@ -12,6 +12,7 @@ import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../util/restaurant/staticswitch.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../widget/componets/common/app_text_field.dart';
@@ -396,9 +397,21 @@ class _MenuScreenState extends State<MenuScreen> {
 
 
   String _formatStockDisplay(Items item) {
-    if (!item.trackInventory) return '';
+    if (!InventoryService.isStockGoverned(item)) return '';
 
     final allowOrderWhenOutOfStock = item.allowOrderWhenOutOfStock;
+
+    // Recipe-Based items hold no stock of their own — show how many the
+    // current ingredient stock can make. Checked before the variant branch:
+    // v1 recipes are item-level, so a variant's own stock is meaningless here.
+    if (item.isRecipeBased) {
+      final canMake = InventoryService.effectiveAvailableStock(item);
+      if (canMake <= 0) {
+        return allowOrderWhenOutOfStock ? 'Order Available' : 'Out of Stock';
+      }
+      if (canMake.isInfinite) return '';
+      return 'Makes ${canMake.toStringAsFixed(0)}';
+    }
 
     // For items with variants, show variant availability status
     if (item.variant != null && item.variant!.isNotEmpty) {
@@ -463,9 +476,26 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   StockStatus _getStockStatus(Items item) {
-    if (!item.trackInventory) return StockStatus.notTracked;
+    if (!InventoryService.isStockGoverned(item)) return StockStatus.notTracked;
 
     final allowOrderWhenOutOfStock = item.allowOrderWhenOutOfStock;
+
+    // Recipe-Based: availability comes from ingredients, not a stored figure.
+    if (item.isRecipeBased) {
+      switch (InventoryService.posStatusFromAvailable(
+        available: InventoryService.effectiveAvailableStock(item),
+        allowOrderWhenOutOfStock: allowOrderWhenOutOfStock,
+      )) {
+        case PosStockStatus.inStock:
+          return StockStatus.inStock;
+        case PosStockStatus.orderAvailable:
+          return StockStatus.orderAvailable;
+        case PosStockStatus.outOfStock:
+          return StockStatus.outOfStock;
+        case PosStockStatus.notTracked:
+          return StockStatus.notTracked;
+      }
+    }
 
     // For items with variants, check if at least one variant has stock
     if (item.variant != null && item.variant!.isNotEmpty) {
@@ -541,7 +571,7 @@ class _MenuScreenState extends State<MenuScreen> {
                     Observer(
                       builder: (_) {
                         final enabledItems =
-                            itemStore.items.where((i) => i.isEnabled).toList();
+                            itemStore.items.where((i) => i.isEnabled && i.sellsAtPos).toList();
                         final cats =
                             categoryStore.categoriesWithItems(enabledItems);
                         // Show a Favorites pill first, but only when there are
@@ -600,7 +630,8 @@ class _MenuScreenState extends State<MenuScreen> {
                           }
 
                           final allItems = itemStore.items;
-                          final visibleItems = allItems.where((item) => item.isEnabled).toList();
+                          final visibleItems =
+                              allItems.where((item) => item.isEnabled && item.sellsAtPos).toList();
                           final lowerQuery = query.toLowerCase();
                           // Snapshot the cart HERE (synchronously, inside the
                           // Observer) so the cards react to add/remove/qty —
@@ -719,7 +750,7 @@ class _MenuScreenState extends State<MenuScreen> {
           child: Observer(
             builder: (_) {
               final enabledItems =
-                  itemStore.items.where((i) => i.isEnabled).toList();
+                  itemStore.items.where((i) => i.isEnabled && i.sellsAtPos).toList();
               final allCategories =
                   categoryStore.categoriesWithItems(enabledItems);
               return Column(
@@ -797,7 +828,8 @@ class _MenuScreenState extends State<MenuScreen> {
                         // Tracked cart snapshot for the in-cart badges/highlight.
                         final cartItems = restaurantCartStore.cartItems.toList();
                         final allItems = itemStore.items;
-                        var filteredItems = allItems.where((item) => item.isEnabled).toList();
+                        var filteredItems =
+                            allItems.where((item) => item.isEnabled && item.sellsAtPos).toList();
 
                         if (activeCategory == _kFavorites) {
                           filteredItems = filteredItems.where((item) => item.isFavorite).toList();

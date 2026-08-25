@@ -134,9 +134,14 @@ mixin _$RestaurantPurchaseOrderStore on _RestaurantPurchaseOrderStore, Store {
       {required String name,
       String? phone,
       String? address,
-      String? gstNumber}) {
+      String? gstNumber,
+      double openingBalance = 0}) {
     return _$addSupplierAsyncAction.run(() => super.addSupplier(
-        name: name, phone: phone, address: address, gstNumber: gstNumber));
+        name: name,
+        phone: phone,
+        address: address,
+        gstNumber: gstNumber,
+        openingBalance: openingBalance));
   }
 
   late final _$createPurchaseOrderAsyncAction = AsyncAction(

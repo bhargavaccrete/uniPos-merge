@@ -93,6 +93,14 @@ import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_orde
 import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_order_item_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_grn_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_grn_item_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_supplier_ledger_entry_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_return_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_return_item_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_supplier_claim_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_supplier_claim_item_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_inventory_loss_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_stock_take_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_stock_take_item_model.dart';
 
 /// Unified Backup Service - Works for both Restaurant and Retail modes
 ///
@@ -959,6 +967,76 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Restaurant GRN Items box error: $e");
         exportMap["restaurantGrnItems"] = [];
+      }
+
+      // Supplier balance journal — must travel with the suppliers themselves,
+      // or a restored balance has nothing explaining how it got there.
+      try {
+        exportMap["restaurantSupplierLedger"] = Hive.box<RestaurantSupplierLedgerEntryModel>(HiveBoxNames.restaurantSupplierLedger).values.map((e) => e.toMap()).toList();
+        debugPrint("📦 Restaurant Supplier Ledger exported: ${exportMap["restaurantSupplierLedger"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Restaurant Supplier Ledger box error: $e");
+        exportMap["restaurantSupplierLedger"] = [];
+      }
+
+      // Damaged-goods / loss / stock-take chain (typeIds 143-149). These were
+      // missing from backup entirely: a restore brought back supplier balances
+      // while destroying the return/claim documents that justified crediting
+      // them down.
+      try {
+        exportMap["restaurantPurchaseReturns"] = Hive.box<RestaurantPurchaseReturnModel>(HiveBoxNames.restaurantPurchaseReturns).values.map((e) => e.toMap()).toList();
+        debugPrint("📦 Restaurant Purchase Returns exported: ${exportMap["restaurantPurchaseReturns"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Restaurant Purchase Returns box error: $e");
+        exportMap["restaurantPurchaseReturns"] = [];
+      }
+
+      try {
+        exportMap["restaurantPurchaseReturnItems"] = Hive.box<RestaurantPurchaseReturnItemModel>(HiveBoxNames.restaurantPurchaseReturnItems).values.map((e) => e.toMap()).toList();
+        debugPrint("📦 Restaurant Purchase Return Items exported: ${exportMap["restaurantPurchaseReturnItems"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Restaurant Purchase Return Items box error: $e");
+        exportMap["restaurantPurchaseReturnItems"] = [];
+      }
+
+      try {
+        exportMap["restaurantSupplierClaims"] = Hive.box<RestaurantSupplierClaimModel>(HiveBoxNames.restaurantSupplierClaims).values.map((e) => e.toMap()).toList();
+        debugPrint("📦 Restaurant Supplier Claims exported: ${exportMap["restaurantSupplierClaims"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Restaurant Supplier Claims box error: $e");
+        exportMap["restaurantSupplierClaims"] = [];
+      }
+
+      try {
+        exportMap["restaurantSupplierClaimItems"] = Hive.box<RestaurantSupplierClaimItemModel>(HiveBoxNames.restaurantSupplierClaimItems).values.map((e) => e.toMap()).toList();
+        debugPrint("📦 Restaurant Supplier Claim Items exported: ${exportMap["restaurantSupplierClaimItems"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Restaurant Supplier Claim Items box error: $e");
+        exportMap["restaurantSupplierClaimItems"] = [];
+      }
+
+      try {
+        exportMap["restaurantInventoryLosses"] = Hive.box<RestaurantInventoryLossModel>(HiveBoxNames.restaurantInventoryLosses).values.map((e) => e.toMap()).toList();
+        debugPrint("📦 Restaurant Inventory Losses exported: ${exportMap["restaurantInventoryLosses"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Restaurant Inventory Losses box error: $e");
+        exportMap["restaurantInventoryLosses"] = [];
+      }
+
+      try {
+        exportMap["restaurantStockTakes"] = Hive.box<RestaurantStockTakeModel>(HiveBoxNames.restaurantStockTakes).values.map((e) => e.toMap()).toList();
+        debugPrint("📦 Restaurant Stock Takes exported: ${exportMap["restaurantStockTakes"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Restaurant Stock Takes box error: $e");
+        exportMap["restaurantStockTakes"] = [];
+      }
+
+      try {
+        exportMap["restaurantStockTakeItems"] = Hive.box<RestaurantStockTakeItemModel>(HiveBoxNames.restaurantStockTakeItems).values.map((e) => e.toMap()).toList();
+        debugPrint("📦 Restaurant Stock Take Items exported: ${exportMap["restaurantStockTakeItems"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Restaurant Stock Take Items box error: $e");
+        exportMap["restaurantStockTakeItems"] = [];
       }
 
     } else if (AppConfig.isRetail) {
@@ -2306,6 +2384,104 @@ class UnifiedBackupService {
       );
     } catch (e) {
       debugPrint("⚠️ Error restoring restaurant GRN items: $e");
+    }
+
+    // Supplier balance journal — restored alongside the suppliers so a
+    // recovered balance still has its history.
+    try {
+      await restoreBoxWithId(
+        "restaurantSupplierLedger",
+        Hive.box<RestaurantSupplierLedgerEntryModel>(
+            HiveBoxNames.restaurantSupplierLedger),
+        (m) => RestaurantSupplierLedgerEntryModel.fromMap(m),
+        (e) => e.entryId,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring restaurant supplier ledger: $e");
+    }
+
+    // Damaged-goods / loss / stock-take chain (typeIds 143-149).
+    try {
+      await restoreBoxWithId(
+        "restaurantPurchaseReturns",
+        Hive.box<RestaurantPurchaseReturnModel>(
+            HiveBoxNames.restaurantPurchaseReturns),
+        (m) => RestaurantPurchaseReturnModel.fromMap(m),
+        (r) => r.returnId,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring restaurant purchase returns: $e");
+    }
+
+    try {
+      await restoreBoxWithId(
+        "restaurantPurchaseReturnItems",
+        Hive.box<RestaurantPurchaseReturnItemModel>(
+            HiveBoxNames.restaurantPurchaseReturnItems),
+        (m) => RestaurantPurchaseReturnItemModel.fromMap(m),
+        (ri) => ri.returnItemId,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring restaurant purchase return items: $e");
+    }
+
+    try {
+      await restoreBoxWithId(
+        "restaurantSupplierClaims",
+        Hive.box<RestaurantSupplierClaimModel>(
+            HiveBoxNames.restaurantSupplierClaims),
+        (m) => RestaurantSupplierClaimModel.fromMap(m),
+        (c) => c.claimId,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring restaurant supplier claims: $e");
+    }
+
+    try {
+      await restoreBoxWithId(
+        "restaurantSupplierClaimItems",
+        Hive.box<RestaurantSupplierClaimItemModel>(
+            HiveBoxNames.restaurantSupplierClaimItems),
+        (m) => RestaurantSupplierClaimItemModel.fromMap(m),
+        (ci) => ci.claimItemId,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring restaurant supplier claim items: $e");
+    }
+
+    try {
+      await restoreBoxWithId(
+        "restaurantInventoryLosses",
+        Hive.box<RestaurantInventoryLossModel>(
+            HiveBoxNames.restaurantInventoryLosses),
+        (m) => RestaurantInventoryLossModel.fromMap(m),
+        (l) => l.lossId,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring restaurant inventory losses: $e");
+    }
+
+    try {
+      await restoreBoxWithId(
+        "restaurantStockTakes",
+        Hive.box<RestaurantStockTakeModel>(HiveBoxNames.restaurantStockTakes),
+        (m) => RestaurantStockTakeModel.fromMap(m),
+        (t) => t.takeId,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring restaurant stock takes: $e");
+    }
+
+    try {
+      await restoreBoxWithId(
+        "restaurantStockTakeItems",
+        Hive.box<RestaurantStockTakeItemModel>(
+            HiveBoxNames.restaurantStockTakeItems),
+        (m) => RestaurantStockTakeItemModel.fromMap(m),
+        (ti) => ti.takeItemId,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring restaurant stock take items: $e");
     }
   }
 

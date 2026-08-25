@@ -35,6 +35,14 @@ class RestaurantSupplierModel extends HiveObject {
   @HiveField(7)
   final String updatedAt;
 
+  /// The liability this supplier already carried when they were added — money
+  /// owed from before the app started tracking them. Recorded once as the
+  /// ledger's `opening` row; [currentBalance] starts equal to it and moves from
+  /// there. Nullable/defaulted so every pre-existing supplier stays valid with
+  /// no migration.
+  @HiveField(8, defaultValue: 0.0)
+  final double openingBalance;
+
   RestaurantSupplierModel({
     required this.supplierId,
     required this.name,
@@ -44,6 +52,7 @@ class RestaurantSupplierModel extends HiveObject {
     this.currentBalance = 0,
     required this.createdAt,
     required this.updatedAt,
+    this.openingBalance = 0,
   });
 
   factory RestaurantSupplierModel.create({
@@ -51,6 +60,7 @@ class RestaurantSupplierModel extends HiveObject {
     String? phone,
     String? address,
     String? gstNumber,
+    double openingBalance = 0,
   }) {
     final now = DateTime.now().toIso8601String();
     return RestaurantSupplierModel(
@@ -59,6 +69,9 @@ class RestaurantSupplierModel extends HiveObject {
       phone: phone,
       address: address,
       gstNumber: gstNumber,
+      openingBalance: openingBalance,
+      // A new supplier owes exactly what they walked in owing.
+      currentBalance: openingBalance,
       createdAt: now,
       updatedAt: now,
     );
@@ -70,6 +83,7 @@ class RestaurantSupplierModel extends HiveObject {
     String? address,
     String? gstNumber,
     double? currentBalance,
+    double? openingBalance,
     bool clearPhone = false,
     bool clearAddress = false,
     bool clearGstNumber = false,
@@ -81,6 +95,7 @@ class RestaurantSupplierModel extends HiveObject {
       address: clearAddress ? null : (address ?? this.address),
       gstNumber: clearGstNumber ? null : (gstNumber ?? this.gstNumber),
       currentBalance: currentBalance ?? this.currentBalance,
+      openingBalance: openingBalance ?? this.openingBalance,
       createdAt: createdAt,
       updatedAt: DateTime.now().toIso8601String(),
     );
@@ -93,6 +108,7 @@ class RestaurantSupplierModel extends HiveObject {
         'address': address,
         'gstNumber': gstNumber,
         'currentBalance': currentBalance,
+        'openingBalance': openingBalance,
         'createdAt': createdAt,
         'updatedAt': updatedAt,
       };
@@ -105,6 +121,7 @@ class RestaurantSupplierModel extends HiveObject {
       address: map['address'] as String?,
       gstNumber: map['gstNumber'] as String?,
       currentBalance: (map['currentBalance'] as num?)?.toDouble() ?? 0,
+      openingBalance: (map['openingBalance'] as num?)?.toDouble() ?? 0,
       createdAt: map['createdAt'] as String,
       updatedAt: map['updatedAt'] as String,
     );

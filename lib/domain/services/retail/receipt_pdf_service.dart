@@ -12,7 +12,11 @@ import '../../../util/restaurant/print_settings.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/plan/plan_enforcement.dart';
 import '../../../core/plan/mode_keys.dart';
-import '../../../core/di/service_locator.dart' show taxStore, attributeStore;
+import '../../../core/di/service_locator.dart' show taxStore;
+// This service is shared: restaurant's bill/KOT print reuses it. Import
+// describeAttributeMap only — resolving AttributeStore from GetIt throws in
+// restaurant mode, where it is never registered.
+import '../../store/retail/attribute_store.dart' show describeAttributeMap;
 import '../../../util/restaurant/staticswitch.dart';
 import '../restaurant/tax_breakdown.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
@@ -1727,7 +1731,7 @@ class ReceiptPdfService {
     // carry no map and fall back to the legacy columns, where `size` holds the
     // variant name — those stay bare, so KOT/bills still read "(Large)".
     final hasNamedAttributes = item.attributes?.isNotEmpty ?? false;
-    final descriptor = attributeStore.describeAttributes(
+    final descriptor = describeAttributeMap(
       item.attributes,
       size: item.size,
       color: item.color,
@@ -2071,12 +2075,11 @@ class ReceiptPdfService {
           // legacy size/color columns for sales recorded before generic
           // attributes existed. `weight` is deliberately excluded — restaurant
           // reuses it as the extras blob rendered separately below.
-          if (attributeStore
-              .describeAttributes(item.attributes,
+          if (describeAttributeMap(item.attributes,
                   size: item.size, color: item.color, separator: ' | ')
               .isNotEmpty)
             pw.Text(
-              attributeStore.describeAttributes(item.attributes,
+              describeAttributeMap(item.attributes,
                   size: item.size, color: item.color, separator: ' | '),
               style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
             ),

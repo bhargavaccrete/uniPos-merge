@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_supplier_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_supplier_ledger_entry_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_order_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_order_item_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_grn_model.dart';
@@ -101,20 +102,25 @@ abstract class _RestaurantPurchaseOrderStore with Store {
 
   // ==================== SUPPLIERS ====================
 
+  /// Inline "add supplier" from the Add PO screen.
+  ///
+  /// Delegates to [RestaurantSupplierStore] so there is a single creation path —
+  /// that store owns opening-balance handling and the ledger's `opening` row.
   @action
   Future<RestaurantSupplierModel> addSupplier({
     required String name,
     String? phone,
     String? address,
     String? gstNumber,
+    double openingBalance = 0,
   }) async {
-    final supplier = RestaurantSupplierModel.create(
+    final supplier = await restaurantSupplierStore.addSupplier(
       name: name,
       phone: phone,
       address: address,
       gstNumber: gstNumber,
+      openingBalance: openingBalance,
     );
-    await restaurantSupplierRepository.saveSupplier(supplier);
     await loadSuppliers();
     return supplier;
   }
@@ -285,15 +291,20 @@ abstract class _RestaurantPurchaseOrderStore with Store {
       // the invoice regardless of what's later returned/claimed. Purchase
       // returns and supplier claims credit this balance back down when their
       // own credit events land (see RestaurantDamagedGoodsStore).
+      //
+      // Routed through RestaurantSupplierStore.recordBalanceMovement — the one
+      // sanctioned path — so the movement also lands in the supplier's ledger
+      // instead of silently changing a number nothing explains.
       if (totalAmount > 0) {
-        final supplier = restaurantSupplierRepository.getSupplierById(supplierId);
-        if (supplier != null) {
-          await restaurantSupplierRepository.saveSupplier(
-            supplier.copyWith(
-              currentBalance: supplier.currentBalance + totalAmount,
-            ),
-          );
-        }
+        await restaurantSupplierStore.recordBalanceMovement(
+          supplierId: supplierId,
+          amount: totalAmount,
+          type: RestaurantSupplierLedgerType.purchase,
+          description: 'Goods received',
+          docNumber: grn.grnNumber,
+          docId: grn.grnId,
+          date: grn.receivedDate,
+        );
       }
 
       // Roll the receiving progress up to the PO's status.

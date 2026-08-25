@@ -47,7 +47,7 @@ class ProductType {
       case rawMaterial:
         return 'Raw Material';
       case semiFinished:
-        return 'Semi-Finished (Prep)';
+        return 'Semi-Finished';
       case recipeBased:
         return 'Recipe-Based';
       case finishedGood:
@@ -59,4 +59,39 @@ class ProductType {
   /// `Items.productType` is nullable so every pre-existing item stays valid
   /// with zero migration — null reads as Finished Good, today's only behavior.
   static String effective(String? type) => type ?? finishedGood;
+
+  /// Menu items (sold on the POS grid) need a category + selling price;
+  /// back-of-house types (Raw Material, Semi-Finished) don't. Single source
+  /// of truth for both AddItemFormState.validate() and Edit Item's save
+  /// validation, so the two screens can't drift on this rule again.
+  static bool isMenuType(String? type) =>
+      type == finishedGood || type == recipeBased;
+
+  /// The stock fields an item must carry once its type is [type]. Recipe-Based
+  /// items derive availability from their recipe (see [isStockDerived]) and
+  /// must never carry over stale tracking/quantity from before a type switch.
+  static ({bool trackInventory, double stockQuantity}) resolvePhysicalStock(
+    String? type, {
+    required bool requestedTrackInventory,
+    required double requestedStockQuantity,
+  }) {
+    if (isStockDerived(type)) {
+      return (trackInventory: false, stockQuantity: 0.0);
+    }
+    return (
+      trackInventory: requestedTrackInventory,
+      stockQuantity: requestedStockQuantity,
+    );
+  }
+
+  /// A Raw Material's "Cost Price" input must seed `Items.lastPurchaseCost`
+  /// — every costing consumer (recipe cost, stock-take, loss valuation,
+  /// movement unitCost) reads that field, not `price`. `price` itself is left
+  /// untouched by callers of this helper, so a Raw Material's existing
+  /// sell-directly-at-POS price behavior is unaffected. GRN continues to be
+  /// the only thing that updates `lastPurchaseCost` after creation (see
+  /// RestaurantPurchaseOrderStore's GRN-confirm flow) — this only seeds the
+  /// initial value so recipe costing isn't blind until the first GRN.
+  static double? seededLastPurchaseCost(String? type, double? enteredCost) =>
+      type == rawMaterial ? enteredCost : null;
 }

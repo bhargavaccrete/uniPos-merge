@@ -3,6 +3,7 @@ import '../../../core/di/service_locator.dart';
 import '../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../data/repositories/restaurant/cart_repository.dart';
 import '../../../domain/services/restaurant/notification_service.dart';
+import '../../../domain/services/restaurant/inventory_service.dart';
 
 part 'cart_store.g.dart';
 
@@ -68,11 +69,18 @@ abstract class _CartStore with Store {
         // Get the actual item to check stock
         final actualItem = await itemStore.getItemById(item.productId);
 
-        if (actualItem != null && actualItem.trackInventory == true && !actualItem.allowOrderWhenOutOfStock) {
+        if (actualItem != null &&
+            InventoryService.isStockGoverned(actualItem) &&
+            !actualItem.allowOrderWhenOutOfStock) {
           double availableStock;
 
           // ✅ FIX: For items with variants, check variant stock, not base stock
-          if (item.variantName != null && actualItem.variant != null && actualItem.variant!.isNotEmpty) {
+          // (Recipe-Based skips this: v1 recipes are item-level, so its
+          // availability always comes from ingredients — see effectiveAvailableStock.)
+          if (!actualItem.isRecipeBased &&
+              item.variantName != null &&
+              actualItem.variant != null &&
+              actualItem.variant!.isNotEmpty) {
             // Item has variants - check variant stock
             try {
               await variantStore.loadVariants();
@@ -90,8 +98,8 @@ abstract class _CartStore with Store {
               };
             }
           } else {
-            // No variants - use base item stock
-            availableStock = actualItem.stockQuantity;
+            // No variants - use base item stock (or recipe availability)
+            availableStock = InventoryService.effectiveAvailableStock(actualItem);
           }
 
           // Check if item is weight-based (already validated in dialog, but double-check)
@@ -161,11 +169,16 @@ abstract class _CartStore with Store {
         // Get the actual item to check stock
         final item = await itemStore.getItemById(cartItem.productId);
 
-        if (item != null && item.trackInventory == true && !item.allowOrderWhenOutOfStock) {
+        if (item != null &&
+            InventoryService.isStockGoverned(item) &&
+            !item.allowOrderWhenOutOfStock) {
           double availableStock;
 
           // ✅ FIX: For items with variants, check variant stock, not base stock
-          if (cartItem.variantName != null && item.variant != null && item.variant!.isNotEmpty) {
+          if (!item.isRecipeBased &&
+              cartItem.variantName != null &&
+              item.variant != null &&
+              item.variant!.isNotEmpty) {
             // Item has variants - check variant stock
             try {
               await variantStore.loadVariants();
@@ -181,8 +194,8 @@ abstract class _CartStore with Store {
               return false;
             }
           } else {
-            // No variants - use base item stock
-            availableStock = item.stockQuantity;
+            // No variants - use base item stock (or recipe availability)
+            availableStock = InventoryService.effectiveAvailableStock(item);
           }
 
           if (item.isSoldByWeight == true) {

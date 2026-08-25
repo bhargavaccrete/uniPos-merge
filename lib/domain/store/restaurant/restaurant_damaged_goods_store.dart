@@ -8,6 +8,7 @@ import '../../../data/models/restaurant/db/restaurant_purchase_return_item_model
 import '../../../data/models/restaurant/db/restaurant_purchase_return_model.dart';
 import '../../../data/models/restaurant/db/restaurant_supplier_claim_item_model.dart';
 import '../../../data/models/restaurant/db/restaurant_supplier_claim_model.dart';
+import '../../../data/models/restaurant/db/restaurant_supplier_ledger_entry_model.dart';
 import '../../../data/repositories/restaurant/restaurant_inventory_loss_repository.dart';
 import '../../../data/repositories/restaurant/restaurant_purchase_return_repository.dart';
 import '../../../data/repositories/restaurant/restaurant_supplier_claim_repository.dart';
@@ -37,12 +38,10 @@ class RestaurantDamagedGoodsStore = _RestaurantDamagedGoodsStore
 /// | Supplier claim | status reaches `settled` | the claim total |
 /// | Inventory loss (write-off) | none — the business absorbs it | — |
 ///
-/// **No separate ledger-entry model.** Retail records every balance change as
-/// a `SupplierLedgerEntryModel` row; restaurant's typeId range (100-149) is
-/// fully claimed by this feature's other 7 models, so credits here adjust
-/// `RestaurantSupplierModel.currentBalance` directly. A per-movement ledger
-/// can be added later under a new ID range if restaurant needs the same
-/// statement-of-account view retail has.
+/// **Credits go through the ledger choke point.** Both credit events call
+/// `RestaurantSupplierStore.recordBalanceMovement`, which writes a
+/// `RestaurantSupplierLedgerEntryModel` row (typeId 185) and then applies the
+/// delta. This store never touches `currentBalance` directly.
 ///
 /// Every credit is guarded by a persisted flag so it applies exactly once.
 abstract class _RestaurantDamagedGoodsStore with Store {
@@ -282,7 +281,15 @@ abstract class _RestaurantDamagedGoodsStore with Store {
     await _returnRepository.save(updated);
 
     if (adjustment != 0) {
-      await _applyBalanceAdjustment(existing.supplierId, adjustment);
+      await restaurantSupplierStore.recordBalanceMovement(
+        supplierId: existing.supplierId,
+        amount: adjustment,
+        type: RestaurantSupplierLedgerType.returnCredit,
+        description: 'Credit note $creditNoteNumber',
+        docNumber: updated.returnNumber,
+        docId: updated.returnId,
+        date: updated.creditNoteDate,
+      );
     }
 
     _replaceReturn(updated);
@@ -365,7 +372,15 @@ abstract class _RestaurantDamagedGoodsStore with Store {
     await _claimRepository.save(updated);
 
     if (adjustment != 0) {
-      await _applyBalanceAdjustment(existing.supplierId, adjustment);
+      await restaurantSupplierStore.recordBalanceMovement(
+        supplierId: existing.supplierId,
+        amount: adjustment,
+        type: RestaurantSupplierLedgerType.claimCredit,
+        description: 'Claim ${status.name}',
+        docNumber: updated.claimNumber,
+        docId: updated.claimId,
+        date: updated.resolvedAt,
+      );
     }
 
     final index = supplierClaims.indexWhere((c) => c.claimId == claimId);
@@ -462,18 +477,6 @@ abstract class _RestaurantDamagedGoodsStore with Store {
   double get totalLossQty =>
       inventoryLosses.fold(0.0, (sum, l) => sum + l.quantity);
 
-  // ==================== SUPPLIER BALANCE ====================
-
-  /// Applies a signed adjustment to a supplier's running balance — negative
-  /// reduces what is owed. Direct field mutation (see class doc for why
-  /// there's no separate ledger-entry model here).
-  Future<void> _applyBalanceAdjustment(String supplierId, double adjustment) async {
-    final supplier = restaurantSupplierRepository.getSupplierById(supplierId);
-    if (supplier == null) return;
-    await restaurantSupplierRepository.saveSupplier(
-      supplier.copyWith(currentBalance: supplier.currentBalance + adjustment),
-    );
-  }
 }
 
 /// What [_RestaurantDamagedGoodsStore.recordFromGRN] created.

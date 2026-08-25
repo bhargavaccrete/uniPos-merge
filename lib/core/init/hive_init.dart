@@ -62,6 +62,7 @@ import 'package:billberrylite/data/models/restaurant/db/restaurant_supplier_clai
 import 'package:billberrylite/data/models/restaurant/db/restaurant_inventory_loss_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_stock_take_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_stock_take_item_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_supplier_ledger_entry_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/extramodel_303.dart';
 import 'package:billberrylite/data/models/restaurant/db/toppingmodel_304.dart';
 import 'package:billberrylite/data/models/restaurant/db/variantmodel_305.dart';
@@ -717,6 +718,11 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantStockTakeItem)) {
       Hive.registerAdapter(RestaurantStockTakeItemModelAdapter());
     }
+    // RestaurantSupplierLedgerEntryModel - 185: first model in the restaurant
+    // overflow range (185-199); the 100-149 block is full. See HiveTypeIds.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantSupplierLedgerEntry)) {
+      Hive.registerAdapter(RestaurantSupplierLedgerEntryModelAdapter());
+    }
   }
 
   /// Open all restaurant Hive boxes
@@ -802,6 +808,10 @@ class HiveInit {
     await Hive.openBox<RestaurantInventoryLossModel>(HiveBoxNames.restaurantInventoryLosses);
     await Hive.openBox<RestaurantStockTakeModel>(HiveBoxNames.restaurantStockTakes);
     await Hive.openBox<RestaurantStockTakeItemModel>(HiveBoxNames.restaurantStockTakeItems);
+
+    // Supplier balance journal — one row per balance movement.
+    await Hive.openBox<RestaurantSupplierLedgerEntryModel>(
+        HiveBoxNames.restaurantSupplierLedger);
 
     _areRestaurantBoxesOpen = true;
   }

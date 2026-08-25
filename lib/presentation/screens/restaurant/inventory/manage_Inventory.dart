@@ -16,10 +16,12 @@ import '../../../../domain/services/restaurant/day_management_service.dart';
 import '../../../../util/restaurant/restaurant_session.dart';
 import '../../../../util/restaurant/staticswitch.dart';
 import '../../../../domain/services/restaurant/stock_adjust_service.dart';
+import '../../../../domain/services/restaurant/inventory_service.dart';
 import 'low_stock_screen.dart';
 import 'recipes_screen.dart';
 import 'raw_materials_screen.dart';
 import 'purchase_order/purchase_order_list_screen.dart';
+import 'supplier/restaurant_supplier_list_screen.dart';
 import 'production_screen.dart';
 import 'food_cost_report_screen.dart';
 import 'inventory_loss_list_screen.dart';
@@ -50,11 +52,16 @@ class _ManageInventoryState extends State<ManageInventory> {
   bool _showLowStockOnly = false;
 
   /// Item needs attention: opted into alerts and is low or out of stock.
+  ///
+  /// Stock status comes from [InventoryService], not the `Items` getters, so a
+  /// Recipe-Based item is judged on how many it can make from its ingredients
+  /// rather than on a `stockQuantity` it never populates. Every other product
+  /// type resolves to exactly the same answer as before.
   bool _isAlertItem(Items item) =>
-      item.trackInventory &&
+      InventoryService.isStockGoverned(item) &&
       item.lowStockAlertEnabled &&
       AppSettings.lowStockAlertsEnabled &&
-      (item.isLowStock || !item.isInStock);
+      (InventoryService.isLowStock(item) || !InventoryService.isInStock(item));
 
   @override
   void initState() {
@@ -356,10 +363,10 @@ class _ManageInventoryState extends State<ManageInventory> {
   Widget _buildStockBadge(Items item) {
     final MaterialColor base;
     final String label;
-    if (!item.isInStock) {
+    if (!InventoryService.isInStock(item)) {
       base = Colors.red;
       label = 'Out of Stock';
-    } else if (item.isLowStock) {
+    } else if (InventoryService.isLowStock(item)) {
       base = Colors.orange;
       label = 'Low Stock';
     } else {
@@ -970,7 +977,79 @@ class _ManageInventoryState extends State<ManageInventory> {
     return null;
   }
 
+  /// Read-only availability for a Recipe-Based item: how many its ingredients
+  /// currently support, from the same [InventoryService] figure the POS uses.
+  Widget _buildRecipeAvailabilityRow(Items item) {
+    final available = InventoryService.effectiveAvailableStock(item);
+    final unlimited = available.isInfinite;
+    final canMake = unlimited ? 0.0 : available;
+
+    return Container(
+      padding: EdgeInsets.all(
+        AppResponsive.getValue(context, mobile: 10.0, tablet: 12.0, desktop: 14.0),
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.restaurant_menu_rounded,
+              size: 18, color: AppColors.secondary),
+          SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Can make',
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  unlimited
+                      ? 'Not limited by ingredients'
+                      : '${canMake.toStringAsFixed(0)} '
+                          '${item.unit ?? (item.isSoldByWeight ? 'kg' : 'pcs')}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: unlimited || canMake > 0
+                        ? Colors.green.shade700
+                        : Colors.red.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Flexible(
+            child: Text(
+              'From recipe ingredients',
+              textAlign: TextAlign.end,
+              style: GoogleFonts.poppins(
+                fontSize: 10.5,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStockRow({required Items item, ItemVariante? variant}) {
+    // Recipe-Based items hold no stock of their own — there is nothing to add
+    // or remove here, so show the derived "can make" figure read-only instead
+    // of an adjuster that would write to a field nothing reads.
+    if (item.isRecipeBased) return _buildRecipeAvailabilityRow(item);
+
     final currentStock = variant != null
         ? (variant.stockQuantity ?? 0)
         : item.stockQuantity;
@@ -1122,6 +1201,16 @@ class _ManageInventoryState extends State<ManageInventory> {
               color: AppColors.success,
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => const RawMaterialsScreen())),
+            ),
+            (
+              title: 'Suppliers',
+              subtitle: 'Contacts, balances & payments',
+              icon: Icons.people_alt_rounded,
+              color: AppColors.secondary,
+              onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const RestaurantSupplierListScreen())),
             ),
             (
               title: 'Purchase Orders',
@@ -1397,12 +1486,17 @@ class _ManageInventoryState extends State<ManageInventory> {
           final categories = categoryStore.categories.toList();
           final items = itemStore.items.toList();
 
-          // Check if there are any items with inventory tracking enabled
-          final inventoryItems =
-              items.where((item) => item.trackInventory == true).toList();
+          // Items whose availability is governed by stock: directly-tracked
+          // ones, plus Recipe-Based items (governed by their ingredients, so
+          // they qualify regardless of their own trackInventory flag — the
+          // same rule the POS applies).
+          final inventoryItems = items
+              .where((item) => InventoryService.isStockGoverned(item))
+              .toList();
           final lowCount = inventoryItems.where(_isAlertItem).length;
-          final outCount =
-              inventoryItems.where((item) => !item.isInStock).length;
+          final outCount = inventoryItems
+              .where((item) => !InventoryService.isInStock(item))
+              .length;
 
           final horizontalPad = AppResponsive.getValue(
             context,
