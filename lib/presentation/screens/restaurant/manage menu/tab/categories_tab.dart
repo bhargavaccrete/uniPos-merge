@@ -50,14 +50,8 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
   }
 
   void _deleteCategoryhive(dynamic id) async {
-    // Cascade-delete all items belonging to this category first
-    final itemsToDelete = itemStore.items
-        .where((item) => item.categoryOfItem == id)
-        .map((item) => item.id)
-        .toList();
-    for (final itemId in itemsToDelete) {
-      await itemStore.deleteItem(itemId);
-    }
+    // No cascade. Items in this category are re-parented to Uncategorized by
+    // the repository — deleting a category must never destroy the dishes in it.
     await categoryStore.deleteCategory(id);
   }
 
@@ -322,7 +316,8 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
       context: context,
       title: 'Delete "${category.name}"?',
       message: itemCount > 0
-          ? 'This will also delete $itemCount item${itemCount > 1 ? 's' : ''} in this category.'
+          ? '$itemCount item${itemCount > 1 ? 's' : ''} in this category will '
+                'be moved to Uncategorized. Nothing is deleted.'
           : 'This category has no items.',
       confirmLabel: 'Delete',
       accent: AppColors.danger,

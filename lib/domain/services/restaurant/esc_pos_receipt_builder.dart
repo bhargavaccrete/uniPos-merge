@@ -152,10 +152,10 @@ class EscPosReceiptBuilder {
 
     // ── ITEMS: Name + qty, choices, extras, instructions ──
     // This is the core of the KOT — what the kitchen reads
-    int totalQty = 0;
+    double totalQty = 0;
     for (final item in receiptData.items) {
-      final qty = item.qty;
-      totalQty += qty;
+      final qty = _qtyLabel(item.qty);
+      totalQty += item.qty;
 
       // Item name with variant: "2x Chicken Biryani (Large)"
       String itemName = item.productName ?? 'Item';
@@ -185,7 +185,8 @@ class EscPosReceiptBuilder {
 
     // ── FOOTER: Item count + total quantity ──
     bytes.addAll(_divider(cols));
-    bytes.addAll(_text('Items: ${receiptData.items.length}   Qty: $totalQty'));
+    bytes.addAll(
+        _text('Items: ${receiptData.items.length}   Qty: ${_qtyLabel(totalQty)}'));
 
     // Feed paper + cut
     bytes.addAll(_feed(4));
@@ -714,6 +715,17 @@ class EscPosReceiptBuilder {
 
   /// Convert a string to bytes + newline.
   /// ESC/POS printers expect raw ASCII bytes terminated by LF (0x0A).
+  /// Renders a line quantity for the ticket. Whole quantities print exactly as
+  /// they always have ("2x"), never "2.0x"; a fractional one (retail loose
+  /// goods, e.g. 1.75 kg) prints its decimals trimmed of trailing zeros.
+  static String _qtyLabel(double qty) {
+    if (qty == qty.roundToDouble()) return qty.toInt().toString();
+    return qty
+        .toStringAsFixed(2)
+        .replaceAll(RegExp(r'0+$'), '')
+        .replaceAll(RegExp(r'\.$'), '');
+  }
+
   static List<int> _text(String text) {
     return [...text.codeUnits, ..._newline];
   }

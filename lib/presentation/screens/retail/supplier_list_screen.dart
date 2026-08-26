@@ -16,6 +16,7 @@ import 'package:billberrylite/presentation/widget/componets/common/app_text_fiel
 import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/row_action_button.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 
@@ -520,12 +521,11 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
         ),
         borderRadius: BorderRadius.circular(radius),
         child: Padding(
-          // Right stays tight — the popup menu carries its own tap padding.
-          padding: EdgeInsets.fromLTRB(
-            AppResponsive.mediumSpacing(context),
-            AppResponsive.smallSpacing(context),
-            4,
-            AppResponsive.smallSpacing(context),
+          // Even padding now: the popup menu that carried its own tap padding
+          // has been replaced by buttons that sit flush.
+          padding: EdgeInsets.symmetric(
+            horizontal: AppResponsive.mediumSpacing(context),
+            vertical: AppResponsive.smallSpacing(context),
           ),
           child: Row(
             children: [
@@ -566,7 +566,9 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                         if (supplier.gstNumber?.isNotEmpty ?? false)
                           supplier.gstNumber!,
                       ].join('  •  '),
-                      maxLines: 1,
+                      // Phone plus a 15-character GST number does not fit one
+                      // line on a phone; allow a second rather than hide the GST.
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.poppins(
                         fontSize: AppResponsive.captionFontSize(context),
@@ -578,85 +580,46 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
               ),
               if (hasBalance) ...[
                 SizedBox(width: AppResponsive.smallSpacing(context)),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: (isAdvance ? AppColors.success : AppColors.danger)
-                        .withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    '${formatMoney(balance.abs())} ${isAdvance ? 'advance' : 'due'}',
-                    maxLines: 1,
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.captionFontSize(context),
-                      fontWeight: FontWeight.w600,
-                      color: isAdvance ? AppColors.success : AppColors.danger,
+                // Flexible + ellipsis: the chip is a fixed-size sibling of the
+                // Expanded name column, so a long balance ('₹1,25,000.00 due')
+                // would otherwise take that width straight out of the name.
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: (isAdvance ? AppColors.success : AppColors.danger)
+                          .withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '${formatMoney(balance.abs())} ${isAdvance ? 'advance' : 'due'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.captionFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: isAdvance ? AppColors.success : AppColors.danger,
+                      ),
                     ),
                   ),
                 ),
               ],
-              PopupMenuButton<String>(
-                icon: Icon(
-                  Icons.more_vert_rounded,
-                  color: AppColors.textSecondary,
-                  size: AppResponsive.iconSize(context),
-                ),
-                color: AppColors.white,
-                surfaceTintColor: AppColors.white,
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                onSelected: (value) {
-                  if (value == 'edit') _showSupplierForm(existing: supplier);
-                  if (value == 'delete') _deleteSupplier(supplier);
-                },
-                itemBuilder: (_) => [
-                  PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.edit_outlined,
-                          size: 18,
-                          color: AppColors.primary,
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          'Edit',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.bodyFontSize(context),
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.delete_outline,
-                          size: 18,
-                          color: AppColors.danger,
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          'Delete',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.bodyFontSize(context),
-                            color: AppColors.danger,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              SizedBox(width: AppResponsive.smallSpacing(context)),
+              RowActionButton(
+                icon: Icons.edit_outlined,
+                color: AppColors.primary,
+                tooltip: 'Edit Supplier',
+                onTap: () => _showSupplierForm(existing: supplier),
+              ),
+              const SizedBox(width: 6),
+              RowActionButton(
+                icon: Icons.delete_outline_rounded,
+                color: AppColors.danger,
+                tooltip: 'Delete Supplier',
+                onTap: () => _deleteSupplier(supplier),
               ),
             ],
           ),

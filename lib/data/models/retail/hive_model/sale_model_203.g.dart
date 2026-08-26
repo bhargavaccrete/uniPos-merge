@@ -19,7 +19,7 @@ class SaleModelAdapter extends TypeAdapter<SaleModel> {
     return SaleModel(
       saleId: fields[0] as String,
       customerId: fields[1] as String?,
-      totalItems: fields[2] as int,
+      totalItems: fields[2] as double,
       subtotal: fields[3] as double,
       discountAmount: fields[4] as double,
       taxAmount: fields[5] as double,

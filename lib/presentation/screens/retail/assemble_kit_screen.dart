@@ -370,7 +370,7 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
           _buildStockStatusRow(
             context,
             name: product.productName,
-            required: _batchQty,
+            required: _batchQty.toDouble(),
             available: variant.stockQty,
             exists: true,
           ),
@@ -444,7 +444,7 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
   ) {
     final componentVariant = _componentVariant(line.componentVariantId);
     final componentName = _componentName(line.componentVariantId, componentVariant);
-    final required = line.quantity * batchQty;
+    final required = (line.quantity * batchQty).toDouble();
     final available = componentVariant?.stockQty ?? 0;
 
     return _buildStockStatusRow(
@@ -541,8 +541,8 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
   Widget _buildStockStatusRow(
     BuildContext context, {
     required String name,
-    required int required,
-    required int available,
+    required double required,
+    required double available,
     required bool exists,
   }) {
     final hasEnough = exists && available >= required;

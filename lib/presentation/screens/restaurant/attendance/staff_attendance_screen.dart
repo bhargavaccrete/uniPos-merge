@@ -395,7 +395,7 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
       children: [
         Text(value,
             style: GoogleFonts.poppins(
-                fontSize: AppResponsive.getValue(context, mobile: 22.0, tablet: 23.0, desktop: 24.0), fontWeight: FontWeight.w800, color: valueColor)),
+                fontSize: AppResponsive.getValue(context, mobile: 22.0, tablet: 23.0, desktop: 24.0), fontWeight: FontWeight.w700, color: valueColor)),
         Text(label,
             style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 11.0, tablet: 12.0, desktop: 13.0), color: Colors.white70)),
       ],

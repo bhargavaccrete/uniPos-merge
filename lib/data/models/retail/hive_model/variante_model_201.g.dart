@@ -23,8 +23,8 @@ class VarianteModelAdapter extends TypeAdapter<VarianteModel> {
       barcode: fields[6] as String?,
       mrp: fields[7] as double?,
       costPrice: fields[8] as double?,
-      stockQty: fields[9] as int,
-      minStock: fields[10] as int?,
+      stockQty: fields[9] as double,
+      minStock: fields[10] as double?,
       taxRate: fields[11] as double?,
       createdAt: fields[12] as String,
       updateAt: fields[13] as String?,
@@ -36,13 +36,16 @@ class VarianteModelAdapter extends TypeAdapter<VarianteModel> {
       isDefault: fields[19] as bool,
       status: fields[20] as String,
       taxId: fields[21] as String?,
+      isDecimalQuantity: fields[22] == null ? false : fields[22] as bool,
+      unit: fields[23] as String?,
+      expiryDate: fields[24] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, VarianteModel obj) {
     writer
-      ..writeByte(19)
+      ..writeByte(22)
       ..writeByte(0)
       ..write(obj.varianteId)
       ..writeByte(1)
@@ -80,7 +83,13 @@ class VarianteModelAdapter extends TypeAdapter<VarianteModel> {
       ..writeByte(20)
       ..write(obj.status)
       ..writeByte(21)
-      ..write(obj.taxId);
+      ..write(obj.taxId)
+      ..writeByte(22)
+      ..write(obj.isDecimalQuantity)
+      ..writeByte(23)
+      ..write(obj.unit)
+      ..writeByte(24)
+      ..write(obj.expiryDate);
   }
 
   @override

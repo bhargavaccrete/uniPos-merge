@@ -67,7 +67,7 @@ class SupplierClaimModel extends HiveObject {
   final String claimDate;
 
   @HiveField(9)
-  final int totalQty;
+  final double totalQty;
 
   /// Value being claimed for — informational only, never posted to a ledger.
   @HiveField(10)
@@ -136,7 +136,7 @@ class SupplierClaimModel extends HiveObject {
     required String poNumber,
     required String supplierId,
     String? supplierName,
-    int totalQty = 0,
+    double totalQty = 0,
     double totalAmount = 0,
     String? notes,
   }) {
@@ -242,7 +242,7 @@ class SupplierClaimModel extends HiveObject {
       supplierId: map['supplierId'] as String? ?? '',
       supplierName: map['supplierName'] as String?,
       claimDate: map['claimDate'] as String,
-      totalQty: (map['totalQty'] as num?)?.toInt() ?? 0,
+      totalQty: (map['totalQty'] as num?)?.toDouble() ?? 0.0,
       totalAmount: (map['totalAmount'] as num?)?.toDouble() ?? 0,
       status: map['status'] as String? ?? SupplierClaimStatus.pending.name,
       resolutionNote: map['resolutionNote'] as String?,
@@ -256,7 +256,7 @@ class SupplierClaimModel extends HiveObject {
   }
 
   SupplierClaimModel copyWith({
-    int? totalQty,
+    double? totalQty,
     double? totalAmount,
     String? status,
     String? resolutionNote,

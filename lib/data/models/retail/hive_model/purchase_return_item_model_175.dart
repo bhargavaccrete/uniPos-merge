@@ -36,7 +36,7 @@ class PurchaseReturnItemModel extends HiveObject {
   final String? variantInfo; // e.g. "Size: L, Color: Red"
 
   @HiveField(7)
-  final int returnedQty;
+  final double returnedQty;
 
   @HiveField(8)
   final double? costPrice;
@@ -73,7 +73,7 @@ class PurchaseReturnItemModel extends HiveObject {
     required String productId,
     String? productName,
     String? variantInfo,
-    required int returnedQty,
+    required double returnedQty,
     double? costPrice,
     String? remarks,
   }) {
@@ -117,7 +117,7 @@ class PurchaseReturnItemModel extends HiveObject {
       productId: map['productId'] as String? ?? '',
       productName: map['productName'] as String?,
       variantInfo: map['variantInfo'] as String?,
-      returnedQty: (map['returnedQty'] as num?)?.toInt() ?? 0,
+      returnedQty: (map['returnedQty'] as num?)?.toDouble() ?? 0.0,
       costPrice: (map['costPrice'] as num?)?.toDouble(),
       totalAmount: (map['totalAmount'] as num?)?.toDouble(),
       remarks: map['remarks'] as String?,

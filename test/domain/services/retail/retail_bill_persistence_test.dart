@@ -34,7 +34,7 @@ void main() {
 
   CartItemModel item({
     required double price,
-    int qty = 1,
+    double qty = 1,
     double gstRatePercent = 0,
   }) =>
       CartItemModel.create(
@@ -181,7 +181,7 @@ void main() {
         CartCalculationService.fromLines(
           lines: items
               .map((i) => CalcLine(
-                  price: i.price, quantity: i.quantity, taxRate: i.taxRate))
+                  price: i.price, quantity: i.quantity.toDouble(), taxRate: i.taxRate))
               .toList(),
           discountType: DiscountType.amount,
           discountValue: 75,
@@ -206,7 +206,7 @@ void main() {
         CartCalculationService.fromLines(
           lines: items
               .map((i) => CalcLine(
-                  price: i.price, quantity: i.quantity, taxRate: i.taxRate))
+                  price: i.price, quantity: i.quantity.toDouble(), taxRate: i.taxRate))
               .toList(),
           discountType: DiscountType.percentage,
           discountValue: 15,
@@ -232,7 +232,7 @@ void main() {
         CartCalculationService.fromLines(
           lines: items
               .map((i) => CalcLine(
-                  price: i.price, quantity: i.quantity, taxRate: i.taxRate))
+                  price: i.price, quantity: i.quantity.toDouble(), taxRate: i.taxRate))
               .toList(),
           discountType: DiscountType.amount,
           discountValue: 0,

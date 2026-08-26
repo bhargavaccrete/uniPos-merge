@@ -32,7 +32,7 @@ class HoldSaleItemModel extends HiveObject {
   final double price;
 
   @HiveField(9)
-  final int qty;
+  final double qty;
 
   @HiveField(10)
   final double total;
@@ -130,7 +130,7 @@ class HoldSaleItemModel extends HiveObject {
     required String productName,
     Map<String, String>? attributes,
     required double price,
-    required int qty,
+    required double qty,
     String? barcode,
     double? gstRate,
     double? taxableAmount,
@@ -213,7 +213,7 @@ class HoldSaleItemModel extends HiveObject {
       attributes: (map['attributes'] as Map?)
           ?.map((k, v) => MapEntry(k.toString(), v.toString())),
       price: (map['price'] as num).toDouble(),
-      qty: (map['qty'] as num).toInt(),
+      qty: (map['qty'] as num).toDouble(),
       total: (map['total'] as num).toDouble(),
       barcode: map['barcode'] as String?,
       createdAt: map['createdAt'] as String,

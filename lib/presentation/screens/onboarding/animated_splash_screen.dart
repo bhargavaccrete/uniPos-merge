@@ -178,7 +178,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
                         'Bill Berry Lite',
                         style: GoogleFonts.poppins(
                           fontSize: 32,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           color: AppColors.primary,
                           letterSpacing: 0.5,
                         ),

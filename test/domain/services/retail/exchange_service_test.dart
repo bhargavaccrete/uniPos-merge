@@ -125,7 +125,7 @@ void main() {
     required String id,
     String productId = 'p1',
     required double price,
-    int stock = 10,
+    double stock = 10,
     double cost = 60,
     double taxRate = 18,
     String status = 'active',
@@ -152,7 +152,7 @@ void main() {
     String variantId = 'v1',
     required double unitPrice,
     required double unitTax,
-    int qty = 1,
+    double qty = 1,
     String paymentType = 'cash',
     String? customerId,
     double? dueAmount,
@@ -206,7 +206,7 @@ void main() {
   SaleModel readSale(String id) =>
       Hive.box<SaleModel>(HiveBoxNames.sales).get(id)!;
 
-  int stockOf(String variantId) =>
+  double stockOf(String variantId) =>
       Hive.box<VarianteModel>(HiveBoxNames.variants).get(variantId)!.stockQty;
 
   List<SaleModel> allSales() =>
@@ -225,7 +225,7 @@ void main() {
     double? dueAmount,
     double? paidAmount,
     String? status,
-    int jeansStock = 5,
+    double jeansStock = 5,
   }) async {
     await seedProduct();
     await seedVariant(id: 'v1', price: 900, stock: 9); // one already sold

@@ -20,8 +20,12 @@ class CartItemModel extends HiveObject {
   @HiveField(7)
   final double price;       // selling price (mrp or after discount)
 
+  /// Quantity on this line. `double` so loose goods can be sold fractionally
+  /// (1.75 kg); piece products hold whole values and behave as before.
+  /// This is the REAL quantity — [price] stays a genuine per-unit price, and
+  /// `total`/discount/return proration all key off this figure.
   @HiveField(8)
-  final int qty;
+  final double qty;
 
   @HiveField(9)
   final double total;       // price * qty
@@ -176,7 +180,7 @@ class CartItemModel extends HiveObject {
     required String productName,
     Map<String, String>? attributes,
     required double price,
-    int qty = 1,
+    double qty = 1,
     String? barcode,
     double? gstRate,
     String? hsnCode,
@@ -296,7 +300,7 @@ class CartItemModel extends HiveObject {
       attributes: (map['attributes'] as Map?)
           ?.map((k, v) => MapEntry(k.toString(), v.toString())),
       price: (map['price'] as num).toDouble(),
-      qty: (map['qty'] as num).toInt(),
+      qty: (map['qty'] as num).toDouble(),
       total: (map['total'] as num).toDouble(),
       barcode: map['barcode'] as String?,
       addedAt: map['addedAt'] as String,

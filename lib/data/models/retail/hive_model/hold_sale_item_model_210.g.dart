@@ -24,7 +24,7 @@ class HoldSaleItemModelAdapter extends TypeAdapter<HoldSaleItemModel> {
       productName: fields[4] as String,
       attributes: (fields[17] as Map?)?.cast<String, String>(),
       price: fields[8] as double,
-      qty: fields[9] as int,
+      qty: fields[9] as double,
       total: fields[10] as double,
       barcode: fields[11] as String?,
       createdAt: fields[12] as String,

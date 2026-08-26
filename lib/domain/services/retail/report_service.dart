@@ -236,7 +236,7 @@ class ReportService {
 
     final totalSales = dailySales.length;
     final totalRevenue = dailySales.fold<double>(0.0, (sum, sale) => sum + sale.totalAmount);
-    final totalItems = dailySales.fold<int>(0, (sum, sale) => sum + sale.totalItems);
+    final totalItems = dailySales.fold<double>(0.0, (sum, sale) => sum + sale.totalItems);
 
     // Discount and tax net the credit notes out. Return headers are stored
     // already negated, so folding over forward sales AND returns nets by
@@ -281,7 +281,7 @@ class ReportService {
 
     final totalSales = monthlySales.length;
     final totalRevenue = monthlySales.fold<double>(0.0, (sum, sale) => sum + sale.totalAmount);
-    final totalItems = monthlySales.fold<int>(0, (sum, sale) => sum + sale.totalItems);
+    final totalItems = monthlySales.fold<double>(0.0, (sum, sale) => sum + sale.totalItems);
 
     // Net of credit notes — see the equivalent note on the daily report.
     final totalDiscount =
@@ -337,7 +337,7 @@ class ReportService {
           // Defaulted here, not at each call site: `SaleItemModel.productName`
           // is nullable and screens cast this straight to `String`.
           'productName': item.productName ?? 'Unknown',
-          'totalQuantity': 0,
+          'totalQuantity': 0.0,
           'totalRevenue': 0.0,
           'totalDiscount': 0.0,
           'totalTax': 0.0,
@@ -380,7 +380,7 @@ class ReportService {
           // the receipt even if the variant was edited afterwards.
           'variantLabel': attributeStore.describeAttributes(item.attributes,
               size: item.size, color: item.color),
-          'totalQuantity': 0,
+          'totalQuantity': 0.0,
           'totalRevenue': 0.0,
           'totalDiscount': 0.0,
           'totalTax': 0.0,
@@ -436,7 +436,7 @@ class ReportService {
           () => {
                 'categoryId': key,
                 'category': label,
-                'totalQuantity': 0,
+                'totalQuantity': 0.0,
                 'totalRevenue': 0.0,
                 'totalDiscount': 0.0,
                 'totalTax': 0.0,
@@ -497,7 +497,7 @@ class ReportService {
           'supplierName':
               supplier?.name ?? grn.supplierName ?? 'Unknown Supplier',
           'receiptCount': 0,
-          'totalItems': 0,
+          'totalItems': 0.0,
           'totalAmount': 0.0,
           'damagedAmount': 0.0,
           'damagedRecoverable': 0.0,
@@ -508,7 +508,8 @@ class ReportService {
       final damaged = damagedByGRN[grn.grnId];
 
       entry['receiptCount'] = (entry['receiptCount'] as int) + 1;
-      entry['totalItems'] = (entry['totalItems'] as int) + grn.totalReceivedQty;
+      entry['totalItems'] =
+          (entry['totalItems'] as num).toDouble() + grn.totalReceivedQty;
       entry['totalAmount'] =
           (entry['totalAmount'] as double) + (grn.totalAmount ?? 0);
       entry['damagedRecoverable'] =
@@ -574,7 +575,8 @@ class ReportService {
     }
 
     // Sort by stock quantity (lowest first)
-    lowStockItems.sort((a, b) => (a['currentStock'] as int).compareTo(b['currentStock'] as int));
+    lowStockItems.sort((a, b) => (a['currentStock'] as num)
+        .compareTo(b['currentStock'] as num));
 
     return lowStockItems;
   }
@@ -851,7 +853,7 @@ class ReportService {
           'variantLabel': attributeStore.describeAttributes(item.attributes,
               size: item.size, color: item.color),
           'barcode': item.barcode,
-          'totalQuantitySold': 0,
+          'totalQuantitySold': 0.0,
           'totalRevenue': 0.0,
           'totalCost': 0.0,
           'totalProfit': 0.0,
@@ -883,7 +885,7 @@ class ReportService {
     final statsList = itemProfits.values.map((stat) {
       final revenue = stat['totalRevenue'] as double;
       final profit = stat['totalProfit'] as double;
-      final qty = stat['totalQuantitySold'] as int;
+      final qty = (stat['totalQuantitySold'] as num).toDouble();
 
       return {
         ...stat,
@@ -1030,7 +1032,7 @@ class ReportService {
           'totalCost': 0.0,
           'totalProfit': 0.0,
           'profitMargin': 0.0,
-          'totalItems': 0,
+          'totalItems': 0.0,
         };
       }
 
@@ -1138,10 +1140,10 @@ class ReportService {
   }
 
   /// Units received against a PO across its confirmed GRNs.
-  int _receivedQtyForPO(String poId) {
+  double _receivedQtyForPO(String poId) {
     return purchaseOrderStore.grns
         .where((g) => g.poId == poId && g.statusEnum == GRNStatus.confirmed)
-        .fold<int>(0, (sum, g) => sum + g.totalReceivedQty);
+        .fold<double>(0.0, (sum, g) => sum + g.totalReceivedQty);
   }
 
   /// Value billed against a PO across its confirmed GRNs — the supplier's
@@ -1204,9 +1206,9 @@ class ReportService {
       'orderCount': placedOrders.length,
       'countByStatus': countByStatus,
       'receiptCount': receipts.length,
-      'orderedQty': placedOrders.fold<int>(0, (sum, po) => sum + po.totalItems),
+      'orderedQty': placedOrders.fold<double>(0.0, (sum, po) => sum + po.totalItems),
       'receivedQty':
-          receipts.fold<int>(0, (sum, g) => sum + g.totalReceivedQty),
+          receipts.fold<double>(0.0, (sum, g) => sum + g.totalReceivedQty),
       'orderedValue':
           placedOrders.fold<double>(0, (sum, po) => sum + po.estimatedTotal),
       'receivedValue':
@@ -1263,8 +1265,8 @@ class ReportService {
     final receipts = _confirmedGRNs(startDate: startDate, endDate: endDate);
     final items = await GRNItemRepository().getAllGRNItems();
 
-    final acceptedByGRN = <String, int>{};
-    final damagedByGRN = <String, int>{};
+    final acceptedByGRN = <String, double>{};
+    final damagedByGRN = <String, double>{};
     for (final item in items) {
       acceptedByGRN[item.grnId] =
           (acceptedByGRN[item.grnId] ?? 0) + item.acceptedQty;

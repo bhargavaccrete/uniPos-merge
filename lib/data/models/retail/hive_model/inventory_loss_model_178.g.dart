@@ -30,7 +30,7 @@ class InventoryLossModelAdapter extends TypeAdapter<InventoryLossModel> {
       productId: fields[10] as String,
       productName: fields[11] as String?,
       variantInfo: fields[12] as String?,
-      quantity: fields[13] as int,
+      quantity: fields[13] as double,
       costPrice: fields[14] as double?,
       lossValue: fields[15] as double,
       reason: fields[16] as String,

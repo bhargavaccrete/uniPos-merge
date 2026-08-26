@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 import 'package:billberrylite/util/common/short_ref.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
@@ -9,6 +10,8 @@ import 'package:billberrylite/util/common/app_responsive.dart';
 
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
+import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
+import 'package:billberrylite/presentation/widget/componets/retail/cart_quantity_field.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/plan/plan_enforcement.dart';
 import '../../../core/plan/retail_entitlement_keys.dart';
@@ -32,13 +35,13 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
 
   /// Units of each variant that may STILL be returned, after any earlier
   /// returns. Every quantity control on this screen is capped by it.
-  Map<String, int> _remaining = {};
+  Map<String, double> _remaining = {};
 
   bool _isLoading = true;
   bool _isProcessing = false;
 
   // For partial return
-  final Map<String, int> _selectedItems = {}; // variantId -> quantity to return
+  final Map<String, double> _selectedItems = {}; // variantId -> quantity to return
 
   String _refundMethod = 'cash';
   String _returnType = 'full'; // full or partial
@@ -71,7 +74,32 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
     }
   }
 
-  int _remainingFor(SaleItemModel item) => _remaining[item.varianteId] ?? 0;
+  double _remainingFor(SaleItemModel item) =>
+      _remaining[item.varianteId] ?? 0;
+
+  /// The catalogue variant behind a sale line, looked up synchronously for
+  /// build-time decisions.
+  VarianteModel? _variantFor(String variantId) {
+    for (final v in productStore.variants) {
+      if (v.varianteId == variantId) return v;
+    }
+    return null;
+  }
+
+  bool _isDecimalLine(SaleItemModel item) =>
+      _variantFor(item.varianteId)?.isDecimalQuantity ?? false;
+
+  /// The quantity a line starts at when it is ticked.
+  ///
+  /// Loose goods default to the WHOLE remaining amount: 1.75 L of milk was one
+  /// purchase, so "1 of 1.75" is not a quantity anyone meant — and a whole-unit
+  /// stepper could never reach 1.75 anyway. A piece line starts at 1, except
+  /// when less than one unit is left (only reachable on a decimal line).
+  double _defaultQtyFor(SaleItemModel item) {
+    final remaining = _remainingFor(item);
+    if (_isDecimalLine(item)) return remaining;
+    return remaining < 1 ? remaining : 1;
+  }
 
   /// Lines that still have something left to give back.
   List<SaleItemModel> get _returnableItems =>
@@ -85,7 +113,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
   ///
   /// A full return means everything STILL outstanding — not the original
   /// quantities, which would refund earlier returns a second time.
-  Map<String, int> get _effectiveSelection {
+  Map<String, double> get _effectiveSelection {
     if (_returnType == 'full') {
       return {
         for (final item in _saleItems)
@@ -561,9 +589,15 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
     final isSelected = _selectedItems.containsKey(item.varianteId);
     final remaining = _remainingFor(item);
     final alreadyReturned = item.qty - remaining;
+    final isDecimal = _isDecimalLine(item);
     // Cap at what is left, never at the originally sold quantity — that is the
     // guard that stops the same units being refunded twice.
-    final returnQty = (_selectedItems[item.varianteId] ?? 1).clamp(1, remaining);
+    //
+    // NOT `.clamp(1, remaining)`: `num.clamp` throws when the lower limit
+    // exceeds the upper one, so a part-returned loose line with 0.75 left
+    // crashed this screen on build. Only an upper cap is needed.
+    final storedQty = _selectedItems[item.varianteId] ?? _defaultQtyFor(item);
+    final returnQty = storedQty > remaining ? remaining : storedQty;
 
     return Container(
       margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
@@ -588,7 +622,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                 onChanged: (value) {
                   setState(() {
                     if (value == true) {
-                      _selectedItems[item.varianteId] = 1;
+                      _selectedItems[item.varianteId] = _defaultQtyFor(item);
                     } else {
                       _selectedItems.remove(item.varianteId);
                     }
@@ -634,7 +668,8 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                     // rather than just refusing at a lower number.
                     if (alreadyReturned > 0)
                       Text(
-                        '$alreadyReturned of ${item.qty} already returned',
+                        '${formatQty(alreadyReturned)} of '
+                        '${formatQty(item.qty)} already returned',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -665,39 +700,80 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                     fontSize: AppResponsive.bodyFontSize(context),
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.remove_circle_outline),
-                  onPressed: returnQty > 1
-                      ? () => setState(
-                          () => _selectedItems[item.varianteId] = returnQty - 1,
-                        )
-                      : null,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 32,
-                    minHeight: 32,
+                if (isDecimal) ...[
+                  // Typed, not stepped — a stepper cannot reach 1.75. Keyed by
+                  // variant so a controller is never carried from one line onto
+                  // another when the returnable list changes.
+                  CartQuantityField(
+                    key: ValueKey(item.varianteId),
+                    qty: returnQty,
+                    allowDecimal: true,
+                    onSubmitted: (qty) async {
+                      if (qty <= 0) {
+                        // Zero means "not returning this line" — untick it
+                        // rather than sending a zero-quantity return.
+                        setState(() => _selectedItems.remove(item.varianteId));
+                        return true;
+                      }
+                      if (qty > remaining) {
+                        // Rejected: returning false snaps the field back to the
+                        // truth instead of leaving an impossible figure on it.
+                        NotificationService.instance.showWarning(
+                          'Only ${formatQty(remaining)} left to return',
+                        );
+                        return false;
+                      }
+                      setState(() => _selectedItems[item.varianteId] = qty);
+                      return true;
+                    },
                   ),
-                ),
-                Text(
-                  '$returnQty / $remaining',
-                  style: TextStyle(
-                    fontSize: AppResponsive.bodyFontSize(context),
-                    fontWeight: FontWeight.w600,
+                  const SizedBox(width: 8),
+                  Text(
+                    'of ${formatQty(remaining)}',
+                    style: TextStyle(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.add_circle_outline),
-                  onPressed: returnQty < remaining
-                      ? () => setState(
-                          () => _selectedItems[item.varianteId] = returnQty + 1,
-                        )
-                      : null,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 32,
-                    minHeight: 32,
+                ] else ...[
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline),
+                    onPressed: returnQty > 1
+                        ? () => setState(
+                            () =>
+                                _selectedItems[item.varianteId] = returnQty - 1,
+                          )
+                        : null,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
                   ),
-                ),
+                  Text(
+                    '${formatQty(returnQty)} / ${formatQty(remaining)}',
+                    style: TextStyle(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline),
+                    // Compares the RESULT against the cap — `returnQty <
+                    // remaining` let a line with 1.75 left step from 1 to 2.
+                    onPressed: returnQty + 1 <= remaining
+                        ? () => setState(
+                            () =>
+                                _selectedItems[item.varianteId] = returnQty + 1,
+                          )
+                        : null,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
+                  ),
+                ],
               ],
             ),
           ],
@@ -768,7 +844,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
           if (_returnType == 'partial') ...[
             SizedBox(height: AppResponsive.smallSpacing(context)),
             Text(
-              '${_effectiveSelection.values.fold(0, (sum, qty) => sum + qty)} items selected',
+              '${formatQty(_effectiveSelection.values.fold(0.0, (sum, qty) => sum + qty))} items selected',
               maxLines: 1,
               style: TextStyle(
                 color: Colors.white70,

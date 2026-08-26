@@ -13,8 +13,8 @@ import 'package:billberrylite/data/models/retail/hive_model/stock_take_model_180
 /// exercised here without Hive or the service locator.
 void main() {
   StockTakeItemModel line({
-    required int system,
-    required int counted,
+    required double system,
+    required double counted,
     double? cost,
   }) =>
       StockTakeItemModel.create(
@@ -72,7 +72,7 @@ void main() {
 
   group('commit applies the variance as a delta, not the counted figure', () {
     /// Mirrors `StockTakeStore.commit`: target = current stock + variance.
-    int target(StockTakeItemModel l, int currentStock) =>
+    double target(StockTakeItemModel l, double currentStock) =>
         currentStock + l.variance;
 
     test('with no movement since the count, delta equals the count', () {

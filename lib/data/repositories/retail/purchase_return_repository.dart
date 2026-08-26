@@ -48,8 +48,8 @@ class PurchaseReturnRepository {
 
   /// How many units of a GRN line have already been sent back — the basis for
   /// partial returns. Cancelled returns don't count.
-  Future<int> returnedQtyForGRNItem(String grnItemId) async {
-    var total = 0;
+  Future<double> returnedQtyForGRNItem(String grnItemId) async {
+    var total = 0.0;
     for (final item in _itemBox.values.where((i) => i.grnItemId == grnItemId)) {
       final parent = _box.get(item.returnId);
       if (parent == null ||

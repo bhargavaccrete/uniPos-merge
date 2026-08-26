@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -12,11 +13,21 @@ import '../../../../domain/services/common/notification_service.dart';
 import '../../../../domain/services/retail/stock_adjustment_reason.dart';
 import '../../../../domain/services/retail/stock_adjustment_service.dart';
 
-/// Whole-number quantity input.
-final _qtyFormatters = <TextInputFormatter>[
-  FilteringTextInputFormatter.digitsOnly,
-  LengthLimitingTextInputFormatter(6),
-];
+/// Quantity input rules for one variant.
+///
+/// A loose-goods variant (`isDecimalQuantity`) may type a fractional amount —
+/// 13.5 kg is a real quantity, and `digitsOnly` silently swallowed the point so
+/// "13.50" was entered as 1350. A piece product stays digits-only, exactly as
+/// it always was.
+List<TextInputFormatter> _qtyFormatters({required bool allowDecimal}) =>
+    <TextInputFormatter>[
+      if (allowDecimal)
+        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))
+      else
+        FilteringTextInputFormatter.digitsOnly,
+      // Room for the point and two decimals on top of the same 6 digits.
+      LengthLimitingTextInputFormatter(allowDecimal ? 9 : 6),
+    ];
 
 /// Read-only stock display for the Edit Variant form.
 ///
@@ -24,9 +35,13 @@ final _qtyFormatters = <TextInputFormatter>[
 /// carries no controller — stock is not editable here by design. See
 /// [StockAdjustmentService] for why.
 class ReadOnlyStockTile extends StatelessWidget {
-  final int stock;
+  final double stock;
 
-  const ReadOnlyStockTile({super.key, required this.stock});
+  /// Unit label to render beside the figure. Defaults to 'pcs', which is what
+  /// every piece product showed before units existed.
+  final String? unit;
+
+  const ReadOnlyStockTile({super.key, required this.stock, this.unit});
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +75,7 @@ class ReadOnlyStockTile extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '$stock pcs',
+                  '${formatQty(stock)} ${unit ?? 'pcs'}',
                   style: GoogleFonts.poppins(
                     fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w600,
@@ -78,7 +93,6 @@ class ReadOnlyStockTile extends StatelessWidget {
               style: GoogleFonts.poppins(
                 fontSize: AppResponsive.captionFontSize(context),
                 color: AppColors.textSecondary,
-                fontStyle: FontStyle.italic,
               ),
             ),
           ),
@@ -140,12 +154,14 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
   StockAdjustmentReason? _reason;
   bool _saving = false;
 
-  int get _currentStock => widget.variant.stockQty;
+  double get _currentStock => widget.variant.stockQty;
 
-  int? get _counted => int.tryParse(_countedController.text.trim());
+  double? get _counted => widget.variant.isDecimalQuantity
+      ? double.tryParse(_countedController.text.trim())
+      : int.tryParse(_countedController.text.trim())?.toDouble();
 
   /// Null until a valid, different quantity is typed.
-  int? get _delta {
+  double? get _delta {
     final counted = _counted;
     if (counted == null || counted == _currentStock) return null;
     return counted - _currentStock;
@@ -164,7 +180,10 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
   @override
   void initState() {
     super.initState();
-    _countedController = TextEditingController(text: _currentStock.toString());
+    // formatQty, not toString(): a piece product holding 20.0 must seed the
+    // field as "20". Input formatters do not run on text set programmatically,
+    // so "20.0" would sit there and then fail an int-only parse.
+    _countedController = TextEditingController(text: formatQty(_currentStock));
   }
 
   @override
@@ -244,13 +263,21 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
               icon: Icons.inventory_2_outlined,
               required: true,
               autofocus: true,
-              keyboardType: TextInputType.number,
-              inputFormatters: _qtyFormatters,
+              keyboardType: widget.variant.isDecimalQuantity
+                  ? const TextInputType.numberWithOptions(decimal: true)
+                  : TextInputType.number,
+              inputFormatters: _qtyFormatters(
+                allowDecimal: widget.variant.isDecimalQuantity,
+              ),
               onChanged: _onCountedChanged,
               validator: (v) {
                 final text = v?.trim() ?? '';
                 if (text.isEmpty) return 'Required';
-                final parsed = int.tryParse(text);
+                // Parsed the same way [_counted] does — an int-only parse here
+                // rejected every fractional count as "Enter a number".
+                final parsed = widget.variant.isDecimalQuantity
+                    ? double.tryParse(text)
+                    : int.tryParse(text)?.toDouble();
                 if (parsed == null) return 'Enter a number';
                 if (parsed == _currentStock) return 'Same as current stock';
                 return null;

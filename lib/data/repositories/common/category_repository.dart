@@ -4,6 +4,7 @@ import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/constants/hive_box_names.dart';
 import '../../models/common/categorymodel_300.dart';
 import '../../models/restaurant/db/itemmodel_302.dart';
+import '../../models/retail/hive_model/product_model_200.dart';
 
 /// Repository layer for Category data access.
 ///
@@ -16,15 +17,20 @@ import '../../models/restaurant/db/itemmodel_302.dart';
 /// The item-cascade methods (`getItemsByCategory`, `getCategoriesWithItemCount`,
 /// the item-delete step inside `deleteCategory`) only apply to restaurant's
 /// `Items` box and are no-ops in retail mode — that split is genuinely
-/// mode-specific behavior, unlike the category box itself.
+/// mode-specific behavior, unlike the category box itself. `deleteCategory`
+/// carries the retail half of that split too: it re-parents products instead of
+/// deleting them.
 class CategoryRepository {
   late Box<Category> _categoryBox;
   Box<Items>? _itemBox;
+  Box<ProductModel>? _productBox;
 
   CategoryRepository() {
     _categoryBox = Hive.box<Category>(HiveBoxNames.category);
     if (AppConfig.isRestaurant) {
       _itemBox = Hive.box<Items>(HiveBoxNames.restaurantItems);
+    } else {
+      _productBox = Hive.box<ProductModel>(HiveBoxNames.products);
     }
   }
 
@@ -44,17 +50,48 @@ class CategoryRepository {
   }
 
   /// Delete a category from Hive.
-  /// Restaurant: also deletes all items in that category (existing behavior).
-  /// Retail: category-only — callers re-parent products themselves.
+  ///
+  /// **Neither mode deletes what was inside the category.** Both re-parent to
+  /// no category. Deleting a category is an organisational act; a menu item or
+  /// product carries far more setup than the label being removed, and losing it
+  /// cannot be undone.
+  ///
+  /// Restaurant used to cascade-delete its items here while `CategoryStore`
+  /// simultaneously tried to re-parent them from its in-memory list — so the
+  /// outcome depended on which screen called, and on whether the plan allowed
+  /// item editing. Doing the re-parent here, against the box, settles it: one
+  /// policy, no dependence on whether a store has hydrated.
+  ///
+  /// Retail: products are never deleted — they are re-parented to no category,
+  /// which is what every retail delete prompt has always promised. Leaving the
+  /// id in place instead would strand it: every retail lookup falls back to
+  /// `?? product.category`, so the raw id would surface as the category NAME in
+  /// Inventory, on the product page, and — via `cart_store` — get written onto
+  /// sale lines, where it would show up forever as a junk row in the
+  /// category-wise sales report.
   Future<void> deleteCategory(String categoryId) async {
     if (_itemBox != null) {
-      final itemsToDelete = _itemBox!.values
-          .where((item) => item.categoryOfItem == categoryId)
-          .map((item) => item.id)
+      // Iterated by KEY, and written back to the same key. Some legacy items
+      // are stored under Hive's auto-increment index rather than under their
+      // own `id`, so a `put(item.id, …)` would insert a second copy of those
+      // instead of updating them.
+      for (final key in _itemBox!.keys.toList()) {
+        final item = _itemBox!.get(key);
+        if (item == null || item.categoryOfItem != categoryId) continue;
+        await _itemBox!.put(key, item.copyWith(categoryOfItem: ''));
+      }
+    }
+
+    if (_productBox != null) {
+      final orphaned = _productBox!.values
+          .where((product) => product.category == categoryId)
           .toList();
 
-      if (itemsToDelete.isNotEmpty) {
-        await _itemBox!.deleteAll(itemsToDelete);
+      for (final product in orphaned) {
+        await _productBox!.put(
+          product.productId,
+          product.copyWith(category: ''),
+        );
       }
     }
 

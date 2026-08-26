@@ -35,7 +35,7 @@ class PurchaseOrderModel extends HiveObject {
   final String expectedDeliveryDate; // ISO 8601 date string
 
   @HiveField(5)
-  final int totalItems; // Total quantity of all items
+  final double totalItems; // Total quantity of all items
 
   @HiveField(6)
   final double estimatedTotal; // Price estimation (optional/editable)
@@ -71,7 +71,7 @@ class PurchaseOrderModel extends HiveObject {
     required String supplierId,
     String? supplierName,
     required String expectedDeliveryDate,
-    int totalItems = 0,
+    double totalItems = 0,
     double estimatedTotal = 0,
     POStatus status = POStatus.draft,
     String? notes,
@@ -137,7 +137,7 @@ class PurchaseOrderModel extends HiveObject {
       supplierId: map['supplierId'] as String,
       supplierName: map['supplierName'] as String?,
       expectedDeliveryDate: map['expectedDeliveryDate'] as String,
-      totalItems: (map['totalItems'] as num).toInt(),
+      totalItems: (map['totalItems'] as num).toDouble(),
       estimatedTotal: (map['estimatedTotal'] as num?)?.toDouble() ?? 0.0,
       status: map['status'] as String,
       notes: map['notes'] as String?,
@@ -153,7 +153,7 @@ class PurchaseOrderModel extends HiveObject {
     String? supplierId,
     String? supplierName,
     String? expectedDeliveryDate,
-    int? totalItems,
+    double? totalItems,
     double? estimatedTotal,
     String? status,
     String? notes,

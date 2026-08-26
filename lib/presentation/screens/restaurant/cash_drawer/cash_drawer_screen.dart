@@ -779,7 +779,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
           style: GoogleFonts.poppins(
             fontSize: AppResponsive.getValue<double>(context,
                 mobile: 32, tablet: 38, desktop: 44),
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
             color: Colors.white,
           ),
         ),
@@ -930,7 +930,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                   fontSize: emphasize
                       ? AppResponsive.subheadingFontSize(context)
                       : AppResponsive.bodyFontSize(context),
-                  fontWeight: emphasize ? FontWeight.w800 : FontWeight.w600,
+                  fontWeight: emphasize ? FontWeight.w700 : FontWeight.w600,
                   color:
                       emphasize ? AppColors.primary : AppColors.textPrimary)),
         ],
@@ -1161,7 +1161,6 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                 Text('audit only — does not affect balance',
                     style: GoogleFonts.poppins(
                         fontSize: AppResponsive.captionFontSize(context),
-                        fontStyle: FontStyle.italic,
                         color: Colors.orange.shade600))
               else if (entry.staffName.isNotEmpty)
                 Text('$timeStr  ·  ${entry.staffName}',
@@ -1693,7 +1692,6 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
                         Text('"${widget.closedNote}"',
                             style: GoogleFonts.poppins(
                                 fontSize: 12,
-                                fontStyle: FontStyle.italic,
                                 color: AppColors.textSecondary)),
                       ],
                     ],

@@ -77,7 +77,7 @@ class _LineDiscountDialogState extends State<LineDiscountDialog> {
   /// Charged unit price — already carries any price override.
   double get _unitPrice => widget.item.price;
 
-  int get _qty => widget.item.qty;
+  double get _qty => widget.item.qty;
 
   double get _gross => _unitPrice * _qty;
 

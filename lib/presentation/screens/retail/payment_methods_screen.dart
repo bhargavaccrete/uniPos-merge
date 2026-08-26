@@ -12,6 +12,7 @@ import 'package:billberrylite/models/payment_method.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/row_action_button.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/stores/payment_method_store.dart';
 import 'package:billberrylite/util/color.dart';
@@ -573,88 +574,30 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                 }
               },
             ),
-            PopupMenuButton<String>(
-              icon: Icon(
-                Icons.more_vert_rounded,
-                color: AppColors.textSecondary,
-                size: AppResponsive.iconSize(context),
-              ),
-              // White sheet — kills the Material 3 elevation tint.
-              color: AppColors.white,
-              surfaceTintColor: Colors.transparent,
-              elevation: 4,
-              shadowColor: Colors.black.withValues(alpha: 0.15),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: const BorderSide(color: AppColors.divider),
-              ),
-              padding: EdgeInsets.zero,
-              onSelected: (value) {
-                if (value == 'edit') {
-                  _showEditDialog(method);
-                } else if (value == 'delete') {
-                  _confirmDelete(method);
-                }
-              },
-              itemBuilder: (_) => [
-                _menuItem(
-                  value: 'edit',
-                  icon: isUpi ? Icons.qr_code_2_rounded : Icons.edit_rounded,
-                  label: isUpi ? 'UPI Setup' : 'Edit',
-                  color: AppColors.primary,
-                ),
-                // A built-in's value is a reporting bucket key — deleting Cash
-                // would leave the drawer and EOD reading a method that no
-                // longer exists.
-                if (!isBuiltIn)
-                  _menuItem(
-                    value: 'delete',
-                    icon: Icons.delete_rounded,
-                    label: 'Delete',
-                    color: AppColors.danger,
-                  ),
-              ],
+            const SizedBox(width: 4),
+            RowActionButton(
+              icon: isUpi ? Icons.qr_code_2_rounded : Icons.edit_outlined,
+              color: AppColors.primary,
+              tooltip: isUpi ? 'UPI Setup' : 'Edit',
+              onTap: () => _showEditDialog(method),
             ),
+            // A built-in's value is a reporting bucket key — deleting Cash
+            // would leave the drawer and EOD reading a method that no longer
+            // exists. Omitted rather than disabled: the row keeps the same
+            // shape the menu gave it, one action instead of two.
+            if (!isBuiltIn) ...[
+              const SizedBox(width: 6),
+              RowActionButton(
+                icon: Icons.delete_outline_rounded,
+                color: AppColors.danger,
+                tooltip: 'Delete',
+                onTap: () => _confirmDelete(method),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  /// A styled row for the card overflow menu: tinted icon chip + colored label.
-  PopupMenuItem<String> _menuItem({
-    required String value,
-    required IconData icon,
-    required String label,
-    required Color color,
-  }) {
-    return PopupMenuItem<String>(
-      value: value,
-      height: 48,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, size: 18, color: color),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: AppResponsive.bodyFontSize(context),
-              fontWeight: FontWeight.w500,
-              color: color == AppColors.danger
-                  ? AppColors.danger
-                  : AppColors.textPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

@@ -58,9 +58,16 @@ class StockAlertService {
   /// (its variant `minStock`, or the global threshold), never below 1. A fixed
   /// "<= 3" would mark a variant that reorders at 2 as critical forever.
   static bool _isCritical(Map<String, dynamic> item) {
-    final reorderPoint = (item['reorderPoint'] as int?) ?? _defaultThreshold;
-    final critical = (reorderPoint / 3).ceil().clamp(1, reorderPoint);
-    return (item['currentStock'] as int) <= critical;
+    // Read as `num`, not `int`: these rows now carry decimal quantities for
+    // loose goods, and a hard `as int` cast would throw on the first one.
+    final reorderPoint =
+        (item['reorderPoint'] as num?)?.toDouble() ?? _defaultThreshold.toDouble();
+    // Hand-bounded rather than `clamp`, which throws when the reorder point is
+    // a fraction below 1. Same result as clamp(1, reorderPoint) for whole values.
+    final raw = (reorderPoint / 3).ceilToDouble();
+    final atLeastOne = raw < 1.0 ? 1.0 : raw;
+    final critical = atLeastOne > reorderPoint ? reorderPoint : atLeastOne;
+    return ((item['currentStock'] as num?)?.toDouble() ?? 0) <= critical;
   }
 
   /// Get critical stock items
@@ -86,7 +93,9 @@ class StockAlertService {
     final items = await getLowStockItems();
     final criticalCount = items.where(_isCritical).length;
     final warningCount = items.length - criticalCount;
-    final outOfStockCount = items.where((item) => (item['currentStock'] as int) == 0).length;
+    final outOfStockCount = items
+        .where((item) => ((item['currentStock'] as num?)?.toDouble() ?? 0) <= 0)
+        .length;
 
     return {
       'totalAlerts': items.length,

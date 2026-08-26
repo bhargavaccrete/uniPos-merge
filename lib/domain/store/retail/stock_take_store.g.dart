@@ -44,25 +44,25 @@ mixin _$StockTakeStore on _StockTakeStore, Store {
           () => super.varianceLineCount,
           name: '_StockTakeStore.varianceLineCount'))
       .value;
-  Computed<int>? _$netVarianceQtyComputed;
+  Computed<double>? _$netVarianceQtyComputed;
 
   @override
-  int get netVarianceQty =>
-      (_$netVarianceQtyComputed ??= Computed<int>(() => super.netVarianceQty,
+  double get netVarianceQty =>
+      (_$netVarianceQtyComputed ??= Computed<double>(() => super.netVarianceQty,
               name: '_StockTakeStore.netVarianceQty'))
           .value;
-  Computed<int>? _$shortageQtyComputed;
+  Computed<double>? _$shortageQtyComputed;
 
   @override
-  int get shortageQty =>
-      (_$shortageQtyComputed ??= Computed<int>(() => super.shortageQty,
+  double get shortageQty =>
+      (_$shortageQtyComputed ??= Computed<double>(() => super.shortageQty,
               name: '_StockTakeStore.shortageQty'))
           .value;
-  Computed<int>? _$excessQtyComputed;
+  Computed<double>? _$excessQtyComputed;
 
   @override
-  int get excessQty =>
-      (_$excessQtyComputed ??= Computed<int>(() => super.excessQty,
+  double get excessQty =>
+      (_$excessQtyComputed ??= Computed<double>(() => super.excessQty,
               name: '_StockTakeStore.excessQty'))
           .value;
   Computed<double>? _$netVarianceValueComputed;
@@ -199,7 +199,7 @@ mixin _$StockTakeStore on _StockTakeStore, Store {
 
   @override
   Future<bool> countVariant(
-      {required VarianteModel variant, required int countedQty}) {
+      {required VarianteModel variant, required double countedQty}) {
     return _$countVariantAsyncAction.run(
         () => super.countVariant(variant: variant, countedQty: countedQty));
   }

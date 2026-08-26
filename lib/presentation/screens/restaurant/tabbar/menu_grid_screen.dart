@@ -478,6 +478,30 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
                   cartItems: cartItems,
                 );
               }),
+              // Items whose category no longer exists. A category delete
+              // re-parents its items instead of destroying them, so without
+              // this they would be enabled and on the menu but unreachable
+              // here. Same section exists in menu.dart's accordion.
+              Builder(
+                builder: (_) {
+                  final known =
+                      categories.map((c) => c.id as String).toSet();
+                  var orphans = enabledItems
+                      .where((i) => !known.contains(i.categoryOfItem ?? ''))
+                      .toList();
+                  if (query.isNotEmpty) {
+                    orphans = orphans.where(matches).toList();
+                  }
+                  if (orphans.isEmpty) return const SizedBox.shrink();
+                  return _buildSection(
+                    id: '__uncategorised__',
+                    title: 'Uncategorized',
+                    icon: Icons.restaurant_menu,
+                    items: orphans,
+                    cartItems: cartItems,
+                  );
+                },
+              ),
             ],
           ),
         );

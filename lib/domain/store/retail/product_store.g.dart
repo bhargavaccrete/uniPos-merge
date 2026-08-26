@@ -77,7 +77,7 @@ mixin _$ProductStore on _ProductStore, Store {
       required String barcode,
       required double sellingPrice,
       double? mrp,
-      int stockQty = 1}) {
+      double stockQty = 1}) {
     return _$createSimpleProductAsyncAction.run(() => super.createSimpleProduct(
         name: name,
         categoryId: categoryId,
@@ -139,7 +139,7 @@ mixin _$ProductStore on _ProductStore, Store {
       AsyncAction('_ProductStore.updateVariantStock', context: context);
 
   @override
-  Future<void> updateVariantStock(String variantId, int newStock) {
+  Future<void> updateVariantStock(String variantId, double newStock) {
     return _$updateVariantStockAsyncAction
         .run(() => super.updateVariantStock(variantId, newStock));
   }

@@ -34,9 +34,9 @@ class ExchangeQuote {
 
   final SaleModel originalSale;
   final SaleItemModel returnedLine;
-  final int returnQty;
+  final double returnQty;
   final VarianteModel replacementVariant;
-  final int replacementQty;
+  final double replacementQty;
 
   const ExchangeQuote({
     required this.returnValue,
@@ -230,9 +230,9 @@ class ExchangeService {
   Future<ExchangeQuote> quote({
     required String originalSaleId,
     required String returnedVariantId,
-    required int returnQty,
+    required double returnQty,
     required String replacementVariantId,
-    int replacementQty = 1,
+    double replacementQty = 1,
   }) async {
     // ---- the sale being exchanged against ---------------------------------
     final originalSale = await saleStore.getSaleById(originalSaleId);
@@ -333,7 +333,7 @@ class ExchangeService {
   /// second tax engine from existing.
   Future<RetailBill> _priceReplacement({
     required VarianteModel variant,
-    required int qty,
+    required double qty,
   }) async {
     final product = productStore.getProductById(variant.productId);
     final gstRate = await gstService.getEffectiveGstRate(
@@ -379,9 +379,9 @@ class ExchangeService {
   Future<ExchangeResult> processExchange({
     required String originalSaleId,
     required String returnedVariantId,
-    required int returnQty,
+    required double returnQty,
     required String replacementVariantId,
-    int replacementQty = 1,
+    double replacementQty = 1,
     required String paymentMethod,
     String? note,
   }) async {
@@ -473,7 +473,7 @@ class ExchangeService {
         final newStock = current.stockQty - replacementQty;
         await productStore.updateVariantStock(
           q.replacementVariant.varianteId,
-          newStock < 0 ? 0 : newStock,
+          newStock < 0 ? 0.0 : newStock,
         );
       }
       await _recordMovement(
@@ -598,7 +598,7 @@ class ExchangeService {
     required String productId,
     required String name,
     required String type,
-    required int qty,
+    required double qty,
     required String groupId,
     required String counterpart,
   }) async {

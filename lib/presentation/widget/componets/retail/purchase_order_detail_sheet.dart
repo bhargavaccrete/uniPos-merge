@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 
 import 'package:google_fonts/google_fonts.dart';
@@ -223,7 +224,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
   Widget _receiptChip(
     BuildContext context,
     String label,
-    int value,
+    double value,
     Color color,
   ) {
     return RichText(
@@ -237,7 +238,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
             ),
           ),
           TextSpan(
-            text: '$value',
+            text: formatQty(value),
             style: TextStyle(
               fontSize: AppResponsive.smallFontSize(context),
               fontWeight: FontWeight.w700,
@@ -611,12 +612,12 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
       future: purchaseOrderStore.getGRNItemsForGRN(grn.grnId),
       builder: (context, snapshot) {
         final grnItems = snapshot.data ?? [];
-        final totalAccepted = grnItems.fold<int>(
-          0,
+        final totalAccepted = grnItems.fold<double>(
+          0.0,
           (sum, item) => sum + item.acceptedQty,
         );
-        final totalDamaged = grnItems.fold<int>(
-          0,
+        final totalDamaged = grnItems.fold<double>(
+          0.0,
           (sum, item) => sum + (item.damagedQty ?? 0),
         );
         final damagedAmount = grnItems.fold<double>(
@@ -759,8 +760,8 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                               _buildDamagedRow(
                                 context,
                                 'Return to Supplier',
-                                returnToSupplier.fold<int>(
-                                  0,
+                                returnToSupplier.fold<double>(
+                                  0.0,
                                   (s, i) => s + (i.damagedQty ?? 0),
                                 ),
                                 AppColors.warning,
@@ -769,8 +770,8 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                               _buildDamagedRow(
                                 context,
                                 'Keep for Claim',
-                                keepForClaim.fold<int>(
-                                  0,
+                                keepForClaim.fold<double>(
+                                  0.0,
                                   (s, i) => s + (i.damagedQty ?? 0),
                                 ),
                                 AppColors.info,
@@ -779,8 +780,8 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                               _buildDamagedRow(
                                 context,
                                 'Write Off',
-                                writeOff.fold<int>(
-                                  0,
+                                writeOff.fold<double>(
+                                  0.0,
                                   (s, i) => s + (i.damagedQty ?? 0),
                                 ),
                                 AppColors.textSecondary,
@@ -951,7 +952,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
   Widget _buildDamagedRow(
     BuildContext context,
     String label,
-    int qty,
+    double qty,
     Color color,
   ) {
     return Padding(

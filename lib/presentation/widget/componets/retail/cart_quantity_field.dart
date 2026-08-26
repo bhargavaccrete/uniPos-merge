@@ -17,6 +17,24 @@ final _cartQtyFormatters = <TextInputFormatter>[
   LengthLimitingTextInputFormatter(4),
 ];
 
+/// Fractional quantity input for loose goods, at most 2 decimals — the same
+/// rule the money fields and restaurant's weight-item fields already use.
+/// Only reachable for a variant flagged `isDecimalQuantity`; piece products
+/// keep [_cartQtyFormatters] and cannot type a decimal point at all.
+final _cartDecimalQtyFormatters = <TextInputFormatter>[
+  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+  LengthLimitingTextInputFormatter(7),
+];
+
+/// Renders a quantity for display: a whole value never shows ".0".
+String _qtyText(double qty) {
+  if (qty == qty.roundToDouble()) return qty.toInt().toString();
+  return qty
+      .toStringAsFixed(2)
+      .replaceAll(RegExp(r'0+$'), '')
+      .replaceAll(RegExp(r'\.$'), '');
+}
+
 /// How long to wait after the last keystroke before applying.
 ///
 /// Short enough to feel immediate, long enough that typing "125" is one cart
@@ -45,7 +63,7 @@ const Duration _kApplyDebounce = Duration(milliseconds: 300);
 class CartQuantityField extends StatefulWidget {
   /// The quantity the STORE currently holds. Treated as the truth: the display
   /// resets to it whenever a value is rejected or abandoned.
-  final int qty;
+  final double qty;
 
   /// Called with a parsed, non-negative integer. `0` means the user asked for
   /// the line to be removed, and only ever arrives on explicit confirmation.
@@ -53,12 +71,18 @@ class CartQuantityField extends StatefulWidget {
   /// Returns whether the value was actually applied, so a rejection (over
   /// stock) can snap the display back to the truth instead of leaving the field
   /// showing a quantity the cart does not have.
-  final Future<bool> Function(int) onSubmitted;
+  final Future<bool> Function(double) onSubmitted;
+
+  /// Whether this line may hold a fractional quantity (loose goods sold by
+  /// weight/volume). False — the default — keeps the digits-only keypad every
+  /// piece product has always had.
+  final bool allowDecimal;
 
   const CartQuantityField({
     super.key,
     required this.qty,
     required this.onSubmitted,
+    this.allowDecimal = false,
   });
 
   @override
@@ -85,7 +109,7 @@ class _CartQuantityFieldState extends State<CartQuantityField> {
     // controller shared or rebuilt per frame is how "used after being disposed"
     // crashes happen — the caller keys this widget by cart line for the same
     // reason.
-    _controller = TextEditingController(text: widget.qty.toString());
+    _controller = TextEditingController(text: _qtyText(widget.qty));
     _focusNode = FocusNode()..addListener(_onFocusChanged);
   }
 
@@ -110,7 +134,7 @@ class _CartQuantityFieldState extends State<CartQuantityField> {
   }
 
   void _resetText() {
-    final text = widget.qty.toString();
+    final text = _qtyText(widget.qty);
     if (_controller.text != text) _controller.text = text;
   }
 
@@ -128,7 +152,7 @@ class _CartQuantityFieldState extends State<CartQuantityField> {
     _editing = true;
     _debounce?.cancel();
 
-    final parsed = int.tryParse(raw.trim());
+    final parsed = _parse(raw);
     if (parsed == null || parsed == 0) return; // destructive — wait for commit
     if (parsed == widget.qty) return;
 
@@ -143,7 +167,7 @@ class _CartQuantityFieldState extends State<CartQuantityField> {
     _debounce?.cancel();
     _editing = false;
 
-    final parsed = int.tryParse(_controller.text.trim());
+    final parsed = _parse(_controller.text);
 
     // Empty or unparseable: the user cleared the field but never named a
     // number. Do NOT touch the cart — this is the case that must not delete
@@ -156,7 +180,16 @@ class _CartQuantityFieldState extends State<CartQuantityField> {
     _apply(parsed);
   }
 
-  Future<void> _apply(int qty) async {
+  /// Parses what was typed. A decimal line accepts fractions; a piece line
+  /// stays integer-only, so nothing can slip a fraction into a pcs product.
+  double? _parse(String raw) {
+    final text = raw.trim();
+    if (widget.allowDecimal) return double.tryParse(text);
+    final asInt = int.tryParse(text);
+    return asInt?.toDouble();
+  }
+
+  Future<void> _apply(double qty) async {
     final applied = await widget.onSubmitted(qty);
     if (!mounted) return;
 
@@ -178,8 +211,11 @@ class _CartQuantityFieldState extends State<CartQuantityField> {
       child: AppTextField(
         controller: _controller,
         focusNode: _focusNode,
-        keyboardType: TextInputType.number,
-        inputFormatters: _cartQtyFormatters,
+        keyboardType: widget.allowDecimal
+            ? const TextInputType.numberWithOptions(decimal: true)
+            : TextInputType.number,
+        inputFormatters:
+            widget.allowDecimal ? _cartDecimalQtyFormatters : _cartQtyFormatters,
         textAlign: TextAlign.center,
         textInputAction: TextInputAction.done,
         // Tight enough to sit inline; the roomy default would not fit between

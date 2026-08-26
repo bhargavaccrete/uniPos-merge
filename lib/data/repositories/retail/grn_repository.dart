@@ -140,10 +140,10 @@ class GRNRepository {
   }
 
   // Get total received quantity for a PO (across all confirmed GRNs)
-  Future<int> getTotalReceivedQtyForPO(String poId) async {
+  Future<double> getTotalReceivedQtyForPO(String poId) async {
     final grns = await getGRNsByPOId(poId);
     return grns
         .where((grn) => grn.statusEnum == GRNStatus.confirmed)
-        .fold<int>(0, (sum, grn) => sum + grn.totalReceivedQty);
+        .fold<double>(0.0, (sum, grn) => sum + grn.totalReceivedQty);
   }
 }

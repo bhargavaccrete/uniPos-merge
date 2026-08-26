@@ -82,7 +82,7 @@ class VariantGeneratorService {
     double? defaultPrice,
     double? defaultMrp,
     double? defaultCostPrice,
-    int defaultStock = 0,
+    double defaultStock = 0,
     List<VarianteModel>? existingVariants,
   }) {
     final variants = <VarianteModel>[];

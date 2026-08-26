@@ -90,9 +90,17 @@ abstract class _StockAlertStore with Store {
   bool isCritical(Map<String, dynamic> item) => _isCritical(item);
 
   bool _isCritical(Map<String, dynamic> item) {
-    final reorderPoint = (item['reorderPoint'] as int?) ?? threshold;
-    final critical = (reorderPoint / 3).ceil().clamp(1, reorderPoint);
-    return (item['currentStock'] as int) <= critical;
+    // `num`, not `int`: a loose-goods variant carries a fractional stock, and
+    // a hard int cast threw the moment one appeared. Mirrors
+    // `StockAlertService._isCritical`, which was already num-safe.
+    final reorderPoint =
+        (item['reorderPoint'] as num?)?.toDouble() ?? threshold.toDouble();
+    // Hand-bounded rather than `clamp`, which throws when the reorder point is
+    // a fraction below 1. Same result as clamp(1, reorderPoint) for whole values.
+    final raw = (reorderPoint / 3).ceilToDouble();
+    final atLeastOne = raw < 1.0 ? 1.0 : raw;
+    final critical = atLeastOne > reorderPoint ? reorderPoint : atLeastOne;
+    return ((item['currentStock'] as num?)?.toDouble() ?? 0) <= critical;
   }
 
   @computed
@@ -107,7 +115,9 @@ abstract class _StockAlertStore with Store {
 
   @computed
   List<Map<String, dynamic>> get outOfStockItems {
-    return lowStockItems.where((item) => (item['currentStock'] as int) == 0).toList();
+    return lowStockItems
+        .where((item) => ((item['currentStock'] as num?)?.toDouble() ?? 0) <= 0)
+        .toList();
   }
 
   @computed

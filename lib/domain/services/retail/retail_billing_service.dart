@@ -110,7 +110,7 @@ class RetailBill {
   });
 
   /// Total quantity across all lines.
-  int get totalItems => lines.fold(0, (s, l) => s + l.item.qty);
+  double get totalItems => lines.fold(0.0, (s, l) => s + l.item.qty);
 
   /// Sum of the per-line discounts, i.e. the part of [discountAmount] that
   /// belonged to individual lines rather than the order.

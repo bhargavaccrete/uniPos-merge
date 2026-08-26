@@ -82,7 +82,7 @@ void main() {
   Future<VarianteModel> addVariant({
     required String variantId,
     required String productId,
-    int stockQty = 0,
+    double stockQty = 0,
   }) async {
     final variant = VarianteModel(
       varianteId: variantId,
@@ -99,9 +99,9 @@ void main() {
   /// Sets up: one kit variant + two component variants + a bundle linking
   /// them, ready for assembleKit/disassembleKit.
   Future<void> setUpKit({
-    int kitStock = 0,
-    int comp1Stock = 100,
-    int comp2Stock = 100,
+    double kitStock = 0,
+    double comp1Stock = 100,
+    double comp2Stock = 100,
     int comp1QtyPerKit = 2,
     int comp2QtyPerKit = 3,
   }) async {

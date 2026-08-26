@@ -232,7 +232,7 @@ class VariantRepository {
   }
 
   /// Update stock quantity
-  Future<void> updateStock(String variantId, int newStockQty) async {
+  Future<void> updateStock(String variantId, double newStockQty) async {
     final variant = _variantBox.get(variantId);
     if (variant != null) {
       final updatedVariant = variant.copyWith(stockQty: newStockQty);
@@ -246,8 +246,8 @@ class VariantRepository {
   }
 
   /// Get total stock across all variants
-  int getTotalStock() {
-    return _variantBox.values.fold(0, (sum, variant) => sum + variant.stockQty);
+  double getTotalStock() {
+    return _variantBox.values.fold(0.0, (sum, variant) => sum + variant.stockQty);
   }
 
   /// Update cost price

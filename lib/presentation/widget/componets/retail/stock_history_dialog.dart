@@ -107,7 +107,6 @@ class _Row extends StatelessWidget {
                   style: GoogleFonts.poppins(
                     fontSize: AppResponsive.captionFontSize(context),
                     color: AppColors.textSecondary,
-                    fontStyle: FontStyle.italic,
                   ),
                 ),
               Text(

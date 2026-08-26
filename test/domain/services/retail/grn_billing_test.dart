@@ -19,8 +19,8 @@ void main() {
   const cost = 100.0;
 
   GRNItemModel receipt({
-    int received = 100,
-    int damaged = 0,
+    double received = 100,
+    double damaged = 0,
     DamagedHandling? handling,
   }) =>
       GRNItemModel.create(

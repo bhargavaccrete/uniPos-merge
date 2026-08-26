@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
 import 'package:billberrylite/domain/services/retail/report_service.dart';
@@ -69,7 +70,7 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
   }
 
   /// Red once a variant is nearly gone, amber while it is merely low.
-  Color _severityColor(int stock) =>
+  Color _severityColor(double stock) =>
       stock <= _criticalAt ? AppColors.danger : AppColors.warning;
 
   @override
@@ -124,15 +125,13 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
       );
     }
 
+    // `num`, not `int` — a loose-goods variant carries a fractional stock and
+    // a hard int cast threw as soon as one was flagged.
     final outOfStock = _reportData
-        .where((r) => (r['currentStock'] as int) <= 0)
+        .where((r) => _stockOf(r) <= 0)
         .length;
     final critical = _reportData
-        .where(
-          (r) =>
-              (r['currentStock'] as int) > 0 &&
-              (r['currentStock'] as int) <= _criticalAt,
-        )
+        .where((r) => _stockOf(r) > 0 && _stockOf(r) <= _criticalAt)
         .length;
 
     final pageRows = ReportPagination.pageSlice(
@@ -200,8 +199,13 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
     );
   }
 
+  /// Reads a report row's stock as a double. One helper so no call site can
+  /// reintroduce a hard `as int` and crash on a decimal variant.
+  static double _stockOf(Map<String, dynamic> row) =>
+      (row['currentStock'] as num?)?.toDouble() ?? 0;
+
   DataRow _buildRow(Map<String, dynamic> item) {
-    final stock = item['currentStock'] as int;
+    final stock = _stockOf(item);
     final costPrice = (item['costPrice'] as num?)?.toDouble();
     final isBundle = item['isBundle'] == true;
     final color = _severityColor(stock);
@@ -238,7 +242,7 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
                 ? 'Available to sell (bundle — bounded by component stock)'
                 : 'Current stock',
             child: Text(
-              '$stock',
+              formatQty(stock),
               style: TextStyle(fontWeight: FontWeight.w700, color: color),
             ),
           ),
@@ -308,9 +312,7 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
       summary: {
         'Threshold': '≤ $_threshold',
         'Variants Flagged': _reportData.length,
-        'Out of Stock': _reportData
-            .where((r) => (r['currentStock'] as int) <= 0)
-            .length,
+        'Out of Stock': _reportData.where((r) => _stockOf(r) <= 0).length,
         'Generated': ReportExportService.formatDateTime(DateTime.now()),
       },
     );

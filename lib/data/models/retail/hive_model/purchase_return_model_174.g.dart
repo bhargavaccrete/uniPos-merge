@@ -26,7 +26,7 @@ class PurchaseReturnModelAdapter extends TypeAdapter<PurchaseReturnModel> {
       supplierId: fields[6] as String,
       supplierName: fields[7] as String?,
       returnDate: fields[8] as String,
-      totalQty: fields[9] as int,
+      totalQty: fields[9] as double,
       totalAmount: fields[10] as double,
       status: fields[11] as String,
       creditNoteNumber: fields[12] as String?,

@@ -110,10 +110,16 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
   }
 
   Future<void> _deleteCategory(Category category) async {
+    final count = _getItemCount(category.id);
+
     final confirmed = await showAppConfirmDialog(
       context: context,
       title: 'Delete Category?',
-      message: 'Delete "${category.name}"? This cannot be undone.',
+      message: count > 0
+          ? 'Delete "${category.name}"? $count '
+                '${AppConfig.isRetail ? 'product' : 'item'}'
+                '${count == 1 ? '' : 's'} will be moved to Uncategorized.'
+          : 'Delete "${category.name}"?',
       confirmLabel: 'Delete',
       accent: AppColors.danger,
       icon: Icons.delete_outline,

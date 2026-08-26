@@ -9,6 +9,7 @@ import 'package:billberrylite/presentation/widget/componets/common/app_dialog.da
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/row_action_button.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
@@ -470,41 +471,21 @@ class _AttributeCard extends StatelessWidget {
                   ],
                 ),
               ),
-              // Edit/Delete sit behind an overflow menu rather than two more
-              // icons competing with the values below.
-              PopupMenuButton<String>(
-                icon: const Icon(
-                  Icons.more_vert,
-                  size: 20,
-                  color: AppColors.textSecondary,
-                ),
-                tooltip: 'Attribute options',
-                color: AppColors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                onSelected: (action) =>
-                    action == 'edit' ? onEdit() : onDelete(),
-                itemBuilder: (_) => [
-                  PopupMenuItem<String>(
-                    value: 'edit',
-                    child: _menuRow(
-                      context,
-                      Icons.edit_outlined,
-                      'Rename',
-                      AppColors.textPrimary,
-                    ),
-                  ),
-                  PopupMenuItem<String>(
-                    value: 'delete',
-                    child: _menuRow(
-                      context,
-                      Icons.delete_outline,
-                      'Delete',
-                      AppColors.danger,
-                    ),
-                  ),
-                ],
+              // Rename/Delete act on the ATTRIBUTE. The value chips below carry
+              // their own long-press menu — that stays, chips are too dense for
+              // per-chip buttons.
+              RowActionButton(
+                icon: Icons.edit_outlined,
+                color: AppColors.primary,
+                tooltip: 'Rename Attribute',
+                onTap: onEdit,
+              ),
+              const SizedBox(width: 6),
+              RowActionButton(
+                icon: Icons.delete_outline_rounded,
+                color: AppColors.danger,
+                tooltip: 'Delete Attribute',
+                onTap: onDelete,
               ),
             ],
           ),
@@ -567,25 +548,6 @@ class _AttributeCard extends StatelessWidget {
       ),
     );
   }
-
-  Widget _menuRow(
-    BuildContext context,
-    IconData icon,
-    String label,
-    Color color,
-  ) => Row(
-    children: [
-      Icon(icon, size: AppResponsive.smallIconSize(context), color: color),
-      const SizedBox(width: 10),
-      Text(
-        label,
-        style: GoogleFonts.poppins(
-          fontSize: AppResponsive.bodyFontSize(context),
-          color: color,
-        ),
-      ),
-    ],
-  );
 
   String _placeholderFor(String attributeName) {
     final name = attributeName.toLowerCase();

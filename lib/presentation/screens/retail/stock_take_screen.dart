@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,6 +7,7 @@ import 'package:intl/intl.dart';
 
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/row_action_button.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
@@ -125,7 +127,7 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
         .where((p) => p.productId == variant.productId)
         .firstOrNull;
 
-    final counted = await showDialog<int>(
+    final counted = await showDialog<double>(
       context: context,
       builder: (_) => _CountEntryDialog(
         productName: product?.productName ?? 'Product',
@@ -133,6 +135,7 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
             variant.hasAttributes ? variant.variantDescription : null,
         systemQty: variant.stockQty,
         initialCount: existing?.countedQty,
+        allowDecimal: variant.isDecimalQuantity,
       ),
     );
 
@@ -564,28 +567,28 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
                   ],
                 ),
               ),
-              if (_isEditable)
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert,
-                      size: 20, color: AppColors.textSecondary),
-                  color: AppColors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  onSelected: (value) {
-                    if (value == 'recount') {
-                      final variant = productStore.variants
-                          .where((v) => v.varianteId == line.variantId)
-                          .firstOrNull;
-                      if (variant != null) _promptCount(variant);
-                    } else if (value == 'remove') {
-                      _removeLine(line);
-                    }
+              // Editable-only, same guard the menu had.
+              if (_isEditable) ...[
+                const SizedBox(width: 6),
+                RowActionButton(
+                  icon: Icons.refresh_rounded,
+                  color: AppColors.primary,
+                  tooltip: 'Recount',
+                  onTap: () {
+                    final variant = productStore.variants
+                        .where((v) => v.varianteId == line.variantId)
+                        .firstOrNull;
+                    if (variant != null) _promptCount(variant);
                   },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(value: 'recount', child: Text('Recount')),
-                    const PopupMenuItem(value: 'remove', child: Text('Remove')),
-                  ],
                 ),
+                const SizedBox(width: 6),
+                RowActionButton(
+                  icon: Icons.delete_outline_rounded,
+                  color: AppColors.danger,
+                  tooltip: 'Remove Line',
+                  onTap: () => _removeLine(line),
+                ),
+              ],
             ],
           ),
           SizedBox(height: AppResponsive.smallSpacing(context)),
@@ -715,14 +718,18 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
 class _CountEntryDialog extends StatefulWidget {
   final String productName;
   final String? variantInfo;
-  final int systemQty;
-  final int? initialCount;
+  final double systemQty;
+  final double? initialCount;
+
+  /// Whether this variant may be counted in fractions (loose goods).
+  final bool allowDecimal;
 
   const _CountEntryDialog({
     required this.productName,
     this.variantInfo,
     required this.systemQty,
     this.initialCount,
+    this.allowDecimal = false,
   });
 
   @override
@@ -737,7 +744,9 @@ class _CountEntryDialogState extends State<_CountEntryDialog> {
   void initState() {
     super.initState();
     _controller = TextEditingController(
-      text: widget.initialCount?.toString() ?? '',
+      text: widget.initialCount == null
+          ? ''
+          : formatQty(widget.initialCount!),
     );
   }
 
@@ -747,7 +756,9 @@ class _CountEntryDialogState extends State<_CountEntryDialog> {
     super.dispose();
   }
 
-  int? get _counted => int.tryParse(_controller.text.trim());
+  double? get _counted => widget.allowDecimal
+      ? double.tryParse(_controller.text.trim())
+      : int.tryParse(_controller.text.trim())?.toDouble();
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
@@ -786,9 +797,14 @@ class _CountEntryDialogState extends State<_CountEntryDialog> {
               icon: Icons.pin_outlined,
               required: true,
               autofocus: true,
-              keyboardType: TextInputType.number,
+              keyboardType: widget.allowDecimal
+                  ? const TextInputType.numberWithOptions(decimal: true)
+                  : TextInputType.number,
               inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
+                if (widget.allowDecimal)
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))
+                else
+                  FilteringTextInputFormatter.digitsOnly,
                 LengthLimitingTextInputFormatter(6),
               ],
               onChanged: (_) => setState(() {}),
@@ -796,7 +812,11 @@ class _CountEntryDialogState extends State<_CountEntryDialog> {
               validator: (v) {
                 final text = v?.trim() ?? '';
                 if (text.isEmpty) return 'Required';
-                if (int.tryParse(text) == null) return 'Enter a number';
+                if (widget.allowDecimal
+                    ? double.tryParse(text) == null
+                    : int.tryParse(text) == null) {
+                  return 'Enter a number';
+                }
                 return null;
               },
             ),

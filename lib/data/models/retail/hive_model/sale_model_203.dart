@@ -22,7 +22,7 @@ class SaleModel extends HiveObject {
   final String? customerId;
 
   @HiveField(2)
-  final int totalItems;
+  final double totalItems;
 
   @HiveField(3)
   final double subtotal;
@@ -189,7 +189,7 @@ class SaleModel extends HiveObject {
   factory SaleModel.create({
     required String saleId,
     String? customerId,
-    required int totalItems,
+    required double totalItems,
     required double subtotal,
     double discountAmount = 0,
     double taxAmount = 0,
@@ -231,7 +231,7 @@ class SaleModel extends HiveObject {
   factory SaleModel.createWithGst({
     required String saleId,
     String? customerId,
-    required int totalItems,
+    required double totalItems,
     required double subtotal,
     required double discountAmount,
     required double totalTaxableAmount,
@@ -271,7 +271,7 @@ class SaleModel extends HiveObject {
   factory SaleModel.createWithSplitPayment({
     required String saleId,
     String? customerId,
-    required int totalItems,
+    required double totalItems,
     required double subtotal,
     required double discountAmount,
     required double totalTaxableAmount,
@@ -373,7 +373,7 @@ class SaleModel extends HiveObject {
   factory SaleModel.createCreditSale({
     required String saleId,
     required String customerId, // Customer is REQUIRED for credit sales
-    required int totalItems,
+    required double totalItems,
     required double subtotal,
     required double discountAmount,
     required double totalTaxableAmount,
@@ -455,7 +455,7 @@ class SaleModel extends HiveObject {
   SaleModel copyWith({
     String? saleId,
     String? customerId,
-    int? totalItems,
+    double? totalItems,
     double? subtotal,
     double? discountAmount,
     double? taxAmount,
@@ -590,7 +590,7 @@ class SaleModel extends HiveObject {
     return SaleModel(
       saleId: map['saleId'] as String,
       customerId: map['customerId'] as String?,
-      totalItems: (map['totalItems'] as num?)?.toInt() ?? 0,
+      totalItems: (map['totalItems'] as num?)?.toDouble() ?? 0.0,
       subtotal: (map['subtotal'] as num?)?.toDouble() ?? 0.0,
       discountAmount: (map['discountAmount'] as num?)?.toDouble() ?? 0.0,
       taxAmount: (map['taxAmount'] as num?)?.toDouble() ?? 0.0,

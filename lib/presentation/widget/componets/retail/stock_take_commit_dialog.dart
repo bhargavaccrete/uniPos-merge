@@ -31,8 +31,8 @@ class StockTakeCommitChoice {
 /// corrections.
 class StockTakeCommitDialog extends StatefulWidget {
   final int varianceLines;
-  final int shortageQty;
-  final int excessQty;
+  final double shortageQty;
+  final double excessQty;
   final double netValue;
 
   const StockTakeCommitDialog({
@@ -46,8 +46,8 @@ class StockTakeCommitDialog extends StatefulWidget {
   static Future<StockTakeCommitChoice?> show(
     BuildContext context, {
     required int varianceLines,
-    required int shortageQty,
-    required int excessQty,
+    required double shortageQty,
+    required double excessQty,
     required double netValue,
   }) {
     return showDialog<StockTakeCommitChoice>(

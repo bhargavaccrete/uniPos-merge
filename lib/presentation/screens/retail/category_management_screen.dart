@@ -9,6 +9,7 @@ import 'package:billberrylite/presentation/widget/componets/common/app_empty_sta
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/row_action_button.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 
@@ -275,67 +276,20 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
                   ],
                 ),
               ),
-              // Edit/delete stay behind the overflow menu — never extra chips.
-              PopupMenuButton<String>(
-                icon: const Icon(
-                  Icons.more_vert,
-                  color: AppColors.textSecondary,
-                  size: 20,
-                ),
-                // M3 tints menu surfaces by default; keep them plain white.
-                color: AppColors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                onSelected: (value) {
-                  if (value == 'edit') {
-                    _showEditCategoryDialog(category);
-                  } else if (value == 'delete') {
-                    _confirmDelete(category);
-                  }
-                },
-                itemBuilder: (context) => [
-                  PopupMenuItem<String>(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.edit_outlined,
-                          size: 20,
-                          color: AppColors.textSecondary,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Edit',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.bodyFontSize(context),
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  PopupMenuItem<String>(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.delete_outline_rounded,
-                          size: 20,
-                          color: AppColors.danger,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Delete',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.bodyFontSize(context),
-                            color: AppColors.danger,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              // Edit/delete sit on the card, matching the product form's
+              // category picker — the two are the same job in two places.
+              RowActionButton(
+                icon: Icons.edit_outlined,
+                color: AppColors.primary,
+                tooltip: 'Rename',
+                onTap: () => _showEditCategoryDialog(category),
+              ),
+              const SizedBox(width: 8),
+              RowActionButton(
+                icon: Icons.delete_outline_rounded,
+                color: AppColors.danger,
+                tooltip: 'Delete',
+                onTap: () => _confirmDelete(category),
               ),
             ],
           ),
@@ -345,62 +299,13 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
   }
 
   // ==================== DIALOGS ====================
-  Future<void> _showEditCategoryDialog(Category category) async {
-    final name = await _promptCategoryName(
-      context: context,
-      title: 'Edit Category',
-      confirmLabel: 'Save',
-      initialValue: category.name,
-    );
-    if (name == null || name.isEmpty) return;
+  // Both delegate to the top-level entry points below, so this screen and the
+  // product form's category picker can never drift apart.
+  Future<void> _showEditCategoryDialog(Category category) =>
+      showEditCategoryDialog(context, category);
 
-    final updated = category.copyWith(
-      name: name,
-      lastEditedTime: DateTime.now(),
-      editCount: category.editCount + 1,
-    );
-
-    final success = await categoryStore.updateCategory(updated);
-    if (!mounted) return;
-    if (success) {
-      NotificationService.instance.showSuccess(
-        'Category "${updated.name}" updated',
-      );
-    } else {
-      NotificationService.instance.showError(
-        categoryStore.errorMessage ?? 'Failed to update category',
-      );
-    }
-  }
-
-  Future<void> _confirmDelete(Category category) async {
-    final productCount = categoryStore.getItemCountForCategory(category.id);
-
-    final confirmed = await showAppConfirmDialog(
-      context: context,
-      title: 'Delete Category?',
-      message: productCount > 0
-          ? 'Delete "${category.name}"? $productCount product'
-                '${productCount == 1 ? '' : 's'} will be moved to Uncategorized.'
-          : 'Delete "${category.name}"?',
-      confirmLabel: 'Delete',
-      accent: AppColors.danger,
-      icon: Icons.delete_outline_rounded,
-    );
-    if (!confirmed || !mounted) return;
-
-    final success = await categoryStore.deleteCategory(category.id);
-    if (!mounted) return;
-    if (success) {
-      NotificationService.instance.showSuccess(
-        'Category "${category.name}" deleted',
-      );
-    } else {
-      NotificationService.instance.showError(
-        categoryStore.errorMessage ?? 'Failed to delete category',
-      );
-    }
-  }
+  Future<void> _confirmDelete(Category category) =>
+      confirmDeleteCategory(context, category);
 }
 
 // ── Shared entry points ──────────────────────────────────────────────────────
@@ -435,6 +340,76 @@ Future<void> showAddCategoryDialog(BuildContext context) async {
       categoryStore.errorMessage ?? 'Failed to add category',
     );
   }
+}
+
+/// Renames an existing category. Safe to call from any context.
+/// Returns true when the rename was saved.
+Future<bool> showEditCategoryDialog(
+  BuildContext context,
+  Category category,
+) async {
+  final name = await _promptCategoryName(
+    context: context,
+    title: 'Edit Category',
+    confirmLabel: 'Save',
+    initialValue: category.name,
+  );
+  if (name == null || name.isEmpty) return false;
+
+  final updated = category.copyWith(
+    name: name,
+    lastEditedTime: DateTime.now(),
+    editCount: category.editCount + 1,
+  );
+
+  final success = await categoryStore.updateCategory(updated);
+  if (!context.mounted) return success;
+  if (success) {
+    NotificationService.instance.showSuccess(
+      'Category "${updated.name}" updated',
+    );
+  } else {
+    NotificationService.instance.showError(
+      categoryStore.errorMessage ?? 'Failed to update category',
+    );
+  }
+  return success;
+}
+
+/// Deletes a category after confirming. Products in it are re-parented to no
+/// category — never deleted. Returns true when the category was removed, so a
+/// caller holding it as a selection knows to clear that selection.
+Future<bool> confirmDeleteCategory(
+  BuildContext context,
+  Category category,
+) async {
+  final productCount = categoryStore.getItemCountForCategory(category.id);
+
+  final confirmed = await showAppConfirmDialog(
+    context: context,
+    title: 'Delete Category?',
+    message: productCount > 0
+        ? 'Delete "${category.name}"? $productCount product'
+              '${productCount == 1 ? '' : 's'} will be moved to Uncategorized.'
+        : 'Delete "${category.name}"?',
+    confirmLabel: 'Delete',
+    accent: AppColors.danger,
+    icon: Icons.delete_outline_rounded,
+  );
+  if (!confirmed || !context.mounted) return false;
+
+  final success = await categoryStore.deleteCategory(category.id);
+  if (!context.mounted) return success;
+  if (success) {
+    NotificationService.instance.showSuccess(
+      'Category "${category.name}" deleted',
+    );
+  } else {
+    NotificationService.instance.showError(
+      categoryStore.errorMessage ?? 'Failed to delete category',
+    );
+  }
+  return success;
 }
 
 /// Shared name prompt for add/edit. Returns the trimmed name, or null when the

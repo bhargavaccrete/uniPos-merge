@@ -13,7 +13,7 @@ class StockAdjustmentResult {
   final String? errorMessage;
 
   /// Stock level after the adjustment was applied.
-  final int? balanceAfter;
+  final double? balanceAfter;
 
   /// Loss number (`LOSS-…`) when the reason was loss-bearing, else null.
   final String? lossNumber;
@@ -57,7 +57,8 @@ class StockAdjustmentService {
 
   static final StockMovementRepository _movements = StockMovementRepository();
 
-  /// Retail sells in whole units, so the movement log records pieces.
+  /// Fallback unit for the movement log when the variant carries none.
+  /// A decimal variant logs its own unit (kg, liter, …) instead.
   static const String _unit = 'pcs';
 
   /// Only the admin identity may adjust stock. An adjustment can make missing
@@ -73,7 +74,7 @@ class StockAdjustmentService {
   /// [StockAdjustmentReason.requiresNote] is set.
   static Future<StockAdjustmentResult> adjust({
     required VarianteModel variant,
-    required int newStock,
+    required double newStock,
     required StockAdjustmentReason reason,
     String? note,
   }) async {
@@ -134,7 +135,7 @@ class StockAdjustmentService {
         balanceAfter: newStock.toDouble(),
         reason: reason.label,
         note: trimmedNote?.isEmpty ?? true ? null : trimmedNote,
-        unit: _unit,
+        unit: variant.isDecimalQuantity ? variant.effectiveUnit : _unit,
         staffName: authService.currentUsername ?? 'Admin',
         sessionId: await DayManagementService.getCurrentSessionId(),
       ));

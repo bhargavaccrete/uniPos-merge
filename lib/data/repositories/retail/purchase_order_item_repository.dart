@@ -55,9 +55,9 @@ class PurchaseOrderItemRepository {
   }
 
   // Get Total Ordered Quantity for a PO
-  Future<int> getTotalOrderedQty(String poId) async {
+  Future<double> getTotalOrderedQty(String poId) async {
     final items = await getItemsByPOId(poId);
-    return items.fold<int>(0, (sum, item) => sum + item.orderedQty);
+    return items.fold<double>(0.0, (sum, item) => sum + item.orderedQty);
   }
 
   // Get Total Estimated Amount for a PO

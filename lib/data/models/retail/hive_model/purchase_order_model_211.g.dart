@@ -22,7 +22,7 @@ class PurchaseOrderModelAdapter extends TypeAdapter<PurchaseOrderModel> {
       supplierId: fields[2] as String,
       supplierName: fields[3] as String?,
       expectedDeliveryDate: fields[4] as String,
-      totalItems: fields[5] as int,
+      totalItems: fields[5] as double,
       estimatedTotal: fields[6] as double,
       status: fields[7] as String,
       notes: fields[8] as String?,

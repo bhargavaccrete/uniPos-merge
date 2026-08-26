@@ -22,7 +22,7 @@ class StockTakeCommitResult {
   final int appliedLines;
 
   /// Net units applied — negative when the count found less than the books.
-  final int netQty;
+  final double netQty;
 
   /// Lines whose adjustment failed. Non-empty means a partial commit.
   final List<String> failedLines;
@@ -106,18 +106,18 @@ abstract class _StockTakeStore with Store {
 
   /// Net units the commit would apply. Negative is a shortage.
   @computed
-  int get netVarianceQty =>
-      varianceItems.fold(0, (sum, i) => sum + i.variance);
+  double get netVarianceQty =>
+      varianceItems.fold(0.0, (sum, i) => sum + i.variance);
 
   @computed
-  int get shortageQty => varianceItems
+  double get shortageQty => varianceItems
       .where((i) => i.isShortage)
-      .fold(0, (sum, i) => sum + i.variance.abs());
+      .fold(0.0, (sum, i) => sum + i.variance.abs());
 
   @computed
-  int get excessQty => varianceItems
+  double get excessQty => varianceItems
       .where((i) => !i.isShortage)
-      .fold(0, (sum, i) => sum + i.variance);
+      .fold(0.0, (sum, i) => sum + i.variance);
 
   /// Value of the net variance at count-time cost. Negative is a loss.
   @computed
@@ -205,7 +205,7 @@ abstract class _StockTakeStore with Store {
   @action
   Future<bool> countVariant({
     required VarianteModel variant,
-    required int countedQty,
+    required double countedQty,
   }) async {
     final take = currentTake;
     if (take == null || !take.isEditable) {
@@ -351,7 +351,7 @@ abstract class _StockTakeStore with Store {
     isCommitting = true;
     final failed = <String>[];
     var appliedLines = 0;
-    var netQty = 0;
+    var netQty = 0.0;
 
     try {
       for (final line in pending) {

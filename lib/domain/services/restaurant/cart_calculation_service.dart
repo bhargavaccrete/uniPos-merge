@@ -17,7 +17,11 @@ enum DiscountType { amount, percentage }
 /// holding a percentage must divide by 100 before constructing.
 class CalcLine {
   final double price;
-  final int quantity;
+
+  /// `double` so retail can bill a fractional quantity (1.75 kg). Restaurant
+  /// passes whole values, which multiply out identically — the engine only ever
+  /// uses this in `price * quantity`.
+  final double quantity;
   final double? taxRate;
 
   /// Discount belonging to THIS line only, in currency, already resolved from
@@ -135,7 +139,7 @@ class CartCalculationService {
           lines: items
               .map((i) => CalcLine(
                     price: i.price,
-                    quantity: i.quantity,
+                    quantity: i.quantity.toDouble(),
                     taxRate: i.taxRate,
                   ))
               .toList(),

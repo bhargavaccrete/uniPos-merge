@@ -382,7 +382,7 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Text('${day.day}', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0), fontWeight: FontWeight.w800, color: isPresent || today ? Colors.white : AppColors.textSecondary)),
+                                  Text('${day.day}', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0), fontWeight: FontWeight.w700, color: isPresent || today ? Colors.white : AppColors.textSecondary)),
                                   Text(_monthShort(day.month), style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 9.0, tablet: 10.0, desktop: 11.0), color: isPresent || today ? Colors.white70 : AppColors.textSecondary)),
                                 ],
                               ),
@@ -503,7 +503,7 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
         children: [
           Icon(icon, color: color, size: AppResponsive.getValue(context, mobile: 22.0, tablet: 24.0, desktop: 26.0)),
           const SizedBox(height: 4),
-          Text(value, style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0), fontWeight: FontWeight.w800, color: color)),
+          Text(value, style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0), fontWeight: FontWeight.w700, color: color)),
           Text(label, textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 10.0, tablet: 11.0, desktop: 12.0), color: AppColors.textSecondary)),
         ],
       ),

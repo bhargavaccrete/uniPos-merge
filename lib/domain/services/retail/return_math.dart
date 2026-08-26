@@ -7,7 +7,7 @@ class ReturnLineFigures {
   /// The original sale line this reverses.
   final SaleItemModel source;
 
-  final int qty;
+  final double qty;
 
   /// The charged unit price, carried across unchanged.
   final double price;
@@ -46,7 +46,7 @@ class ReturnLineFigures {
 /// stored negated while return lines are stored positive.
 class ReturnFigures {
   final List<ReturnLineFigures> lines;
-  final int totalItems;
+  final double totalItems;
 
   /// Gross of the returned quantities, before discount.
   final double subtotal;
@@ -101,10 +101,10 @@ class RetailReturnMath {
   ///
   /// Return lines store `qty` POSITIVE (kept that way for stock restoration),
   /// so these are summed as-is.
-  static Map<String, int> returnedQtyByVariant(
+  static Map<String, double> returnedQtyByVariant(
     List<SaleItemModel> returnLines,
   ) {
-    final out = <String, int>{};
+    final out = <String, double>{};
     for (final line in returnLines) {
       out[line.varianteId] = (out[line.varianteId] ?? 0) + line.qty;
     }
@@ -121,12 +121,12 @@ class RetailReturnMath {
   ///
   /// Safe because the retail cart merges by `variantId` at every mutation site,
   /// so one sale can never hold two lines for the same variant.
-  static Map<String, int> remainingByVariant({
+  static Map<String, double> remainingByVariant({
     required List<SaleItemModel> soldLines,
     required List<SaleItemModel> returnedLines,
   }) {
     final alreadyReturned = returnedQtyByVariant(returnedLines);
-    final out = <String, int>{};
+    final out = <String, double>{};
     for (final line in soldLines) {
       final remaining = line.qty - (alreadyReturned[line.varianteId] ?? 0);
       out[line.varianteId] = remaining > 0 ? remaining : 0;
@@ -167,7 +167,7 @@ class RetailReturnMath {
   static ReturnFigures compute({
     required SaleModel sale,
     required List<SaleItemModel> soldLines,
-    required Map<String, int> returnQtyByVariantId,
+    required Map<String, double> returnQtyByVariantId,
   }) {
     if (returnQtyByVariantId.isEmpty || soldLines.isEmpty) {
       return ReturnFigures.empty;
@@ -178,7 +178,7 @@ class RetailReturnMath {
     };
 
     final lines = <ReturnLineFigures>[];
-    var totalItems = 0;
+    var totalItems = 0.0;
     var subtotal = 0.0;
     var discountAmount = 0.0;
     var taxAmount = 0.0;

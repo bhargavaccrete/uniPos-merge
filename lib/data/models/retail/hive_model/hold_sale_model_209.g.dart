@@ -21,7 +21,7 @@ class HoldSaleModelAdapter extends TypeAdapter<HoldSaleModel> {
       customerId: fields[1] as String?,
       customerName: fields[2] as String?,
       note: fields[3] as String?,
-      totalItems: fields[4] as int,
+      totalItems: fields[4] as double,
       subtotal: fields[5] as double,
       createdAt: fields[6] as String,
       updatedAt: fields[7] as String,

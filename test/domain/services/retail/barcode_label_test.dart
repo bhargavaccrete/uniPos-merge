@@ -43,7 +43,7 @@ void main() {
         hsnCode: hsn,
       );
 
-  VarianteModel variant({String? barcode, int stock = 12}) => VarianteModel(
+  VarianteModel variant({String? barcode, double stock = 12}) => VarianteModel(
         varianteId: 'v1',
         productId: 'p1',
         barcode: barcode,
@@ -132,7 +132,7 @@ void main() {
     test('the stock quick-fill uses the variant stock', () {
       // What the sheet does when "use stock quantity" is tapped.
       final v = variant(barcode: 'BB0000000001', stock: 20);
-      final labels = LabelPdfService.expand([(spec(), v.stockQty)]);
+      final labels = LabelPdfService.expand([(spec(), v.stockQty.round())]);
       expect(labels, hasLength(20));
     });
 

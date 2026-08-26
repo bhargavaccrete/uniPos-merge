@@ -81,21 +81,17 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
   Future<void> _deleteCategory(Category category) async {
     final itemCount = _itemCounts[category.id] ?? 0;
 
-    if (itemCount > 0) {
-      await showAppInfoDialog(
-        context: context,
-        title: 'Cannot Delete',
-        message:
-            'This category has $itemCount item${itemCount > 1 ? 's' : ''}. Please reassign or delete the items first.',
-      );
-      return;
-    }
-
+    // Used to refuse outright while the category held items, asking the user to
+    // reassign them by hand. The delete no longer destroys anything, so it just
+    // states where those items land.
     final confirm = await showAppConfirmDialog(
       context: context,
       title: 'Delete Category?',
-      message:
-          'Are you sure you want to delete "${category.name}"? This action cannot be undone.',
+      message: itemCount > 0
+          ? 'Delete "${category.name}"? $itemCount '
+                'item${itemCount > 1 ? 's' : ''} will be moved to '
+                'Uncategorized. Nothing is deleted.'
+          : 'Are you sure you want to delete "${category.name}"?',
       confirmLabel: 'Delete',
       accent: Colors.red,
       icon: Icons.delete_rounded,

@@ -43,7 +43,7 @@ void main() {
 
   CalcLine line(
     double price,
-    int qty, {
+    double qty, {
     double rate = 0.18,
     double lineDiscount = 0,
   }) =>
@@ -176,7 +176,7 @@ void main() {
       double value, {
       DiscountType type = DiscountType.percentage,
       double unit = 900,
-      int qty = 1,
+      double qty = 1,
       double? cost = 600,
     }) =>
         LineDiscountService.validate(
@@ -574,7 +574,7 @@ void main() {
   group('CartItemModel line-discount persistence', () {
     CartItemModel row({
       double price = 900,
-      int qty = 1,
+      double qty = 1,
       String? type = 'percentage',
       double? value = 10,
       double? amount = 90,

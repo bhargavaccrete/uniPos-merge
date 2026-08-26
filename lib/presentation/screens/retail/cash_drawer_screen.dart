@@ -565,7 +565,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                 tablet: 38,
                 desktop: 44,
               ),
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: Colors.white,
             ),
           ),

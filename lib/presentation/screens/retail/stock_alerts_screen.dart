@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
@@ -227,8 +228,9 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
   }
 
   Widget _buildAlertCard(BuildContext context, Map<String, dynamic> item) {
-    final stock = item['currentStock'] as int;
-    final isOutOfStock = stock == 0;
+    // `num` — decimal variants hold a fractional stock.
+    final stock = (item['currentStock'] as num?)?.toDouble() ?? 0;
+    final isOutOfStock = stock <= 0;
     // The store's rule — a third of THIS row's reorder point — not a flat
     // `stock <= 3`. The flat version disagreed with the Critical tile above,
     // so a variant reordering at 20 with 5 left counted as critical but was
@@ -335,7 +337,7 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    '$stock',
+                    formatQty(stock),
                     style: TextStyle(
                       fontSize: AppResponsive.headingFontSize(context),
                       fontWeight: FontWeight.bold,

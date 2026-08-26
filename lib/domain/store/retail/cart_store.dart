@@ -32,8 +32,8 @@ const int kMaxCartLineQuantity = 9999;
 class CartOperationResult {
   final bool success;
   final String? errorMessage;
-  final int? availableStock;
-  final int? requestedQuantity;
+  final double? availableStock;
+  final double? requestedQuantity;
 
   CartOperationResult({
     required this.success,
@@ -50,13 +50,19 @@ class CartOperationResult {
         availableStock: 0,
       );
 
+  /// Renders a quantity without a trailing ".0" so a piece product still
+  /// reads "Only 3 items available", not "Only 3.0 items available".
+  static String formatQty(double q) =>
+      q == q.roundToDouble() ? q.toInt().toString() : q.toString();
+
   factory CartOperationResult.insufficientStock({
-    required int available,
-    required int requested,
+    required double available,
+    required double requested,
   }) =>
       CartOperationResult(
         success: false,
-        errorMessage: 'Only $available items available in stock',
+        errorMessage:
+            'Only ${formatQty(available)} items available in stock',
         availableStock: available,
         requestedQuantity: requested,
       );
@@ -186,8 +192,8 @@ abstract class _CartStore with Store {
   int get itemCount => items.length;
 
   @computed
-  int get totalItems {
-    int total = 0;
+  double get totalItems {
+    double total = 0.0;
     for (var item in items) {
       total += item.qty;
     }
@@ -298,7 +304,7 @@ abstract class _CartStore with Store {
     Category? category,
     double? priceOverride,
     double? gstRateOverride,
-    int qty = 1,
+    double qty = 1,
     double? originalPrice,
     String? overrideReason,
     String? overrideNote,
@@ -737,7 +743,7 @@ abstract class _CartStore with Store {
   /// of truth, and carries forward everything that must survive a quantity
   /// change — including the price override and its audit trail.
   @action
-  Future<CartOperationResult> setQuantity(String variantId, int quantity) async {
+  Future<CartOperationResult> setQuantity(String variantId, double quantity) async {
     final index = items.indexWhere((item) => item.variantId == variantId);
     if (index == -1) {
       return CartOperationResult(
@@ -831,10 +837,12 @@ abstract class _CartStore with Store {
     }
 
     final item = items[index];
-    final requestedQty = item.qty + 1;
 
     // Fetch current variant stock from repository for validation
     final variant = await variantRepository.getVariantById(variantId);
+
+    // A loose-goods line steps by a fraction (0.25 kg), a piece line by 1.
+    final requestedQty = item.qty + (variant?.quantityStep ?? 1.0);
 
     // Validate stock if variant is found
     if (variant != null) {
@@ -888,8 +896,10 @@ abstract class _CartStore with Store {
     final index = items.indexWhere((item) => item.variantId == variantId);
     if (index != -1) {
       final item = items[index];
-      if (item.qty > 1) {
-        final updatedQty = item.qty - 1;
+      final variant = await variantRepository.getVariantById(variantId);
+      final step = variant?.quantityStep ?? 1.0;
+      if (item.qty > step) {
+        final updatedQty = item.qty - step;
 
         // Check if tax inclusive mode is enabled
         final taxInclusive = await gstService.isTaxInclusiveMode();
@@ -945,7 +955,7 @@ abstract class _CartStore with Store {
   }
 
   /// Get quantity of a variant in cart
-  int getQuantity(String variantId) {
+  double getQuantity(String variantId) {
     for (var item in items) {
       if (item.variantId == variantId) {
         return item.qty;
@@ -969,7 +979,7 @@ abstract class _CartStore with Store {
   }
 
   /// Get available stock for a variant
-  Future<int> getAvailableStock(String variantId) async {
+  Future<double> getAvailableStock(String variantId) async {
     final variant = await variantRepository.getVariantById(variantId);
     return variant?.stockQty ?? 0;
   }
@@ -1111,7 +1121,7 @@ abstract class _CartStore with Store {
     Category? category,
     double? priceOverride,
     double? gstRateOverride,
-    int qty = 1,
+    double qty = 1,
     double? originalPrice,
     String? overrideReason,
     String? overrideNote,
@@ -1170,7 +1180,7 @@ abstract class _CartStore with Store {
   @action
   Future<CartOperationResult> setQuantityInTab(
     String variantId,
-    int quantity,
+    double quantity,
   ) async {
     final result = await setQuantity(variantId, quantity);
     if (result.success) {

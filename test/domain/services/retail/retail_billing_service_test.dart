@@ -28,7 +28,7 @@ void main() {
 
   CartItemModel item({
     required double price,
-    int qty = 1,
+    double qty = 1,
     double gstRatePercent = 0,
   }) =>
       CartItemModel.create(

@@ -18,7 +18,7 @@ class HoldSaleModel extends HiveObject {
   final String? note; // Reason for holding (e.g., "Customer checking price", "Forgot wallet")
 
   @HiveField(4)
-  final int totalItems;
+  final double totalItems;
 
   @HiveField(5)
   final double subtotal;
@@ -69,7 +69,7 @@ class HoldSaleModel extends HiveObject {
     String? customerId,
     String? customerName,
     String? note,
-    required int totalItems,
+    required double totalItems,
     required double subtotal,
     double? itemTotal,
     double? discountAmount,
@@ -120,7 +120,7 @@ class HoldSaleModel extends HiveObject {
       customerId: map['customerId'] as String?,
       customerName: map['customerName'] as String?,
       note: map['note'] as String?,
-      totalItems: (map['totalItems'] as num).toInt(),
+      totalItems: (map['totalItems'] as num).toDouble(),
       subtotal: (map['subtotal'] as num).toDouble(),
       createdAt: map['createdAt'] as String,
       updatedAt: map['updatedAt'] as String,

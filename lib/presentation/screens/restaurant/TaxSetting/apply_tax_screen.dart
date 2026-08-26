@@ -454,7 +454,6 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                             style: GoogleFonts.poppins(
                               fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0),
                               color: AppColors.textSecondary,
-                              fontStyle: FontStyle.italic,
                             ),
                           ),
                         ),

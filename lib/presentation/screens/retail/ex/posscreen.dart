@@ -10,6 +10,8 @@ import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/retail/expiry_date_field.dart';
+import 'package:billberrylite/domain/services/retail/expiry_status.dart';
 import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -413,6 +415,43 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     });
   }
 
+  /// Gate on expired goods, asked once per add.
+  ///
+  /// Returns true when the sale may proceed. Only [RetailExpiryStatus.expired]
+  /// asks — expiring-soon and expiring-today are badged on the row and the cart
+  /// line but never interrupt, because stock is still legally sellable on its
+  /// expiry date and a prompt at every scan would be dismissed by reflex.
+  ///
+  /// Deliberately NOT a hard block: shops clear near-date stock at a discount,
+  /// and refusing outright would strand it with no override. The confirmation
+  /// makes selling expired goods a deliberate act, which is the actual goal.
+  ///
+  /// Judged on the exact VARIANT being sold, not the product — warning about a
+  /// product while selling a perfectly good variant of it teaches cashiers to
+  /// tap through the warning.
+  Future<bool> _confirmExpiredSale(
+    ProductModel product,
+    VarianteModel variant,
+  ) async {
+    final status = productStore.expiryStatusForVariant(variant);
+    if (status != RetailExpiryStatus.expired) return true;
+    if (!mounted) return false;
+
+    final expiry = variant.expiryDateTime;
+    return showAppConfirmDialog(
+      context: context,
+      title: 'Expired stock',
+      message: expiry == null
+          ? '${product.productName} is past its expiry date. Sell it anyway?'
+          : '${product.productName} expired on '
+              '${kExpiryDateFormat.format(expiry)}. Sell it anyway?',
+      confirmLabel: 'Sell anyway',
+      cancelLabel: 'Cancel',
+      accent: AppColors.danger,
+      icon: Icons.event_busy_rounded,
+    );
+  }
+
   Future<void> _onProductSelected(ProductModel product) async {
     // Inactive variants stay in the catalogue but never reach a till.
     final variants = (await productStore.getVariantsForProduct(
@@ -429,6 +468,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     }
 
     if (variants.length == 1) {
+      if (!await _confirmExpiredSale(product, variants.first)) return;
       final result = await cartStore.addItemToTab(product, variants.first);
       _clearSearch();
       if (mounted) {
@@ -477,6 +517,12 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
       final product = await productStore.findByBarcode(barcode);
 
       if (product != null) {
+        // The scan path adds directly, so it needs the same gate as a tap —
+        // and a scan is the likeliest way perishable stock reaches the till.
+        if (!await _confirmExpiredSale(product, variant)) {
+          if (mounted) _clearSearch();
+          return;
+        }
         final result = await cartStore.addItemToTab(product, variant);
 
         if (mounted) {
@@ -518,6 +564,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     );
 
     if (selectedVariant != null && mounted) {
+      if (!await _confirmExpiredSale(product, selectedVariant)) return;
       final result = await cartStore.addItemToTab(product, selectedVariant);
       if (result.success) {
         NotificationService.instance.showSuccess(
@@ -1189,7 +1236,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
           price = product.defaultPrice ?? product.defaultMrp ?? 0;
         }
 
-        final stock = variants.fold<int>(0, (sum, v) => sum + v.stockQty);
+        final stock = variants.fold<double>(0.0, (sum, v) => sum + v.stockQty);
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -1248,6 +1295,23 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                        ),
+                        // Expiry, seen BEFORE the item is added. Product-level
+                        // (most urgent across variants) because that is what
+                        // this row represents; the exact variant is judged
+                        // again on add. Renders nothing when not alerting.
+                        Builder(
+                          builder: (_) {
+                            final expiry = productStore
+                                .expiryStatusForProduct(product.productId);
+                            if (!expiry.isAlerting) {
+                              return const SizedBox.shrink();
+                            }
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: ExpiryStatusPill(status: expiry),
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -1405,6 +1469,30 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                               ),
                               const SizedBox(height: 4),
                               _buildLinePrice(context, item),
+                              // The search row is gone once the item is in the
+                              // cart, so without this the warning disappears
+                              // exactly when the customer is standing there.
+                              // Judged per variant, like the add-time gate.
+                              Builder(
+                                builder: (_) {
+                                  final variant = productStore.variants
+                                      .where(
+                                          (v) => v.varianteId == item.variantId)
+                                      .firstOrNull;
+                                  if (variant == null) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  final status = productStore
+                                      .expiryStatusForVariant(variant);
+                                  if (!status.isAlerting) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: ExpiryStatusPill(status: status),
+                                  );
+                                },
+                              ),
                             ],
                           ),
                         ),
@@ -1426,6 +1514,14 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                             CartQuantityField(
                               key: ValueKey(item.cartItemId),
                               qty: item.qty,
+                              // Only a loose-goods line may take a fraction;
+                              // a piece line keeps its digits-only keypad.
+                              allowDecimal: productStore.variants
+                                      .where((v) =>
+                                          v.varianteId == item.variantId)
+                                      .firstOrNull
+                                      ?.isDecimalQuantity ??
+                                  false,
                               onSubmitted: (qty) =>
                                   _applyTypedQuantity(item, qty),
                             ),
@@ -1488,7 +1584,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
   /// so it is confirmed first: typing a digit is a much easier slip than
   /// pressing − repeatedly, and the line may carry a negotiated price override
   /// that would be lost with it.
-  Future<bool> _applyTypedQuantity(CartItemModel item, int qty) async {
+  Future<bool> _applyTypedQuantity(CartItemModel item, double qty) async {
     if (qty == 0) {
       final confirmed = await showAppConfirmDialog(
         context: context,
@@ -2453,7 +2549,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
         barcode: barcode,
         sellingPrice: double.parse(price.trim()),
         mrp: mrp.trim().isEmpty ? null : double.parse(mrp.trim()),
-        stockQty: int.parse(stock.trim().isEmpty ? '1' : stock.trim()),
+        stockQty: double.parse(stock.trim().isEmpty ? '1' : stock.trim()),
       );
 
       final result = await cartStore.addItemToTab(product, variant);

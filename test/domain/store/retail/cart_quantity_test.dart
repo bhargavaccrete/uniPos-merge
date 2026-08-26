@@ -6,7 +6,7 @@ import 'package:billberrylite/domain/store/retail/cart_store.dart';
 /// Rebuilds a cart line the way `CartStore.setQuantity` does — same factory,
 /// same carry-forward list. This pins the *contract* of that rebuild without
 /// needing Hive or GetIt booted (the store itself needs both).
-CartItemModel rebuiltAt(CartItemModel item, int qty, {bool taxInclusive = false}) {
+CartItemModel rebuiltAt(CartItemModel item, double qty, {bool taxInclusive = false}) {
   return CartItemModel.create(
     cartItemId: item.cartItemId,
     variantId: item.variantId,
@@ -31,7 +31,7 @@ CartItemModel line({
   double? originalPrice = 900,
   String? reason = 'clearance',
   String? note = 'display piece',
-  int qty = 1,
+  double qty = 1,
   double gstRate = 18,
   bool taxInclusive = false,
 }) {
@@ -62,15 +62,29 @@ void main() {
     });
   });
 
-  group('quantity stays an int', () {
-    test('CartItemModel.qty is an int', () {
-      expect(line(qty: 12).qty, isA<int>());
+  // Was "quantity stays an int". Quantity is now a double so loose goods can
+  // be sold by weight (1.75 kg) — see the decimal-quantity work. A piece
+  // product must still behave exactly as it did, which is what these pin.
+  group('quantity is a double that still counts pieces exactly', () {
+    test('CartItemModel.qty is a double', () {
+      expect(line(qty: 12).qty, isA<double>());
     });
 
-    test('a typed quantity does not introduce fractional units', () {
+    test('a whole typed quantity stays exact, with no fractional drift', () {
       final l = rebuiltAt(line(), 12);
       expect(l.qty, equals(12));
-      expect(l.qty, isA<int>());
+      expect(l.qty % 1, equals(0));
+    });
+
+    test('a fractional quantity is preserved, not truncated', () {
+      final l = rebuiltAt(line(), 1.75);
+      expect(l.qty, equals(1.75));
+    });
+
+    test('line total follows a fractional quantity', () {
+      // 100 x 1.5 = 150, not 100 (truncated) or 200 (rounded up).
+      final l = rebuiltAt(line(price: 100), 1.5);
+      expect(l.taxableAmount, equals(150.0));
     });
   });
 

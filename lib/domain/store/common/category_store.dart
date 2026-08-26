@@ -182,24 +182,29 @@ abstract class _CategoryStore with Store {
 
       await _repository.deleteCategory(categoryId);
 
+      // The repository has already re-parented everything that pointed at this
+      // category, in the box. All that is left here is to mirror that in the
+      // observable lists so open screens repaint.
+      //
+      // Deliberately an in-place edit, NOT a save: writing back through
+      // updateItem/updateProduct would repeat what the repository just did,
+      // against a list that may be stale — and updateItem is plan-gated, which
+      // once made this outcome depend on the shop's licence. A full reload
+      // would also reorder legacy auto-keyed items.
       if (AppConfig.isRestaurant) {
-        // Re-parent any items that belonged to this category so none are left
-        // pointing at a deleted category (which would otherwise render as
-        // "Unknown"). This makes deletion safe from every caller — the add-item
-        // sheet, the edit screen, and category management all share this path.
-        final orphaned =
-            itemStore.items.where((i) => i.categoryOfItem == categoryId).toList();
-        for (final item in orphaned) {
-          await itemStore.updateItem(item.copyWith(categoryOfItem: ''));
+        for (var i = 0; i < itemStore.items.length; i++) {
+          final item = itemStore.items[i];
+          if (item.categoryOfItem == categoryId) {
+            itemStore.items[i] = item.copyWith(categoryOfItem: '');
+          }
         }
         categoryItemsMap.remove(categoryId);
       } else {
-        // Retail: re-parent products so none are left pointing at a deleted
-        // category id.
-        final orphaned =
-            productStore.products.where((p) => p.category == categoryId).toList();
-        for (final product in orphaned) {
-          await productStore.updateProduct(product.copyWith(category: ''));
+        for (var i = 0; i < productStore.products.length; i++) {
+          final product = productStore.products[i];
+          if (product.category == categoryId) {
+            productStore.products[i] = product.copyWith(category: '');
+          }
         }
       }
 

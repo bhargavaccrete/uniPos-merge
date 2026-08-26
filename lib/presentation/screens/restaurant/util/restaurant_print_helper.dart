@@ -120,7 +120,7 @@ class RestaurantPrintHelper {
           size: item.variantName,
           weight: additionalInfo,
           price: 0, // Price set to 0 for KOT - kitchen doesn't need pricing
-          qty: item.quantity,
+          qty: item.quantity.toDouble(),
           discountAmount: 0,
           gstRate: 0, // No tax info needed for KOT
         );
@@ -131,7 +131,7 @@ class RestaurantPrintHelper {
       final saleModel = SaleModel.createWithGst(
         saleId: kotId,
         customerId: null,
-        totalItems: kotItems.length,
+        totalItems: kotItems.length.toDouble(),
         subtotal: 0, // Not needed for KOT
         discountAmount: 0,
         totalTaxableAmount: 0,
@@ -397,7 +397,7 @@ class RestaurantPrintHelper {
           size: variantDisplayName, // Use formatted variant name with price
           weight: additionalInfo, // Use weight field to store extras and choices info
           price: displayPrice, // ✅ Use adjusted price based on tax mode
-          qty: item.quantity,
+          qty: item.quantity.toDouble(),
           discountAmount: 0, // Item level discount not typically stored in restaurant cart
           gstRate: itemTaxRate,
           // Note: total field in create() is calculated
@@ -442,7 +442,7 @@ class RestaurantPrintHelper {
       var saleModel = SaleModel.createWithGst(
         saleId: invoiceId,
         customerId: order.customerName.isNotEmpty ? 'GUEST' : null,
-        totalItems: order.items.length,
+        totalItems: order.items.length.toDouble(),
         subtotal: calculations.subtotal,  // Base price (without tax)
         discountAmount: calculations.discountAmount, // regular discount only (points shown separately)
         totalTaxableAmount: calculations.subtotal - calculations.discountAmount,

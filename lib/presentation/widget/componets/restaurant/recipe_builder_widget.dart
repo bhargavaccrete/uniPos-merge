@@ -687,7 +687,7 @@ class _RecipeBuilderWidgetState extends State<RecipeBuilderWidget> {
                   '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalCost)}',
                   style: GoogleFonts.poppins(
                     fontSize: 20,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.success,
                   ),
                 ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/presentation/widget/componets/retail/expiry_date_field.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,6 +10,7 @@ import 'package:billberrylite/presentation/widget/componets/common/app_text_fiel
 import 'package:billberrylite/presentation/screens/retail/add_product_screen.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/row_action_button.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 
@@ -37,9 +39,15 @@ final _moneyFormatters = <TextInputFormatter>[
   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
 ];
 
-/// Whole-number input (stock counts).
+/// Whole-number input (stock counts) — what a piece product uses.
 final _qtyFormatters = <TextInputFormatter>[
   FilteringTextInputFormatter.digitsOnly,
+];
+
+/// Fractional stock input for loose goods, at most 2 decimals. Reached only
+/// when the product's variants are flagged `isDecimalQuantity`.
+final _decimalQtyFormatters = <TextInputFormatter>[
+  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
 ];
 
 /// Everything about one product in one place: its details at the top, then every
@@ -470,7 +478,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   // ==================== SUMMARY ====================
   Widget _buildSummaryCard(List<VarianteModel> variants) {
-    final totalStock = variants.fold<int>(0, (sum, v) => sum + v.stockQty);
+    final totalStock = variants.fold<double>(0.0, (sum, v) => sum + v.stockQty);
     // Averages what the shop actually charges, not what it paid.
     final avgPrice = variants.isEmpty
         ? 0.0
@@ -643,7 +651,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       Flexible(
                         child: Text(
                           description.isEmpty ? 'Default' : description,
-                          maxLines: 1,
+                          // Two lines on a narrow screen: 'Size: XL • Color:
+                          // Navy Blue' is the row's identity — losing its tail
+                          // to an ellipsis makes two variants indistinguishable.
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.poppins(
                             fontSize: AppResponsive.smallFontSize(context),
@@ -710,11 +721,36 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         color: AppColors.textSecondary,
                       ),
                     ),
+                  // Renders nothing unless this variant is expiring/expired.
+                  if (variant.hasExpiry) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        ExpiryStatusPill(
+                          status: productStore.expiryStatusForVariant(variant),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          kExpiryDateFormat.format(variant.expiryDateTime!),
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.captionFontSize(context),
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
             const SizedBox(width: 8),
-            Column(
+            // Capped: a Column sizes to its widest child, and the text column
+            // beside it is Expanded — so without a ceiling a long "MRP:"/"Cost:"
+            // string would keep taking width from the variant description
+            // rather than ellipsizing itself.
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 104),
+              child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -745,122 +781,104 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ),
                   ),
               ],
+              ),
             ),
-            // Edit/delete stay behind the overflow menu — never extra icons.
-            PopupMenuButton<String>(
-              icon: const Icon(
-                Icons.more_vert,
-                color: AppColors.textSecondary,
-                size: 20,
-              ),
-              // M3 tints menu surfaces by default; keep them plain white.
-              color: AppColors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              onSelected: (value) {
-                if (value == 'edit') {
-                  _openEditVariant(variant);
-                } else if (value == 'adjust') {
-                  _openAdjustStock(variant);
-                } else if (value == 'label') {
-                  _openPrintLabel(variant);
-                } else if (value == 'delete') {
-                  _deleteVariant(variant);
-                }
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem<String>(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.edit_outlined,
-                        size: 20,
-                        color: AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Edit',
-                        style: GoogleFonts.poppins(
-                          fontSize: AppResponsive.bodyFontSize(context),
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
+            const SizedBox(width: 6),
+            // Edit and Delete are visible buttons on the row, matching the
+            // product and category rows. The two permission-gated extras stay
+            // behind an overflow that hides itself when neither is allowed.
+            RowActionButton(
+              icon: Icons.edit_outlined,
+              color: AppColors.primary,
+              tooltip: 'Edit Variant',
+              onTap: () => _openEditVariant(variant),
+            ),
+            const SizedBox(width: 6),
+            RowActionButton(
+              icon: Icons.delete_outline_rounded,
+              color: AppColors.danger,
+              tooltip: 'Delete Variant',
+              onTap: () => _deleteVariant(variant),
+            ),
+            _buildVariantExtrasMenu(variant),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Adjust Stock / Print Label for a variant.
+  ///
+  /// Both are admin-only and were already hidden individually rather than
+  /// shown-and-refused, so a cashier is never told about a control they can't
+  /// use. With Edit and Delete now living on the row itself, the menu has
+  /// nothing left to show for that user — so it renders nothing at all instead
+  /// of an empty popup.
+  Widget _buildVariantExtrasMenu(VarianteModel variant) {
+    final canAdjust = StockAdjustmentService.canAdjust;
+    final canPrint = BarcodeLabelPermission.canPrint;
+    if (!canAdjust && !canPrint) return const SizedBox.shrink();
+
+    return PopupMenuButton<String>(
+      icon: const Icon(
+        Icons.more_vert,
+        color: AppColors.textSecondary,
+        size: 20,
+      ),
+      // M3 tints menu surfaces by default; keep them plain white.
+      color: AppColors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      onSelected: (value) {
+        if (value == 'adjust') {
+          _openAdjustStock(variant);
+        } else if (value == 'label') {
+          _openPrintLabel(variant);
+        }
+      },
+      itemBuilder: (context) => [
+        if (canAdjust)
+          PopupMenuItem<String>(
+            value: 'adjust',
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.tune_rounded,
+                  size: 20,
+                  color: AppColors.textSecondary,
                 ),
-                // Admin-only: hidden entirely rather than shown-and-refused,
-                // so a cashier is never told about a control they can't use.
-                if (StockAdjustmentService.canAdjust)
-                  PopupMenuItem<String>(
-                    value: 'adjust',
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.tune_rounded,
-                          size: 20,
-                          color: AppColors.textSecondary,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Adjust Stock',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.bodyFontSize(context),
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                // Admin-only, hidden for everyone else — same rule as
-                // Adjust Stock above.
-                if (BarcodeLabelPermission.canPrint)
-                  PopupMenuItem<String>(
-                    value: 'label',
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.qr_code_2_rounded,
-                          size: 20,
-                          color: AppColors.textSecondary,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Print Label',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.bodyFontSize(context),
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                PopupMenuItem<String>(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.delete_outline_rounded,
-                        size: 20,
-                        color: AppColors.danger,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Delete',
-                        style: GoogleFonts.poppins(
-                          fontSize: AppResponsive.bodyFontSize(context),
-                          color: AppColors.danger,
-                        ),
-                      ),
-                    ],
+                const SizedBox(width: 12),
+                Text(
+                  'Adjust Stock',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ],
             ),
-          ],
-        ),
-      ),
+          ),
+        if (canPrint)
+          PopupMenuItem<String>(
+            value: 'label',
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.qr_code_2_rounded,
+                  size: 20,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Print Label',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 
@@ -923,6 +941,15 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
   final _stockController = TextEditingController();
   final _minStockController = TextEditingController();
   String? _selectedTaxId;
+
+  /// An existing sibling variant, purely to inherit the product's unit of
+  /// measure. They all agree, so the first one speaks for the product — the
+  /// same rule the Add/Edit Product screen uses when seeding its UoM control.
+  VarianteModel? get _siblingUnitSource =>
+      productStore.variantsFor(widget.productId).firstOrNull;
+
+  /// Whether this product's variants are stocked in fractional amounts.
+  bool get _allowDecimal => _siblingUnitSource?.isDecimalQuantity ?? false;
 
   final List<_CustomAttrData> _customAttributes = [];
   bool _saving = false;
@@ -1023,12 +1050,18 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
       mrp: _mrpController.text.trim().isEmpty
           ? null
           : double.tryParse(_mrpController.text.trim()),
-      stockQty: int.tryParse(_stockController.text.trim()) ?? 0,
+      stockQty: double.tryParse(_stockController.text.trim()) ?? 0,
       minStock: _minStockController.text.trim().isEmpty
           ? null
-          : int.tryParse(_minStockController.text.trim()),
+          : double.tryParse(_minStockController.text.trim()),
       taxRate: _taxRateFor(_selectedTaxId),
       taxId: _selectedTaxId,
+      // Unit of measure is a PRODUCT-level decision stored per variant, so a
+      // variant added here must inherit it. Without this a new variant of a
+      // loose-goods product silently defaulted to whole pieces, and its stock
+      // field would refuse a decimal.
+      isDecimalQuantity: _siblingUnitSource?.isDecimalQuantity ?? false,
+      unit: _siblingUnitSource?.unit,
       customAttributes: attributes,
     );
 
@@ -1092,12 +1125,17 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
             const SizedBox(height: 12),
             AppTextField(
               controller: _stockController,
-              label: 'Stock Quantity',
+              label: _allowDecimal
+                  ? 'Stock Quantity (${_siblingUnitSource!.effectiveUnit})'
+                  : 'Stock Quantity',
               hint: '0',
               icon: Icons.inventory_2_outlined,
               required: true,
-              keyboardType: TextInputType.number,
-              inputFormatters: _qtyFormatters,
+              keyboardType: _allowDecimal
+                  ? const TextInputType.numberWithOptions(decimal: true)
+                  : TextInputType.number,
+              inputFormatters:
+                  _allowDecimal ? _decimalQtyFormatters : _qtyFormatters,
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Required' : null,
             ),
@@ -1107,8 +1145,11 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
               label: 'Min Stock (Optional)',
               hint: '0',
               icon: Icons.warning_amber_outlined,
-              keyboardType: TextInputType.number,
-              inputFormatters: _qtyFormatters,
+              keyboardType: _allowDecimal
+                  ? const TextInputType.numberWithOptions(decimal: true)
+                  : TextInputType.number,
+              inputFormatters:
+                  _allowDecimal ? _decimalQtyFormatters : _qtyFormatters,
             ),
             const SizedBox(height: 12),
             AppTextField(
@@ -1162,6 +1203,13 @@ class _EditVariantDialog extends StatefulWidget {
 }
 
 class _EditVariantDialogState extends State<_EditVariantDialog> {
+  /// This variant's own unit of measure decides whether its quantity fields
+  /// accept a fraction.
+  bool get _allowDecimal => widget.variant.isDecimalQuantity;
+
+  /// Per-variant expiry. Null = does not expire.
+  DateTime? _expiryDate;
+
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _sellingPriceController;
   late final TextEditingController _costPriceController;
@@ -1194,6 +1242,9 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
       text: v.minStock?.toString() ?? '',
     );
     _barcodeController = TextEditingController(text: v.barcode ?? '');
+    // Seed from the variant, or saving would silently clear an existing expiry
+    // (the save path treats a null `_expiryDate` as an explicit clear).
+    _expiryDate = v.expiryDateTime;
 
     for (final entry
         in (v.customAttributes ?? const <String, String>{}).entries) {
@@ -1310,7 +1361,7 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
           : double.tryParse(_costPriceController.text.trim()),
       mrp: mrpText.isEmpty ? null : double.tryParse(mrpText),
       clearMrp: mrpText.isEmpty,
-      minStock: minStockText.isEmpty ? null : int.tryParse(minStockText),
+      minStock: minStockText.isEmpty ? null : double.tryParse(minStockText),
       clearMinStock: minStockText.isEmpty,
       status: _active ? kActiveVariantStatus : kInactiveVariantStatus,
       // An empty map rather than null, so removing every row actually clears
@@ -1321,6 +1372,8 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
       // the explicit flag — same reason as clearMrp above.
       barcode: newBarcode.isEmpty ? null : newBarcode,
       clearBarcode: newBarcode.isEmpty,
+      expiryDate: _expiryDate?.toIso8601String(),
+      clearExpiryDate: _expiryDate == null,
     );
 
     final result = await productStore.updateVariant(updated);
@@ -1397,15 +1450,31 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
             // reason, no audit row and no before/after, which is exactly what
             // made stock discrepancies unexplainable. Changes go through
             // Adjust Stock in the variant's overflow menu instead.
-            ReadOnlyStockTile(stock: widget.variant.stockQty),
+            ReadOnlyStockTile(
+              stock: widget.variant.stockQty,
+              unit: widget.variant.isDecimalQuantity
+                  ? widget.variant.effectiveUnit
+                  : null,
+            ),
             const SizedBox(height: 12),
             AppTextField(
               controller: _minStockController,
               label: 'Min Stock (Optional)',
               hint: '0',
               icon: Icons.warning_amber_outlined,
-              keyboardType: TextInputType.number,
-              inputFormatters: _qtyFormatters,
+              keyboardType: _allowDecimal
+                  ? const TextInputType.numberWithOptions(decimal: true)
+                  : TextInputType.number,
+              inputFormatters:
+                  _allowDecimal ? _decimalQtyFormatters : _qtyFormatters,
+            ),
+            const SizedBox(height: 12),
+            // Per-variant: a 500ml and a 1L of the same product are stocked
+            // separately, so they expire separately.
+            ExpiryDateField(
+              value: _expiryDate,
+              onPick: (picked) => setState(() => _expiryDate = picked),
+              onClear: () => setState(() => _expiryDate = null),
             ),
             const SizedBox(height: 4),
             SwitchListTile.adaptive(
@@ -1464,6 +1533,13 @@ class _BulkAddVariantDialog extends StatefulWidget {
 
 class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
   final _formKey = GlobalKey<FormState>();
+
+  /// Existing sibling variant, purely to inherit the product's unit of measure
+  /// onto every generated row.
+  VarianteModel? get _siblingUnitSource =>
+      productStore.variantsFor(widget.productId).firstOrNull;
+
+  bool get _allowDecimal => _siblingUnitSource?.isDecimalQuantity ?? false;
 
   // Shared across every generated variant.
   final _costPriceController = TextEditingController();
@@ -1644,7 +1720,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
         : double.tryParse(_mrpController.text.trim());
     final minStock = _minStockController.text.trim().isEmpty
         ? null
-        : int.tryParse(_minStockController.text.trim());
+        : double.tryParse(_minStockController.text.trim());
     final baseBarcode = _baseBarcodeController.text.trim();
     final taxRate = _taxRateFor(_selectedTaxId);
 
@@ -1678,10 +1754,14 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
               double.tryParse(row?.priceController.text.trim() ?? '') ?? 0.0,
           costPrice: costPrice,
           mrp: mrp,
-          stockQty: int.tryParse(row?.stockController.text.trim() ?? '') ?? 0,
+          stockQty: double.tryParse(row?.stockController.text.trim() ?? '') ?? 0,
           minStock: minStock,
           taxRate: taxRate,
           taxId: _selectedTaxId,
+          // Inherit the product's unit of measure, same as the single-add
+          // dialog — otherwise bulk-added rows default to whole pieces.
+          isDecimalQuantity: _siblingUnitSource?.isDecimalQuantity ?? false,
+          unit: _siblingUnitSource?.unit,
         ),
       );
       counter++;
@@ -1934,8 +2014,11 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
               label: 'Min Stock (Optional)',
               hint: '0',
               icon: Icons.warning_amber_outlined,
-              keyboardType: TextInputType.number,
-              inputFormatters: _qtyFormatters,
+              keyboardType: _allowDecimal
+                  ? const TextInputType.numberWithOptions(decimal: true)
+                  : TextInputType.number,
+              inputFormatters:
+                  _allowDecimal ? _decimalQtyFormatters : _qtyFormatters,
             ),
             const SizedBox(height: 12),
             AppTextField(
@@ -2045,8 +2128,11 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
               controller: row.stockController,
               label: 'Qty',
               hint: '0',
-              keyboardType: TextInputType.number,
-              inputFormatters: _qtyFormatters,
+              keyboardType: _allowDecimal
+                  ? const TextInputType.numberWithOptions(decimal: true)
+                  : TextInputType.number,
+              inputFormatters:
+                  _allowDecimal ? _decimalQtyFormatters : _qtyFormatters,
             ),
           ),
         ],

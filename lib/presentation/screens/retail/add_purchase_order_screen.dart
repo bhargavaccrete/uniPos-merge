@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 import 'package:flutter/services.dart';
 import 'package:billberrylite/core/config/phone_rule.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
@@ -437,7 +438,9 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
 
   void _editItemQty(int index) {
     final item = _orderItems[index];
-    final controller = TextEditingController(text: item.orderedQty.toString());
+    final allowDecimal = item.variant.isDecimalQuantity;
+    final controller =
+        TextEditingController(text: formatQty(item.orderedQty));
 
     showDialog<void>(
       context: context,
@@ -457,8 +460,15 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
             label: 'Quantity',
             required: true,
             icon: Icons.inventory_2_outlined,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            keyboardType: allowDecimal
+                ? const TextInputType.numberWithOptions(decimal: true)
+                : TextInputType.number,
+            inputFormatters: [
+              if (allowDecimal)
+                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))
+              else
+                FilteringTextInputFormatter.digitsOnly,
+            ],
             autofocus: true,
           ),
           actions: [
@@ -467,7 +477,10 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
             appDialogPrimaryButton(
               label: 'Save',
               onPressed: () {
-                final newQty = int.tryParse(controller.text.trim()) ?? 0;
+                final newQty = (allowDecimal
+                        ? double.tryParse(controller.text.trim())
+                        : int.tryParse(controller.text.trim())?.toDouble()) ??
+                    0;
                 // Silently ignoring 0 used to close the dialog with nothing
                 // changed, which reads as the save having failed.
                 if (newQty <= 0) {
@@ -515,8 +528,8 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final totalItems = _orderItems.fold<int>(
-      0,
+    final totalItems = _orderItems.fold<double>(
+      0.0,
       (sum, item) => sum + item.orderedQty,
     );
     final estimatedTotal = _orderItems.fold<double>(
@@ -997,7 +1010,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
 // Data class for PO items during editing
 class POItemData {
   final VarianteModel variant;
-  final int orderedQty;
+  final double orderedQty;
   final double? estimatedPrice;
   final String? poItemId;
 
@@ -1010,7 +1023,7 @@ class POItemData {
 
   POItemData copyWith({
     VarianteModel? variant,
-    int? orderedQty,
+    double? orderedQty,
     double? estimatedPrice,
     String? poItemId,
   }) {
@@ -1035,6 +1048,10 @@ class _AddPOItemDialog extends StatefulWidget {
 
 class _AddPOItemDialogState extends State<_AddPOItemDialog> {
   VarianteModel? _selectedVariant;
+
+  /// The chosen variant decides whether a fractional order quantity may be
+  /// typed. Nothing selected yet = whole numbers, as before.
+  bool get _allowDecimal => _selectedVariant?.isDecimalQuantity ?? false;
   final TextEditingController _quantityController = TextEditingController(
     text: '1',
   );
@@ -1192,8 +1209,15 @@ class _AddPOItemDialogState extends State<_AddPOItemDialog> {
               label: 'Quantity',
               required: true,
               icon: Icons.numbers_rounded,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              keyboardType: _allowDecimal
+                  ? const TextInputType.numberWithOptions(decimal: true)
+                  : TextInputType.number,
+              inputFormatters: [
+                if (_allowDecimal)
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))
+                else
+                  FilteringTextInputFormatter.digitsOnly,
+              ],
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 12),
@@ -1261,8 +1285,11 @@ class _AddPOItemDialogState extends State<_AddPOItemDialog> {
                 return;
               }
 
-              final quantity =
-                  int.tryParse(_quantityController.text.trim()) ?? 0;
+              final quantity = (_allowDecimal
+                      ? double.tryParse(_quantityController.text.trim())
+                      : int.tryParse(_quantityController.text.trim())
+                          ?.toDouble()) ??
+                  0;
               if (quantity <= 0) {
                 NotificationService.instance.showError(
                   'Please enter a valid quantity',
@@ -1291,7 +1318,7 @@ class _AddPOItemDialogState extends State<_AddPOItemDialog> {
   /// Live qty × price preview, so the cost of the line is visible before it's
   /// added rather than only in the order list afterwards.
   double get _lineTotal {
-    final qty = int.tryParse(_quantityController.text.trim()) ?? 0;
+    final qty = double.tryParse(_quantityController.text.trim()) ?? 0;
     final price = double.tryParse(_priceController.text.trim()) ?? 0;
     return qty * price;
   }
@@ -1299,7 +1326,7 @@ class _AddPOItemDialogState extends State<_AddPOItemDialog> {
 
 // Helper class to hold quantity and price data
 class _QuantityPriceData {
-  final int quantity;
+  final double quantity;
   final double? price;
 
   _QuantityPriceData({required this.quantity, this.price});
@@ -1768,11 +1795,18 @@ class _QuantityConfirmationDialogState
                             controller:
                                 _quantityControllers[variant.varianteId],
                             label: 'Qty',
-                            keyboardType: TextInputType.number,
+                            keyboardType: variant.isDecimalQuantity
+                                ? const TextInputType.numberWithOptions(
+                                    decimal: true)
+                                : TextInputType.number,
                             // keyboardType alone doesn't block letters from a
                             // paste or a hardware keyboard.
                             inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
+                              if (variant.isDecimalQuantity)
+                                FilteringTextInputFormatter.allow(
+                                    RegExp(r'^\d*\.?\d{0,2}'))
+                              else
+                                FilteringTextInputFormatter.digitsOnly,
                             ],
                           ),
                         ),
@@ -1819,10 +1853,13 @@ class _QuantityConfirmationDialogState
               final result = <VarianteModel, _QuantityPriceData>{};
 
               for (var variant in widget.variants) {
-                final qty =
-                    int.tryParse(
-                      _quantityControllers[variant.varianteId]!.text,
-                    ) ??
+                final qty = (variant.isDecimalQuantity
+                        ? double.tryParse(
+                            _quantityControllers[variant.varianteId]!.text,
+                          )
+                        : int.tryParse(
+                            _quantityControllers[variant.varianteId]!.text,
+                          )?.toDouble()) ??
                     0;
                 if (qty > 0) {
                   final priceText = _priceControllers[variant.varianteId]!.text

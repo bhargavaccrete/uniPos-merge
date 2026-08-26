@@ -594,7 +594,6 @@ class _RestaurantSupplierDetailScreenState
               ].join('  ·  '),
               style: GoogleFonts.poppins(
                 fontSize: 11,
-                fontStyle: FontStyle.italic,
                 color: AppColors.textSecondary,
               ),
             ),

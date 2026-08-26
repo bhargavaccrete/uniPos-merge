@@ -64,7 +64,7 @@ class PurchaseReturnModel extends HiveObject {
   final String returnDate;
 
   @HiveField(9)
-  final int totalQty;
+  final double totalQty;
 
   @HiveField(10)
   final double totalAmount;
@@ -129,7 +129,7 @@ class PurchaseReturnModel extends HiveObject {
     required String poNumber,
     required String supplierId,
     String? supplierName,
-    int totalQty = 0,
+    double totalQty = 0,
     double totalAmount = 0,
     String? notes,
   }) {
@@ -222,7 +222,7 @@ class PurchaseReturnModel extends HiveObject {
       supplierId: map['supplierId'] as String? ?? '',
       supplierName: map['supplierName'] as String?,
       returnDate: map['returnDate'] as String,
-      totalQty: (map['totalQty'] as num?)?.toInt() ?? 0,
+      totalQty: (map['totalQty'] as num?)?.toDouble() ?? 0.0,
       totalAmount: (map['totalAmount'] as num?)?.toDouble() ?? 0,
       status: map['status'] as String? ?? PurchaseReturnStatus.pending.name,
       creditNoteNumber: map['creditNoteNumber'] as String?,
@@ -236,7 +236,7 @@ class PurchaseReturnModel extends HiveObject {
   }
 
   PurchaseReturnModel copyWith({
-    int? totalQty,
+    double? totalQty,
     double? totalAmount,
     String? status,
     String? creditNoteNumber,

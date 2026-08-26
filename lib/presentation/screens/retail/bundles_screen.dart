@@ -301,8 +301,8 @@ class _InfoRow extends StatelessWidget {
 /// "Available to Sell" chip, color-coded green/orange/red — the bundle
 /// equivalent of restaurant's "N can be made" chip.
 class _AvailabilityPill extends StatelessWidget {
-  final int available;
-  final int? minStock;
+  final double available;
+  final double? minStock;
 
   const _AvailabilityPill({required this.available, this.minStock});
 

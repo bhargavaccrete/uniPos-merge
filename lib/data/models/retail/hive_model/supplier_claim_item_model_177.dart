@@ -33,7 +33,7 @@ class SupplierClaimItemModel extends HiveObject {
   final String? variantInfo;
 
   @HiveField(7)
-  final int claimedQty;
+  final double claimedQty;
 
   @HiveField(8)
   final double? costPrice;
@@ -69,7 +69,7 @@ class SupplierClaimItemModel extends HiveObject {
     required String productId,
     String? productName,
     String? variantInfo,
-    required int claimedQty,
+    required double claimedQty,
     double? costPrice,
     String? remarks,
   }) {
@@ -113,7 +113,7 @@ class SupplierClaimItemModel extends HiveObject {
       productId: map['productId'] as String? ?? '',
       productName: map['productName'] as String?,
       variantInfo: map['variantInfo'] as String?,
-      claimedQty: (map['claimedQty'] as num?)?.toInt() ?? 0,
+      claimedQty: (map['claimedQty'] as num?)?.toDouble() ?? 0.0,
       costPrice: (map['costPrice'] as num?)?.toDouble(),
       totalAmount: (map['totalAmount'] as num?)?.toDouble(),
       remarks: map['remarks'] as String?,

@@ -166,7 +166,7 @@ abstract class _DamagedGoodsStore with Store {
       poNumber: grn.poNumber,
       supplierId: grn.supplierId,
       supplierName: grn.supplierName,
-      totalQty: items.fold<int>(0, (s, i) => s + (i.damagedQty ?? 0)),
+      totalQty: items.fold<double>(0.0, (s, i) => s + (i.damagedQty ?? 0)),
       totalAmount: items.fold<double>(0, (s, i) => s + (i.damagedAmount ?? 0)),
       notes: 'Raised automatically from ${grn.grnNumber}',
     );
@@ -204,7 +204,7 @@ abstract class _DamagedGoodsStore with Store {
       poNumber: grn.poNumber,
       supplierId: grn.supplierId,
       supplierName: grn.supplierName,
-      totalQty: items.fold<int>(0, (s, i) => s + (i.damagedQty ?? 0)),
+      totalQty: items.fold<double>(0.0, (s, i) => s + (i.damagedQty ?? 0)),
       totalAmount: items.fold<double>(0, (s, i) => s + (i.damagedAmount ?? 0)),
       notes: 'Raised automatically from ${grn.grnNumber}',
     );
@@ -341,7 +341,7 @@ abstract class _DamagedGoodsStore with Store {
       _returnRepository.getItems(returnId);
 
   /// Units of a GRN line already returned — the basis for a partial return.
-  Future<int> returnedQtyForGRNItem(String grnItemId) =>
+  Future<double> returnedQtyForGRNItem(String grnItemId) =>
       _returnRepository.returnedQtyForGRNItem(grnItemId);
 
   void _replaceReturn(PurchaseReturnModel updated) {
@@ -518,7 +518,7 @@ abstract class _DamagedGoodsStore with Store {
       inventoryLosses.fold(0.0, (sum, l) => sum + l.lossValue);
 
   @computed
-  int get totalLossQty =>
+  double get totalLossQty =>
       inventoryLosses.fold(0, (sum, l) => sum + l.quantity);
 
   // ==================== STOCK ADJUSTMENT LOSS ====================
@@ -538,7 +538,7 @@ abstract class _DamagedGoodsStore with Store {
     required String productId,
     String? productName,
     String? variantInfo,
-    required int quantity,
+    required double quantity,
     double? costPrice,
     required String reason,
     String? note,

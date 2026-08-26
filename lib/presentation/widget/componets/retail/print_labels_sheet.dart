@@ -158,8 +158,8 @@ class _PrintLabelsSheetState extends State<PrintLabelsSheet> {
     if (!_hasBarcode(v)) return;
     final id = v.varianteId;
     setState(() {
-      _counts[id] = v.stockQty;
-      _controllers[id]!.text = v.stockQty.toString();
+      _counts[id] = v.stockQty.round();
+      _controllers[id]!.text = v.stockQty.round().toString();
       if (v.stockQty > 0) {
         _selected.add(id);
       } else {

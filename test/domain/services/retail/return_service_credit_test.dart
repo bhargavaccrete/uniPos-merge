@@ -87,7 +87,7 @@ void main() {
 
   Future<void> seedVariant({
     String id = 'v1',
-    int stock = 10,
+    double stock = 10,
     double cost = 60,
   }) async {
     await Hive.box<VarianteModel>(HiveBoxNames.variants).put(
@@ -106,7 +106,7 @@ void main() {
   /// One sale of `qty` units at 100 + 18% exclusive GST, so a unit is 118.
   Future<SaleModel> seedSale({
     String saleId = 'S1',
-    int qty = 1,
+    double qty = 1,
     String paymentType = 'cash',
     String? customerId,
     double? dueAmount,

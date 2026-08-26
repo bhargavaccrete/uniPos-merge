@@ -16,7 +16,7 @@ import 'package:billberrylite/domain/services/retail/receipt_pdf_service.dart';
 void main() {
   SaleItemModel soldLine({
     double price = 900,
-    int qty = 1,
+    double qty = 1,
     double discountAmount = 130.50,
     double? lineDiscountAmount = 90,
     String? type = 'percentage',

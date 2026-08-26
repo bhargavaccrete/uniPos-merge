@@ -884,7 +884,6 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
                   child: Text('audit',
                       style: GoogleFonts.poppins(
                         fontSize: 9,
-                        fontStyle: FontStyle.italic,
                         color: Colors.orange.shade700,
                       )),
                 ),
@@ -1166,7 +1165,6 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
                 Text('audit only',
                     style: GoogleFonts.poppins(
                       fontSize: AppResponsive.captionFontSize(context) * 0.85,
-                      fontStyle: FontStyle.italic,
                       color: Colors.orange.shade500,
                     )),
             ]),

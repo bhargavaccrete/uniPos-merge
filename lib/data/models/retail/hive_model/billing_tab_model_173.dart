@@ -38,8 +38,8 @@ class BillingTabModel extends HiveObject {
   });
 
   /// Get total items count in this tab
-  int get totalItems {
-    int total = 0;
+  double get totalItems {
+    double total = 0;
     for (var item in items) {
       total += item.qty;
     }

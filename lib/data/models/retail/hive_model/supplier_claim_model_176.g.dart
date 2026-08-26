@@ -26,7 +26,7 @@ class SupplierClaimModelAdapter extends TypeAdapter<SupplierClaimModel> {
       supplierId: fields[6] as String,
       supplierName: fields[7] as String?,
       claimDate: fields[8] as String,
-      totalQty: fields[9] as int,
+      totalQty: fields[9] as double,
       totalAmount: fields[10] as double,
       status: fields[11] as String,
       resolutionNote: fields[12] as String?,

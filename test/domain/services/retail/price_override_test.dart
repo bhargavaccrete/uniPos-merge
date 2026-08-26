@@ -195,7 +195,7 @@ void main() {
       double? originalPrice = 900,
       String? reason = 'clearance',
       String? note,
-      int qty = 1,
+      double qty = 1,
       double gstRate = 18,
       bool taxInclusive = false,
     }) {

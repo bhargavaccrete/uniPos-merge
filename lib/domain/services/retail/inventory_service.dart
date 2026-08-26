@@ -59,7 +59,7 @@ class RetailInventoryService {
       if (variant == null) continue;
 
       final newStock = variant.stockQty - item.qty;
-      final finalStock = newStock < 0 ? 0 : newStock;
+      final finalStock = newStock < 0 ? 0.0 : newStock;
       await productStore.updateVariantStock(item.variantId, finalStock);
 
       final label = product != null && variant.hasAttributes
@@ -92,7 +92,7 @@ class RetailInventoryService {
   static Future<void> _deductBundleComponents({
     required ProductModel bundleProduct,
     required String bundleVariantId,
-    required int saleQty,
+    required double saleQty,
     required String staffName,
     required String? sessionId,
   }) async {
@@ -105,7 +105,7 @@ class RetailInventoryService {
 
       final deductQty = saleQty * component.quantity;
       final newStock = variant.stockQty - deductQty;
-      final finalStock = newStock < 0 ? 0 : newStock;
+      final finalStock = newStock < 0 ? 0.0 : newStock;
       await productStore.updateVariantStock(component.componentVariantId, finalStock);
 
       String label = variant.sku ?? component.componentVariantId;
@@ -140,12 +140,12 @@ class RetailInventoryService {
   /// stock supports. Mirrors restaurant's
   /// `InventoryService.calculateAvailableToMake`. Returns 0 if the variant
   /// has no bundle configured or a component is out of stock/missing.
-  static int calculateAvailableToSell(ProductModel product, VarianteModel variant) {
+  static double calculateAvailableToSell(ProductModel product, VarianteModel variant) {
     if (!product.isBundle) return variant.stockQty;
     final RetailBundleModel? bundle = bundleRepository.getBundleForVariant(variant.varianteId);
     if (bundle == null || !bundle.hasComponents) return 0;
 
-    int? minBundles;
+    double? minBundles;
     for (final component in bundle.components) {
       if (component.quantity <= 0) continue;
       VarianteModel? componentVariant;
@@ -156,7 +156,8 @@ class RetailInventoryService {
       } catch (_) {
         return 0; // a required component no longer exists — can't be sold
       }
-      final bundlesFromThisComponent = componentVariant.stockQty ~/ component.quantity;
+      final bundlesFromThisComponent =
+          (componentVariant.stockQty ~/ component.quantity).toDouble();
       minBundles = minBundles == null
           ? bundlesFromThisComponent
           : (bundlesFromThisComponent < minBundles ? bundlesFromThisComponent : minBundles);

@@ -43,11 +43,11 @@ class StockTakeItemModel extends HiveObject {
 
   /// What the system claimed when this line was counted.
   @HiveField(6)
-  final int systemQty;
+  final double systemQty;
 
   /// What the shop physically counted.
   @HiveField(7)
-  final int countedQty;
+  final double countedQty;
 
   /// Cost at count time, for valuing the variance.
   @HiveField(8)
@@ -59,7 +59,7 @@ class StockTakeItemModel extends HiveObject {
   /// Units actually applied at commit. Null while draft, or when the line had
   /// no variance and so was skipped.
   @HiveField(10)
-  final int? appliedQty;
+  final double? appliedQty;
 
   StockTakeItemModel({
     required this.takeItemId,
@@ -81,8 +81,8 @@ class StockTakeItemModel extends HiveObject {
     required String productId,
     String? productName,
     String? variantInfo,
-    required int systemQty,
-    required int countedQty,
+    required double systemQty,
+    required double countedQty,
     double? costPrice,
   }) {
     return StockTakeItemModel(
@@ -101,7 +101,7 @@ class StockTakeItemModel extends HiveObject {
 
   /// Counted minus system. Negative means stock is missing, which is the usual
   /// direction; positive means more was found than the books expected.
-  int get variance => countedQty - systemQty;
+  double get variance => countedQty - systemQty;
 
   bool get hasVariance => variance != 0;
 
@@ -112,10 +112,10 @@ class StockTakeItemModel extends HiveObject {
   double get varianceValue => costPrice == null ? 0 : variance * costPrice!;
 
   StockTakeItemModel copyWith({
-    int? systemQty,
-    int? countedQty,
+    double? systemQty,
+    double? countedQty,
     double? costPrice,
-    int? appliedQty,
+    double? appliedQty,
   }) {
     return StockTakeItemModel(
       takeItemId: takeItemId,
@@ -156,11 +156,11 @@ class StockTakeItemModel extends HiveObject {
         productId: map['productId'] as String? ?? '',
         productName: map['productName'] as String?,
         variantInfo: map['variantInfo'] as String?,
-        systemQty: (map['systemQty'] as num?)?.toInt() ?? 0,
-        countedQty: (map['countedQty'] as num?)?.toInt() ?? 0,
+        systemQty: (map['systemQty'] as num?)?.toDouble() ?? 0.0,
+        countedQty: (map['countedQty'] as num?)?.toDouble() ?? 0.0,
         costPrice: (map['costPrice'] as num?)?.toDouble(),
         countedAt:
             map['countedAt'] as String? ?? DateTime.now().toIso8601String(),
-        appliedQty: (map['appliedQty'] as num?)?.toInt(),
+        appliedQty: (map['appliedQty'] as num?)?.toDouble(),
       );
 }

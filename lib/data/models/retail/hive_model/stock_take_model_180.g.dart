@@ -28,7 +28,7 @@ class StockTakeModelAdapter extends TypeAdapter<StockTakeModel> {
       updatedAt: fields[8] as String,
       completedAt: fields[9] as String?,
       committedLineCount: fields[10] as int?,
-      committedNetQty: fields[11] as int?,
+      committedNetQty: fields[11] as double?,
     );
   }
 

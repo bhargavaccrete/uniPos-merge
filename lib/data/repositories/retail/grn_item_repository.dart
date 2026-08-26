@@ -69,21 +69,21 @@ class GRNItemRepository {
   }
 
   // Get Total Received Quantity for a GRN
-  Future<int> getTotalReceivedQty(String grnId) async {
+  Future<double> getTotalReceivedQty(String grnId) async {
     final items = await getItemsByGRNId(grnId);
-    return items.fold<int>(0, (sum, item) => sum + item.receivedQty);
+    return items.fold<double>(0.0, (sum, item) => sum + item.receivedQty);
   }
 
   // Get Total Ordered Quantity for a GRN
-  Future<int> getTotalOrderedQty(String grnId) async {
+  Future<double> getTotalOrderedQty(String grnId) async {
     final items = await getItemsByGRNId(grnId);
-    return items.fold<int>(0, (sum, item) => sum + item.orderedQty);
+    return items.fold<double>(0.0, (sum, item) => sum + item.orderedQty);
   }
 
   // Get Total Damaged Quantity for a GRN
-  Future<int> getTotalDamagedQty(String grnId) async {
+  Future<double> getTotalDamagedQty(String grnId) async {
     final items = await getItemsByGRNId(grnId);
-    return items.fold<int>(0, (sum, item) => sum + (item.damagedQty ?? 0));
+    return items.fold<double>(0.0, (sum, item) => sum + (item.damagedQty ?? 0));
   }
 
   /// Inventory value of a GRN (accepted units only) — NOT what the supplier is
@@ -95,17 +95,17 @@ class GRNItemRepository {
   }
 
   // Get Total Received Quantity for a Variant (across all GRNs)
-  Future<int> getTotalReceivedQtyForVariant(String variantId) async {
+  Future<double> getTotalReceivedQtyForVariant(String variantId) async {
     final items = await getItemsByVariantId(variantId);
-    return items.fold<int>(0, (sum, item) => sum + item.receivedQty);
+    return items.fold<double>(0.0, (sum, item) => sum + item.receivedQty);
   }
 
   // Get Total Received Quantity for a PO Item (across all CONFIRMED GRNs only)
-  Future<int> getTotalReceivedQtyForPOItem(String poItemId) async {
+  Future<double> getTotalReceivedQtyForPOItem(String poItemId) async {
     final items = await getItemsByPOItemId(poItemId);
     // Only count items from confirmed GRNs
     final grnBox = Hive.box<GRNModel>('grns');
-    int total = 0;
+    double total = 0.0;
     for (var item in items) {
       final grn = grnBox.get(item.grnId);
       if (grn != null && grn.status == 'confirmed') {

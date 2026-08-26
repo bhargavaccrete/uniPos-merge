@@ -7,6 +7,7 @@ import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/row_action_button.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/util/color.dart';
@@ -245,25 +246,15 @@ class _StockTakeListScreenState extends State<StockTakeListScreen> {
                     ),
                   ),
                 ),
-                // Discard stays behind the overflow menu, and only for drafts —
-                // a completed take is the evidence for adjustments that
-                // already happened.
+                // Discard is draft-only — a completed take is the evidence for
+                // adjustments that already happened. Now a single button: the
+                // menu it used to live in held only this one item.
                 if (take.isDraft)
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert,
-                        size: 20, color: AppColors.textSecondary),
-                    color: AppColors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    onSelected: (v) {
-                      if (v == 'discard') _cancelTake(take);
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'discard',
-                        child: Text('Discard'),
-                      ),
-                    ],
+                  RowActionButton(
+                    icon: Icons.delete_outline_rounded,
+                    color: AppColors.danger,
+                    tooltip: 'Discard Draft',
+                    onTap: () => _cancelTake(take),
                   ),
               ],
             ),

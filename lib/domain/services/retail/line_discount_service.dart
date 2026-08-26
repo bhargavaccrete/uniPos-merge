@@ -96,7 +96,7 @@ class LineDiscountService {
     required DiscountType type,
     required double value,
     required double chargedUnitPrice,
-    required int qty,
+    required double qty,
   }) {
     final gross = chargedUnitPrice * qty;
 

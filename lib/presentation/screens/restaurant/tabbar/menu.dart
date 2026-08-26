@@ -10,6 +10,7 @@ import '../../../../domain/services/restaurant/day_management_service.dart';
 import '../../../widget/restaurant/opening_balance_dialog.dart';
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
+import '../../../../data/models/common/categorymodel_300.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../domain/services/restaurant/inventory_service.dart';
@@ -68,6 +69,59 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   /// Mobile "Favorites" section pinned at the top of the category list.
+  /// Items belonging to no surviving category.
+  ///
+  /// Deleting a category re-parents its items rather than destroying them, so
+  /// without this section such an item would still exist, still be enabled, and
+  /// still be counted on the menu — while being completely unreachable from the
+  /// order screen. It renders only when there is something to show, so a shop
+  /// that keeps every item categorised never sees it.
+  Widget _buildUncategorisedSection(
+    List<Items> visibleItems,
+    List<dynamic> renderedCategories,
+    String query,
+    String lowerQuery,
+    List<CartItem> cartItems,
+  ) {
+    // A sentinel, not '' — the key maps are shared with real categories and an
+    // empty id is a plausible value for legacy data.
+    const uncategorisedId = '__uncategorised__';
+
+    final known = renderedCategories.map((c) => c.id as String).toSet();
+    var orphans = visibleItems
+        .where((item) => !known.contains(item.categoryOfItem ?? ''))
+        .toList();
+
+    if (query.isNotEmpty) {
+      orphans = orphans
+          .where((i) =>
+              i.name.toLowerCase().contains(lowerQuery) ||
+              (i.itemCode != null &&
+                  i.itemCode!.toLowerCase().contains(lowerQuery)))
+          .toList();
+    }
+    if (orphans.isEmpty) return const SizedBox.shrink();
+
+    _categoryKeys.putIfAbsent(uncategorisedId, () => GlobalKey());
+    _expansionControllers.putIfAbsent(
+        uncategorisedId, () => ExpansibleController());
+
+    return _CategorySectionCard(
+      category: Category(id: uncategorisedId, name: 'Uncategorized'),
+      searchFilteredItems: orphans,
+      initiallyExpanded: query.isNotEmpty || AppSettings.keepCategoriesOpen,
+      controller: _expansionControllers[uncategorisedId],
+      cardKey: _categoryKeys[uncategorisedId]!,
+      cartItems: cartItems,
+      onItemTap: _handleItemTap,
+      onToggleFavorite: _toggleFavorite,
+      formatStock: _formatStockDisplay,
+      getStockStatus: _getStockStatus,
+      gridView: AppSettings.menuGridView,
+      buildGridCard: _buildGridItemCard,
+    );
+  }
+
   Widget _buildFavoritesSection(List<Items> visibleItems, String query, String lowerQuery, List<CartItem> cartItems) {
     var favItems = visibleItems.where((i) => i.isFavorite).toList();
     if (query.isNotEmpty) {
@@ -710,6 +764,13 @@ class _MenuScreenState extends State<MenuScreen> {
                                     buildGridCard: _buildGridItemCard,
                                   );
                                 }).toList(),
+                                _buildUncategorisedSection(
+                                  visibleItems,
+                                  categories,
+                                  query,
+                                  lowerQuery,
+                                  cartItems,
+                                ),
                               ],
                             ),
                           );

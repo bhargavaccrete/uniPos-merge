@@ -94,7 +94,7 @@ abstract class _PurchaseOrderStore with Store {
   @action
   Future<String> addPurchaseOrder(PurchaseOrderModel po, List<PurchaseOrderItemModel> items) async {
     // Calculate totals
-    final totalItems = items.fold<int>(0, (sum, item) => sum + item.orderedQty);
+    final totalItems = items.fold<double>(0.0, (sum, item) => sum + item.orderedQty);
     final estimatedTotal = items.fold<double>(0.0, (sum, item) => sum + (item.estimatedTotal ?? 0));
 
     final updatedPO = po.copyWith(
@@ -112,7 +112,7 @@ abstract class _PurchaseOrderStore with Store {
   @action
   Future<void> updatePurchaseOrder(PurchaseOrderModel po, List<PurchaseOrderItemModel> items) async {
     // Calculate totals
-    final totalItems = items.fold<int>(0, (sum, item) => sum + item.orderedQty);
+    final totalItems = items.fold<double>(0.0, (sum, item) => sum + item.orderedQty);
     final estimatedTotal = items.fold<double>(0.0, (sum, item) => sum + (item.estimatedTotal ?? 0));
 
     final updatedPO = po.copyWith(
@@ -271,8 +271,8 @@ abstract class _PurchaseOrderStore with Store {
   @action
   Future<String> createGRN(GRNModel grn, List<GRNItemModel> items) async {
     // Calculate totals
-    final totalOrderedQty = items.fold<int>(0, (sum, item) => sum + item.orderedQty);
-    final totalReceivedQty = items.fold<int>(0, (sum, item) => sum + item.receivedQty);
+    final totalOrderedQty = items.fold<double>(0.0, (sum, item) => sum + item.orderedQty);
+    final totalReceivedQty = items.fold<double>(0.0, (sum, item) => sum + item.receivedQty);
     // Billable, not accepted: the receipt accrues the full delivered value so
     // it matches the supplier's invoice.
     final totalAmount =
@@ -294,8 +294,8 @@ abstract class _PurchaseOrderStore with Store {
   @action
   Future<void> updateGRN(GRNModel grn, List<GRNItemModel> items) async {
     // Calculate totals
-    final totalOrderedQty = items.fold<int>(0, (sum, item) => sum + item.orderedQty);
-    final totalReceivedQty = items.fold<int>(0, (sum, item) => sum + item.receivedQty);
+    final totalOrderedQty = items.fold<double>(0.0, (sum, item) => sum + item.orderedQty);
+    final totalReceivedQty = items.fold<double>(0.0, (sum, item) => sum + item.receivedQty);
     // Billable, not accepted: the receipt accrues the full delivered value so
     // it matches the supplier's invoice.
     final totalAmount =
@@ -403,7 +403,7 @@ abstract class _PurchaseOrderStore with Store {
 
     // Get all PO items
     final poItems = await _poItemRepository.getItemsByPOId(poId);
-    final totalOrdered = poItems.fold<int>(0, (sum, item) => sum + item.orderedQty);
+    final totalOrdered = poItems.fold<double>(0.0, (sum, item) => sum + item.orderedQty);
 
     // Get total received from all confirmed GRNs
     final totalReceived = await _grnRepository.getTotalReceivedQtyForPO(poId);
@@ -459,7 +459,7 @@ abstract class _PurchaseOrderStore with Store {
   }
 
   /// Get already received quantity for a specific PO item (from confirmed GRNs)
-  Future<int> getReceivedQtyForPOItem(String poItemId) async {
+  Future<double> getReceivedQtyForPOItem(String poItemId) async {
     return await _grnItemRepository.getTotalReceivedQtyForPOItem(poItemId);
   }
 
@@ -473,7 +473,7 @@ abstract class _PurchaseOrderStore with Store {
   /// Only CONFIRMED GRNs count; a draft GRN has moved no stock and owes no
   /// money, exactly as [confirmGRN] treats it.
   POReceiptProgress progressFor(PurchaseOrderModel po) {
-    var received = 0;
+    var received = 0.0;
     var billedAmount = 0.0;
 
     for (final grn in grns) {
@@ -504,9 +504,9 @@ abstract class _PurchaseOrderStore with Store {
       final grnItems =
           await _grnItemRepository.getItemsByPOItemId(poItem.poItemId);
 
-      var received = 0;
-      var accepted = 0;
-      var damaged = 0;
+      var received = 0.0;
+      var accepted = 0.0;
+      var damaged = 0.0;
 
       for (final grnItem in grnItems) {
         final grn = _grnRepository.getGRNById(grnItem.grnId);
@@ -565,8 +565,8 @@ abstract class _PurchaseOrderStore with Store {
 /// Credits from returns and settled claims are NOT netted off here; they are
 /// supplier-ledger events, not order events.
 class POReceiptProgress {
-  final int ordered;
-  final int received;
+  final double ordered;
+  final double received;
   final double billedAmount;
 
   const POReceiptProgress({
@@ -575,16 +575,16 @@ class POReceiptProgress {
     required this.billedAmount,
   });
 
-  int get remaining => (ordered - received).clamp(0, ordered);
+  double get remaining => (ordered - received).clamp(0.0, ordered);
   bool get hasReceipts => received > 0;
 }
 
 /// Per-line receiving detail for a PO item.
 class POItemReceipt {
-  final int ordered;
-  final int received;
-  final int accepted;
-  final int damaged;
+  final double ordered;
+  final double received;
+  final double accepted;
+  final double damaged;
 
   const POItemReceipt({
     required this.ordered,
@@ -593,5 +593,5 @@ class POItemReceipt {
     required this.damaged,
   });
 
-  int get remaining => (ordered - received).clamp(0, ordered);
+  double get remaining => (ordered - received).clamp(0.0, ordered);
 }

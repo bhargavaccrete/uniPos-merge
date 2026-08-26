@@ -348,7 +348,6 @@ class _RestaurantInventoryLossListScreenState
               style: GoogleFonts.poppins(
                 fontSize: AppResponsive.captionFontSize(context),
                 color: AppColors.textSecondary,
-                fontStyle: FontStyle.italic,
               ),
             ),
           ],

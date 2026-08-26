@@ -7,6 +7,7 @@ import 'package:billberrylite/domain/services/common/notification_service.dart';
 import 'package:billberrylite/domain/services/retail/hold_sale_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/row_action_button.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
@@ -514,43 +515,14 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                       ),
                     ),
                     const Spacer(),
-                    PopupMenuButton<String>(
-                      icon: const Icon(
-                        Icons.more_vert,
-                        color: AppColors.textSecondary,
-                        size: 20,
-                      ),
-                      tooltip: 'Options',
-                      // M3 tints menu surfaces lavender by default — pin it
-                      // to white so it matches the cards.
-                      color: AppColors.white,
-                      surfaceTintColor: AppColors.white,
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: AppColors.divider),
-                      ),
-                      onSelected: (value) {
-                        if (value == 'delete') {
-                          _deleteHoldSale(holdSale);
-                        } else if (value == 'details') {
-                          _showHoldSaleDetails(holdSale);
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        _menuItem(
-                          'details',
-                          Icons.info_outline,
-                          'View Details',
-                          AppColors.info,
-                        ),
-                        _menuItem(
-                          'delete',
-                          Icons.delete_outline,
-                          'Delete',
-                          AppColors.danger,
-                        ),
-                      ],
+                    // Delete only. 'View Details' left with the menu — tapping
+                    // the card already opens the details sheet, so the entry
+                    // was a second route to the same place.
+                    RowActionButton(
+                      icon: Icons.delete_outline_rounded,
+                      color: AppColors.danger,
+                      tooltip: 'Delete Parked Sale',
+                      onTap: () => _deleteHoldSale(holdSale),
                     ),
                   ],
                 ),
@@ -562,28 +534,4 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
     );
   }
 
-  PopupMenuItem<String> _menuItem(
-    String value,
-    IconData icon,
-    String label,
-    Color color,
-  ) {
-    return PopupMenuItem<String>(
-      value: value,
-      height: 44,
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 19),
-          const SizedBox(width: 12),
-          Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: AppResponsive.bodyFontSize(context),
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

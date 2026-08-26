@@ -83,7 +83,7 @@ class StockTakeModel extends HiveObject {
   /// Net units applied at commit — negative when the count found less than the
   /// system claimed, which is the usual direction.
   @HiveField(11)
-  final int? committedNetQty;
+  final double? committedNetQty;
 
   StockTakeModel({
     required this.takeId,
@@ -147,7 +147,7 @@ class StockTakeModel extends HiveObject {
     String? note,
     String? completedAt,
     int? committedLineCount,
-    int? committedNetQty,
+    double? committedNetQty,
     bool clearScopeNote = false,
     bool clearNote = false,
   }) {
@@ -196,6 +196,6 @@ class StockTakeModel extends HiveObject {
             map['updatedAt'] as String? ?? DateTime.now().toIso8601String(),
         completedAt: map['completedAt'] as String?,
         committedLineCount: (map['committedLineCount'] as num?)?.toInt(),
-        committedNetQty: (map['committedNetQty'] as num?)?.toInt(),
+        committedNetQty: (map['committedNetQty'] as num?)?.toDouble(),
       );
 }

@@ -21,12 +21,13 @@ mixin _$CartStore on _CartStore, Store {
   int get itemCount => (_$itemCountComputed ??=
           Computed<int>(() => super.itemCount, name: '_CartStore.itemCount'))
       .value;
-  Computed<int>? _$totalItemsComputed;
+  Computed<double>? _$totalItemsComputed;
 
   @override
-  int get totalItems => (_$totalItemsComputed ??=
-          Computed<int>(() => super.totalItems, name: '_CartStore.totalItems'))
-      .value;
+  double get totalItems =>
+      (_$totalItemsComputed ??= Computed<double>(() => super.totalItems,
+              name: '_CartStore.totalItems'))
+          .value;
   Computed<double>? _$totalPriceComputed;
 
   @override
@@ -204,7 +205,7 @@ mixin _$CartStore on _CartStore, Store {
       {Category? category,
       double? priceOverride,
       double? gstRateOverride,
-      int qty = 1,
+      double qty = 1,
       double? originalPrice,
       String? overrideReason,
       String? overrideNote,
@@ -269,7 +270,7 @@ mixin _$CartStore on _CartStore, Store {
       AsyncAction('_CartStore.setQuantity', context: context);
 
   @override
-  Future<CartOperationResult> setQuantity(String variantId, int quantity) {
+  Future<CartOperationResult> setQuantity(String variantId, double quantity) {
     return _$setQuantityAsyncAction
         .run(() => super.setQuantity(variantId, quantity));
   }
@@ -333,7 +334,7 @@ mixin _$CartStore on _CartStore, Store {
       {Category? category,
       double? priceOverride,
       double? gstRateOverride,
-      int qty = 1,
+      double qty = 1,
       double? originalPrice,
       String? overrideReason,
       String? overrideNote,
@@ -387,7 +388,8 @@ mixin _$CartStore on _CartStore, Store {
       AsyncAction('_CartStore.setQuantityInTab', context: context);
 
   @override
-  Future<CartOperationResult> setQuantityInTab(String variantId, int quantity) {
+  Future<CartOperationResult> setQuantityInTab(
+      String variantId, double quantity) {
     return _$setQuantityInTabAsyncAction
         .run(() => super.setQuantityInTab(variantId, quantity));
   }

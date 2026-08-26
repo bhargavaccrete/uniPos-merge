@@ -16,7 +16,7 @@ void main() {
   SaleItemModel line({
     String variantId = 'v1',
     double price = 100,
-    int qty = 1,
+    double qty = 1,
     double discountAmount = 0,
     double? lineDiscountAmount,
     required double taxableAmount,
@@ -41,7 +41,7 @@ void main() {
       );
 
   /// A return line as the RETURN path stores it: qty positive.
-  SaleItemModel returnedLine({required String variantId, required int qty}) =>
+  SaleItemModel returnedLine({required String variantId, required double qty}) =>
       SaleItemModel.fromCalculated(
         saleId: 'RTN_1',
         varianteId: variantId,
@@ -83,7 +83,7 @@ void main() {
   group('tax-inclusive returns refund what was charged', () {
     // MRP 118 at 18% inclusive: the customer paid 118, of which 18 is GST.
     // Stored: price=118 (inclusive), taxable=100, gst=18, total=118.
-    SaleItemModel inclusiveLine({int qty = 1}) => line(
+    SaleItemModel inclusiveLine({double qty = 1}) => line(
           price: 118,
           qty: qty,
           taxableAmount: 100.0 * qty,
@@ -159,7 +159,7 @@ void main() {
   group('discounts prorate and keep the subset contract', () {
     // The approved worked example: 1000 -> override 900 -> line 10% (90)
     // -> bill 5% of 810 (40.50) -> taxable 769.50, total discount 130.50.
-    SaleItemModel discounted({int qty = 2}) => line(
+    SaleItemModel discounted({double qty = 2}) => line(
           price: 900,
           qty: qty,
           discountAmount: 130.50 * qty,
@@ -262,9 +262,9 @@ void main() {
 
     test('three separate single returns walk it down 2, 1, 0', () {
       final returned = <SaleItemModel>[];
-      final seen = <int>[];
+      final seen = <double>[];
       for (var i = 0; i < 3; i++) {
-        returned.add(returnedLine(variantId: 'v1', qty: 1));
+        returned.add(returnedLine(variantId: 'v1', qty: 1.0));
         seen.add(RetailReturnMath.remainingByVariant(
           soldLines: sold,
           returnedLines: returned,
@@ -274,7 +274,7 @@ void main() {
     });
 
     test('a fourth unit has nothing left to give back', () {
-      final returned = List.generate(3, (_) => returnedLine(variantId: 'v1', qty: 1));
+      final returned = List.generate(3, (_) => returnedLine(variantId: 'v1', qty: 1.0));
       expect(
         RetailReturnMath.remainingByVariant(soldLines: sold, returnedLines: returned)['v1'],
         0,
@@ -282,7 +282,7 @@ void main() {
     });
 
     test('remaining never goes negative', () {
-      final returned = List.generate(5, (_) => returnedLine(variantId: 'v1', qty: 1));
+      final returned = List.generate(5, (_) => returnedLine(variantId: 'v1', qty: 1.0));
       expect(
         RetailReturnMath.remainingByVariant(soldLines: sold, returnedLines: returned)['v1'],
         0,
@@ -304,7 +304,7 @@ void main() {
     test('returnedQtyByVariant sums positive return-line quantities', () {
       expect(
         RetailReturnMath.returnedQtyByVariant([
-          returnedLine(variantId: 'v1', qty: 1),
+          returnedLine(variantId: 'v1', qty: 1.0),
           returnedLine(variantId: 'v1', qty: 2),
           returnedLine(variantId: 'v2', qty: 4),
         ]),

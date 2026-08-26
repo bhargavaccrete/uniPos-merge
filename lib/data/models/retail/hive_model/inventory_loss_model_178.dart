@@ -87,7 +87,7 @@ class InventoryLossModel extends HiveObject {
   final String? variantInfo;
 
   @HiveField(13)
-  final int quantity;
+  final double quantity;
 
   @HiveField(14)
   final double? costPrice;
@@ -140,7 +140,7 @@ class InventoryLossModel extends HiveObject {
     required String productId,
     String? productName,
     String? variantInfo,
-    required int quantity,
+    required double quantity,
     double? costPrice,
     required String reason,
     String? note,
@@ -205,7 +205,7 @@ class InventoryLossModel extends HiveObject {
       productId: map['productId'] as String? ?? '',
       productName: map['productName'] as String?,
       variantInfo: map['variantInfo'] as String?,
-      quantity: (map['quantity'] as num?)?.toInt() ?? 0,
+      quantity: (map['quantity'] as num?)?.toDouble() ?? 0.0,
       costPrice: (map['costPrice'] as num?)?.toDouble(),
       lossValue: (map['lossValue'] as num?)?.toDouble() ?? 0,
       reason: map['reason'] as String? ?? 'Damaged on receipt',

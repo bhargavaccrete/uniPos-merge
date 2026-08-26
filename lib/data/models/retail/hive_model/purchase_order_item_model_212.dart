@@ -29,7 +29,7 @@ class PurchaseOrderItemModel extends HiveObject {
   final String? variantInfo; // e.g., "Size: L, Color: Red"
 
   @HiveField(6)
-  final int orderedQty; // Quantity we want to order
+  final double orderedQty; // Quantity we want to order
 
   @HiveField(7)
   final double? estimatedPrice; // Optional price estimation per unit
@@ -59,7 +59,7 @@ class PurchaseOrderItemModel extends HiveObject {
     required String productId,
     String? productName,
     String? variantInfo,
-    required int orderedQty,
+    required double orderedQty,
     double? estimatedPrice,
   }) {
     final now = DateTime.now().toIso8601String();
@@ -101,7 +101,7 @@ class PurchaseOrderItemModel extends HiveObject {
       productId: map['productId'] as String,
       productName: map['productName'] as String?,
       variantInfo: map['variantInfo'] as String?,
-      orderedQty: (map['orderedQty'] as num).toInt(),
+      orderedQty: (map['orderedQty'] as num).toDouble(),
       estimatedPrice: (map['estimatedPrice'] as num?)?.toDouble(),
       estimatedTotal: (map['estimatedTotal'] as num?)?.toDouble(),
       createdAt: map['createdAt'] as String,
@@ -115,7 +115,7 @@ class PurchaseOrderItemModel extends HiveObject {
     String? productId,
     String? productName,
     String? variantInfo,
-    int? orderedQty,
+    double? orderedQty,
     double? estimatedPrice,
     double? estimatedTotal,
     String? createdAt,

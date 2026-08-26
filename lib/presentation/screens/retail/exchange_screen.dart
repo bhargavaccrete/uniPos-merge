@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:billberrylite/core/di/service_locator.dart';
@@ -46,11 +48,15 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
 
   /// Units of each variant still returnable — every quantity control is capped
   /// by this, so the same goods can never come back twice.
-  Map<String, int> _remaining = {};
+  Map<String, double> _remaining = {};
 
   SaleItemModel? _returnedItem;
-  int _returnQty = 1;
+  double _returnQty = 1;
   VarianteModel? _replacement;
+
+  /// Types the returned quantity for a loose-goods line. A stepper cannot reach
+  /// 1.75, so those lines get a field instead.
+  final TextEditingController _qtyController = TextEditingController();
 
   String _paymentMethod = 'cash';
 
@@ -82,8 +88,9 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
         _sale = sale;
         _saleItems = items;
         _remaining = remaining;
-        _returnedItem = returnable.length == 1 ? returnable.first : null;
-        _returnQty = 1;
+        // Set through the helper so a loose-goods line starts at its full
+        // remaining amount rather than at 1.
+        _selectReturnedItem(returnable.length == 1 ? returnable.first : null);
         _isLoading = false;
       });
 
@@ -96,7 +103,51 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
     }
   }
 
-  int _remainingFor(SaleItemModel item) => _remaining[item.varianteId] ?? 0;
+  @override
+  void dispose() {
+    _qtyController.dispose();
+    super.dispose();
+  }
+
+  double _remainingFor(SaleItemModel item) => _remaining[item.varianteId] ?? 0;
+
+  /// The catalogue variant behind a sale line. Looked up by hand rather than
+  /// through the async `getVariantById`, because build-time code needs it.
+  VarianteModel? _variantFor(String variantId) {
+    for (final v in productStore.variants) {
+      if (v.varianteId == variantId) return v;
+    }
+    return null;
+  }
+
+  /// Whether the line being returned is sold in fractional amounts.
+  bool get _returnedIsDecimal {
+    final item = _returnedItem;
+    if (item == null) return false;
+    return _variantFor(item.varianteId)?.isDecimalQuantity ?? false;
+  }
+
+  /// Selects the line coming back and picks a sensible starting quantity.
+  ///
+  /// A loose-goods line defaults to the WHOLE remaining amount: 1.75 L of milk
+  /// was sold as one indivisible purchase, so "1 of 1.75" is not a quantity the
+  /// cashier meant. A piece line still starts at 1, capped by what is left.
+  void _selectReturnedItem(SaleItemModel? item) {
+    _returnedItem = item;
+
+    if (item == null) {
+      _returnQty = 1;
+      _qtyController.text = '';
+      return;
+    }
+
+    final max = _remainingFor(item);
+    final isDecimal =
+        _variantFor(item.varianteId)?.isDecimalQuantity ?? false;
+
+    _returnQty = isDecimal ? max : (max < 1 ? max : 1);
+    _qtyController.text = formatQty(_returnQty);
+  }
 
   List<SaleItemModel> get _returnableItems =>
       _saleItems.where((i) => _remainingFor(i) > 0).toList();
@@ -145,10 +196,7 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
       ),
     );
     if (picked == null) return;
-    setState(() {
-      _returnedItem = picked;
-      _returnQty = 1;
-    });
+    setState(() => _selectReturnedItem(picked));
     await _refreshQuote();
   }
 
@@ -162,7 +210,7 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
     await _refreshQuote();
   }
 
-  Future<void> _setQty(int qty) async {
+  Future<void> _setQty(double qty) async {
     setState(() => _returnQty = qty);
     await _refreshQuote();
   }
@@ -415,7 +463,8 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
             SizedBox(height: AppResponsive.smallSpacing(context)),
             Text(
               '${formatMoney(variant.effectivePrice)} · '
-              '${variant.stockQty} in stock',
+              '${formatQtyWithUnit(variant.stockQty, variant.effectiveUnit)} '
+              'in stock',
               style: GoogleFonts.poppins(
                 fontSize: AppResponsive.smallFontSize(context),
                 color: AppColors.textSecondary,
@@ -476,48 +525,106 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
   Widget _qtyStepper(SaleItemModel item) {
     final max = _remainingFor(item);
     final alreadyReturned = item.qty - max;
+    final unit = _variantFor(item.varianteId)?.effectiveUnit;
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Qty',
-            style: GoogleFonts.poppins(
-                fontSize: AppResponsive.bodyFontSize(context))),
-        const SizedBox(width: 8),
-        IconButton(
-          icon: const Icon(Icons.remove_circle_outline),
-          onPressed: _returnQty > 1 ? () => _setQty(_returnQty - 1) : null,
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-        ),
-        Text(
-          '$_returnQty / $max',
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.bodyFontSize(context),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        IconButton(
-          icon: const Icon(Icons.add_circle_outline),
-          onPressed: _returnQty < max ? () => _setQty(_returnQty + 1) : null,
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-        ),
-        if (alreadyReturned > 0) ...[
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '$alreadyReturned already returned',
-              textAlign: TextAlign.right,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.captionFontSize(context),
-                color: AppColors.warning,
-                fontWeight: FontWeight.w600,
+        if (_returnedIsDecimal)
+          _decimalQtyField(max, unit)
+        else
+          Row(
+            children: [
+              Text('Qty',
+                  style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context))),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.remove_circle_outline),
+                onPressed:
+                    _returnQty > 1 ? () => _setQty(_returnQty - 1) : null,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
+              Text(
+                '${formatQty(_returnQty)} / ${formatQty(max)}',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add_circle_outline),
+                // Compares the RESULT against the cap. `_returnQty < max` let a
+                // line with 1.75 remaining step from 1 to 2 — more than was
+                // ever sold.
+                onPressed: _returnQty + 1 <= max
+                    ? () => _setQty(_returnQty + 1)
+                    : null,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              ),
+            ],
+          ),
+        if (alreadyReturned > 0) ...[
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+          Text(
+            '${formatQty(alreadyReturned)} already returned',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.captionFontSize(context),
+              color: AppColors.warning,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
+      ],
+    );
+  }
+
+  /// Typed quantity for a loose-goods line, capped at what is still
+  /// returnable. Anything above the cap is pulled back to it as you type,
+  /// rather than being refused on save.
+  Widget _decimalQtyField(double max, String? unit) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: AppTextField(
+            controller: _qtyController,
+            label: 'Quantity${unit != null && unit.isNotEmpty ? ' ($unit)' : ''}',
+            icon: Icons.scale_outlined,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+            ],
+            onChanged: (raw) {
+              final parsed = double.tryParse(raw.trim());
+              if (parsed == null || parsed <= 0) return;
+              if (parsed > max) {
+                _qtyController.text = formatQty(max);
+                _qtyController.selection = TextSelection.collapsed(
+                  offset: _qtyController.text.length,
+                );
+                _setQty(max);
+                return;
+              }
+              _setQty(parsed);
+            },
+          ),
+        ),
+        const SizedBox(width: 12),
+        Padding(
+          padding: const EdgeInsets.only(top: 14),
+          child: Text(
+            'of ${formatQtyWithUnit(max, unit)}',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -646,7 +753,7 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
 /// still returnable.
 class _ReturnedItemPicker extends StatelessWidget {
   final List<SaleItemModel> items;
-  final Map<String, int> remaining;
+  final Map<String, double> remaining;
 
   const _ReturnedItemPicker({required this.items, required this.remaining});
 
@@ -677,8 +784,8 @@ class _ReturnedItemPicker extends StatelessWidget {
                 ),
               ),
               subtitle: Text(
-                '$left of ${item.qty} still returnable · '
-                '${formatMoney(item.price)} each',
+                '${formatQty(left)} of ${formatQty(item.qty)} still '
+                'returnable · ${formatMoney(item.price)} each',
                 style: GoogleFonts.poppins(
                   fontSize: 12,
                   color: AppColors.textSecondary,
@@ -785,7 +892,8 @@ class _ReplacementPickerState extends State<_ReplacementPicker> {
                           ),
                           subtitle: Text(
                             '${formatMoney(v.effectivePrice)} · '
-                            '${v.stockQty} in stock',
+                            '${formatQtyWithUnit(v.stockQty, v.effectiveUnit)} '
+                            'in stock',
                             style: GoogleFonts.poppins(
                               fontSize: 12,
                               color: AppColors.textSecondary,

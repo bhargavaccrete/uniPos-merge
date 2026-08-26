@@ -1,5 +1,7 @@
 import 'package:hive/hive.dart';
 import 'package:billberrylite/core/constants/hive_type_ids.dart';
+import 'package:billberrylite/core/constants/item_units.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 part 'variante_model_201.g.dart';
 
 @HiveType(typeId: HiveTypeIds.retailVariant)
@@ -22,11 +24,14 @@ class VarianteModel extends HiveObject {
   @HiveField(8)
   final double? costPrice;
 
+  /// On-hand stock. `double` so loose goods can be stocked fractionally
+  /// (10.5 kg); piece products simply hold whole values (20.0) and behave
+  /// exactly as they did when this was an `int`.
   @HiveField(9)
-  final int stockQty;
+  final double stockQty;
 
   @HiveField(10)
-  final int? minStock;
+  final double? minStock;
 
   @HiveField(11)
   final double? taxRate; // GST rate at variant level (overrides product/category)
@@ -73,6 +78,38 @@ class VarianteModel extends HiveObject {
   @HiveField(21)
   final String? taxId;
 
+  // ==================== UNIT OF MEASURE ====================
+  // Retail's only unit concept. [isDecimalQuantity] is the single switch that
+  // decides whether a fractional quantity may be TYPED for this variant — every
+  // quantity field in the app branches on it, so a piece product keeps the
+  // digits-only keypad it has always had. Defaults to false, which is why every
+  // pre-existing variant stays a piece product with no migration.
+
+  /// Whether this variant is sold/stocked in fractional amounts (loose goods:
+  /// 1.75 kg of potatoes). False = counted in whole pieces.
+  @HiveField(22, defaultValue: false)
+  final bool isDecimalQuantity;
+
+  /// Stock-keeping unit label, one of [kItemUnits]. Null reads as 'piece', so
+  /// existing variants need no backfill. Read through [effectiveUnit].
+  @HiveField(23)
+  final String? unit;
+
+  // ==================== EXPIRY ====================
+  // Stored on the VARIANT because stock is: a 500ml and a 1L milk are stocked
+  // and sold independently, so they expire independently. One date per variant
+  // — this is deliberately NOT batch/lot tracking, there are no lots, no FEFO
+  // and no per-batch stock.
+
+  /// Optional expiry date as an ISO8601 string, normalised to midnight local
+  /// so it behaves as a calendar day rather than an instant.
+  ///
+  /// **Null means this variant does not expire**, which is how every
+  /// pre-existing variant reads back — a new nullable field needs no
+  /// `defaultValue` and no migration. Read through [expiryDateTime].
+  @HiveField(24)
+  final String? expiryDate;
+
   VarianteModel({
     required this.varianteId,
     required this.productId,
@@ -93,6 +130,9 @@ class VarianteModel extends HiveObject {
     this.isDefault = false,
     this.status = 'active',
     this.taxId,
+    this.isDecimalQuantity = false,
+    this.unit,
+    this.expiryDate,
   });
 
   // Factory for creating a variant
@@ -103,8 +143,8 @@ class VarianteModel extends HiveObject {
     String? barcode,
     double? mrp,
     double? costPrice,
-    int stockQty = 0,
-    int? minStock,
+    double stockQty = 0,
+    double? minStock,
     double? taxRate,
     Map<String, String>? customAttributes,
     double? sellingPrice,
@@ -114,6 +154,9 @@ class VarianteModel extends HiveObject {
     bool isDefault = false,
     String status = 'active',
     String? taxId,
+    bool isDecimalQuantity = false,
+    String? unit,
+    String? expiryDate,
   }) {
     final now = DateTime.now().toIso8601String();
     return VarianteModel(
@@ -136,11 +179,37 @@ class VarianteModel extends HiveObject {
       isDefault: isDefault,
       status: status,
       taxId: taxId,
+      isDecimalQuantity: isDecimalQuantity,
+      unit: unit,
+      expiryDate: expiryDate,
     );
   }
 
   /// Get the effective selling price (sellingPrice > mrp > 0)
   double get effectivePrice => sellingPrice ?? mrp ?? 0;
+
+  /// Canonical unit label for this variant. Null/unrecognised reads as 'piece',
+  /// so a variant saved before units existed still renders sensibly.
+  String get effectiveUnit => normalizeItemUnit(unit) ?? 'piece';
+
+  /// Smallest step a +/- control may move this variant by. Decimal goods step
+  /// by 0.25 (a quarter kg); piece goods keep the whole-unit step they had.
+  double get quantityStep => isDecimalQuantity ? 0.25 : 1.0;
+
+  /// Renders a quantity the way this variant should read: piece goods drop the
+  /// decimals entirely ("20"), decimal goods keep up to 2 and trim trailing
+  /// zeros ("10.5", "1.25"). Display only — never feed this back into maths.
+  String formatQuantity(double qty) =>
+      isDecimalQuantity ? formatQty(qty) : qty.round().toString();
+
+  /// The parsed expiry date, or null when this variant does not expire.
+  /// Unparseable stored text reads as null rather than throwing — a bad date
+  /// must not make the whole catalogue unopenable.
+  DateTime? get expiryDateTime =>
+      expiryDate == null ? null : DateTime.tryParse(expiryDate!);
+
+  /// True when an expiry date is set AND parseable.
+  bool get hasExpiry => expiryDateTime != null;
 
   /// Labelled descriptor, e.g. "Storage: 1tb, Colour: Black".
   ///
@@ -198,6 +267,9 @@ class VarianteModel extends HiveObject {
       'isDefault': isDefault,
       'status': status,
       'taxId': taxId,
+      'isDecimalQuantity': isDecimalQuantity,
+      'unit': unit,
+      'expiryDate': expiryDate,
     };
   }
 
@@ -210,8 +282,8 @@ class VarianteModel extends HiveObject {
       barcode: map['barcode'] as String?,
       mrp: (map['mrp'] as num?)?.toDouble(),
       costPrice: (map['costPrice'] as num?)?.toDouble(),
-      stockQty: (map['stockQty'] as num?)?.toInt() ?? 0,
-      minStock: (map['minStock'] as num?)?.toInt(),
+      stockQty: (map['stockQty'] as num?)?.toDouble() ?? 0.0,
+      minStock: (map['minStock'] as num?)?.toDouble(),
       taxRate: (map['taxRate'] as num?)?.toDouble(),
       createdAt: map['createdAt'] as String,
       updateAt: map['updateAt'] as String?,
@@ -227,6 +299,10 @@ class VarianteModel extends HiveObject {
       isDefault: (map['isDefault'] as bool?) ?? false,
       status: (map['status'] as String?) ?? 'active',
       taxId: map['taxId'] as String?,
+      isDecimalQuantity: (map['isDecimalQuantity'] as bool?) ?? false,
+      unit: map['unit'] as String?,
+      // Absent in every backup written before expiry existed -> null.
+      expiryDate: map['expiryDate'] as String?,
     );
   }
 
@@ -244,8 +320,8 @@ class VarianteModel extends HiveObject {
     String? barcode,
     double? mrp,
     double? costPrice,
-    int? stockQty,
-    int? minStock,
+    double? stockQty,
+    double? minStock,
     double? taxRate,
     String? createdAt,
     String? updateAt,
@@ -269,6 +345,12 @@ class VarianteModel extends HiveObject {
     /// Clearing a barcode strands every label already printed with it, so a
     /// caller must confirm with the user first.
     bool clearBarcode = false,
+    bool? isDecimalQuantity,
+    String? unit,
+    String? expiryDate,
+    /// Same reason as [clearMrp]: `expiryDate ?? this.expiryDate` cannot put the
+    /// field back to null, so REMOVING an expiry needs an explicit flag.
+    bool clearExpiryDate = false,
   }) {
     return VarianteModel(
       varianteId: varianteId ?? this.varianteId,
@@ -290,6 +372,10 @@ class VarianteModel extends HiveObject {
       isDefault: isDefault ?? this.isDefault,
       status: status ?? this.status,
       taxId: taxId ?? this.taxId,
+      isDecimalQuantity: isDecimalQuantity ?? this.isDecimalQuantity,
+      unit: unit ?? this.unit,
+      expiryDate:
+          clearExpiryDate ? null : (expiryDate ?? this.expiryDate),
     );
   }
 }

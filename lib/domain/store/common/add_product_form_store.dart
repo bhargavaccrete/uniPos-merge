@@ -82,11 +82,13 @@ abstract class _AddProductFormStore with Store {
   @observable
   String barcode = '';
 
+  /// RETAIL opening stock. `double` so loose goods can start at 10.5 kg.
+  /// (Restaurant keeps its own [restaurantStockQuantity], already a double.)
   @observable
-  int stockQuantity = 0;
+  double stockQuantity = 0;
 
   @observable
-  int minStock = 0;
+  double minStock = 0;
 
   @observable
   String productType = 'simple'; // 'simple' or 'variable'
@@ -270,10 +272,10 @@ abstract class _AddProductFormStore with Store {
   void setBarcode(String value) => barcode = value;
 
   @action
-  void setStockQuantity(int value) => stockQuantity = value;
+  void setStockQuantity(double value) => stockQuantity = value;
 
   @action
-  void setMinStock(int value) => minStock = value;
+  void setMinStock(double value) => minStock = value;
 
   @action
   void setProductType(String value) {
@@ -757,7 +759,7 @@ class VariantFormData {
   double price;
   double costPrice;
   double mrp;
-  int stockQuantity;
+  double stockQuantity;
 
   VariantFormData({
     required this.id,
@@ -781,7 +783,7 @@ class VariantFormData {
     double? price,
     double? costPrice,
     double? mrp,
-    int? stockQuantity,
+    double? stockQuantity,
   }) {
     return VariantFormData(
       id: id,

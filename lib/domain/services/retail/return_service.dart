@@ -99,7 +99,7 @@ class ReturnService {
   ///
   /// This is the single source of truth for the Return and Exchange screens —
   /// cap every quantity picker with it.
-  Future<Map<String, int>> remainingReturnable(String originalSaleId) async {
+  Future<Map<String, double>> remainingReturnable(String originalSaleId) async {
     final soldLines = await saleItemRepository.getItemsBySaleId(originalSaleId);
     if (soldLines.isEmpty) return {};
     return RetailReturnMath.remainingByVariant(
@@ -149,7 +149,7 @@ class ReturnService {
   /// figure shown to the cashier can drift from the figure actually refunded.
   Future<ReturnFigures> quote({
     required String originalSaleId,
-    required Map<String, int> itemsToReturn,
+    required Map<String, double> itemsToReturn,
   }) async {
     final sale = await saleStore.getSaleById(originalSaleId);
     if (sale == null) return ReturnFigures.empty;
@@ -177,7 +177,7 @@ class ReturnService {
     String? returnReason,
   }) async {
     final remaining = await remainingReturnable(originalSaleId);
-    final toReturn = <String, int>{
+    final toReturn = <String, double>{
       for (final e in remaining.entries)
         if (e.value > 0) e.key: e.value,
     };
@@ -197,7 +197,7 @@ class ReturnService {
   /// Return selected quantities: `variantId -> qty`.
   Future<String> processPartialReturn({
     required String originalSaleId,
-    required Map<String, int> itemsToReturn,
+    required Map<String, double> itemsToReturn,
     required String refundMethod,
     String? returnReason,
     /// Cash that actually left the till, when the caller knows better than the
@@ -227,7 +227,7 @@ class ReturnService {
   /// hand goods back without a record of it.
   Future<ReturnOutcome> _process({
     required String originalSaleId,
-    required Map<String, int> itemsToReturn,
+    required Map<String, double> itemsToReturn,
     required String refundMethod,
     String? returnReason,
     double? cashRefundOverride,
@@ -246,7 +246,7 @@ class ReturnService {
       throw Exception('No items found in original sale');
     }
 
-    final requested = <String, int>{
+    final requested = <String, double>{
       for (final e in itemsToReturn.entries)
         if (e.value > 0) e.key: e.value,
     };

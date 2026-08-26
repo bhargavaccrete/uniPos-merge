@@ -24,7 +24,7 @@ class PurchaseOrderItemModelAdapter
       productId: fields[3] as String,
       productName: fields[4] as String?,
       variantInfo: fields[5] as String?,
-      orderedQty: fields[6] as int,
+      orderedQty: fields[6] as double,
       estimatedPrice: fields[7] as double?,
       estimatedTotal: fields[8] as double?,
       createdAt: fields[9] as String,

@@ -25,7 +25,7 @@ class SupplierClaimItemModelAdapter
       productId: fields[4] as String,
       productName: fields[5] as String?,
       variantInfo: fields[6] as String?,
-      claimedQty: fields[7] as int,
+      claimedQty: fields[7] as double,
       costPrice: fields[8] as double?,
       totalAmount: fields[9] as double?,
       remarks: fields[10] as String?,

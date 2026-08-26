@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 import 'package:flutter/services.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -102,11 +103,17 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
 
   void _showEditItemDialog(int index) {
     final item = _receivingItems[index];
+    // The PO line's own variant decides whether fractions may be received.
+    final allowDecimal = productStore.variants
+            .where((v) => v.varianteId == item.variantId)
+            .firstOrNull
+            ?.isDecimalQuantity ??
+        false;
     final receivedController = TextEditingController(
-      text: item.receivedQty.toString(),
+      text: formatQty(item.receivedQty),
     );
     final damagedController = TextEditingController(
-      text: item.damagedQty.toString(),
+      text: formatQty(item.damagedQty),
     );
     final priceController = TextEditingController(
       text: item.costPrice.toStringAsFixed(2),
@@ -120,8 +127,14 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
         child: MoneyScope(
           child: StatefulBuilder(
             builder: (context, setDialogState) {
-              final received = int.tryParse(receivedController.text) ?? 0;
-              final damaged = int.tryParse(damagedController.text) ?? 0;
+              final received = (allowDecimal
+                      ? double.tryParse(receivedController.text)
+                      : int.tryParse(receivedController.text)?.toDouble()) ??
+                  0;
+              final damaged = (allowDecimal
+                      ? double.tryParse(damagedController.text)
+                      : int.tryParse(damagedController.text)?.toDouble()) ??
+                  0;
               final accepted = received - damaged;
               final price = double.tryParse(priceController.text) ?? 0;
               final overDamaged = damaged > received;
@@ -142,8 +155,15 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                       label: 'Received Quantity',
                       hint: 'Total physically received',
                       icon: Icons.local_shipping_outlined,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      keyboardType: allowDecimal
+                          ? const TextInputType.numberWithOptions(decimal: true)
+                          : TextInputType.number,
+                      inputFormatters: [
+                        if (allowDecimal)
+                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))
+                        else
+                          FilteringTextInputFormatter.digitsOnly,
+                      ],
                       onChanged: (_) => setDialogState(() {}),
                     ),
                     const SizedBox(height: 12),
@@ -152,8 +172,15 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                       label: 'Damaged Quantity',
                       hint: 'Received but unusable',
                       icon: Icons.report_gmailerrorred_outlined,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      keyboardType: allowDecimal
+                          ? const TextInputType.numberWithOptions(decimal: true)
+                          : TextInputType.number,
+                      inputFormatters: [
+                        if (allowDecimal)
+                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))
+                        else
+                          FilteringTextInputFormatter.digitsOnly,
+                      ],
                       onChanged: (_) => setDialogState(() {}),
                       // Surfaced inline as well as on save — the summary below
                       // would otherwise show a negative accepted count.
@@ -332,8 +359,8 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
   }
 
   Widget _editSummary({
-    required int accepted,
-    required int damaged,
+    required double accepted,
+    required double damaged,
     required double price,
     required bool overDamaged,
   }) {
@@ -449,20 +476,20 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
     }
 
     // Calculate totals
-    final totalOrdered = _receivingItems.fold<int>(
+    final totalOrdered = _receivingItems.fold<double>(
       0,
       (sum, item) => sum + item.orderedQty,
     );
-    final totalReceived = _receivingItems.fold<int>(
+    final totalReceived = _receivingItems.fold<double>(
       0,
       (sum, item) => sum + item.receivedQty,
     );
-    final totalAccepted = _receivingItems.fold<int>(
-      0,
+    final totalAccepted = _receivingItems.fold<double>(
+      0.0,
       (sum, item) => sum + item.acceptedQty,
     );
-    final totalDamaged = _receivingItems.fold<int>(
-      0,
+    final totalDamaged = _receivingItems.fold<double>(
+      0.0,
       (sum, item) => sum + item.damagedQty,
     );
     final totalAcceptedAmount = _receivingItems.fold<double>(
@@ -566,7 +593,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                 AppColors.primary,
               ),
               _buildConfirmItem(
-                '${formatMoney(totalBillableAmount)} for all $totalReceived items received',
+                '${formatMoney(totalBillableAmount)} for all ${formatQty(totalReceived)} items received',
               ),
               if (totalDamaged > 0)
                 _buildConfirmItem(
@@ -587,17 +614,17 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                 ),
                 if (returnToSupplierItems.isNotEmpty)
                   _buildConfirmItem(
-                    '${returnToSupplierItems.fold<int>(0, (s, i) => s + i.damagedQty)} → purchase return raised, credited when the credit note arrives',
+                    '${formatQty(returnToSupplierItems.fold<double>(0.0, (s, i) => s + i.damagedQty))} → purchase return raised, credited when the credit note arrives',
                     color: AppColors.info,
                   ),
                 if (keepForClaimItems.isNotEmpty)
                   _buildConfirmItem(
-                    '${keepForClaimItems.fold<int>(0, (s, i) => s + i.damagedQty)} → supplier claim opened, credited only if it is settled',
+                    '${formatQty(keepForClaimItems.fold<double>(0.0, (s, i) => s + i.damagedQty))} → supplier claim opened, credited only if it is settled',
                     color: AppColors.warning,
                   ),
                 if (writeOffItems.isNotEmpty)
                   _buildConfirmItem(
-                    '${writeOffItems.fold<int>(0, (s, i) => s + i.damagedQty)} → written off, a cost the business absorbs',
+                    '${formatQty(writeOffItems.fold<double>(0.0, (s, i) => s + i.damagedQty))} → written off, a cost the business absorbs',
                     color: AppColors.textSecondary,
                   ),
               ],
@@ -788,20 +815,20 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final totalOrdered = _receivingItems.fold<int>(
+    final totalOrdered = _receivingItems.fold<double>(
       0,
       (sum, item) => sum + item.orderedQty,
     );
-    final totalReceived = _receivingItems.fold<int>(
+    final totalReceived = _receivingItems.fold<double>(
       0,
       (sum, item) => sum + item.receivedQty,
     );
-    final totalAccepted = _receivingItems.fold<int>(
-      0,
+    final totalAccepted = _receivingItems.fold<double>(
+      0.0,
       (sum, item) => sum + item.acceptedQty,
     );
-    final totalDamaged = _receivingItems.fold<int>(
-      0,
+    final totalDamaged = _receivingItems.fold<double>(
+      0.0,
       (sum, item) => sum + item.damagedQty,
     );
     final totalAcceptedAmount = _receivingItems.fold<double>(
@@ -1393,7 +1420,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
     );
   }
 
-  Widget _buildQtyChip(String label, int qty, Color color) {
+  Widget _buildQtyChip(String label, double qty, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -1401,7 +1428,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
-        '$label: $qty',
+        '$label: ${formatQty(qty)}',
         maxLines: 1,
         style: TextStyle(
           fontSize: AppResponsive.captionFontSize(context),
@@ -1446,9 +1473,9 @@ class ReceivingItemData {
   final String productId;
   final String productName;
   final String? variantInfo;
-  final int orderedQty;
-  final int receivedQty;
-  final int damagedQty;
+  final double orderedQty;
+  final double receivedQty;
+  final double damagedQty;
   final DamagedHandling damagedHandling;
   final double costPrice;
 
@@ -1466,7 +1493,7 @@ class ReceivingItemData {
   });
 
   /// Accepted quantity = received - damaged (only good items go to stock)
-  int get acceptedQty => receivedQty - damagedQty;
+  double get acceptedQty => receivedQty - damagedQty;
 
   /// Amount for accepted items only — this is inventory value, NOT what the
   /// supplier is owed. See [billableAmount].
@@ -1486,9 +1513,9 @@ class ReceivingItemData {
     String? productId,
     String? productName,
     String? variantInfo,
-    int? orderedQty,
-    int? receivedQty,
-    int? damagedQty,
+    double? orderedQty,
+    double? receivedQty,
+    double? damagedQty,
     DamagedHandling? damagedHandling,
     double? costPrice,
   }) {

@@ -264,8 +264,8 @@ class _AddProductScreenState extends State<AddProductScreen>
       _formStore.setHsnCode(_hsnCodeController.text.isEmpty ? null : _hsnCodeController.text);
       _formStore.setSku(_skuController.text);
       _formStore.setBarcode(_barcodeController.text);
-      _formStore.setStockQuantity(int.tryParse(_stockController.text) ?? 0);
-      _formStore.setMinStock(int.tryParse(_minStockController.text) ?? 0);
+      _formStore.setStockQuantity(double.tryParse(_stockController.text) ?? 0);
+      _formStore.setMinStock(double.tryParse(_minStockController.text) ?? 0);
     } else {
       _formStore.setUnit(_unitController.text.isEmpty ? null : _unitController.text);
       _formStore.setRestaurantStockQuantity(double.tryParse(_restaurantStockController.text) ?? 0);
@@ -1520,7 +1520,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                 const SizedBox(width: 6),
                 Text(
                   'Tip: Long press a value to edit or delete it.',
-                  style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary, fontStyle: FontStyle.italic),
+                  style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary),
                 ),
               ],
             ),
@@ -1819,7 +1819,6 @@ class _AddProductScreenState extends State<AddProductScreen>
             style: GoogleFonts.poppins(
               color: AppColors.textSecondary,
               fontSize: 11,
-              fontStyle: FontStyle.italic,
             ),
           ),
         ],
@@ -1830,7 +1829,7 @@ class _AddProductScreenState extends State<AddProductScreen>
   void _applyBulkPricing() {
     final costPrice = double.tryParse(_bulkCostPriceController.text);
     final sellingPrice = double.tryParse(_bulkSellingPriceController.text);
-    final stock = int.tryParse(_bulkStockController.text);
+    final stock = double.tryParse(_bulkStockController.text);
 
     if (costPrice == null && sellingPrice == null && stock == null) {
       NotificationService.instance.showError('Please enter at least one value to apply');
@@ -1983,7 +1982,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                         icon: Icons.inventory_2,
                         initialValue: variant.stockQuantity.toString(),
                         numeric: true,
-                        onChanged: (v) => _formStore.updateRetailVariant(index, variant.copyWith(stockQuantity: int.tryParse(v) ?? 0)),
+                        onChanged: (v) => _formStore.updateRetailVariant(index, variant.copyWith(stockQuantity: double.tryParse(v) ?? 0)),
                       ),
                     ],
                   )
@@ -2057,7 +2056,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                               icon: Icons.inventory_2,
                               initialValue: variant.stockQuantity.toString(),
                               numeric: true,
-                              onChanged: (v) => _formStore.updateRetailVariant(index, variant.copyWith(stockQuantity: int.tryParse(v) ?? 0)),
+                              onChanged: (v) => _formStore.updateRetailVariant(index, variant.copyWith(stockQuantity: double.tryParse(v) ?? 0)),
                             ),
                           ),
                           const SizedBox(width: 8),

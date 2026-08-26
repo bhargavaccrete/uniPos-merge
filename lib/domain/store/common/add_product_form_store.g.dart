@@ -316,13 +316,13 @@ mixin _$AddProductFormStore on _AddProductFormStore, Store {
       Atom(name: '_AddProductFormStore.stockQuantity', context: context);
 
   @override
-  int get stockQuantity {
+  double get stockQuantity {
     _$stockQuantityAtom.reportRead();
     return super.stockQuantity;
   }
 
   @override
-  set stockQuantity(int value) {
+  set stockQuantity(double value) {
     _$stockQuantityAtom.reportWrite(value, super.stockQuantity, () {
       super.stockQuantity = value;
     });
@@ -332,13 +332,13 @@ mixin _$AddProductFormStore on _AddProductFormStore, Store {
       Atom(name: '_AddProductFormStore.minStock', context: context);
 
   @override
-  int get minStock {
+  double get minStock {
     _$minStockAtom.reportRead();
     return super.minStock;
   }
 
   @override
-  set minStock(int value) {
+  set minStock(double value) {
     _$minStockAtom.reportWrite(value, super.minStock, () {
       super.minStock = value;
     });
@@ -829,7 +829,7 @@ mixin _$AddProductFormStore on _AddProductFormStore, Store {
   }
 
   @override
-  void setStockQuantity(int value) {
+  void setStockQuantity(double value) {
     final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
         name: '_AddProductFormStore.setStockQuantity');
     try {
@@ -840,7 +840,7 @@ mixin _$AddProductFormStore on _AddProductFormStore, Store {
   }
 
   @override
-  void setMinStock(int value) {
+  void setMinStock(double value) {
     final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
         name: '_AddProductFormStore.setMinStock');
     try {

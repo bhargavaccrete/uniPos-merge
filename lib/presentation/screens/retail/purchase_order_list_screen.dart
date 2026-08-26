@@ -5,6 +5,7 @@ import 'package:billberrylite/data/models/retail/hive_model/supplier_model_205.d
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/row_action_button.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/util/color.dart';
@@ -704,69 +705,24 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
                       ),
                     ),
                   ),
-                  // Cancel/Delete are draft-only, so the menu only exists then.
-                  if (po.statusEnum == POStatus.draft)
-                    SizedBox(
-                      height: 28,
-                      width: 32,
-                      child: PopupMenuButton<String>(
-                        padding: EdgeInsets.zero,
-                        icon: const Icon(
-                          Icons.more_vert,
-                          size: 18,
-                          color: AppColors.textSecondary,
-                        ),
-                        onSelected: (value) {
-                          if (value == 'cancel') _cancelPO(po);
-                          if (value == 'delete') _deletePO(po);
-                        },
-                        itemBuilder: (_) => [
-                          PopupMenuItem(
-                            value: 'cancel',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.block,
-                                  size: 18,
-                                  color: AppColors.warning,
-                                ),
-                                SizedBox(width: 10),
-                                Text(
-                                  'Cancel PO',
-                                  style: TextStyle(
-                                    fontSize: AppResponsive.bodyFontSize(
-                                      context,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 'delete',
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.delete_outline,
-                                  size: 18,
-                                  color: AppColors.danger,
-                                ),
-                                SizedBox(width: 10),
-                                Text(
-                                  'Delete',
-                                  style: TextStyle(
-                                    fontSize: AppResponsive.bodyFontSize(
-                                      context,
-                                    ),
-                                    color: AppColors.danger,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+                  // Cancel/Delete are draft-only, so the buttons only exist
+                  // then — same guard the menu had.
+                  if (po.statusEnum == POStatus.draft) ...[
+                    const SizedBox(width: 6),
+                    RowActionButton(
+                      icon: Icons.block,
+                      color: AppColors.warning,
+                      tooltip: 'Cancel PO',
+                      onTap: () => _cancelPO(po),
                     ),
+                    const SizedBox(width: 6),
+                    RowActionButton(
+                      icon: Icons.delete_outline_rounded,
+                      color: AppColors.danger,
+                      tooltip: 'Delete PO',
+                      onTap: () => _deletePO(po),
+                    ),
+                  ],
                 ],
               ),
               SizedBox(height: AppResponsive.smallSpacing(context)),

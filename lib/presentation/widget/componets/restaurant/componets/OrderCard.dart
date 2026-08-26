@@ -278,7 +278,6 @@ class OrderCard extends StatelessWidget {
                                   style: GoogleFonts.poppins(
                                     fontSize: isTablet ? 13 : 12,
                                     color: Colors.grey.shade600,
-                                    fontStyle: FontStyle.italic,
                                   ),
                                 ),
                               if (item.choiceNames != null && item.choiceNames!.isNotEmpty)
@@ -287,7 +286,6 @@ class OrderCard extends StatelessWidget {
                                   style: GoogleFonts.poppins(
                                     fontSize: isTablet ? 13 : 12,
                                     color: Colors.grey.shade600,
-                                    fontStyle: FontStyle.italic,
                                   ),
                                 ),
                               if (item.extras != null && item.extras!.isNotEmpty)
@@ -333,7 +331,6 @@ class OrderCard extends StatelessWidget {
                                       style: GoogleFonts.poppins(
                                         fontSize: isTablet ? 13 : 12,
                                         color: AppColors.orange,
-                                        fontStyle: FontStyle.italic,
                                         fontWeight: FontWeight.w500,
                                       ),
                                     );

@@ -37,11 +37,11 @@ mixin _$DamagedGoodsStore on _DamagedGoodsStore, Store {
       (_$totalLossValueComputed ??= Computed<double>(() => super.totalLossValue,
               name: '_DamagedGoodsStore.totalLossValue'))
           .value;
-  Computed<int>? _$totalLossQtyComputed;
+  Computed<double>? _$totalLossQtyComputed;
 
   @override
-  int get totalLossQty =>
-      (_$totalLossQtyComputed ??= Computed<int>(() => super.totalLossQty,
+  double get totalLossQty =>
+      (_$totalLossQtyComputed ??= Computed<double>(() => super.totalLossQty,
               name: '_DamagedGoodsStore.totalLossQty'))
           .value;
 
@@ -198,7 +198,7 @@ mixin _$DamagedGoodsStore on _DamagedGoodsStore, Store {
       required String productId,
       String? productName,
       String? variantInfo,
-      required int quantity,
+      required double quantity,
       double? costPrice,
       required String reason,
       String? note}) {

@@ -205,7 +205,6 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
                     style: GoogleFonts.poppins(
                       fontSize: 12,
                       color: AppColors.textSecondary,
-                      fontStyle: FontStyle.italic,
                     ),
                   ),
                 ],

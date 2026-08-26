@@ -34,8 +34,10 @@ class SaleItemModel extends HiveObject {
   @HiveField(7)
   final double price; // Unit price before tax
 
+  /// Quantity sold (or returned — return lines store this POSITIVE). `double`
+  /// so loose goods sell fractionally; piece products hold whole values.
   @HiveField(8)
-  final int qty;
+  final double qty;
 
   @HiveField(9)
   final double total; // Final total after discount and tax
@@ -204,7 +206,7 @@ class SaleItemModel extends HiveObject {
     String? weight,
     Map<String, String>? attributes,
     required double price,
-    required int qty,
+    required double qty,
     double? discountAmount,
     double? gstRate,
     String? barcode,
@@ -303,7 +305,7 @@ class SaleItemModel extends HiveObject {
     String? weight,
     Map<String, String>? attributes,
     required double price,
-    required int qty,
+    required double qty,
     required double discountAmount,
     required double gstRate,
     required double taxableAmount,
@@ -413,7 +415,7 @@ class SaleItemModel extends HiveObject {
       // Money and quantity default — a missing amount is recoverable data, and
       // throwing here aborted the whole restore over one line.
       price: (map['price'] as num?)?.toDouble() ?? 0.0,
-      qty: (map['qty'] as num?)?.toInt() ?? 0,
+      qty: (map['qty'] as num?)?.toDouble() ?? 0.0,
       total: (map['total'] as num?)?.toDouble() ?? 0.0,
       discountAmount: (map['discountAmount'] as num?)?.toDouble(),
       taxAmount: (map['taxAmount'] as num?)?.toDouble(),

@@ -23,11 +23,11 @@ class StockTakeItemModelAdapter extends TypeAdapter<StockTakeItemModel> {
       productId: fields[3] as String,
       productName: fields[4] as String?,
       variantInfo: fields[5] as String?,
-      systemQty: fields[6] as int,
-      countedQty: fields[7] as int,
+      systemQty: fields[6] as double,
+      countedQty: fields[7] as double,
       costPrice: fields[8] as double?,
       countedAt: fields[9] as String,
-      appliedQty: fields[10] as int?,
+      appliedQty: fields[10] as double?,
     );
   }
 

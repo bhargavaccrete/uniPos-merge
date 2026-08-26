@@ -23,7 +23,7 @@ class CartItemModelAdapter extends TypeAdapter<CartItemModel> {
       productName: fields[3] as String,
       attributes: (fields[21] as Map?)?.cast<String, String>(),
       price: fields[7] as double,
-      qty: fields[8] as int,
+      qty: fields[8] as double,
       total: fields[9] as double,
       barcode: fields[10] as String?,
       addedAt: fields[11] as String,

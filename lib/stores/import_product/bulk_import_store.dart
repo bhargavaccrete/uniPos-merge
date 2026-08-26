@@ -695,9 +695,9 @@ abstract class _BulkImportStore with Store {
     double cost = double.tryParse(row[10].toString()) ?? 0.0;
     double price = double.tryParse(row[11].toString()) ?? 0.0;
     double? mrp = double.tryParse(row[12].toString());
-    int stock = int.tryParse(row[13].toString()) ?? 0;
+    double stock = double.tryParse(row[13].toString()) ?? 0;
     String barcode = row[14].toString().trim();
-    int minStock = int.tryParse(row[15].toString()) ?? 5;
+    double minStock = double.tryParse(row[15].toString()) ?? 5;
 
     Map<String, String> attributes = {};
     

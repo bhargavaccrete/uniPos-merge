@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/presentation/screens/retail/expiry_alerts_screen.dart';
+import 'package:billberrylite/domain/services/retail/expiry_alert_service.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -733,6 +735,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       _buildStockAlertCard(context),
+      _buildExpiryAlertCard(context),
       DashboardMenuCard(
         icon: Icons.settings_rounded,
         title: 'Settings',
@@ -755,6 +758,50 @@ class _HomeScreenState extends State<HomeScreen> {
       //   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RetailPosScreen())),
       // ),
     ];
+  }
+
+  /// Expiry counterpart to the stock-alert card.
+  ///
+  /// The count is DERIVED from live variant data inside the Observer rather
+  /// than held in a store — there is no expiry alert state to keep in sync, so
+  /// re-opening the app can never inflate the badge.
+  Widget _buildExpiryAlertCard(BuildContext context) {
+    return Observer(
+      builder: (_) {
+        // Touch the observables so MobX re-runs this when the catalogue changes.
+        productStore.products.length;
+        productStore.variants.length;
+
+        final summary = ExpiryAlertService.getExpirySummary();
+        final alertCount = summary['totalAlerts'] as int;
+        final hasExpired = (summary['expiredCount'] as int) > 0;
+
+        return DashboardMenuCard(
+          icon: Icons.event_busy_rounded,
+          title: 'Expiry Alerts',
+          color: hasExpired ? AppColors.danger : Colors.deepOrange,
+          badge: alertCount > 0
+              ? DashboardCardBadge(
+                  count: alertCount,
+                  color: hasExpired
+                      ? AppColors.danger
+                      : const Color(0xFFFF9800),
+                )
+              : null,
+          onTap: _gated(
+            context,
+            RetailEntKeys.inventory,
+            'Expiry Alerts',
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ExpiryAlertsScreen(),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   /// The whole card sits inside the Observer — the accent colour is reactive

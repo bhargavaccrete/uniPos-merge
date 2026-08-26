@@ -8,6 +8,7 @@ import '../../../data/repositories/retail/variant_repository.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/plan/plan_enforcement.dart';
 import '../../../core/plan/retail_entitlement_keys.dart';
+import '../../services/retail/expiry_status.dart';
 
 
 part 'product_store.g.dart';
@@ -102,7 +103,7 @@ abstract class _ProductStore with Store {
     required String barcode,
     required double sellingPrice,
     double? mrp,
-    int stockQty = 1,
+    double stockQty = 1,
   }) async {
     final code = barcode.trim();
     if (code.isNotEmpty && isBarcodeTaken(code)) {
@@ -242,8 +243,8 @@ abstract class _ProductStore with Store {
 
   int variantCountFor(String productId) => variantsFor(productId).length;
 
-  int totalStockFor(String productId) =>
-      variantsFor(productId).fold<int>(0, (sum, v) => sum + v.stockQty);
+  double totalStockFor(String productId) =>
+      variantsFor(productId).fold<double>(0.0, (sum, v) => sum + v.stockQty);
 
   /// The variant whose price represents the product on a card. Deliberately
   /// `.first` (Hive insertion order) to preserve existing display behaviour.
@@ -261,8 +262,8 @@ abstract class _ProductStore with Store {
   /// screen uses. Observable, so changing it re-renders every dependent view.
   int get lowStockThreshold => stockAlertStore.threshold;
 
-  RetailStockStatus stockStatusForQty(int qty) =>
-      statusFor(qty, lowStockThreshold);
+  RetailStockStatus stockStatusForQty(double qty) =>
+      statusFor(qty, lowStockThreshold.toDouble());
 
   /// The one stock rule, so the inventory colouring, the Stock Alerts card and
   /// the low-stock report can never disagree.
@@ -271,9 +272,14 @@ abstract class _ProductStore with Store {
   /// variant's own `minStock` when it has one, otherwise the global threshold.
   /// The "critical" band is a third of that (min 1), rather than a fixed 3, so
   /// a variant that reorders at 2 is not permanently red.
-  RetailStockStatus statusFor(int qty, int reorderPoint) {
+  RetailStockStatus statusFor(double qty, double reorderPoint) {
     if (qty <= 0) return RetailStockStatus.outOfStock;
-    final critical = (reorderPoint / 3).ceil().clamp(1, reorderPoint);
+    // Hand-bounded rather than `clamp`, which THROWS when the reorder point is
+    // a fraction below 1 (a decimal variant may legitimately reorder at 0.5 kg).
+    // Same result as the old clamp(1, reorderPoint) for every whole value.
+    final raw = (reorderPoint / 3).ceilToDouble();
+    final atLeastOne = raw < 1.0 ? 1.0 : raw;
+    final critical = atLeastOne > reorderPoint ? reorderPoint : atLeastOne;
     if (qty <= critical) return RetailStockStatus.critical;
     if (qty <= reorderPoint) return RetailStockStatus.low;
     return RetailStockStatus.inStock;
@@ -281,8 +287,8 @@ abstract class _ProductStore with Store {
 
   /// A variant's own `minStock` wins over the global threshold — that is the
   /// whole point of collecting it on the variant forms.
-  int reorderPointFor(VarianteModel variant) =>
-      variant.minStock ?? lowStockThreshold;
+  double reorderPointFor(VarianteModel variant) =>
+      variant.minStock ?? lowStockThreshold.toDouble();
 
   bool isSellable(VarianteModel variant) =>
       variant.status == kActiveVariantStatus;
@@ -304,6 +310,31 @@ abstract class _ProductStore with Store {
 
   RetailStockStatus stockStatusForProduct(String productId) =>
       stockStatusForQty(totalStockFor(productId));
+
+  // ==================== EXPIRY CLASSIFICATION ====================
+  // Thin wrappers over the ONE rule in `expiry_status.dart`, mirroring the
+  // stock-status wrappers above. The maths lives there, not here, so the
+  // inventory badge, the variant row and the Expiry Alerts screen cannot drift.
+
+  RetailExpiryStatus expiryStatusForVariant(VarianteModel variant) =>
+      expiryStatusFor(variant.expiryDateTime);
+
+  /// The most urgent expiry across a product's variants — what a single
+  /// product row in the inventory list should show. `noExpiry` when none of
+  /// its variants carries a date.
+  RetailExpiryStatus expiryStatusForProduct(String productId) {
+    var worst = RetailExpiryStatus.noExpiry;
+    for (final variant in variantsFor(productId)) {
+      final status = expiryStatusForVariant(variant);
+      if (status == RetailExpiryStatus.noExpiry) continue;
+      // Enum order is noExpiry < expired < expiringToday < expiringSoon < valid,
+      // so the lowest non-noExpiry index is the most urgent.
+      if (worst == RetailExpiryStatus.noExpiry || status.index < worst.index) {
+        worst = status;
+      }
+    }
+    return worst;
+  }
 
   /// Replace in place, never remove-then-add: card prices key off
   /// `variants.first`, so reordering would silently change what's displayed.
@@ -354,7 +385,7 @@ abstract class _ProductStore with Store {
 
   /// Update stock for a variant
   @action
-  Future<void> updateVariantStock(String variantId, int newStock) async {
+  Future<void> updateVariantStock(String variantId, double newStock) async {
     await _variantRepository.updateStock(variantId, newStock);
     // Re-read rather than rebuilding with copyWith — copyWith bumps `updateAt`
     // to now, which would drift the in-memory copy from what was persisted.

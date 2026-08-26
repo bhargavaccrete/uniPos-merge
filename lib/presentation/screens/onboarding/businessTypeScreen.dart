@@ -93,7 +93,7 @@ class BusinessTypeStep extends StatelessWidget {
             fontSize: compact
                 ? AppResponsive.getValue<double>(context, mobile: 22, tablet: 26, desktop: 28)
                 : AppResponsive.getValue<double>(context, mobile: 24, tablet: 28, desktop: 32),
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
             color: AppColors.textPrimary,
             height: 1.25,
           ),

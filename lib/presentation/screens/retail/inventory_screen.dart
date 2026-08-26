@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:billberrylite/presentation/widget/componets/retail/expiry_date_field.dart';
+import 'package:billberrylite/domain/services/retail/expiry_status.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
@@ -13,6 +15,7 @@ import 'package:billberrylite/presentation/widget/componets/common/app_text_fiel
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/row_action_button.dart';
 
 import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
@@ -132,8 +135,8 @@ class _InventoryScreenState extends State<InventoryScreen>
         })
         .map((product) {
           final variants = index[product.productId] ?? const <VarianteModel>[];
-          final totalStock = variants.fold<int>(
-            0,
+          final totalStock = variants.fold<double>(
+            0.0,
             (sum, v) => sum + v.stockQty,
           );
           return _ProductRow(
@@ -142,6 +145,8 @@ class _InventoryScreenState extends State<InventoryScreen>
             categoryName: names[product.category] ?? product.category,
             totalStock: totalStock,
             status: productStore.stockStatusForQty(totalStock),
+            expiryStatus:
+                productStore.expiryStatusForProduct(product.productId),
             price: productStore.costPriceFor(product.productId),
           );
         })
@@ -172,66 +177,24 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
-  /// Edit / Delete for a product. Behind an overflow menu rather than visible
-  /// chips, matching the Categories tab and the variant rows.
+  /// Edit / Delete for a product, as visible buttons on the row — matching the
+  /// Categories tab and the product form's category picker.
   Widget _buildProductMenu(ProductModel product) {
-    return PopupMenuButton<String>(
-      icon: const Icon(
-        Icons.more_vert,
-        color: AppColors.textSecondary,
-        size: 20,
-      ),
-      padding: EdgeInsets.zero,
-      // M3 tints menu surfaces by default; keep them plain white.
-      color: AppColors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      onSelected: (value) {
-        if (value == 'edit') {
-          openEditProductScreen(context, product);
-        } else if (value == 'delete') {
-          _deleteProduct(product);
-        }
-      },
-      itemBuilder: (context) => [
-        PopupMenuItem<String>(
-          value: 'edit',
-          child: Row(
-            children: [
-              const Icon(
-                Icons.edit_outlined,
-                size: 20,
-                color: AppColors.textSecondary,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Edit Product',
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.bodyFontSize(context),
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ],
-          ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        RowActionButton(
+          icon: Icons.edit_outlined,
+          color: AppColors.primary,
+          tooltip: 'Edit Product',
+          onTap: () => openEditProductScreen(context, product),
         ),
-        PopupMenuItem<String>(
-          value: 'delete',
-          child: Row(
-            children: [
-              const Icon(
-                Icons.delete_outline_rounded,
-                size: 20,
-                color: AppColors.danger,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Delete Product',
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.bodyFontSize(context),
-                  color: AppColors.danger,
-                ),
-              ),
-            ],
-          ),
+        const SizedBox(width: 6),
+        RowActionButton(
+          icon: Icons.delete_outline_rounded,
+          color: AppColors.danger,
+          tooltip: 'Delete Product',
+          onTap: () => _deleteProduct(product),
         ),
       ],
     );
@@ -645,15 +608,31 @@ class _InventoryScreenState extends State<InventoryScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      row.product.productName,
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.bodyFontSize(context),
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    // Price shares the name's line instead of taking its own
+                    // column. As a sibling of the text column it competed with
+                    // it for width, and on a phone the detail line below lost —
+                    // category, stock and variant count all ellipsized away.
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            row.product.productName,
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.bodyFontSize(context),
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildPriceText(
+                          row.price,
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          color: AppColors.primary,
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     // One Text.rich, not a Row of five Texts: only the category
@@ -689,18 +668,22 @@ class _InventoryScreenState extends State<InventoryScreen>
                           ],
                         ],
                       ),
-                      maxLines: 1,
+                      // Two lines, not one: the variant count is the last span,
+                      // so on a narrow screen it was always the part that got
+                      // cut. A single-line detail still occupies one line —
+                      // maxLines only allows a second, it doesn't reserve one.
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    // Renders nothing unless a variant is expiring/expired.
+                    if (row.expiryStatus.isAlerting) ...[
+                      const SizedBox(height: 4),
+                      ExpiryStatusPill(status: row.expiryStatus),
+                    ],
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              _buildPriceText(
-                row.price,
-                fontSize: AppResponsive.subheadingFontSize(context),
-                color: AppColors.primary,
-              ),
+              const SizedBox(width: 8),
               _buildProductMenu(row.product),
             ],
           ),
@@ -841,8 +824,12 @@ class _ProductRow {
   final ProductModel product;
   final List<VarianteModel> variants;
   final String categoryName;
-  final int totalStock;
+  final double totalStock;
   final RetailStockStatus status;
+
+  /// Most urgent expiry across this product's variants. Derived once here
+  /// rather than per rebuild, matching how [status] is handled.
+  final RetailExpiryStatus expiryStatus;
   final double price;
 
   const _ProductRow({
@@ -851,6 +838,7 @@ class _ProductRow {
     required this.categoryName,
     required this.totalStock,
     required this.status,
+    required this.expiryStatus,
     required this.price,
   });
 }

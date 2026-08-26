@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'package:billberrylite/presentation/widget/componets/retail/expiry_date_field.dart';
+import 'package:billberrylite/domain/services/retail/expiry_status.dart';
+import 'package:billberrylite/core/constants/item_units.dart';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -21,6 +24,7 @@ import 'package:billberrylite/presentation/widget/retail/product_attribute_selec
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/universal_image_picker.dart';
+import 'package:billberrylite/presentation/widget/componets/common/row_action_button.dart';
 import 'package:billberrylite/domain/services/common/notification_service.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
@@ -40,9 +44,15 @@ final _moneyFormatters = <TextInputFormatter>[
   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
 ];
 
-/// Whole-number input (stock counts).
+/// Whole-number input (stock counts) — what a piece product uses.
 final _qtyFormatters = <TextInputFormatter>[
   FilteringTextInputFormatter.digitsOnly,
+];
+
+/// Fractional stock input for loose goods, at most 2 decimals — the same rule
+/// [_moneyFormatters] uses, so precision is consistent across the form.
+final _decimalQtyFormatters = <TextInputFormatter>[
+  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
 ];
 
 /// Single entry point for "Add Product" so the inventory list, its empty state
@@ -187,6 +197,29 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final _defaultMrpController = TextEditingController();
   final _defaultStockController = TextEditingController();
 
+  /// Unit of measure for every variant of this product.
+  ///
+  /// One switch for the whole product: a shop sells potatoes by weight, not
+  /// "this variant by weight and that one by piece". [_isDecimalQuantity] is
+  /// what unlocks a fractional quantity anywhere in the app for these variants;
+  /// left off (the default) the product behaves exactly as products always have.
+  bool _isDecimalQuantity = false;
+  String _unit = 'piece';
+
+  /// Optional expiry for this product's variants. Null = does not expire,
+  /// which is every product unless the shop says otherwise. Product-level
+  /// control, stored per variant (see the fan-out in [_updateProduct]).
+  DateTime? _expiryDate;
+
+  /// Quantity-field wiring, branched once so every stock box on this form
+  /// agrees. A piece product keeps the digits-only keypad it always had.
+  List<TextInputFormatter> get _activeQtyFormatters =>
+      _isDecimalQuantity ? _decimalQtyFormatters : _qtyFormatters;
+
+  TextInputType get _qtyKeyboard => _isDecimalQuantity
+      ? const TextInputType.numberWithOptions(decimal: true)
+      : TextInputType.number;
+
   Category? _selectedCategoryModel;
   List<Category> _categories = [];
 
@@ -278,6 +311,19 @@ class _AddProductScreenState extends State<AddProductScreen> {
       _taxManuallyChanged = true;
       _imageBytes = product.imageBytes;
       _stockMode = product.effectiveStockMode;
+      // Unit of measure lives on the variants; they always agree, so the first
+      // one speaks for the product. Absent/legacy variants read as pieces.
+      final firstVariant =
+          productStore.variantsFor(product.productId).firstOrNull;
+      if (firstVariant != null) {
+        _isDecimalQuantity = firstVariant.isDecimalQuantity;
+        _unit = firstVariant.isDecimalQuantity
+            ? firstVariant.effectiveUnit
+            : 'piece';
+        // Expiry is product-level in the form, per-variant in storage — the
+        // first variant speaks for the product, same rule as the unit.
+        _expiryDate = firstVariant.expiryDateTime;
+      }
       if (product.needsBundleComponents) {
         // Load each variant's own bundle row, if any — see the field docs
         // above for why staging is per-variant.
@@ -472,6 +518,30 @@ class _AddProductScreenState extends State<AddProductScreen> {
     // (covers a mode switch back to standard, and a variant whose
     // components were removed). See docs/retail_inventory_system_plan.md §3.2.
     final existingVariants = productStore.variantsFor(existing.productId);
+
+    // Unit of measure is product-level but stored per variant, so a change
+    // here has to reach every variant — otherwise the toggle would appear to
+    // save and change nothing. Only writes when it actually differs.
+    final expiryIso = _expiryDate?.toIso8601String();
+    for (final variant in existingVariants) {
+      final unitChanged = variant.isDecimalQuantity != _isDecimalQuantity ||
+          (_isDecimalQuantity && variant.unit != _unit);
+      // Expiry is product-level here but stored per variant, so a change has
+      // to reach every one of them — including CLEARING it, which needs the
+      // explicit flag because `?? this.x` can never write null back.
+      final expiryChanged = variant.expiryDate != expiryIso;
+      if (unitChanged || expiryChanged) {
+        await productStore.updateVariant(
+          variant.copyWith(
+            isDecimalQuantity: _isDecimalQuantity,
+            unit: _isDecimalQuantity ? _unit : 'piece',
+            expiryDate: expiryIso,
+            clearExpiryDate: expiryIso == null,
+          ),
+        );
+      }
+    }
+
     for (final variant in existingVariants) {
       final variantId = variant.varianteId;
       final components = _bundleComponentsByVariant[variantId] ?? const [];
@@ -636,6 +706,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
           productId: productId,
           taxRate: taxRate,
           taxId: _selectedTaxId,
+          isDecimalQuantity: _isDecimalQuantity,
+          unit: _unit,
+          expiryDate: _expiryDate?.toIso8601String(),
         ),
       );
       // The generated variant's own varianteId was already used as its
@@ -675,9 +748,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
           costPrice: variantData.costPriceController.text.trim().isEmpty
               ? null
               : double.tryParse(variantData.costPriceController.text.trim()),
-          stockQty: int.tryParse(variantData.stockController.text.trim()) ?? 0,
+          stockQty: double.tryParse(variantData.stockController.text.trim()) ?? 0,
           taxRate: taxRate,
           taxId: _selectedTaxId,
+          isDecimalQuantity: _isDecimalQuantity,
+          unit: _unit,
+          expiryDate: _expiryDate?.toIso8601String(),
           customAttributes: fieldValues,
         ),
       );
@@ -908,6 +984,23 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 _buildSectionHeader('Stock Mode'),
                 const SizedBox(height: 10),
                 _buildStockModeSection(),
+                const SizedBox(height: 16),
+
+                // ── Unit of Measure ───────────────────────────────────────
+                // Product-level, because a shop sells potatoes by weight — not
+                // "this variant by weight, that one by piece".
+                _buildSectionHeader('Unit of Measure'),
+                const SizedBox(height: 10),
+                _buildUnitOfMeasureSection(),
+                const SizedBox(height: 16),
+
+                // ── Expiry ────────────────────────────────────────────────
+                // Optional for EVERY product — there is no perishable/food
+                // classification in retail, so non-expiring products simply
+                // leave it unset. NOT batch tracking: one date per variant.
+                _buildSectionHeader('Expiry'),
+                const SizedBox(height: 10),
+                _buildExpirySection(),
                 const SizedBox(height: 16),
 
                 // Editing touches product fields only — variants are managed on
@@ -1265,10 +1358,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
               Expanded(
                 child: _buildTextField(
                   controller: variant.stockController,
-                  label: 'Stock*',
+                  label: _isDecimalQuantity ? 'Stock* ($_unit)' : 'Stock*',
                   hint: '0',
-                  keyboardType: TextInputType.number,
-                  inputFormatters: _qtyFormatters,
+                  keyboardType: _qtyKeyboard,
+                  inputFormatters: _activeQtyFormatters,
                 ),
               ),
               const SizedBox(width: 12),
@@ -1382,7 +1475,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
               style: GoogleFonts.poppins(
                 fontSize: AppResponsive.captionFontSize(context),
                 color: AppColors.textSecondary,
-                fontStyle: FontStyle.italic,
               ),
             ),
           ],
@@ -1409,6 +1501,120 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   // ── Stock Mode (Standard / Bundle / Repack) ───────────────────────────
   // See docs/retail_inventory_system_plan.md §3.2.
+
+  /// Switches this product between whole pieces and fractional (loose) goods,
+  /// and names the unit when it is fractional.
+  ///
+  /// Off by default, which is why every existing product keeps its whole-number
+  /// behaviour untouched. Turning it on is the ONLY thing that lets a decimal
+  /// be typed into a quantity field anywhere in the app for these variants.
+  /// Optional expiry date for this product's variants.
+  ///
+  /// A switch reveals the picker, mirroring the Unit of Measure control above.
+  /// Turning it OFF clears the date, so nothing stale can survive — the same
+  /// reason that control resets `_unit` to 'piece'.
+  Widget _buildExpirySection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SwitchListTile.adaptive(
+          value: _expiryDate != null,
+          onChanged: (on) => setState(() {
+            // Default to a week out so the picker opens somewhere sensible;
+            // switching off must leave nothing behind.
+            _expiryDate = on
+                ? dateOnly(DateTime.now().add(const Duration(days: 7)))
+                : null;
+          }),
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: Text(
+            'Has an expiry date',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          subtitle: Text(
+            _expiryDate == null
+                ? 'This product does not expire'
+                : 'Alerts $kExpiryWarningDays days before it expires',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+        if (_expiryDate != null) ...[
+          const SizedBox(height: 10),
+          ExpiryDateField(
+            value: _expiryDate,
+            onPick: (picked) => setState(() => _expiryDate = picked),
+            onClear: () => setState(() => _expiryDate = null),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildUnitOfMeasureSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SwitchListTile.adaptive(
+          value: _isDecimalQuantity,
+          onChanged: (v) => setState(() {
+            _isDecimalQuantity = v;
+            // Collapsing back to pieces must not leave a stale 'kg' behind.
+            if (!v) _unit = 'piece';
+            else if (_unit == 'piece') _unit = 'kg';
+          }),
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: Text(
+            'Sold by weight / volume',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          subtitle: Text(
+            _isDecimalQuantity
+                ? 'Quantities may be fractional, e.g. 1.75 $_unit'
+                : 'Counted in whole pieces',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+        if (_isDecimalQuantity) ...[
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            initialValue: kItemUnits.contains(_unit) ? _unit : 'kg',
+            decoration: InputDecoration(
+              labelText: 'Unit',
+              isDense: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            // Reuses restaurant's canonical list so the two sides can never
+            // drift apart on what a unit is called.
+            items: kItemUnits
+                .where((u) => u != 'piece')
+                .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+                .toList(),
+            onChanged: (v) {
+              if (v != null) setState(() => _unit = v);
+            },
+          ),
+        ],
+      ],
+    );
+  }
 
   Widget _buildStockModeSection() {
     return Column(
@@ -1817,7 +2023,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
     );
   }
 
-  /// Bottom sheet listing the categories, with Manage pinned at the bottom.
+  /// Bottom sheet listing the categories, with full add/edit/delete in place
+  /// and Manage pinned at the bottom.
+  ///
+  /// Every mutation routes through the shared entry points in
+  /// `category_management_screen.dart` — the same prompts and the same delete
+  /// confirmation the standalone screen uses, so the two can never disagree.
+  /// [StatefulBuilder] lets the sheet redraw its own list after a change
+  /// without being torn down and reopened.
   Future<void> _showCategoryPicker() async {
     await showModalBottomSheet<void>(
       context: context,
@@ -1826,119 +2039,210 @@ class _AddProductScreenState extends State<AddProductScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (sheetContext) => SafeArea(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(sheetContext).size.height * 0.6,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
-                child: Row(
-                  children: [
-                    Text(
-                      'Select Category',
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.subheadingFontSize(context),
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.close_rounded,
-                        color: AppColors.textSecondary,
-                      ),
-                      onPressed: () => Navigator.pop(sheetContext),
-                    ),
-                  ],
-                ),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) {
+          /// Reload the catalogue, re-resolve the current selection against it,
+          /// then repaint the sheet.
+          ///
+          /// The selection is re-read rather than kept: a rename must show its
+          /// new name on the closed field, and a delete must leave the field
+          /// empty so the form's validator stops the save instead of writing an
+          /// id that no longer exists.
+          Future<void> refresh() async {
+            await _loadCategories();
+            if (!mounted) return;
+            final selectedId = _selectedCategoryModel?.id;
+            if (selectedId != null) {
+              Category? stillThere;
+              for (final category in _categories) {
+                if (category.id == selectedId) {
+                  stillThere = category;
+                  break;
+                }
+              }
+              setState(() => _selectedCategoryModel = stillThere);
+            }
+            setSheetState(() {});
+          }
+
+          return SafeArea(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(sheetContext).size.height * 0.7,
               ),
-              const Divider(height: 1, color: AppColors.divider),
-              Flexible(
-                child: _categories.isEmpty
-                    ? Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Text(
-                          'No categories yet.',
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 18, 8, 10),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Select Category',
                           style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.smallFontSize(context),
-                            color: AppColors.textSecondary,
+                            fontSize: AppResponsive.subheadingFontSize(context),
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
                           ),
                         ),
-                      )
-                    : ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: _categories.length,
-                        itemBuilder: (_, i) {
-                          final category = _categories[i];
-                          final isSelected =
-                              _selectedCategoryModel?.id == category.id;
-                          return ListTile(
-                            leading: Icon(
-                              isSelected
-                                  ? Icons.radio_button_checked
-                                  : Icons.radio_button_unchecked,
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : AppColors.textSecondary,
-                              size: 20,
+                        const Spacer(),
+                        TextButton.icon(
+                          onPressed: () async {
+                            await showAddCategoryDialog(sheetContext);
+                            await refresh();
+                          },
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                          label: Text(
+                            'Add',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.smallFontSize(context),
+                              fontWeight: FontWeight.w600,
                             ),
-                            title: Text(
-                              category.name,
+                          ),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.primary,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: AppColors.textSecondary,
+                          ),
+                          onPressed: () => Navigator.pop(sheetContext),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1, color: AppColors.divider),
+                  Flexible(
+                    child: _categories.isEmpty
+                        ? Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Text(
+                              'No categories yet. Tap Add to create one.',
                               style: GoogleFonts.poppins(
-                                fontSize: AppResponsive.bodyFontSize(context),
-                                fontWeight: isSelected
-                                    ? FontWeight.w600
-                                    : FontWeight.w400,
-                                color: isSelected
-                                    ? AppColors.primary
-                                    : AppColors.textPrimary,
+                                fontSize: AppResponsive.smallFontSize(context),
+                                color: AppColors.textSecondary,
                               ),
                             ),
-                            onTap: () {
-                              setState(() => _selectedCategoryModel = category);
-                              Navigator.pop(sheetContext);
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: _categories.length,
+                            itemBuilder: (_, i) {
+                              final category = _categories[i];
+                              final isSelected =
+                                  _selectedCategoryModel?.id == category.id;
+                              final productCount = categoryStore
+                                  .getItemCountForCategory(category.id);
+
+                              return ListTile(
+                                leading: Icon(
+                                  isSelected
+                                      ? Icons.radio_button_checked
+                                      : Icons.radio_button_unchecked,
+                                  color: isSelected
+                                      ? AppColors.primary
+                                      : AppColors.textSecondary,
+                                  size: 20,
+                                ),
+                                title: Text(
+                                  category.name,
+                                  style: GoogleFonts.poppins(
+                                    fontSize:
+                                        AppResponsive.bodyFontSize(context),
+                                    fontWeight: isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
+                                    color: isSelected
+                                        ? AppColors.primary
+                                        : AppColors.textPrimary,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '$productCount product'
+                                  '${productCount == 1 ? '' : 's'}',
+                                  style: GoogleFonts.poppins(
+                                    fontSize:
+                                        AppResponsive.smallFontSize(context),
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    RowActionButton(
+                                      icon: Icons.edit_outlined,
+                                      color: AppColors.primary,
+                                      tooltip: 'Rename',
+                                      onTap: () async {
+                                        await showEditCategoryDialog(
+                                          sheetContext,
+                                          category,
+                                        );
+                                        await refresh();
+                                      },
+                                    ),
+                                    const SizedBox(width: 6),
+                                    RowActionButton(
+                                      icon: Icons.delete_outline_rounded,
+                                      color: AppColors.danger,
+                                      tooltip: 'Delete',
+                                      onTap: () async {
+                                        await confirmDeleteCategory(
+                                          sheetContext,
+                                          category,
+                                        );
+                                        await refresh();
+                                      },
+                                    ),
+                                  ],
+                                ),
+                                onTap: () {
+                                  setState(
+                                    () => _selectedCategoryModel = category,
+                                  );
+                                  Navigator.pop(sheetContext);
+                                },
+                              );
                             },
-                          );
-                        },
-                      ),
-              ),
-              const Divider(height: 1, color: AppColors.divider),
-              ListTile(
-                leading: const Icon(
-                  Icons.tune_rounded,
-                  color: AppColors.primary,
-                  size: 20,
-                ),
-                title: Text(
-                  'Manage Categories',
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.bodyFontSize(context),
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
+                          ),
                   ),
-                ),
-                onTap: () async {
-                  Navigator.pop(sheetContext);
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const CategoryManagementScreen(),
+                  const Divider(height: 1, color: AppColors.divider),
+                  ListTile(
+                    leading: const Icon(
+                      Icons.tune_rounded,
+                      color: AppColors.primary,
+                      size: 20,
                     ),
-                  );
-                  await _loadCategories();
-                },
+                    title: Text(
+                      'Manage Categories',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    onTap: () async {
+                      Navigator.pop(sheetContext);
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const CategoryManagementScreen(),
+                        ),
+                      );
+                      await _loadCategories();
+                    },
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
+
 
   Widget _buildTaxDropdown() {
     final taxes = taxStore.taxes;
@@ -2141,10 +2445,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
               Expanded(
                 child: _buildTextField(
                   controller: _defaultStockController,
-                  label: 'Stock',
+                  label: _isDecimalQuantity ? 'Stock ($_unit)' : 'Stock',
                   hint: '0',
-                  keyboardType: TextInputType.number,
-                  inputFormatters: _qtyFormatters,
+                  keyboardType: _qtyKeyboard,
+                  inputFormatters: _activeQtyFormatters,
                 ),
               ),
             ],
@@ -2176,7 +2480,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
             style: GoogleFonts.poppins(
               fontSize: AppResponsive.captionFontSize(context),
               color: AppColors.textSecondary,
-              fontStyle: FontStyle.italic,
             ),
           ),
         ],
@@ -2189,7 +2492,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final costPrice = double.tryParse(_defaultCostController.text);
     final sellingPrice = double.tryParse(_defaultPriceController.text);
     final mrp = double.tryParse(_defaultMrpController.text);
-    final stock = int.tryParse(_defaultStockController.text);
+    final stock = double.tryParse(_defaultStockController.text);
 
     if (costPrice == null && sellingPrice == null) {
       NotificationService.instance.showWarning(
@@ -2215,7 +2518,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     double? costPrice,
     double? sellingPrice,
     double? mrp,
-    int? stock,
+    double? stock,
   }) {
     setState(() {
       for (var i = 0; i < _generatedVariants.length; i++) {
@@ -2386,12 +2689,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 child: _buildVariantTextField(
                   key: 'stock_$index',
                   value: variant.stockQty.toString(),
-                  label: 'Stock',
-                  inputFormatters: _qtyFormatters,
+                  label: _isDecimalQuantity ? 'Stock ($_unit)' : 'Stock',
+                  inputFormatters: _activeQtyFormatters,
                   onChanged: (value) {
                     _updateGeneratedVariant(
                       index,
-                      stockQty: int.tryParse(value),
+                      stockQty: double.tryParse(value),
                     );
                   },
                 ),
@@ -2470,7 +2773,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     double? costPrice,
     double? sellingPrice,
     double? mrp,
-    int? stockQty,
+    double? stockQty,
     String? barcode,
   }) {
     setState(() {
