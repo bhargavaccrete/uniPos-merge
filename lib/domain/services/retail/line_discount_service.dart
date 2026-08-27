@@ -91,8 +91,13 @@ class LineDiscountService {
   /// Order matters: hard blocks are checked before the soft warning, so an
   /// impossible discount is refused outright rather than surfacing as a
   /// "below cost — are you sure?" the cashier can click through.
+  ///
+  /// [variant] is null for a quick item, which has no catalogue row and so no
+  /// cost. Only the soft below-cost warning consults it; every hard block is
+  /// pure line arithmetic, so an ad-hoc line is validated exactly as strictly as
+  /// a catalogue one — it simply has no cost floor to fall through.
   static LineDiscountValidation validate({
-    required VarianteModel variant,
+    required VarianteModel? variant,
     required DiscountType type,
     required double value,
     required double chargedUnitPrice,
@@ -160,7 +165,7 @@ class LineDiscountService {
     // 6. Soft warning: selling under cost is a real decision (clearance, damaged
     //    stock) so it is allowed — but never silently. Measured on the price after
     //    BOTH the override and this discount.
-    final cost = variant.costPrice;
+    final cost = variant?.costPrice;
     if (cost != null && cost > 0 && effectiveUnit < cost) {
       return LineDiscountValidation._(
         LineDiscountVerdict.belowCost,

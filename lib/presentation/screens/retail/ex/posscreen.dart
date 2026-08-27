@@ -28,6 +28,8 @@ import 'package:billberrylite/domain/services/retail/price_override_service.dart
 import 'package:billberrylite/domain/services/retail/line_discount_service.dart';
 import 'package:billberrylite/domain/services/retail/retail_billing_service.dart' show DiscountType;
 import 'package:billberrylite/presentation/widget/componets/retail/line_discount_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/retail/quick_item_dialog.dart';
+import 'package:billberrylite/domain/services/retail/quick_item_service.dart';
 import '../../../../core/di/service_locator.dart';
 import 'package:billberrylite/core/routes/routes_name.dart';
 import 'package:billberrylite/domain/services/common/notification_service.dart';
@@ -774,7 +776,57 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
             onPressed: cartStore.itemCount > 0 ? _holdCurrentSale : null,
           ),
         ),
+        // Sell something the catalogue does not carry. Lives on the shared
+        // AppBar so mobile, tablet and desktop all get it from one place.
+        IconButton(
+          icon: const Icon(Icons.add_shopping_cart_outlined),
+          tooltip: 'Add quick item',
+          onPressed: _openQuickItem,
+        ),
       ],
+    );
+  }
+
+  /// Type an ad-hoc line straight into the cart.
+  ///
+  /// No permission gate: unlike price override and line discount, this does not
+  /// move money off a settled figure — the cashier is quoting a price for
+  /// something that was never priced.
+  Future<void> _openQuickItem() async {
+    // The tax dropdown reads `taxStore.taxes`, which is otherwise only loaded by
+    // the settings and product screens — without this the POS would offer an
+    // empty rate list on a cold start.
+    await taxStore.loadTaxes();
+    // Resolved HERE, not inside the dialog: a DropdownButtonFormField seeds its
+    // selection on first build only, so a rate arriving from an async lookup
+    // after that build would never show as selected.
+    final defaultGstRate = await gstService.getDefaultGstRate();
+    if (!mounted) return;
+
+    await showDialog<bool>(
+      context: context,
+      builder: (_) => _moneyScope(
+        QuickItemDialog(
+          defaultGstRate: defaultGstRate,
+          money: _money,
+          onApply: ({
+            required String name,
+            required double price,
+            required double gstRate,
+            required int qty,
+          }) async {
+            final result = await cartStore.addQuickItemToTab(
+              name: name,
+              price: price,
+              gstRate: gstRate,
+              qty: qty,
+            );
+            return result.success
+                ? null
+                : (result.errorMessage ?? 'Could not add the item');
+          },
+        ),
+      ),
     );
   }
 
@@ -1619,7 +1671,11 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
   /// …): a `more_vert` `PopupMenuButton` whose admin-only entries are simply NOT
   /// BUILT for a non-admin, rather than shown and refused.
   Widget _buildLineActions(CartItemModel item) {
-    final canOverride = PriceOverrideService.canOverride;
+    // A quick item has no catalogue price to override — the cashier typed the
+    // price it is selling at. Discount and Remove stay: both are meaningful on
+    // an ad-hoc line.
+    final canOverride = PriceOverrideService.canOverride &&
+        !QuickItemService.isQuickItem(item.variantId);
     final canDiscount = LineDiscountService.canDiscount;
 
     return PopupMenuButton<String>(
@@ -1689,10 +1745,14 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
   Future<void> _openLineDiscount(CartItemModel item) async {
     if (!LineDiscountService.canDiscount) return;
 
-    final variant = await productStore.getVariantById(item.variantId);
+    final isQuick = QuickItemService.isQuickItem(item.variantId);
+    // A quick item has no catalogue row by design, so its lookup miss is
+    // expected rather than the "someone deleted this product" case below.
+    final variant =
+        isQuick ? null : await productStore.getVariantById(item.variantId);
     if (!mounted) return;
 
-    if (variant == null) {
+    if (!isQuick && variant == null) {
       NotificationService.instance.showError(
         'Variant no longer exists — remove this line and re-add it.',
       );
@@ -1734,6 +1794,10 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
   /// refused, matching the stock-adjustment precedent.
   Widget _buildLinePrice(BuildContext context, CartItemModel item) {
     final overridden = item.isPriceOverridden;
+    // Matches the overflow menu: no catalogue price behind a quick item, so the
+    // price is a plain label rather than a control.
+    final canOverride = PriceOverrideService.canOverride &&
+        !QuickItemService.isQuickItem(item.variantId);
 
     // A Wrap, NOT a Row. With an override AND a line discount this line carries
     // four pieces ("~~2000~~ 1600 ✏ -320.00 (20%)"), which on a phone exceeds
@@ -1762,7 +1826,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
             color: overridden ? AppColors.warning : AppColors.textSecondary,
           ),
         ),
-        if (PriceOverrideService.canOverride)
+        if (canOverride)
           Icon(
             Icons.edit_outlined,
             size: AppResponsive.smallFontSize(context),
@@ -1783,7 +1847,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
       ],
     );
 
-    if (!PriceOverrideService.canOverride) return priceText;
+    if (!canOverride) return priceText;
 
     return InkWell(
       onTap: () => _openPriceOverride(item),

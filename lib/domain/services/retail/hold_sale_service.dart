@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/retail/hive_model/hold_sale_item_model_210.dart';
 import '../../../data/models/retail/hive_model/hold_sale_model_209.dart';
+import 'quick_item_service.dart';
 import 'retail_billing_service.dart' show DiscountType;
 
 /// Park / restore for retail sales.
@@ -91,6 +92,21 @@ class HoldSaleService {
 
     int skipped = 0;
     for (final holdItem in items) {
+      // A quick item has no catalogue row to look up, so it must be replayed
+      // before the lookup below — which treats a miss as "this product was
+      // deleted" and drops the line. The parked figures are replayed as-is, for
+      // the same reason catalogue lines are: the customer was quoted them.
+      if (QuickItemService.isQuickItem(holdItem.variantId)) {
+        final result = await retailCartStore.addQuickItemToTab(
+          name: holdItem.productName,
+          price: holdItem.price,
+          gstRate: holdItem.gstRate ?? 0,
+          qty: holdItem.qty.round(),
+        );
+        if (!result.success) skipped++;
+        continue;
+      }
+
       final product = productStore.getProductById(holdItem.productId);
       final variant = await productStore.getVariantById(holdItem.variantId);
 

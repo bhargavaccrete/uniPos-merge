@@ -12,6 +12,7 @@ import '../../../data/repositories/retail/cart_repository.dart';
 import '../../services/retail/gst_service.dart';
 import '../../services/retail/retail_billing_service.dart';
 import '../../services/retail/line_discount_service.dart';
+import '../../services/retail/quick_item_service.dart';
 
 
 
@@ -435,6 +436,77 @@ abstract class _CartStore with Store {
     await _repository.saveCartItem(newItem);
 
     // Add to observable list at the top
+    items.insert(0, newItem);
+    return CartOperationResult.success();
+  }
+
+  /// Add an ad-hoc "quick item" — something the catalogue does not carry, typed
+  /// at the POS.
+  ///
+  /// Separate from [addItem] rather than folded into it, because [addItem]'s
+  /// first act is a stock gate (`variant.stockQty <= 0` → out of stock) and a
+  /// quick item has no stock to check. Everything AFTER the gate is shared: the
+  /// line is built by [CartItemModel.create], the same factory every catalogue
+  /// line goes through, so total/taxable/GST/CGST/SGST and the tax-inclusive
+  /// branch are computed identically.
+  ///
+  /// **A fresh identity every call, never a merge.** [addItem] deliberately
+  /// bumps the quantity when the same variant is re-scanned; a quick item must
+  /// do the opposite — two "Local Bread" lines at different prices are two
+  /// different things — so it mints a new id and always inserts.
+  ///
+  /// **No catalogue row is created.** The ids resolve to nothing, which every
+  /// downstream lookup already tolerates: stock deduction skips the line,
+  /// checkout stores a null cost, and the profit reports treat that cost as
+  /// unknown rather than zero.
+  @action
+  Future<CartOperationResult> addQuickItem({
+    required String name,
+    required double price,
+    double gstRate = 0,
+    int qty = 1,
+  }) async {
+    final cleanName = name.trim();
+    if (QuickItemService.validateName(cleanName) != null) {
+      return CartOperationResult(
+        success: false,
+        errorMessage: 'Enter an item name',
+      );
+    }
+    if (QuickItemService.validatePrice(price) != null) {
+      return CartOperationResult(
+        success: false,
+        errorMessage: 'Price must be greater than 0',
+      );
+    }
+    if (QuickItemService.validateQty(qty) != null) {
+      return CartOperationResult(
+        success: false,
+        errorMessage: 'Quantity must be at least 1',
+      );
+    }
+
+    // Same gate [_getEffectiveGstRate] applies: a business not registered for
+    // tax bills at 0 no matter what was picked.
+    final effectiveGstRate = TaxFeature.enabled ? gstRate : 0.0;
+    final taxInclusive = await gstService.isTaxInclusiveMode();
+
+    final variantId = QuickItemService.newVariantId();
+    final newItem = CartItemModel.create(
+      cartItemId: '${variantId}_${DateTime.now().millisecondsSinceEpoch}',
+      variantId: variantId,
+      productId: QuickItemService.newProductId(),
+      productName: cleanName,
+      // No barcode, HSN, category or attributes: a quick item has none of them
+      // and inventing blanks would put empty descriptors on the receipt.
+      price: price,
+      qty: qty.toDouble(),
+      gstRate: effectiveGstRate,
+      taxInclusive: taxInclusive,
+    );
+
+    await _repository.saveCartItem(newItem);
+
     items.insert(0, newItem);
     return CartOperationResult.success();
   }
@@ -1144,6 +1216,26 @@ abstract class _CartStore with Store {
       lineDiscountValue: lineDiscountValue,
       lineDiscountReason: lineDiscountReason,
       lineDiscountNote: lineDiscountNote,
+    );
+    if (result.success) {
+      await _saveCurrentTabItems();
+    }
+    return result;
+  }
+
+  /// Ad-hoc line, persisted to the active tab. See [addQuickItem].
+  @action
+  Future<CartOperationResult> addQuickItemToTab({
+    required String name,
+    required double price,
+    double gstRate = 0,
+    int qty = 1,
+  }) async {
+    final result = await addQuickItem(
+      name: name,
+      price: price,
+      gstRate: gstRate,
+      qty: qty,
     );
     if (result.success) {
       await _saveCurrentTabItems();

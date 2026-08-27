@@ -3,6 +3,7 @@ import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/retail/hive_model/cart_model_202.dart';
 import 'package:billberrylite/data/repositories/business_details_repository.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
+import 'package:billberrylite/domain/services/retail/quick_item_service.dart';
 import 'package:billberrylite/domain/services/retail/retail_billing_service.dart';
 import 'package:billberrylite/util/restaurant/staticswitch.dart';
 
@@ -296,6 +297,121 @@ void main() {
       expect(sale.paidAmount, 118); // never exceeds the bill
       expect(sale.dueAmount, 0);
       expect(sale.status, SaleStatus.paid);
+    });
+  });
+
+  // The engine is deliberately id-blind — it never reads variantId or
+  // productId. These pin that a quick item, whose ids resolve to no catalogue
+  // row, bills exactly like a catalogue line sitting beside it.
+  group('quick items bill through the same engine', () {
+    CartItemModel quick({
+      required String name,
+      required double price,
+      double qty = 1,
+      double gstRatePercent = 0,
+      double? lineDiscountAmount,
+    }) =>
+        CartItemModel.create(
+          cartItemId: '${QuickItemService.idPrefix}$name',
+          variantId: QuickItemService.newVariantId(),
+          productId: QuickItemService.newProductId(),
+          productName: name,
+          price: price,
+          qty: qty,
+          gstRate: gstRatePercent,
+          lineDiscountAmount: lineDiscountAmount,
+        );
+
+    test('a lone quick item bills like any other line', () {
+      final bill = RetailBillingService.compute(
+        items: [quick(name: 'Local Bread', price: 45, gstRatePercent: 5)],
+        isTaxInclusive: false,
+      );
+
+      expect(bill.taxableAmount, 45);
+      expect(bill.totalGst, 2.25);
+      expect(bill.grandTotal, 47.25);
+    });
+
+    test('two quick items stay two lines and both reach the total', () {
+      final bill = RetailBillingService.compute(
+        items: [
+          quick(name: 'Local Bread', price: 45),
+          quick(name: 'Plastic Bag', price: 5),
+        ],
+        isTaxInclusive: false,
+      );
+
+      expect(bill.lines.length, 2);
+      expect(bill.itemTotal, 50);
+      expect(bill.grandTotal, 50);
+    });
+
+    test('a mixed basket sums a catalogue line and a quick line', () {
+      final bill = RetailBillingService.compute(
+        items: [
+          item(price: 100, gstRatePercent: 18),
+          quick(name: 'Local Bread', price: 45, qty: 2, gstRatePercent: 5),
+        ],
+        isTaxInclusive: false,
+      );
+
+      expect(bill.lines.length, 2);
+      expect(bill.itemTotal, 190); // 100 + 90
+      expect(bill.taxableAmount, 190);
+      expect(bill.totalGst, 22.5); // 18 + 4.5
+      expect(bill.grandTotal, 212.5);
+    });
+
+    test('a quick line keeps its own GST rate in the breakdown', () {
+      final bill = RetailBillingService.compute(
+        items: [
+          item(price: 100, gstRatePercent: 18),
+          quick(name: 'Local Bread', price: 100, gstRatePercent: 5),
+        ],
+        isTaxInclusive: false,
+      );
+
+      expect(bill.gstBreakdown[18]!.totalGstAmount, 18);
+      expect(bill.gstBreakdown[5]!.totalGstAmount, 5);
+    });
+
+    test('a line discount on a quick item reaches the bill', () {
+      final bill = RetailBillingService.compute(
+        items: [
+          quick(
+            name: 'Local Bread',
+            price: 100,
+            gstRatePercent: 0,
+            lineDiscountAmount: 10,
+          ),
+        ],
+        isTaxInclusive: false,
+      );
+
+      expect(bill.lineDiscountTotal, 10);
+      expect(bill.taxableAmount, 90);
+      expect(bill.grandTotal, 90);
+    });
+
+    test('a quick item is unaffected by an order-level discount elsewhere '
+        'beyond its fair share', () {
+      final bill = RetailBillingService.compute(
+        items: [
+          item(price: 100, gstRatePercent: 0),
+          quick(name: 'Local Bread', price: 100, gstRatePercent: 0),
+        ],
+        isTaxInclusive: false,
+        discountType: DiscountType.amount,
+        discountValue: 20,
+      );
+
+      // Two equal lines share a flat 20 evenly.
+      expect(bill.itemTotal, 200);
+      expect(bill.discountAmount, 20);
+      expect(bill.grandTotal, 180);
+      expect(bill.lines[0].discountAmount, 10);
+      expect(bill.lines[1].discountAmount, 10);
     });
   });
 }

@@ -227,6 +227,19 @@ mixin _$CartStore on _CartStore, Store {
         lineDiscountNote: lineDiscountNote));
   }
 
+  late final _$addQuickItemAsyncAction =
+      AsyncAction('_CartStore.addQuickItem', context: context);
+
+  @override
+  Future<CartOperationResult> addQuickItem(
+      {required String name,
+      required double price,
+      double gstRate = 0,
+      int qty = 1}) {
+    return _$addQuickItemAsyncAction.run(() => super
+        .addQuickItem(name: name, price: price, gstRate: gstRate, qty: qty));
+  }
+
   late final _$overrideLinePriceAsyncAction =
       AsyncAction('_CartStore.overrideLinePrice', context: context);
 
@@ -355,6 +368,19 @@ mixin _$CartStore on _CartStore, Store {
         lineDiscountValue: lineDiscountValue,
         lineDiscountReason: lineDiscountReason,
         lineDiscountNote: lineDiscountNote));
+  }
+
+  late final _$addQuickItemToTabAsyncAction =
+      AsyncAction('_CartStore.addQuickItemToTab', context: context);
+
+  @override
+  Future<CartOperationResult> addQuickItemToTab(
+      {required String name,
+      required double price,
+      double gstRate = 0,
+      int qty = 1}) {
+    return _$addQuickItemToTabAsyncAction.run(() => super.addQuickItemToTab(
+        name: name, price: price, gstRate: gstRate, qty: qty));
   }
 
   late final _$removeItemFromTabAsyncAction =

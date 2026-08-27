@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:get_it/get_it.dart';
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/data/repositories/business_type_repository.dart';
@@ -109,6 +111,41 @@ typedef VariantRepositoryRes = restaurant.VariantRepositoryRes;
 
 final locator = GetIt.instance;
 
+/// The business mode whose dependency graph is currently in the container,
+/// or null when only the common registrations are present.
+BusinessMode? _registeredBusinessMode;
+
+/// Undo hooks for every registration made by [_registerRetailDependencies] /
+/// [_registerRestaurantDependencies], in registration order.
+final List<FutureOr<void> Function()> _businessUnregisterHooks = [];
+
+/// Registers a business-mode-scoped lazy singleton and remembers how to remove
+/// it again.
+///
+/// The two mode graphs overlap (CategoryStore, TaxStore, CustomerStore,
+/// StaffStore, EodStore, ExpenseStore, CashMovementStore and their
+/// repositories are shared), so registering one on top of the other throws
+/// "already registered" partway through and leaves the rest of that mode —
+/// ProductStore included — missing. Switching mode therefore tears the old
+/// graph down first, which this bookkeeping makes possible.
+void _regBusiness<T extends Object>(T Function() factory) {
+  locator.registerLazySingleton<T>(factory);
+  _businessUnregisterHooks.add(() => locator.unregister<T>());
+}
+
+/// Removes everything the current business mode registered, newest first.
+Future<void> _unregisterBusinessDependencies() async {
+  // Restaurant wires these to stores that are about to disappear.
+  RestaurantSession.onShiftAutoClose = null;
+  RestaurantSession.onAttendanceAutoClockOut = null;
+
+  for (final undo in _businessUnregisterHooks.reversed) {
+    await undo();
+  }
+  _businessUnregisterHooks.clear();
+  _registeredBusinessMode = null;
+}
+
 /// Initialize all dependencies
 /// Call this in main() AFTER Hive initialization
 /// Hive adapters and boxes are registered in main.dart
@@ -169,109 +206,104 @@ Future<void> setupServiceLocator() async {
   // Register business-specific dependencies based on mode
   // If mode is not set yet (during setup), we'll register them later
   if (AppConfig.isBusinessModeSet) {
-    if (AppConfig.isRetail) {
-      await _registerRetailDependencies();
-    } else if (AppConfig.isRestaurant) {
-      await _registerRestaurantDependencies();
-    }
+    // Through registerBusinessDependencies, not the private helpers directly,
+    // so `_registeredBusinessMode` reflects what is actually in the container.
+    await registerBusinessDependencies(AppConfig.businessMode);
   }
 }
 
 /// Register retail-specific dependencies
 /// Called when business mode is set to retail
 Future<void> _registerRetailDependencies() async {
-  // Skip if already registered
-  if (locator.isRegistered<ProductStore>()) return;
-
   // Register Repositories (Singletons - lazy loaded)
-  locator.registerLazySingleton<SaleItemRepository>(() => SaleItemRepository());
-  locator.registerLazySingleton<HoldSaleRepository>(() => HoldSaleRepository());
+  _regBusiness<SaleItemRepository>(() => SaleItemRepository());
+  _regBusiness<HoldSaleRepository>(() => HoldSaleRepository());
 
   // Register Services (Singletons - lazy loaded)
-  locator.registerLazySingleton<ReportService>(() => ReportService());
-  locator.registerLazySingleton<StockAlertService>(() => StockAlertService());
-  locator.registerLazySingleton<GstService>(() => GstService());
-  locator.registerLazySingleton<SkuGeneratorService>(() => SkuGeneratorService());
-  locator.registerLazySingleton<BarcodeGeneratorService>(
+  _regBusiness<ReportService>(() => ReportService());
+  _regBusiness<StockAlertService>(() => StockAlertService());
+  _regBusiness<GstService>(() => GstService());
+  _regBusiness<SkuGeneratorService>(() => SkuGeneratorService());
+  _regBusiness<BarcodeGeneratorService>(
       () => BarcodeGeneratorService());
-  locator.registerLazySingleton<CustomerIdGeneratorService>(
+  _regBusiness<CustomerIdGeneratorService>(
       () => CustomerIdGeneratorService());
-  locator.registerLazySingleton<DamagedGoodsStore>(() => DamagedGoodsStore());
-  locator.registerLazySingleton<StockTakeStore>(() => StockTakeStore());
+  _regBusiness<DamagedGoodsStore>(() => DamagedGoodsStore());
+  _regBusiness<StockTakeStore>(() => StockTakeStore());
 
   // Register Repositories
-  locator.registerLazySingleton<retail.VariantRepository>(() => retail.VariantRepository());
+  _regBusiness<retail.VariantRepository>(() => retail.VariantRepository());
 
   // Bundle/kit products — see docs/retail_inventory_system_plan.md §3.2.
-  locator.registerLazySingleton<BundleRepository>(() => BundleRepository());
-  locator.registerLazySingleton<KitAssemblyRepository>(() => KitAssemblyRepository());
+  _regBusiness<BundleRepository>(() => BundleRepository());
+  _regBusiness<KitAssemblyRepository>(() => KitAssemblyRepository());
 
   // Category CRUD (add/edit/delete) — shared store+repository with restaurant.
   // Same `Category` model, retail's own box; plan-gating and item-cascade
   // logic inside are business-mode-aware (see CategoryRepository/CategoryStore).
-  locator.registerLazySingleton<CategoryRepository>(() => CategoryRepository());
-  locator.registerLazySingleton<CategoryStore>(
+  _regBusiness<CategoryRepository>(() => CategoryRepository());
+  _regBusiness<CategoryStore>(
     () => CategoryStore(locator<CategoryRepository>()),
   );
 
   // Tax — shared with restaurant (same Tax entity/box, unified this branch).
   // Add Product's tax dropdown reads `taxStore.taxes`; without this
   // registration it throws as soon as the screen loads.
-  locator.registerLazySingleton<TaxRepository>(() => TaxRepository());
-  locator.registerLazySingleton<TaxStore>(
+  _regBusiness<TaxRepository>(() => TaxRepository());
+  _regBusiness<TaxStore>(
     () => TaxStore(locator<TaxRepository>()),
   );
 
   // Register AuthService — single admin password, SharedPreferences-backed
   // (same storage approach as restaurant's admin PIN), no Hive model.
-  locator.registerLazySingleton<AuthService>(() => AuthService());
+  _regBusiness<AuthService>(() => AuthService());
 
   // Register Stores (Singletons - lazy loaded)
   // CartStore depends on CartRepository — the store never touches Hive itself.
-  locator.registerLazySingleton<retail.CartRepository>(
+  _regBusiness<retail.CartRepository>(
       () => retail.CartRepository());
-  locator.registerLazySingleton<retail.CartStore>(
+  _regBusiness<retail.CartStore>(
       () => retail.CartStore(locator<retail.CartRepository>()));
-  locator.registerLazySingleton<ProductStore>(() => ProductStore());
-  locator.registerLazySingleton<SaleStore>(() => SaleStore());
+  _regBusiness<ProductStore>(() => ProductStore());
+  _regBusiness<SaleStore>(() => SaleStore());
 
   // Customer CRUD — shared store+repository with restaurant. Same `Customer`
   // model, retail's own box; plan-gating inside is a no-op for retail (see
   // PlanEnforce._bypassed).
-  locator.registerLazySingleton<CustomerRepository>(() => CustomerRepository());
-  locator.registerLazySingleton<CustomerStore>(
+  _regBusiness<CustomerRepository>(() => CustomerRepository());
+  _regBusiness<CustomerStore>(
     () => CustomerStore(locator<CustomerRepository>()),
   );
 
   // Staff CRUD — shared store+repository with restaurant. Same `StaffModel`
   // (restaurant's shape only — retail's onboarding no longer collects the
   // extra permission/employment fields), retail's own box.
-  locator.registerLazySingleton<StaffRepository>(() => StaffRepository());
-  locator.registerLazySingleton<StaffStore>(
+  _regBusiness<StaffRepository>(() => StaffRepository());
+  _regBusiness<StaffStore>(
     () => StaffStore(locator<StaffRepository>()),
   );
 
-  locator.registerLazySingleton<SupplierStore>(() => SupplierStore());
-  locator.registerLazySingleton<PurchaseOrderStore>(() => PurchaseOrderStore());
+  _regBusiness<SupplierStore>(() => SupplierStore());
+  _regBusiness<PurchaseOrderStore>(() => PurchaseOrderStore());
 
   // HoldSaleStore depends on HoldSaleRepository
-  locator.registerLazySingleton<HoldSaleStore>(
+  _regBusiness<HoldSaleStore>(
         () => HoldSaleStore(locator<HoldSaleRepository>()),
   );
 
   // Initialize HoldSaleStore to open boxes
   locator<HoldSaleStore>().init();
 
-  locator.registerLazySingleton<StockAlertStore>(() => StockAlertStore());
+  _regBusiness<StockAlertStore>(() => StockAlertStore());
 
   // Credit System
-  locator.registerLazySingleton<CreditPaymentRepository>(() => CreditPaymentRepository());
-  locator.registerLazySingleton<CreditStore>(() => CreditStore());
+  _regBusiness<CreditPaymentRepository>(() => CreditPaymentRepository());
+  _regBusiness<CreditStore>(() => CreditStore());
 
   // Attribute System (WooCommerce-style)
-  locator.registerLazySingleton<AttributeRepository>(() => AttributeRepository());
-  locator.registerLazySingleton<AttributeStore>(() => AttributeStore());
-  locator.registerLazySingleton<VariantGeneratorService>(() => VariantGeneratorService());
+  _regBusiness<AttributeRepository>(() => AttributeRepository());
+  _regBusiness<AttributeStore>(() => AttributeStore());
+  _regBusiness<VariantGeneratorService>(() => VariantGeneratorService());
 
   // End-of-Day & Expenses (reused from restaurant side).
   // The repositories are already AppConfig.isRetail-aware (they bind to the
@@ -279,22 +311,22 @@ Future<void> _registerRetailDependencies() async {
   // same restaurant stores work here unchanged. Without these, retail EOD
   // generation, EOD save, and the Start-Day "carry forward last closing
   // balance" all fail because eodStore/expenseStore aren't resolvable.
-  locator.registerLazySingleton<ExpenseRepository>(() => ExpenseRepository());
-  locator.registerLazySingleton<ExpenseStore>(
+  _regBusiness<ExpenseRepository>(() => ExpenseRepository());
+  _regBusiness<ExpenseStore>(
     () => ExpenseStore(locator<ExpenseRepository>()),
   );
-  locator.registerLazySingleton<EodRepository>(() => EodRepository());
-  locator.registerLazySingleton<EodStore>(
+  _regBusiness<EodRepository>(() => EodRepository());
+  _regBusiness<EodStore>(
     () => EodStore(locator<EodRepository>()),
   );
-  locator.registerLazySingleton<ItemCancellationRepository>(
+  _regBusiness<ItemCancellationRepository>(
       () => ItemCancellationRepository());
 
   // Cash Drawer (Cash In / Cash Out) — reused from restaurant. The repository
   // binds to the shared cashMovementsBox (opened for retail in hive_init), and
   // feeds EOD cash reconciliation which already reads these movements.
-  locator.registerLazySingleton<CashMovementRepository>(() => CashMovementRepository());
-  locator.registerLazySingleton<CashMovementStore>(
+  _regBusiness<CashMovementRepository>(() => CashMovementRepository());
+  _regBusiness<CashMovementStore>(
     () => CashMovementStore(locator<CashMovementRepository>()),
   );
 
@@ -309,97 +341,94 @@ Future<void> _registerRetailDependencies() async {
 /// Register restaurant-specific dependencies
 /// Called when business mode is set to restaurant
 Future<void> _registerRestaurantDependencies() async {
-  // Skip if already registered
-  if (locator.isRegistered<CategoryStore>()) return;
-
 
   // ==================== RESTAURANT REPOSITORIES ====================
-  locator.registerLazySingleton<CategoryRepository>(() => CategoryRepository());
-  locator.registerLazySingleton<ItemRepository>(() => ItemRepository());
-  locator.registerLazySingleton<RecipeRepository>(() => RecipeRepository());
-  locator.registerLazySingleton<RecipeProductionRepository>(
+  _regBusiness<CategoryRepository>(() => CategoryRepository());
+  _regBusiness<ItemRepository>(() => ItemRepository());
+  _regBusiness<RecipeRepository>(() => RecipeRepository());
+  _regBusiness<RecipeProductionRepository>(
     () => RecipeProductionRepository(),
   );
-  locator.registerLazySingleton<RestaurantSupplierRepository>(() => RestaurantSupplierRepository());
-  locator.registerLazySingleton<RestaurantPurchaseOrderRepository>(() => RestaurantPurchaseOrderRepository());
-  locator.registerLazySingleton<RestaurantPurchaseOrderItemRepository>(() => RestaurantPurchaseOrderItemRepository());
-  locator.registerLazySingleton<RestaurantGRNRepository>(() => RestaurantGRNRepository());
-  locator.registerLazySingleton<RestaurantGRNItemRepository>(() => RestaurantGRNItemRepository());
-  locator.registerLazySingleton<RestaurantPurchaseReturnRepository>(() => RestaurantPurchaseReturnRepository());
-  locator.registerLazySingleton<RestaurantSupplierClaimRepository>(() => RestaurantSupplierClaimRepository());
-  locator.registerLazySingleton<RestaurantInventoryLossRepository>(() => RestaurantInventoryLossRepository());
-  locator.registerLazySingleton<RestaurantStockTakeRepository>(() => RestaurantStockTakeRepository());
-  locator.registerLazySingleton<RestaurantSupplierLedgerRepository>(() => RestaurantSupplierLedgerRepository());
-  locator.registerLazySingleton<VariantRepositoryRes>(() => restaurant.VariantRepositoryRes());
-  locator.registerLazySingleton<ChoiceRepository>(() => ChoiceRepository());
-  locator.registerLazySingleton<ExtraRepository>(() => ExtraRepository());
-  locator.registerLazySingleton<OrderRepository>(() => OrderRepository());
-  locator.registerLazySingleton<PastOrderRepository>(() => PastOrderRepository());
-  locator.registerLazySingleton<CartRepository>(() => CartRepository());
-  locator.registerLazySingleton<TableRepository>(() => TableRepository());
-  locator.registerLazySingleton<CustomerRepository>(() => CustomerRepository());
-  locator.registerLazySingleton<StaffRepository>(() => StaffRepository());
-  locator.registerLazySingleton<ShiftRepository>(() => ShiftRepository());
-  locator.registerLazySingleton<CashMovementRepository>(() => CashMovementRepository());
-  locator.registerLazySingleton<CashHandoverRepository>(() => CashHandoverRepository());
-  locator.registerLazySingleton<ExpenseRepository>(() => ExpenseRepository());
-  locator.registerLazySingleton<ExpenseCategoryRepository>(() => ExpenseCategoryRepository());
-  locator.registerLazySingleton<TaxRepository>(() => TaxRepository());
-  locator.registerLazySingleton<EodRepository>(() => EodRepository());
-  locator.registerLazySingleton<ItemCancellationRepository>(
+  _regBusiness<RestaurantSupplierRepository>(() => RestaurantSupplierRepository());
+  _regBusiness<RestaurantPurchaseOrderRepository>(() => RestaurantPurchaseOrderRepository());
+  _regBusiness<RestaurantPurchaseOrderItemRepository>(() => RestaurantPurchaseOrderItemRepository());
+  _regBusiness<RestaurantGRNRepository>(() => RestaurantGRNRepository());
+  _regBusiness<RestaurantGRNItemRepository>(() => RestaurantGRNItemRepository());
+  _regBusiness<RestaurantPurchaseReturnRepository>(() => RestaurantPurchaseReturnRepository());
+  _regBusiness<RestaurantSupplierClaimRepository>(() => RestaurantSupplierClaimRepository());
+  _regBusiness<RestaurantInventoryLossRepository>(() => RestaurantInventoryLossRepository());
+  _regBusiness<RestaurantStockTakeRepository>(() => RestaurantStockTakeRepository());
+  _regBusiness<RestaurantSupplierLedgerRepository>(() => RestaurantSupplierLedgerRepository());
+  _regBusiness<VariantRepositoryRes>(() => restaurant.VariantRepositoryRes());
+  _regBusiness<ChoiceRepository>(() => ChoiceRepository());
+  _regBusiness<ExtraRepository>(() => ExtraRepository());
+  _regBusiness<OrderRepository>(() => OrderRepository());
+  _regBusiness<PastOrderRepository>(() => PastOrderRepository());
+  _regBusiness<CartRepository>(() => CartRepository());
+  _regBusiness<TableRepository>(() => TableRepository());
+  _regBusiness<CustomerRepository>(() => CustomerRepository());
+  _regBusiness<StaffRepository>(() => StaffRepository());
+  _regBusiness<ShiftRepository>(() => ShiftRepository());
+  _regBusiness<CashMovementRepository>(() => CashMovementRepository());
+  _regBusiness<CashHandoverRepository>(() => CashHandoverRepository());
+  _regBusiness<ExpenseRepository>(() => ExpenseRepository());
+  _regBusiness<ExpenseCategoryRepository>(() => ExpenseCategoryRepository());
+  _regBusiness<TaxRepository>(() => TaxRepository());
+  _regBusiness<EodRepository>(() => EodRepository());
+  _regBusiness<ItemCancellationRepository>(
       () => ItemCancellationRepository());
-  locator.registerLazySingleton<AttendanceRepository>(() => AttendanceRepository());
-  locator.registerLazySingleton<NotificationRepository>(() => NotificationRepository());
+  _regBusiness<AttendanceRepository>(() => AttendanceRepository());
+  _regBusiness<NotificationRepository>(() => NotificationRepository());
   // PrinterRepository / ThermalPrinterService / PrinterStore are COMMON —
   // registered in setupServiceLocator(), see the printer block there.
 
   // ==================== RESTAURANT STORES ====================
-  locator.registerLazySingleton<CategoryStore>(
+  _regBusiness<CategoryStore>(
     () => CategoryStore(locator<CategoryRepository>()),
   );
-  locator.registerLazySingleton<ItemStore>(
+  _regBusiness<ItemStore>(
     () => ItemStore(locator<ItemRepository>()),
   );
-  locator.registerLazySingleton<RestaurantPurchaseOrderStore>(
+  _regBusiness<RestaurantPurchaseOrderStore>(
     () => RestaurantPurchaseOrderStore(),
   );
-  locator.registerLazySingleton<RestaurantDamagedGoodsStore>(
+  _regBusiness<RestaurantDamagedGoodsStore>(
     () => RestaurantDamagedGoodsStore(),
   );
-  locator.registerLazySingleton<RestaurantSupplierStore>(
+  _regBusiness<RestaurantSupplierStore>(
     () => RestaurantSupplierStore(),
   );
-  locator.registerLazySingleton<RestaurantStockTakeStore>(
+  _regBusiness<RestaurantStockTakeStore>(
     () => RestaurantStockTakeStore(),
   );
-  locator.registerLazySingleton<VariantStore>(
+  _regBusiness<VariantStore>(
     () => VariantStore(locator<restaurant.VariantRepositoryRes>()),
   );
-  locator.registerLazySingleton<ChoiceStore>(
+  _regBusiness<ChoiceStore>(
     () => ChoiceStore(locator<ChoiceRepository>()),
   );
-  locator.registerLazySingleton<ExtraStore>(
+  _regBusiness<ExtraStore>(
     () => ExtraStore(locator<ExtraRepository>()),
   );
-  locator.registerLazySingleton<OrderStore>(
+  _regBusiness<OrderStore>(
     () => OrderStore(locator<OrderRepository>()),
   );
-  locator.registerLazySingleton<PastOrderStore>(
+  _regBusiness<PastOrderStore>(
     () => PastOrderStore(locator<PastOrderRepository>()),
   );
-  locator.registerLazySingleton<restaurant.CartStoreRes>(
+  _regBusiness<restaurant.CartStoreRes>(
     () => restaurant.CartStoreRes(locator<CartRepository>()),
   );
-  locator.registerLazySingleton<TableStore>(
+  _regBusiness<TableStore>(
     () => TableStore(locator<TableRepository>()),
   );
-  locator.registerLazySingleton<CustomerStore>(
+  _regBusiness<CustomerStore>(
     () => CustomerStore(locator<CustomerRepository>()),
   );
-  locator.registerLazySingleton<StaffStore>(
+  _regBusiness<StaffStore>(
     () => StaffStore(locator<StaffRepository>()),
   );
-  locator.registerLazySingleton<ShiftStore>(
+  _regBusiness<ShiftStore>(
     () => ShiftStore(locator<ShiftRepository>()),
   );
   // Auto-close the open shift when any logout path calls RestaurantSession.clearSession()
@@ -408,47 +437,56 @@ Future<void> _registerRestaurantDependencies() async {
   RestaurantSession.onAttendanceAutoClockOut = (name) => attendanceStore.autoClockOutIfOpen(name);
 
   // Cash Management stores
-  locator.registerLazySingleton<CashMovementStore>(
+  _regBusiness<CashMovementStore>(
     () => CashMovementStore(locator<CashMovementRepository>()),
   );
-  locator.registerLazySingleton<CashHandoverStore>(
+  _regBusiness<CashHandoverStore>(
     () => CashHandoverStore(locator<CashHandoverRepository>()),
   );
-  locator.registerLazySingleton<ExpenseStore>(
+  _regBusiness<ExpenseStore>(
     () => ExpenseStore(locator<ExpenseRepository>()),
   );
-  locator.registerLazySingleton<ExpenseCategoryStore>(
+  _regBusiness<ExpenseCategoryStore>(
     () => ExpenseCategoryStore(locator<ExpenseCategoryRepository>()),
   );
-  locator.registerLazySingleton<TaxStore>(
+  _regBusiness<TaxStore>(
     () => TaxStore(locator<TaxRepository>()),
   );
-  locator.registerLazySingleton<EodStore>(
+  _regBusiness<EodStore>(
     () => EodStore(locator<EodRepository>()),
   );
-  locator.registerLazySingleton<AppStore>(() => AppStore());
-  locator.registerLazySingleton<AttendanceStore>(() => AttendanceStore(locator<AttendanceRepository>()));
-  locator.registerLazySingleton<NotificationStore>(() => NotificationStore(locator<NotificationRepository>()));
+  _regBusiness<AppStore>(() => AppStore());
+  _regBusiness<AttendanceStore>(() => AttendanceStore(locator<AttendanceRepository>()));
+  _regBusiness<NotificationStore>(() => NotificationStore(locator<NotificationRepository>()));
 }
 
 /// Register business dependencies dynamically (called during setup wizard)
 /// This is called when user selects a business type
+/// Safe to call repeatedly, and safe to call with a DIFFERENT mode than last
+/// time — the setup wizard's Business Type step lets the user change their mind
+/// until setup is completed, and the previous mode's graph is torn down before
+/// the new one goes in.
 Future<void> registerBusinessDependencies(BusinessMode mode) async {
-  // ignore: avoid_print
-  if (mode == BusinessMode.retail) {
-    // ignore: avoid_print
-    await _registerRetailDependencies();
-    // ignore: avoid_print
-  } else if (mode == BusinessMode.restaurant) {
-    // ignore: avoid_print
-    await _registerRestaurantDependencies();
-    // ignore: avoid_print
+  if (mode == BusinessMode.none) return;
+  if (_registeredBusinessMode == mode) return;
+
+  if (_registeredBusinessMode != null) {
+    await _unregisterBusinessDependencies();
   }
+
+  if (mode == BusinessMode.retail) {
+    await _registerRetailDependencies();
+  } else if (mode == BusinessMode.restaurant) {
+    await _registerRestaurantDependencies();
+  }
+  _registeredBusinessMode = mode;
 }
 
 /// Reset all dependencies (useful for testing or logout)
 Future<void> resetServiceLocator() async {
   await locator.reset();
+  _businessUnregisterHooks.clear();
+  _registeredBusinessMode = null;
 }
 
 
@@ -456,6 +494,8 @@ Future<void> resetServiceLocator() async {
 /// Reset all dependencies (useful for testing or logout)
 Future<void> resetLocator() async {
   await locator.reset();
+  _businessUnregisterHooks.clear();
+  _registeredBusinessMode = null;
   await setupServiceLocator();
 }
 

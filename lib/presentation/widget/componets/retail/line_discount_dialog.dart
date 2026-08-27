@@ -37,7 +37,11 @@ final _discountFormatters = <TextInputFormatter>[
 /// showing it and refusing.
 class LineDiscountDialog extends StatefulWidget {
   final CartItemModel item;
-  final VarianteModel variant;
+
+  /// Null for a quick item, which has no catalogue row. Only the variant
+  /// descriptor in the subtitle and the below-cost floor need it, and both fall
+  /// back cleanly — an ad-hoc line simply has no cost to sell under.
+  final VarianteModel? variant;
 
   /// Money formatter supplied by the caller, which already sits inside a
   /// MoneyScope. Injected rather than calling `formatMoney` here so this dialog
@@ -189,8 +193,8 @@ class _LineDiscountDialogState extends State<LineDiscountDialog> {
 
     return AppDialogShell(
       title: 'Line Discount',
-      subtitle: widget.variant.hasAttributes
-          ? '${widget.item.productName} - ${widget.variant.variantDescription}'
+      subtitle: (widget.variant?.hasAttributes ?? false)
+          ? '${widget.item.productName} - ${widget.variant!.variantDescription}'
           : widget.item.productName,
       accent: AppColors.primary,
       icon: Icons.percent_rounded,
@@ -300,7 +304,9 @@ class _LineDiscountDialogState extends State<LineDiscountDialog> {
   /// Current selling price and the line it applies to, so the decision is made
   /// with the numbers in view. Cost is shown because this dialog is admin-only.
   Widget _buildReferencePrices(BuildContext context) {
-    final cost = widget.variant.costPrice;
+    // Null for a quick item — the cost row below is simply not built, the same
+    // way it is skipped for a catalogue variant with no cost on record.
+    final cost = widget.variant?.costPrice;
 
     return Container(
       width: double.infinity,
