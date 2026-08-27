@@ -8,6 +8,8 @@ import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/di/service_locator.dart';
+import '../../../../core/constants/item_units.dart';
+import '../../../../data/models/common/categorymodel_300.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/itemvariantemodel_312.dart';
 import '../../../../data/models/restaurant/db/stock_movement_model.dart';
@@ -50,6 +52,25 @@ class _ManageInventoryState extends State<ManageInventory> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   bool _showLowStockOnly = false;
+
+  /// Synthetic category id for tracked items with no real category assigned
+  /// (Category is optional for Raw Material/Semi-Finished) — never a real
+  /// Category's id, which is a generated UUID.
+  static const _uncategorizedId = '__uncategorized__';
+
+  /// Whether [item]'s stock can carry a fractional quantity, based on its
+  /// actual Stock Unit — only 'piece' (or no unit at all) is a whole-count
+  /// unit. `isSoldByWeight` is a POS Selling Method concept that doesn't
+  /// apply to Raw Material/Semi-Finished and is never set for them, so it
+  /// can't be used to decide this (it silently rounded away real fractional
+  /// deductions, e.g. 0.20 kg used from stock, for every Raw Material).
+  bool _allowsDecimals(Items item) {
+    final normalized = normalizeItemUnit(item.unit);
+    return normalized != null && normalized != 'piece';
+  }
+
+  String _unitFor(Items item) =>
+      normalizeItemUnit(item.unit) ?? item.unit ?? 'pcs';
 
   /// Item needs attention: opted into alerts and is low or out of stock.
   ///
@@ -137,9 +158,7 @@ class _ManageInventoryState extends State<ManageInventory> {
     final noteController = TextEditingController();
 
     // Intent-driven accent: green for adding, red for removing.
-    final Color accent = isAdd
-        ? const Color(0xFF2E7D32)
-        : const Color(0xFFC62828);
+    final Color accent = isAdd ? AppColors.success : AppColors.danger;
     final IconData headerIcon = isAdd
         ? Icons.add_circle_rounded
         : Icons.remove_circle_rounded;
@@ -361,16 +380,16 @@ class _ManageInventoryState extends State<ManageInventory> {
 
   /// Stock status pill — priority: Out of Stock > Low Stock > In Stock.
   Widget _buildStockBadge(Items item) {
-    final MaterialColor base;
+    final Color base;
     final String label;
     if (!InventoryService.isInStock(item)) {
-      base = Colors.red;
+      base = AppColors.danger;
       label = 'Out of Stock';
     } else if (InventoryService.isLowStock(item)) {
-      base = Colors.orange;
+      base = AppColors.orange;
       label = 'Low Stock';
     } else {
-      base = Colors.green;
+      base = AppColors.success;
       label = 'In Stock';
     }
     return Container(
@@ -399,7 +418,7 @@ class _ManageInventoryState extends State<ManageInventory> {
             width: 6,
             height: 6,
             decoration: BoxDecoration(
-              color: base.shade600,
+              color: base,
               shape: BoxShape.circle,
             ),
           ),
@@ -414,7 +433,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                 desktop: 13.0,
               ),
               fontWeight: FontWeight.w600,
-              color: base.shade700,
+              color: base,
             ),
           ),
         ],
@@ -433,7 +452,7 @@ class _ManageInventoryState extends State<ManageInventory> {
         AppSettings.lowStockAlertsEnabled &&
         qty <= item.effectiveLowStockThreshold;
     if (!out && !low) return const SizedBox.shrink();
-    final MaterialColor color = out ? Colors.red : Colors.orange;
+    final Color color = out ? AppColors.danger : AppColors.orange;
     return Container(
       margin: const EdgeInsets.only(right: 8),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -446,14 +465,14 @@ class _ManageInventoryState extends State<ManageInventory> {
         style: GoogleFonts.poppins(
           fontSize: 10,
           fontWeight: FontWeight.w700,
-          color: color.shade700,
+          color: color,
         ),
       ),
     );
   }
 
   void _openHistory(Items item) {
-    final unit = item.unit ?? (item.isSoldByWeight ? 'kg' : 'pcs');
+    final unit = _unitFor(item);
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -479,8 +498,8 @@ class _ManageInventoryState extends State<ManageInventory> {
       return;
     }
 
-    final isWeightBased = item.isSoldByWeight;
-    final unit = item.unit ?? (isWeightBased ? 'kg' : 'pcs');
+    final isWeightBased = _allowsDecimals(item);
+    final unit = _unitFor(item);
 
     final stockToAdd = double.tryParse(controller.text);
     if (stockToAdd == null || stockToAdd <= 0) {
@@ -610,8 +629,8 @@ class _ManageInventoryState extends State<ManageInventory> {
     final currentStock = variant != null
         ? (variant.stockQuantity ?? 0)
         : item.stockQuantity;
-    final isWeightBased = item.isSoldByWeight;
-    final unit = item.unit ?? (isWeightBased ? 'kg' : 'pcs');
+    final isWeightBased = _allowsDecimals(item);
+    final unit = _unitFor(item);
 
     // Check if there is enough stock to remove
     if (currentStock < stockToRemove) {
@@ -788,7 +807,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              item.isSoldByWeight
+                              _allowsDecimals(item)
                                   ? 'Weight-based'
                                   : 'Unit-based',
                               style: GoogleFonts.poppins(
@@ -805,7 +824,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                           ),
                           SizedBox(width: 8),
                           Text(
-                            '(${item.unit ?? (item.isSoldByWeight ? 'kg' : 'pcs')})',
+                            '(${_unitFor(item)})',
                             style: GoogleFonts.poppins(
                               fontSize: AppResponsive.getValue(
                                 context,
@@ -1017,13 +1036,13 @@ class _ManageInventoryState extends State<ManageInventory> {
                   unlimited
                       ? 'Not limited by ingredients'
                       : '${canMake.toStringAsFixed(0)} '
-                          '${item.unit ?? (item.isSoldByWeight ? 'kg' : 'pcs')}',
+                          '${_unitFor(item)}',
                   style: GoogleFonts.poppins(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                     color: unlimited || canMake > 0
-                        ? Colors.green.shade700
-                        : Colors.red.shade700,
+                        ? AppColors.success
+                        : AppColors.danger,
                   ),
                 ),
               ],
@@ -1057,8 +1076,8 @@ class _ManageInventoryState extends State<ManageInventory> {
         ? '${item.id}_${variant.variantId}'
         : item.id;
     final controller = _getStockController(controllerKey);
-    final isWeightBased = item.isSoldByWeight;
-    final unit = item.unit ?? (isWeightBased ? 'kg' : 'pcs');
+    final isWeightBased = _allowsDecimals(item);
+    final unit = _unitFor(item);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1086,8 +1105,8 @@ class _ManageInventoryState extends State<ManageInventory> {
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: currentStock > 0
-                          ? Colors.green.shade700
-                          : Colors.red.shade700,
+                          ? AppColors.success
+                          : AppColors.danger,
                     ),
                   ),
                 ],
@@ -1121,7 +1140,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                       child: ElevatedButton(
                         onPressed: () => _removeStock(item, variant: variant),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
+                          backgroundColor: AppColors.danger,
                           foregroundColor: Colors.white,
                           elevation: 0,
                           padding: EdgeInsets.zero,
@@ -1140,7 +1159,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                       child: ElevatedButton(
                         onPressed: () => _addStock(item, variant: variant),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
+                          backgroundColor: AppColors.success,
                           foregroundColor: Colors.white,
                           elevation: 0,
                           padding: EdgeInsets.zero,
@@ -1347,10 +1366,11 @@ class _ManageInventoryState extends State<ManageInventory> {
   /// Gradient hero banner with live "at a glance" counters — Tracked / Low /
   /// Out — flowing straight out of the flat app bar.
   Widget _buildHero(int tracked, int low, int outOfStock) {
+    // App bar already carries the "Inventory" title, so this card shows only
+    // the live stats — no title/subtitle/icon. Keeps the primary→secondary
+    // gradient (rather than a flat primary) so the card still visually
+    // separates from the app bar instead of merging into one solid block.
     return GradientHeroHeader(
-      title: 'Inventory Control',
-      subtitle: 'Recipes, purchasing, production & live stock — all in one place',
-      icon: Icons.inventory_2_rounded,
       accent: AppColors.secondary,
       stats: [
         HeroStat(
@@ -1456,7 +1476,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                         child: Container(
                           padding: const EdgeInsets.all(4),
                           decoration: const BoxDecoration(
-                            color: Colors.red,
+                            color: AppColors.danger,
                             shape: BoxShape.circle,
                           ),
                           constraints: const BoxConstraints(
@@ -1485,6 +1505,21 @@ class _ManageInventoryState extends State<ManageInventory> {
         builder: (context) {
           final categories = categoryStore.categories.toList();
           final items = itemStore.items.toList();
+
+          // Category is optional for Raw Material/Semi-Finished, so an item
+          // with no category (or one pointing at a since-deleted category)
+          // would otherwise match no group below and silently never render.
+          // Give those items a synthetic "Uncategorized" group instead of
+          // hiding them until someone assigns a real category.
+          final categoryIds = categories.map((c) => c.id).toSet();
+          final hasUncategorizedStock = items.any((item) =>
+              item.trackInventory == true &&
+              !categoryIds.contains(item.categoryOfItem));
+          final displayCategories = [
+            ...categories,
+            if (hasUncategorizedStock)
+              Category(id: _uncategorizedId, name: 'Uncategorized'),
+          ];
 
           // Items whose availability is governed by stock: directly-tracked
           // ones, plus Recipe-Based items (governed by their ingredients, so
@@ -1586,7 +1621,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                   ),
                 ),
               ),
-              if (categories.isEmpty)
+              if (displayCategories.isEmpty)
                 SliverFillRemaining(
                   hasScrollBody: false,
                   child: _buildEmptyState(
@@ -1630,11 +1665,16 @@ class _ManageInventoryState extends State<ManageInventory> {
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
-                        final category = categories[index];
+                        final category = displayCategories[index];
+                        final isUncategorizedGroup =
+                            category.id == _uncategorizedId;
                         final categoryItems = items
                             .where(
                               (item) =>
-                                  item.categoryOfItem == category.id &&
+                                  (isUncategorizedGroup
+                                      ? !categoryIds
+                                          .contains(item.categoryOfItem)
+                                      : item.categoryOfItem == category.id) &&
                                   item.trackInventory == true &&
                                   (!_showLowStockOnly || _isAlertItem(item)) &&
                                   (_searchQuery.isEmpty ||
@@ -1712,7 +1752,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                           ),
                         );
                       },
-                      childCount: categories.length,
+                      childCount: displayCategories.length,
                     ),
                   ),
                 ),

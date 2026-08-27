@@ -7,7 +7,7 @@ import '../../../data/repositories/restaurant/stock_movement_repository.dart';
 /// a single Semi-Finished or Recipe-Based item.
 class RecipeCostReportRow {
   final Items item;
-  final RecipeModel recipe;
+  final RecipeModel? recipe;
   final double costPerUnit;
   final double? sellingPrice;
   final double? foodCostPercent; // costPerUnit / sellingPrice * 100
@@ -16,7 +16,7 @@ class RecipeCostReportRow {
 
   RecipeCostReportRow({
     required this.item,
-    required this.recipe,
+    this.recipe,
     required this.costPerUnit,
     required this.sellingPrice,
     required this.foodCostPercent,
@@ -86,11 +86,26 @@ class RecipeReportService {
 
     final rows = <RecipeCostReportRow>[];
     for (final item in itemStore.items) {
-      if (!item.isSemiFinished && !item.isRecipeBased) continue;
-      final recipe = recipeRepository.getRecipeForItem(item.id);
-      if (recipe == null || !recipe.hasIngredients) continue;
+      final isRecipe = item.isSemiFinished || item.isRecipeBased;
+      if (!isRecipe && !item.isFinishedGood) continue;
 
-      final costPerUnit = recipe.estimatedCostPerUnit(costOf);
+      // Finished Goods must have a cost configured to show up in the report
+      if (item.isFinishedGood && item.lastPurchaseCost == null) continue;
+
+      RecipeModel? recipe;
+      int ingredientCount = 0;
+      double costPerUnit = 0.0;
+
+      if (isRecipe) {
+        recipe = recipeRepository.getRecipeForItem(item.id);
+        if (recipe == null || !recipe.hasIngredients) continue;
+        costPerUnit = recipe.estimatedCostPerUnit(costOf);
+        ingredientCount = recipe.ingredients.length;
+      } else {
+        // Finished Good
+        costPerUnit = item.lastPurchaseCost ?? 0.0;
+      }
+
       final sellingPrice = item.price;
       double? foodCostPercent;
       double? marginPercent;
@@ -106,7 +121,7 @@ class RecipeReportService {
         sellingPrice: sellingPrice,
         foodCostPercent: foodCostPercent,
         marginPercent: marginPercent,
-        ingredientCount: recipe.ingredients.length,
+        ingredientCount: ingredientCount,
       ));
     }
     rows.sort((a, b) => a.item.name.compareTo(b.item.name));

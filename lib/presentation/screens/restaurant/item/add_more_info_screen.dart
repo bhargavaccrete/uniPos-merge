@@ -4,6 +4,7 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Button.dart' show CommonButton;
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/data/models/restaurant/db/product_type.dart';
 import 'variant_selection_screen.dart';
 import 'choice_selection_screen.dart';
 import 'extra_selection_screen.dart';
@@ -71,31 +72,33 @@ class _AddMoreInfoScreenState extends State<AddMoreInfoScreen> {
                   const SizedBox(height: 24),*/
 
                   // Add Variants Option
-                  _buildOptionCard(
-                    icon: Icons.straighten_outlined,
-                    title: 'Add Variants',
-                    description:
-                        'Add different sizes (S, M, L) with custom prices',
-                    count: selectedVariants.length,
-                    onTap: () async {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => VariantSelectionScreen(
-                            selectedVariants: selectedVariants,
-                            trackInventory: _trackInventory,
+                  if (itemData['productType'] != ProductType.rawMaterial &&
+                      itemData['productType'] != ProductType.semiFinished) ...[
+                    _buildOptionCard(
+                      icon: Icons.straighten_outlined,
+                      title: 'Add Variants',
+                      description:
+                          'Add different sizes (S, M, L) with custom prices',
+                      count: selectedVariants.length,
+                      onTap: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => VariantSelectionScreen(
+                              selectedVariants: selectedVariants,
+                              trackInventory: _trackInventory,
+                            ),
                           ),
-                        ),
-                      );
-                      if (result != null) {
-                        setState(() {
-                          selectedVariants = result;
-                        });
-                      }
-                    },
-                  ),
-
-                  const SizedBox(height: 14),
+                        );
+                        if (result != null) {
+                          setState(() {
+                            selectedVariants = result;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                  ],
 
                   // Add Choices Option
                   _buildOptionCard(

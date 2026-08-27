@@ -100,6 +100,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
   String allowOutOfStockFilter = 'YES';
   String _lowStockAlertFilter = 'NO';
   bool _isSaving = false;
+  bool _isEnabled = true;
 
   // Product Type + Recipe (BOM) — see docs/inventory_recipe_system_plan.md
   String _productType = ProductType.finishedGood;
@@ -171,6 +172,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
     selectedFilter = widget.items.trackInventory == true ? 'YES' : 'NO';
     allowOutOfStockFilter = widget.items.allowOrderWhenOutOfStock == true ? 'YES' : 'NO';
 
+    _isEnabled = widget.items.isEnabled;
     _productType = widget.items.effectiveProductType;
     _sellDirectlyAtPos = widget.items.sellDirectlyAtPos;
     _currentRecipe = recipeRepository.getRecipeForItem(widget.items.id);
@@ -340,44 +342,48 @@ class _EdititemScreenState extends State<EdititemScreen> {
     final pendingAdjustments = <Map<String, dynamic>>[];
     Map<String, dynamic>? pendingSimpleAdjustment;
     List<ItemVariante> selectedVariants = [];
-    for (int i = 0; i < _allVariants.length; i++) {
-      if (_variantCheckedList[i]) {
-        final priceText = _variantPriceControllers[i].text.trim();
-        final variantId = _allVariants[i].id;
+    final isRawOrSemi = _productType == ProductType.rawMaterial ||
+        _productType == ProductType.semiFinished;
+    if (!isRawOrSemi) {
+      for (int i = 0; i < _allVariants.length; i++) {
+        if (_variantCheckedList[i]) {
+          final priceText = _variantPriceControllers[i].text.trim();
+          final variantId = _allVariants[i].id;
 
-        // ✅ FIX: Preserve existing stock quantities when editing
-        // Find the existing variant with this variantId to preserve stock data
-        final existingVariant = widget.items.variant?.firstWhere(
-          (v) => v.variantId == variantId,
-          orElse: () => ItemVariante(
-            variantId: variantId,
-            price: 0.0,
-            trackInventory: null,
-            stockQuantity: null,
-          ),
-        );
+          // ✅ FIX: Preserve existing stock quantities when editing
+          // Find the existing variant with this variantId to preserve stock data
+          final existingVariant = widget.items.variant?.firstWhere(
+            (v) => v.variantId == variantId,
+            orElse: () => ItemVariante(
+              variantId: variantId,
+              price: 0.0,
+              trackInventory: null,
+              stockQuantity: null,
+            ),
+          );
 
-        // When inventory tracking is on, take the edited per-variant stock;
-        // otherwise keep whatever was there.
-        final newStock = selectedFilter.toLowerCase() == 'yes'
-            ? (double.tryParse(_variantStockControllers[i].text.trim()) ??
-                existingVariant?.stockQuantity ??
-                0.0)
-            : existingVariant?.stockQuantity;
+          // When inventory tracking is on, take the edited per-variant stock;
+          // otherwise keep whatever was there.
+          final newStock = selectedFilter.toLowerCase() == 'yes'
+              ? (double.tryParse(_variantStockControllers[i].text.trim()) ??
+                  existingVariant?.stockQuantity ??
+                  0.0)
+              : existingVariant?.stockQuantity;
 
-        // Log an adjustment if a tracked variant's stock actually changed.
-        if (selectedFilter.toLowerCase() == 'yes' && newStock != null) {
-          final oldStock = existingVariant?.stockQuantity ?? 0.0;
-          if (newStock != oldStock) {
-            pendingAdjustments.add({'variantId': variantId, 'old': oldStock, 'new': newStock});
+          // Log an adjustment if a tracked variant's stock actually changed.
+          if (selectedFilter.toLowerCase() == 'yes' && newStock != null) {
+            final oldStock = existingVariant?.stockQuantity ?? 0.0;
+            if (newStock != oldStock) {
+              pendingAdjustments.add({'variantId': variantId, 'old': oldStock, 'new': newStock});
+            }
           }
-        }
 
-        selectedVariants.add(ItemVariante(
-            variantId: variantId,
-            price: double.tryParse(priceText) ?? 0.0,
-            trackInventory: existingVariant?.trackInventory,
-            stockQuantity: newStock));
+          selectedVariants.add(ItemVariante(
+              variantId: variantId,
+              price: double.tryParse(priceText) ?? 0.0,
+              trackInventory: existingVariant?.trackInventory,
+              stockQuantity: newStock));
+        }
       }
     }
 
@@ -442,6 +448,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
           : (_sellingMethod == SellingMethod.byWeight ? _selectedUnit : null),
       itemCode: itemCode,
       productType: _productType,
+      isEnabled: _isEnabled,
     );
 
     // Set tax directly (not via copyWith) so selecting "No Tax" (null) actually
@@ -454,11 +461,14 @@ class _EdititemScreenState extends State<EdititemScreen> {
     updateItem.recipeId =
         ProductType.hasRecipe(_productType) ? _currentRecipe?.id : null;
 
-    // sellDirectlyAtPos: same direct-set reason. Only Raw Materials carry an
+    // sellDirectlyAtPos: same direct-set reason. Only Raw Materials and Semi-Finished carry an
     // override; switching to any other type clears it back to null so the item
-    // follows that type's default (all of which are "sellable").
+    // follows that type's default.
     updateItem.sellDirectlyAtPos =
-        _productType == ProductType.rawMaterial ? _sellDirectlyAtPos : null;
+        (_productType == ProductType.rawMaterial ||
+         _productType == ProductType.semiFinished)
+            ? _sellDirectlyAtPos
+            : null;
 
     // Low-stock alert (only meaningful when inventory tracking is on).
     // Set directly so turning tracking/alert off clears the override.
@@ -623,6 +633,21 @@ class _EdititemScreenState extends State<EdititemScreen> {
             textInputAction: TextInputAction.next,
             onFieldSubmitted: (_) => _priceFocus.requestFocus(),
           ),
+          const SizedBox(height: 15),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            title: Text('Active / Enabled',
+                style: GoogleFonts.poppins(
+                    fontSize: 14, fontWeight: FontWeight.w500)),
+            subtitle: Text(
+                'Turn off to temporarily hide this item from POS and listings.',
+                style: GoogleFonts.poppins(
+                    fontSize: 12, color: AppColors.textSecondary)),
+            value: _isEnabled,
+            activeColor: AppColors.primary,
+            onChanged: (v) => setState(() => _isEnabled = v),
+          ),
           const SizedBox(height: 25),
 
           // Selling Method Section — Raw Material/Semi-Finished get a plain
@@ -682,43 +707,47 @@ class _EdititemScreenState extends State<EdititemScreen> {
 
           // Product Type — determines whether this item is stocked directly,
           // made from a recipe, or both. See docs/inventory_recipe_system_plan.md §3/§8.1.
-          _buildSectionHeader('Product Type', Icons.category_rounded),
-          const SizedBox(height: 15),
-          Dropdown(
-            items: ProductType.all.map(ProductType.displayName).toList(),
-            selectedItem: ProductType.displayName(_productType),
-            onChanged: (label) {
-              final type = ProductType.all.firstWhere(
-                (t) => ProductType.displayName(t) == label,
-                orElse: () => ProductType.finishedGood,
-              );
-              setState(() {
-                _productType = type;
-                // Switching away from a recipe type drops the in-progress
-                // recipe rather than silently keeping stale ingredients.
-                if (!ProductType.hasRecipe(type)) _currentRecipe = null;
-                // Recipe-Based is always stock-governed via its ingredients —
-                // same "enforce limits by default" policy as enabling
-                // inventory tracking above, so Add and Edit agree.
-                if (type == ProductType.recipeBased) {
-                  allowOutOfStockFilter = 'NO';
-                }
-              });
-            },
-          ),
-          // Raw Materials are ingredients, not menu items, so they stay out of
-          // the POS sale grid unless explicitly opted in. Only shown for that
-          // type — every other type is sellable and has nothing to decide.
-          if (_productType == ProductType.rawMaterial) ...[
+          if (PlanEnforce.allows(EntKeys.inventory)) ...[
+            _buildSectionHeader('Product Type', Icons.category_rounded),
+            const SizedBox(height: 15),
+            Dropdown(
+              items: ProductType.all.map(ProductType.displayName).toList(),
+              selectedItem: ProductType.displayName(_productType),
+              onChanged: (label) {
+                final type = ProductType.all.firstWhere(
+                  (t) => ProductType.displayName(t) == label,
+                  orElse: () => ProductType.finishedGood,
+                );
+                setState(() {
+                  _productType = type;
+                  // Switching away from a recipe type drops the in-progress
+                  // recipe rather than silently keeping stale ingredients.
+                  if (!ProductType.hasRecipe(type)) _currentRecipe = null;
+                  // Recipe-Based is always stock-governed via its ingredients —
+                  // same "enforce limits by default" policy as enabling
+                  // inventory tracking above, so Add and Edit agree.
+                  if (type == ProductType.recipeBased) {
+                    allowOutOfStockFilter = 'NO';
+                  }
+                });
+              },
+            ),
+          ],
+          // Raw Materials / Semi-Finished are ingredients/prep items, so they stay out of
+          // the POS sale grid unless explicitly opted in.
+          if (_productType == ProductType.rawMaterial ||
+              _productType == ProductType.semiFinished) ...[
             const SizedBox(height: 6),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               dense: true,
-              title: Text('Sell directly at POS',
+              title: Text(_productType == ProductType.rawMaterial ? 'Sell directly at POS' : 'Show on POS Menu',
                   style: GoogleFonts.poppins(
                       fontSize: 14, fontWeight: FontWeight.w500)),
               subtitle: Text(
-                  'Raw materials are hidden from the menu by default. Turn on to sell this one as-is.',
+                  _productType == ProductType.rawMaterial
+                      ? 'Raw materials are hidden from the menu by default. Turn on to sell this one as-is.'
+                      : 'Semi-finished prep items are hidden from the menu by default. Turn on to show and sell this one.',
                   style: GoogleFonts.poppins(
                       fontSize: 12, color: AppColors.textSecondary)),
               value: _sellDirectlyAtPos ?? false,
@@ -827,7 +856,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
           // Recipe (Bill of Materials) — Semi-Finished items describe what
           // they're prepped FROM; Recipe-Based items describe what they're
           // assembled FROM at sale time. See design doc §3/§4/§8.2.
-          if (ProductType.hasRecipe(_productType)) ...[
+          if (PlanEnforce.allows(EntKeys.inventory) && ProductType.hasRecipe(_productType)) ...[
             RecipeBuilderWidget(
               itemId: widget.items.id,
               allItems: itemStore.items.where((i) => i.id != widget.items.id).toList(),
@@ -851,7 +880,10 @@ class _EdititemScreenState extends State<EdititemScreen> {
           // be created here (via the "+ New" button in each section header).
           _buildSectionHeader('Additional Options', Icons.extension),
           const SizedBox(height: 15),
-          _buildVariantSection(_allVariants),
+          if (_productType != ProductType.rawMaterial &&
+              _productType != ProductType.semiFinished) ...[
+            _buildVariantSection(_allVariants),
+          ],
           _buildChoiceSection(_allChoices),
           if (_choiceCheckedList.contains(true))
             _buildDefaultSelectionButton(_allChoices),
@@ -979,8 +1011,19 @@ class _EdititemScreenState extends State<EdititemScreen> {
 
   // ── Inventory sub-fields (mirror the Add Item sheet) ────────────────────────
 
+  /// The unit to show next to a stock quantity field. Raw Material/
+  /// Semi-Finished always use their Stock Unit (independent of Selling
+  /// Method, which they don't show); Finished Good/Recipe-Based keep the
+  /// original by-weight-only condition, unchanged.
+  String _unitLabel() {
+    final isBackOfHouse = _productType == ProductType.rawMaterial ||
+        _productType == ProductType.semiFinished;
+    if (isBackOfHouse) return _selectedUnit;
+    return _sellingMethod == SellingMethod.byWeight ? _selectedUnit : 'pcs';
+  }
+
   Widget _buildCurrentStockField() {
-    final unit = _sellingMethod == SellingMethod.byWeight ? _selectedUnit : 'pcs';
+    final unit = _unitLabel();
     return AppTextField(
       controller: _stockController,
       label: 'Current Stock ($unit)',
@@ -1016,8 +1059,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
         if (_lowStockAlertFilter == 'YES') ...[
           const SizedBox(height: 8),
           Builder(builder: (_) {
-            final unit =
-                _sellingMethod == SellingMethod.byWeight ? _selectedUnit : 'pcs';
+            final unit = _unitLabel();
             return AppTextField(
               controller: _lowStockController,
               label: 'Alert threshold ($unit, optional)',

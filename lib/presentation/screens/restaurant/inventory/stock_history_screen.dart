@@ -124,7 +124,7 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
 
   Widget _buildRow(StockMovementModel m) {
     final isIn = m.isIn;
-    final color = isIn ? AppColors.success : Colors.red;
+    final color = isIn ? AppColors.success : AppColors.danger;
     final variant = _variantOf(m);
     return Container(
       padding: const EdgeInsets.all(12),

@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../../../core/plan/entitlement_keys.dart';
+import '../../../../../core/plan/plan_enforcement.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../core/config/tax_feature.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
@@ -425,15 +427,20 @@ class _AddItemSheetState extends State<AddItemSheet> {
     return [
       // Product Type drives every other field below it, so it's the first
       // decision the user makes.
-      _buildProductTypeSelector(),
-      const SizedBox(height: 18),
-      if (_formState.productType == ProductType.rawMaterial) ...[
+      if (PlanEnforce.allows(EntKeys.inventory)) ...[
+        _buildProductTypeSelector(),
+        const SizedBox(height: 18),
+      ],
+      if (_formState.productType == ProductType.rawMaterial ||
+          _formState.productType == ProductType.semiFinished) ...[
         _buildSellDirectlyAtPosToggle(),
         const SizedBox(height: 14),
       ],
       _buildItemNameField(),
       const SizedBox(height: 14),
       _buildItemCodeField(),
+      const SizedBox(height: 14),
+      _buildEnabledToggle(),
       const SizedBox(height: 18),
       // Raw Material/Semi-Finished aren't sold, so Selling Method (a POS
       // concept) is replaced by a plain Stock Unit picker.
@@ -876,20 +883,37 @@ class _AddItemSheetState extends State<AddItemSheet> {
     );
   }
 
-  /// Raw Material only — mirrors Edit Item's identical switch. Default OFF:
-  /// a Raw Material stays hidden from the POS grid unless explicitly opted in.
   Widget _buildSellDirectlyAtPosToggle() {
+    final isRaw = _formState.productType == ProductType.rawMaterial;
+    final title = isRaw ? 'Sell directly at POS' : 'Show on POS Menu';
+    final subtitle = isRaw
+        ? 'Raw materials are ingredients, not menu items, by default. Turn on if customers can buy this one directly (e.g. a canned drink).'
+        : 'Prep items are for recipes, not menu items, by default. Turn on if customers can also buy this one directly (e.g. a side of dough).';
     return SwitchListTile(
       contentPadding: EdgeInsets.zero,
       dense: true,
-      title: Text('Sell directly at POS',
+      title: Text(title,
           style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
-      subtitle: Text(
-          'Raw materials are hidden from the menu by default. Turn on to sell this one as-is.',
+      subtitle: Text(subtitle,
           style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
       value: _formState.sellDirectlyAtPos ?? false,
       activeColor: AppColors.primary,
       onChanged: (v) => setState(() => _formState.setSellDirectlyAtPos(v)),
+    );
+  }
+
+  Widget _buildEnabledToggle() {
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      title: Text('Active',
+          style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
+      subtitle: Text(
+          'Pause this item everywhere — sales, POS menu, and lists — without deleting it.',
+          style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
+      value: _formState.isEnabled,
+      activeColor: AppColors.primary,
+      onChanged: (v) => setState(() => _formState.setIsEnabled(v)),
     );
   }
 
@@ -965,10 +989,21 @@ class _AddItemSheetState extends State<AddItemSheet> {
     );
   }
 
-  Widget _buildCurrentStockField() {
-    final unit = _formState.sellingMethod == SellingMethod.byWeight
+  /// The unit to show next to a stock quantity field. Raw Material/
+  /// Semi-Finished always use their Stock Unit (independent of Selling
+  /// Method, which they don't show); Finished Good/Recipe-Based keep the
+  /// original by-weight-only condition, unchanged.
+  String _unitLabel() {
+    final isBackOfHouse = _formState.productType == ProductType.rawMaterial ||
+        _formState.productType == ProductType.semiFinished;
+    if (isBackOfHouse) return _formState.selectedUnit;
+    return _formState.sellingMethod == SellingMethod.byWeight
         ? _formState.selectedUnit
         : 'pcs';
+  }
+
+  Widget _buildCurrentStockField() {
+    final unit = _unitLabel();
     return AppTextField(
       controller: _formState.stockController,
       label: 'Current Stock ($unit)',
@@ -1001,9 +1036,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
         if (_formState.lowStockAlertEnabled) ...[
           const SizedBox(height: 8),
           Builder(builder: (_) {
-            final unit = _formState.sellingMethod == SellingMethod.byWeight
-                ? _formState.selectedUnit
-                : 'pcs';
+            final unit = _unitLabel();
             return AppTextField(
               controller: _formState.lowStockThresholdController,
               label: 'Alert threshold ($unit, optional)',

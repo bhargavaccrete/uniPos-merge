@@ -10,6 +10,8 @@ import '../../../widget/componets/common/app_text_field.dart';
 import '../../../widget/componets/common/app_dialog.dart';
 import '../../../widget/componets/common/dialog_dispose_scope.dart';
 import '../../../widget/componets/common/primary_app_bar.dart';
+import '../../../../core/constants/item_units.dart';
+import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 
 /// Flat, actionable list of every item/variant that is low or out of stock.
 /// Opened from the inventory alert bell.
@@ -32,8 +34,20 @@ class _LowStockScreenState extends State<LowStockScreen> {
   String _qty(double v) =>
       v % 1 == 0 ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
 
+  String _unitOf(Items item) =>
+      normalizeItemUnit(item.unit) ?? item.unit ?? 'pcs';
+
+  /// Whether [item]'s quantity can be fractional, based on its actual Stock
+  /// Unit — only 'piece' (or no unit at all) is a whole-count unit.
+  /// `isSoldByWeight` doesn't apply to Raw Material/Semi-Finished and is
+  /// never set for them, so it can't decide this.
+  bool _allowsDecimals(Items item) {
+    final normalized = normalizeItemUnit(item.unit);
+    return normalized != null && normalized != 'piece';
+  }
+
   Future<void> _restock(StockAlertEntry e) async {
-    final unit = e.item.unit ?? (e.item.isSoldByWeight ? 'kg' : 'pcs');
+    final unit = _unitOf(e.item);
     final qtyController = TextEditingController();
     String reason = _addReasons.first;
     final noteController = TextEditingController();
@@ -122,7 +136,7 @@ class _LowStockScreenState extends State<LowStockScreen> {
       NotificationService.instance.showError('Enter a valid quantity');
       return;
     }
-    if (!e.item.isSoldByWeight && qty % 1 != 0) {
+    if (!_allowsDecimals(e.item) && qty % 1 != 0) {
       NotificationService.instance.showError('Unit-based items must be whole numbers');
       return;
     }
@@ -188,8 +202,8 @@ class _LowStockScreenState extends State<LowStockScreen> {
   }
 
   Widget _buildRow(StockAlertEntry e) {
-    final unit = e.item.unit ?? (e.item.isSoldByWeight ? 'kg' : 'pcs');
-    final MaterialColor color = e.isOut ? Colors.red : Colors.orange;
+    final unit = _unitOf(e.item);
+    final Color color = e.isOut ? AppColors.danger : AppColors.orange;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -238,7 +252,7 @@ class _LowStockScreenState extends State<LowStockScreen> {
                       ),
                       child: Text(e.isOut ? 'Out' : 'Low',
                           style: GoogleFonts.poppins(
-                              fontSize: 10, fontWeight: FontWeight.w700, color: color.shade700)),
+                              fontSize: 10, fontWeight: FontWeight.w700, color: color)),
                     ),
                     const SizedBox(width: 8),
                     Text('${_qty(e.stock)} $unit left',

@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/constants/item_units.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/presentation/widget/componets/common/gradient_hero_header.dart';
 import '../manage menu/tab/edit_item.dart';
@@ -74,43 +76,11 @@ class _RawMaterialsScreenState extends State<RawMaterialsScreen> {
           Container(
             color: AppColors.white,
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            child: TextField(
+            child: AppTextField(
               controller: _searchController,
               onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
-              style: GoogleFonts.poppins(fontSize: 14),
-              decoration: InputDecoration(
-                hintText: 'Search raw materials…',
-                hintStyle: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                ),
-                prefixIcon: Icon(
-                  Icons.search_rounded,
-                  color: AppColors.primary,
-                  size: 20,
-                ),
-                filled: true,
-                fillColor: AppColors.surfaceLight,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.divider),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.divider),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppColors.primary,
-                    width: 1.5,
-                  ),
-                ),
-              ),
+              hint: 'Search raw materials…',
+              icon: Icons.search_rounded,
             ),
           ),
           Expanded(
@@ -155,27 +125,27 @@ class _RawMaterialTile extends StatelessWidget {
 
   const _RawMaterialTile({required this.item});
 
-  String _formatStock(double stock, String unit, bool isWeightBased) {
-    if (!isWeightBased) return stock.toStringAsFixed(0);
+  String _formatStock(double stock, bool showDecimals) {
+    if (!showDecimals) return stock.toStringAsFixed(0);
     return stock == stock.roundToDouble()
         ? stock.toStringAsFixed(0)
         : stock.toStringAsFixed(2);
   }
 
   Widget _buildStockBadge(BuildContext context) {
-    final MaterialColor base;
+    final Color base;
     final String label;
     if (!item.trackInventory) {
-      base = Colors.blueGrey;
+      base = AppColors.textSecondary;
       label = 'Not Tracked';
     } else if (!item.isInStock) {
-      base = Colors.red;
+      base = AppColors.danger;
       label = 'Out of Stock';
     } else if (item.isLowStock) {
-      base = Colors.orange;
+      base = AppColors.orange;
       label = 'Low Stock';
     } else {
-      base = Colors.green;
+      base = AppColors.success;
       label = 'In Stock';
     }
     return Container(
@@ -191,7 +161,7 @@ class _RawMaterialTile extends StatelessWidget {
             width: 6,
             height: 6,
             decoration: BoxDecoration(
-              color: base.shade600,
+              color: base,
               shape: BoxShape.circle,
             ),
           ),
@@ -201,7 +171,7 @@ class _RawMaterialTile extends StatelessWidget {
             style: GoogleFonts.poppins(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: base.shade700,
+              color: base,
             ),
           ),
         ],
@@ -211,8 +181,13 @@ class _RawMaterialTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isWeightBased = item.isSoldByWeight;
-    final unit = item.unit ?? (isWeightBased ? 'kg' : 'pcs');
+    // Raw Material always persists a real Stock Unit (independent of Selling
+    // Method, which doesn't apply to it and is never set for it) — only
+    // 'piece' is a whole-count unit; kg/gm/liter/ml can carry fractional
+    // stock after a production deduction and must show decimals.
+    final normalizedUnit = normalizeItemUnit(item.unit);
+    final unit = normalizedUnit ?? item.unit ?? 'pcs';
+    final showDecimals = normalizedUnit != null && normalizedUnit != 'piece';
 
     return InkWell(
       borderRadius: BorderRadius.circular(16),
@@ -275,7 +250,7 @@ class _RawMaterialTile extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        'Stock: ${_formatStock(item.stockQuantity, unit, isWeightBased)} $unit',
+                        'Stock: ${_formatStock(item.stockQuantity, showDecimals)} $unit',
                         style: GoogleFonts.poppins(
                           fontSize: 12,
                           color: AppColors.textSecondary,

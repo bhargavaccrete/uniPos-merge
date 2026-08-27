@@ -459,6 +459,10 @@ class _MenuScreenState extends State<MenuScreen> {
     // current ingredient stock can make. Checked before the variant branch:
     // v1 recipes are item-level, so a variant's own stock is meaningless here.
     if (item.isRecipeBased) {
+      final recipe = recipeRepository.getRecipeForItem(item.id);
+      if (recipe == null || !recipe.hasIngredients) {
+        return 'Recipe Not Configured';
+      }
       final canMake = InventoryService.effectiveAvailableStock(item);
       if (canMake <= 0) {
         return allowOrderWhenOutOfStock ? 'Order Available' : 'Out of Stock';
@@ -536,6 +540,10 @@ class _MenuScreenState extends State<MenuScreen> {
 
     // Recipe-Based: availability comes from ingredients, not a stored figure.
     if (item.isRecipeBased) {
+      final recipe = recipeRepository.getRecipeForItem(item.id);
+      if (recipe == null || !recipe.hasIngredients) {
+        return StockStatus.outOfStock;
+      }
       switch (InventoryService.posStatusFromAvailable(
         available: InventoryService.effectiveAvailableStock(item),
         allowOrderWhenOutOfStock: allowOrderWhenOutOfStock,
@@ -1063,17 +1071,28 @@ class _MenuScreenState extends State<MenuScreen> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              (item.itemCode != null && item.itemCode!.isNotEmpty)
-                                  ? '${item.itemCode} ${item.name}'
-                                  : item.name,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: isDisabled ? AppColors.textSecondary : AppColors.textPrimary,
-                              ),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                if (item.isVeg != null) ...[
+                                  _buildVegIndicator(item.isVeg),
+                                  const SizedBox(width: 6),
+                                ],
+                                Expanded(
+                                  child: Text(
+                                    (item.itemCode != null && item.itemCode!.isNotEmpty)
+                                        ? '${item.itemCode} ${item.name}'
+                                        : item.name,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDisabled ? AppColors.textSecondary : AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -1483,13 +1502,24 @@ class _ItemListTileState extends State<_ItemListTile> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        (widget.item.itemCode != null && widget.item.itemCode!.isNotEmpty)
-                            ? '${widget.item.itemCode} ${widget.item.name}'
-                            : widget.item.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: isDisabled ? AppColors.textSecondary : AppColors.textPrimary),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          if (widget.item.isVeg != null) ...[
+                            _buildVegIndicator(widget.item.isVeg),
+                            const SizedBox(width: 6),
+                          ],
+                          Expanded(
+                            child: Text(
+                              (widget.item.itemCode != null && widget.item.itemCode!.isNotEmpty)
+                                  ? '${widget.item.itemCode} ${widget.item.name}'
+                                  : widget.item.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: isDisabled ? AppColors.textSecondary : AppColors.textPrimary),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 6),
                       Row(
@@ -1750,4 +1780,27 @@ class _HorizontalCategoryStripState extends State<_HorizontalCategoryStrip> {
       ),
     );
   }
+}
+
+Widget _buildVegIndicator(String? isVeg) {
+  if (isVeg == null) return const SizedBox.shrink();
+  final clean = isVeg.toLowerCase().trim();
+  if (clean != 'veg' && clean != 'non-veg') return const SizedBox.shrink();
+  final isVegBool = clean == 'veg';
+  final color = isVegBool ? Colors.green : Colors.red.shade800;
+  return Container(
+    width: 12,
+    height: 12,
+    decoration: BoxDecoration(
+      border: Border.all(color: color, width: 1.2),
+      color: Colors.transparent,
+    ),
+    padding: const EdgeInsets.all(1.5),
+    child: Container(
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+      ),
+    ),
+  );
 }

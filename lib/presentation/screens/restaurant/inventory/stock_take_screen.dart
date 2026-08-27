@@ -12,6 +12,7 @@ import 'package:billberrylite/presentation/widget/componets/common/primary_app_b
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 
+import '../../../../core/constants/item_units.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/restaurant_stock_take_item_model.dart';
@@ -85,7 +86,16 @@ class _RestaurantStockTakeScreenState
   }
 
   String _unitOf(Items item) =>
-      item.unit ?? (item.isSoldByWeight ? 'kg' : 'pcs');
+      normalizeItemUnit(item.unit) ?? item.unit ?? 'pcs';
+
+  /// Whether [item]'s count can be fractional, based on its actual Stock
+  /// Unit — only 'piece' (or no unit at all) is a whole-count unit.
+  /// `isSoldByWeight` doesn't apply to Raw Material/Semi-Finished (the only
+  /// types counted here) and is never set for them, so it can't decide this.
+  bool _allowsDecimal(Items item) {
+    final normalized = normalizeItemUnit(item.unit);
+    return normalized != null && normalized != 'piece';
+  }
 
   /// Asks for the counted quantity. Pre-filled with the existing count when
   /// re-counting, and left blank on a first count so the system figure is
@@ -101,7 +111,7 @@ class _RestaurantStockTakeScreenState
       builder: (_) => _CountEntryDialog(
         itemName: item.name,
         unit: _unitOf(item),
-        allowDecimal: item.isSoldByWeight,
+        allowDecimal: _allowsDecimal(item),
         systemQty: item.stockQuantity,
         initialCount: existing?.countedQty,
       ),

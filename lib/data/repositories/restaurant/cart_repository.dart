@@ -4,6 +4,7 @@ import '../../models/restaurant/db/cartmodel_308.dart';
 import '../../models/restaurant/db/itemmodel_302.dart';
 import '../../models/restaurant/db/variantmodel_305.dart';
 import '../../../domain/services/restaurant/inventory_service.dart';
+import '../../../../core/di/service_locator.dart';
 
 /// Repository layer for Cart data access (Restaurant)
 /// Handles all Hive database operations for cart items
@@ -60,6 +61,15 @@ class CartRepository {
       // Check if inventory tracking is enabled and stock is available
       if (inventoryItem != null &&
           InventoryService.isStockGoverned(inventoryItem)) {
+        if (inventoryItem.isRecipeBased) {
+          final recipe = recipeRepository.getRecipeForItem(inventoryItem.id);
+          if (recipe == null || !recipe.hasIngredients) {
+            return {
+              'success': false,
+              'message': 'Recipe not configured for ${item.title}'
+            };
+          }
+        }
         if (!inventoryItem.allowOrderWhenOutOfStock) {
           // Check stock availability. Recipe-Based items skip the variant
           // branch — v1 recipes are item-level, so availability always comes

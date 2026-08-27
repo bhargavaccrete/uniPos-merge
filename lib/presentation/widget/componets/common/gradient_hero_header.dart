@@ -21,12 +21,15 @@ class HeroStat {
 /// signature "eye-catching" surface shared across the inventory suite so every
 /// screen opens with the same rich, cohesive header instead of a hard seam.
 class GradientHeroHeader extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
+  /// When null, the icon/title/subtitle row is omitted entirely and the card
+  /// shows only [stats] — for a screen whose app bar already carries the title.
+  final String? title;
+  final String? subtitle;
+  final IconData? icon;
 
   /// Second gradient stop. Defaults to a lighter blue for a subtle sheen; pass
-  /// e.g. [AppColors.secondary] to tint a screen toward its module colour.
+  /// e.g. [AppColors.secondary] to tint a screen toward its module colour, or
+  /// [AppColors.primary] for a flat (non-gradient) card.
   final Color accent;
 
   /// Optional live metric pills laid out in a row beneath the title.
@@ -37,9 +40,9 @@ class GradientHeroHeader extends StatelessWidget {
 
   const GradientHeroHeader({
     super.key,
-    required this.title,
-    required this.subtitle,
-    required this.icon,
+    this.title,
+    this.subtitle,
+    this.icon,
     this.accent = const Color(0xFF1565C0),
     this.stats = const [],
     this.trailing,
@@ -78,55 +81,60 @@ class GradientHeroHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              // Frosted icon medallion.
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.25),
+          if (title != null)
+            Row(
+              children: [
+                if (icon != null) ...[
+                  // Frosted icon medallion.
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.25),
+                      ),
+                    ),
+                    child: Icon(icon, color: Colors.white, size: 26),
+                  ),
+                  const SizedBox(width: 14),
+                ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.poppins(
+                            fontSize: 12.5,
+                            color: Colors.white.withValues(alpha: 0.85),
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                child: Icon(icon, color: Colors.white, size: 26),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.poppins(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.poppins(
-                        fontSize: 12.5,
-                        color: Colors.white.withValues(alpha: 0.85),
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (trailing != null) ...[const SizedBox(width: 8), trailing!],
-            ],
-          ),
+                if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+              ],
+            ),
           if (stats.isNotEmpty) ...[
-            const SizedBox(height: 18),
+            if (title != null) const SizedBox(height: 18),
             Row(
               children: [
                 for (var i = 0; i < stats.length; i++) ...[

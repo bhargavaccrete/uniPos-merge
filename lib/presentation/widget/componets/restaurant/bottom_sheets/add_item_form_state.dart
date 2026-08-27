@@ -27,6 +27,14 @@ class AddItemFormState extends ChangeNotifier {
   // Image
   Uint8List? selectedImage;
 
+  // Active / Enabled state
+  bool isEnabled = true;
+
+  void setIsEnabled(bool value) {
+    isEnabled = value;
+    notifyListeners();
+  }
+
   // Product Type — determines whether this item is a menu item (Finished Good /
   // Recipe-Based → needs a category + selling price) or a back-of-house
   // ingredient/prep item (Raw Material / Semi-Finished → those are optional).
@@ -155,13 +163,17 @@ class AddItemFormState extends ChangeNotifier {
 
   /// Convert form state to Items model
   Future<Items> toItem() async {
-    final itemVariants = selectedVariants
-        .map((v) => ItemVariante(
-              variantId: v['variantId'],
-              price: v['price'],
-              stockQuantity: (v['stockQuantity'] as num?)?.toDouble() ?? 0.0,
-            ))
-        .toList();
+    final isRawOrSemi = productType == ProductType.rawMaterial ||
+        productType == ProductType.semiFinished;
+    final itemVariants = isRawOrSemi
+        ? <ItemVariante>[]
+        : selectedVariants
+            .map((v) => ItemVariante(
+                  variantId: v['variantId'],
+                  price: v['price'],
+                  stockQuantity: (v['stockQuantity'] as num?)?.toDouble() ?? 0.0,
+                ))
+            .toList();
 
     return Items(
       id: const Uuid().v4(),
@@ -197,13 +209,16 @@ class AddItemFormState extends ChangeNotifier {
           : null,
       trackInventory: trackInventory,
       allowOrderWhenOutOfStock: allowOrderWhenOutOfStock,
-      sellDirectlyAtPos:
-          productType == ProductType.rawMaterial ? sellDirectlyAtPos : null,
+      sellDirectlyAtPos: (productType == ProductType.rawMaterial ||
+              productType == ProductType.semiFinished)
+          ? sellDirectlyAtPos
+          : null,
       variant: itemVariants,
       choiceIds: selectedChoiceIds,
       extraId: selectedExtraIds,
       defaultChoiceOptionIds: defaultChoiceOptionIds,
       itemCode: itemCodeController.text.trim(),
+      isEnabled: isEnabled,
       createdTime: DateTime.now(),
       editCount: 0,
     );
@@ -290,9 +305,13 @@ class AddItemFormState extends ChangeNotifier {
         type == ProductType.semiFinished) {
       trackInventory = true;
       allowOrderWhenOutOfStock = false;
+      sellDirectlyAtPos = false;
     } else if (type == ProductType.recipeBased) {
       trackInventory = false;
       allowOrderWhenOutOfStock = false;
+      sellDirectlyAtPos = null;
+    } else {
+      sellDirectlyAtPos = null;
     }
     notifyListeners();
   }

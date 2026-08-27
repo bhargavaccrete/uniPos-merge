@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:billberrylite/domain/store/restaurant/restaurant_supplier_store.dart';
+import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
 
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_order_item_model.dart';
@@ -57,6 +60,12 @@ String poStatusLabel(RestaurantPOStatus status) {
 }
 
 class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
+  @override
+  void initState() {
+    super.initState();
+    restaurantSupplierStore.loadSuppliers();
+  }
+
   Future<void> _navigateToAdd() async {
     final result = await Navigator.push<bool>(
       context,
@@ -82,6 +91,32 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
     await restaurantPurchaseOrderStore.markPOSent(po.poId);
     if (!mounted) return;
     NotificationService.instance.showSuccess('${po.poNumber} marked as Sent');
+
+    final supplier = restaurantSupplierStore.suppliers
+        .where((s) => s.supplierId == po.supplierId)
+        .firstOrNull;
+    final phone = supplier?.phone;
+
+    if (phone != null && phone.trim().isNotEmpty) {
+      final wantShare = await showAppConfirmDialog(
+        context: context,
+        title: 'Purchase Order sent',
+        message: 'Would you like to share this Purchase Order with the supplier on WhatsApp?',
+        confirmLabel: 'Share on WhatsApp',
+        cancelLabel: 'Not Now',
+        accent: AppColors.success,
+        icon: Icons.share_rounded,
+      );
+      if (wantShare && mounted) {
+        final items = restaurantPurchaseOrderItemRepository.getItemsByPOId(po.poId);
+        await sharePurchaseOrderToWhatsApp(
+          context: context,
+          po: po,
+          items: items,
+          phone: phone,
+        );
+      }
+    }
   }
 
   void _showDetail(RestaurantPurchaseOrderModel po) {
@@ -373,6 +408,10 @@ class _PODetailSheetState extends State<_PODetailSheet> {
   Widget build(BuildContext context) {
     final po = widget.po;
     final status = po.statusEnum;
+    final supplier = restaurantSupplierStore.suppliers
+        .where((s) => s.supplierId == po.supplierId)
+        .firstOrNull;
+    final phone = supplier?.phone;
 
     return MoneyScope(
       child: DraggableScrollableSheet(
@@ -505,7 +544,9 @@ class _PODetailSheetState extends State<_PODetailSheet> {
                             },
                           ),
               ),
-              if (status == RestaurantPOStatus.draft || po.canReceive)
+              if (status == RestaurantPOStatus.draft ||
+                  po.canReceive ||
+                  status == RestaurantPOStatus.completed)
                 Padding(
                   padding: const EdgeInsets.all(20),
                   child: Row(
@@ -515,6 +556,28 @@ class _PODetailSheetState extends State<_PODetailSheet> {
                           label: 'Mark Sent',
                           onPressed: widget.onMarkSent,
                         ),
+                      if (status != RestaurantPOStatus.draft &&
+                          status != RestaurantPOStatus.cancelled) ...[
+                        appDialogPrimaryButton(
+                          label: 'WhatsApp PO',
+                          onPressed: (phone == null || phone.trim().isEmpty)
+                              ? () {
+                                  NotificationService.instance.showError(
+                                    'Supplier mobile number is not available.',
+                                  );
+                                }
+                              : () => sharePurchaseOrderToWhatsApp(
+                                    context: context,
+                                    po: po,
+                                    items: _items,
+                                    phone: phone,
+                                  ),
+                          color: (phone == null || phone.trim().isEmpty)
+                              ? AppColors.textSecondary
+                              : AppColors.success,
+                        ),
+                        if (po.canReceive) const SizedBox(width: 12),
+                      ],
                       if (po.canReceive)
                         appDialogPrimaryButton(
                           label: 'Receive Items',
@@ -528,5 +591,74 @@ class _PODetailSheetState extends State<_PODetailSheet> {
         ),
       ),
     );
+  }
+}
+
+String cleanSupplierPhone(String phone) {
+  return phone.replaceAll(RegExp(r'[^0-9]'), '');
+}
+
+String buildWhatsAppPOMessage({
+  required RestaurantPurchaseOrderModel po,
+  required List<RestaurantPurchaseOrderItemModel> items,
+  required List<Items> allItems,
+}) {
+  final buffer = StringBuffer();
+  buffer.writeln('Purchase Order: ${po.poNumber}');
+  buffer.writeln('Supplier: ${po.supplierName ?? 'Unknown'}');
+
+  String localFormatDate(String iso) {
+    final date = DateTime.tryParse(iso);
+    if (date == null) return iso;
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+  }
+
+  buffer.writeln('Expected Delivery: ${localFormatDate(po.expectedDeliveryDate)}');
+  if (po.notes?.isNotEmpty == true) {
+    buffer.writeln('Notes: ${po.notes}');
+  }
+  buffer.writeln();
+  buffer.writeln('Items:');
+  for (final item in items) {
+    final itemDetail = allItems.where((i) => i.id == item.itemId).firstOrNull;
+    final unit = itemDetail?.unit ?? '';
+    final unitStr = unit.isNotEmpty ? ' $unit' : '';
+    final qty = item.orderedQty;
+    final cleanQty = qty == qty.toInt() ? qty.toInt().toString() : qty.toString();
+    buffer.writeln('- ${item.itemName} — Qty: $cleanQty$unitStr');
+  }
+  buffer.writeln();
+  buffer.writeln('Estimated Total: ${formatMoney(po.estimatedTotal)}');
+
+  return buffer.toString().trim();
+}
+
+Future<void> sharePurchaseOrderToWhatsApp({
+  required BuildContext context,
+  required RestaurantPurchaseOrderModel po,
+  required List<RestaurantPurchaseOrderItemModel> items,
+  required String phone,
+}) async {
+  final cleanPhone = cleanSupplierPhone(phone);
+  if (cleanPhone.isEmpty) {
+    NotificationService.instance.showError('Supplier mobile number is not available.');
+    return;
+  }
+
+  final message = buildWhatsAppPOMessage(
+    po: po,
+    items: items,
+    allItems: itemStore.items,
+  );
+  final whatsappUrl = 'https://wa.me/$cleanPhone?text=${Uri.encodeComponent(message)}';
+  final uri = Uri.parse(whatsappUrl);
+
+  try {
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok) {
+      NotificationService.instance.showError('Could not launch WhatsApp.');
+    }
+  } catch (e) {
+    NotificationService.instance.showError('Could not launch WhatsApp: $e');
   }
 }

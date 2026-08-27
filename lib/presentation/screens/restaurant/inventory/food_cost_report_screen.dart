@@ -333,15 +333,22 @@ class _FoodCostCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: (isSemi ? AppColors.info : AppColors.orange).withValues(alpha: 0.12),
+                        color: (row.item.isSemiFinished
+                                ? AppColors.info
+                                : (row.item.isRecipeBased ? AppColors.orange : AppColors.success))
+                            .withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        isSemi ? 'Semi-Finished' : 'Recipe-Based',
+                        row.item.isSemiFinished
+                            ? 'Semi-Finished'
+                            : (row.item.isRecipeBased ? 'Recipe-Based' : 'Finished Good'),
                         style: GoogleFonts.poppins(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w700,
-                          color: isSemi ? AppColors.info : AppColors.orange,
+                          color: row.item.isSemiFinished
+                              ? AppColors.info
+                              : (row.item.isRecipeBased ? AppColors.orange : AppColors.success),
                         ),
                       ),
                     ),

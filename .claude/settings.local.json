@@ -9,7 +9,15 @@
       "Bash(rm -f constants/restaurant/color.dart)",
       "Bash(rmdir constants/restaurant constants)",
       "PowerShell(flutter analyze *)",
-      "Bash(flutter test *)"
+      "Bash(flutter test *)",
+      "Bash(cd:*)",
+      "Bash(grep:*)",
+      "Bash(echo:*)",
+      "Bash(do:*)",
+      "Bash(done:*)",
+      "Bash(ls:*)",
+      "Bash(sed:*)",
+      "Bash(head:*)"
     ]
   },
   "outputStyle": "Explanatory"
