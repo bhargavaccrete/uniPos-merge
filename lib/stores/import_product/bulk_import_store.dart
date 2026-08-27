@@ -9,8 +9,8 @@ import 'package:billberrylite/data/models/retail/hive_model/attribute_model_219.
 import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
 import 'package:billberrylite/data/models/common/categorymodel_300.dart';
-import 'package:billberrylite/data/repositories/retail/product_repository.dart';
 import 'package:billberrylite/data/repositories/retail/variant_repository.dart';
+import 'package:billberrylite/domain/services/retail/retail_import_schema.dart';
 import 'package:billberrylite/domain/store/retail/attribute_store.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/config/tax_feature.dart';
@@ -19,23 +19,125 @@ import 'package:uuid/uuid.dart';
 
 part 'bulk_import_store.g.dart';
 
+/// Turns a picked CSV/XLSX file into raw rows.
+///
+/// A plain class rather than members of [BulkImportStore] because Dart does not
+/// inherit statics through the `class X = _X with _$X` MobX alias — and these
+/// need to be reachable (and testable) without constructing a store.
+class RetailImportFileReader {
+  RetailImportFileReader._();
+
+  /// Reads a CSV file into raw rows. Static and public so the read path is
+  /// testable without a file picker.
+  static List<List<dynamic>> csvRows(Uint8List bytes) {
+    var content = utf8.decode(bytes, allowMalformed: true);
+    // Normalise line endings so the converter sees a single EOL form.
+    content = content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+
+    final table = const CsvToListConverter(
+      eol: '\n',
+      // Keep everything as strings; the parser owns number handling so a
+      // stray "1,200" is reported rather than silently reinterpreted.
+      shouldParseNumbers: false,
+    ).convert(content);
+
+    return table
+        .where((row) => row.any((cell) => cell.toString().trim().isNotEmpty))
+        .toList();
+  }
+
+  /// Reads the Products sheet of an XLSX/XLS file into raw rows.
+  static List<List<dynamic>> excelRows(Uint8List bytes) {
+    final excel = Excel.decodeBytes(bytes);
+    if (excel.tables.isEmpty) return const [];
+
+    // Product data lives specifically in "Products", not whichever sheet comes
+    // first (that is "Instructions", which silently made every import fail).
+    var table = excel.tables['Products'];
+    if (table == null) {
+      final match = excel.tables.keys.firstWhere(
+        (name) => name.toLowerCase() == 'products',
+        orElse: () => excel.tables.keys.first,
+      );
+      table = excel.tables[match];
+    }
+    if (table == null) return const [];
+
+    final rows = <List<dynamic>>[];
+    for (final row in table.rows) {
+      final cells = row.map(_cellText).toList();
+      if (cells.any((c) => c.toString().isNotEmpty)) rows.add(cells);
+    }
+    return rows;
+  }
+
+  static String _cellText(Data? cell) {
+    final value = cell?.value;
+    if (value == null) return '';
+    if (value is TextCellValue) return value.value.toString();
+    if (value is IntCellValue) return value.value.toString();
+    if (value is DoubleCellValue) return value.value.toString();
+    if (value is BoolCellValue) return value.value.toString();
+    if (value is DateCellValue) {
+      // Rendered as an ISO date so parseImportDate reads it without guessing.
+      return DateTime(
+        value.year,
+        value.month,
+        value.day,
+      ).toIso8601String().split('T').first;
+    }
+    if (value is DateTimeCellValue) {
+      return DateTime(
+        value.year,
+        value.month,
+        value.day,
+      ).toIso8601String().split('T').first;
+    }
+    return value.toString();
+  }
+}
+
+/// Counts a finished import, for the results panel.
+class RetailImportOutcome {
+  final int productsCreated;
+  final int productsUpdated;
+  final int variantsImported;
+  final int variantsSkipped;
+  final int rowsRejected;
+  final int productsBlockedByLimit;
+  final int groupsFailed;
+
+  const RetailImportOutcome({
+    this.productsCreated = 0,
+    this.productsUpdated = 0,
+    this.variantsImported = 0,
+    this.variantsSkipped = 0,
+    this.rowsRejected = 0,
+    this.productsBlockedByLimit = 0,
+    this.groupsFailed = 0,
+  });
+
+  bool get hadProblems =>
+      rowsRejected > 0 || groupsFailed > 0 || productsBlockedByLimit > 0;
+}
+
+/// What happened to one Handle group.
+enum _GroupResult { created, updated, blockedByLimit, failed }
+
 class BulkImportStore = _BulkImportStore with _$BulkImportStore;
 
 abstract class _BulkImportStore with Store {
-  // Repositories
-  late final ProductRepository _productRepository;
   late final VariantRepository _variantRepository;
 
   _BulkImportStore() {
     // Lazy initialization to prevent early Hive access
-    _productRepository = ProductRepository();
     _variantRepository = VariantRepository();
   }
 
-  // Get AttributeStore from injector (MobX store with observable lists)
   AttributeStore get _attributeStore => locator<AttributeStore>();
 
-  // Observables
+  // ── Observables ───────────────────────────────────────────────────────────
+
   @observable
   bool isLoading = false;
 
@@ -54,24 +156,31 @@ abstract class _BulkImportStore with Store {
   @observable
   ObservableList<List<dynamic>> parsedRows = ObservableList<List<dynamic>>();
 
+  /// The validated view of [parsedRows]. Produced at pick time so the confirm
+  /// dialog can show real row-level errors BEFORE anything is written.
+  @observable
+  RetailImportParseResult? preview;
+
+  /// Counts of the last completed import.
+  @observable
+  RetailImportOutcome? outcome;
+
   @observable
   ObservableList<String> logMessages = ObservableList<String>();
 
-  // Actions
+  // ── Template ──────────────────────────────────────────────────────────────
 
-  /// Generate and save Template (Excel .xlsx by default)
+  /// Generate and save the template (Excel .xlsx).
   @action
   Future<String?> downloadTemplate() async {
     isLoading = true;
     errorMessage = null;
     try {
-      // Build the template with Syncfusion xlsio so Category/Tax Rate get real
-      // Excel dropdowns (live-seeded from the shop's existing categories/taxes)
-      // — same technique as the restaurant side's ImportTemplateBuilder.
+      // Built with Syncfusion xlsio so Category/Tax/Unit get real Excel
+      // dropdowns (live-seeded from the shop's own categories and taxes) —
+      // same technique as the restaurant side's ImportTemplateBuilder.
       final bytes = RetailImportTemplateBuilder().build();
 
-      // 5. Save File via native picker — handles web download, desktop
-      //    Save dialog, and Android/iOS Downloads + permissions uniformly.
       const fileName = 'product_import_template.xlsx';
 
       if (kIsWeb) {
@@ -100,7 +209,7 @@ abstract class _BulkImportStore with Store {
             : 'Download cancelled.';
         return result;
       } else {
-        // Desktop (Windows/macOS/Linux): picker returns a path, we write bytes.
+        // Desktop: the picker returns a path, we write the bytes.
         final result = await FilePicker.platform.saveFile(
           dialogTitle: 'Save Template',
           fileName: fileName,
@@ -123,131 +232,69 @@ abstract class _BulkImportStore with Store {
     }
   }
 
-  /// Pick and Parse File (CSV or Excel)
+  // ── Pick + parse ──────────────────────────────────────────────────────────
+
+  /// Pick a file, read it, then validate every row WITHOUT writing anything.
   @action
   Future<void> pickAndParseFile() async {
     isLoading = true;
     errorMessage = null;
     parsedRows.clear();
-    
+    preview = null;
+    outcome = null;
+
     try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['csv', 'xlsx', 'xls'],
-        withData: true, // Ensure we get bytes
+        withData: true,
       );
 
-      if (result != null) {
-        PlatformFile file = result.files.first;
-        String extension = file.extension?.toLowerCase() ?? '';
-        
-        // 1. Get Bytes (Prioritize memory bytes)
-        Uint8List? fileBytes = file.bytes;
-        
-        // 2. Fallback to reading from path if bytes are missing (Desktop/Native sometimes)
-        if (fileBytes == null && file.path != null) {
-          fileBytes = await File(file.path!).readAsBytes();
-        }
+      if (result == null) return; // user cancelled
 
-        if (fileBytes == null) {
-          throw Exception("Could not read file data. Please try again.");
-        }
+      final file = result.files.first;
+      final extension = file.extension?.toLowerCase() ?? '';
 
-        // 3. Parse based on extension
-        if (extension == 'csv') {
-          // --- CSV Parsing ---
-          String fileContent = utf8.decode(fileBytes);
-
-          // Normalize line endings - replace \r\n with \n, then split by \n
-          fileContent = fileContent.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
-
-          // Check if file has proper line breaks
-          int lineBreaks = '\n'.allMatches(fileContent).length;
-
-          List<List<dynamic>> csvTable = const CsvToListConverter(
-            eol: '\n',
-            shouldParseNumbers: false, // Keep all as strings to preserve formatting
-          ).convert(fileContent);
-
-          // Filter out completely empty rows
-          for (var row in csvTable) {
-            // Skip rows that are completely empty
-            if (row.every((cell) => cell.toString().trim().isEmpty)) {
-              continue;
-            }
-            parsedRows.add(row);
-          }
-
-
-        } else if (extension == 'xlsx' || extension == 'xls') {
-          // --- Excel Parsing ---
-          var excel = Excel.decodeBytes(fileBytes);
-          // The downloaded template has multiple sheets (Instructions,
-          // Categories, Taxes, Products) — product data lives specifically in
-          // "Products", not whichever sheet happens to come first (that's
-          // "Instructions", which silently made every import fail with
-          // "Product Name is required" since instruction lines have no name).
-          if (excel.tables.isNotEmpty) {
-            var table = excel.tables['Products'];
-            if (table == null) {
-              final match = excel.tables.keys.firstWhere(
-                (name) => name.toLowerCase() == 'products',
-                orElse: () => excel.tables.keys.first,
-              );
-              table = excel.tables[match];
-            }
-
-            if (table != null) {
-              for (var row in table.rows) {
-                // Convert Data objects to strings/values
-                // Extract the actual value from the CellValue object
-                List<dynamic> rowData = row.map((cell) {
-                  if (cell == null || cell.value == null) return '';
-
-                  // Get the actual value from the CellValue
-                  var value = cell.value;
-                  if (value is TextCellValue) {
-                    return value.value;
-                  } else if (value is IntCellValue) {
-                    return value.value.toString();
-                  } else if (value is DoubleCellValue) {
-                    return value.value.toString();
-                  } else if (value is BoolCellValue) {
-                    return value.value.toString();
-                  } else if (value is DateCellValue) {
-                    return value.toString();
-                  } else if (value is TimeCellValue) {
-                    return value.toString();
-                  } else if (value is DateTimeCellValue) {
-                    return value.toString();
-                  } else {
-                    return value.toString();
-                  }
-                }).toList();
-                // Skip empty rows
-                if (rowData.any((cell) => cell.toString().isNotEmpty)) {
-                  parsedRows.add(rowData);
-                }
-              }
-            }
-          }
-        } else {
-           throw Exception("Unsupported file format: $extension");
-        }
-
-        if (parsedRows.isEmpty || parsedRows.length < 2) {
-          errorMessage = "File is empty or missing headers.";
-          return;
-        }
-
-        // Debug: Print parsed data
-        if (parsedRows.isNotEmpty) {
-          if (parsedRows.length > 1) {
-          }
-        }
-
-        successMessage = "Loaded ${parsedRows.length - 1} rows. Review and click Import.";
+      Uint8List? fileBytes = file.bytes;
+      // Desktop/native sometimes gives a path instead of bytes.
+      if (fileBytes == null && file.path != null) {
+        fileBytes = await File(file.path!).readAsBytes();
       }
+      if (fileBytes == null) {
+        throw Exception('Could not read file data. Please try again.');
+      }
+
+      if (extension == 'csv') {
+        parsedRows.addAll(RetailImportFileReader.csvRows(fileBytes));
+      } else if (extension == 'xlsx' || extension == 'xls') {
+        parsedRows.addAll(RetailImportFileReader.excelRows(fileBytes));
+      } else {
+        throw Exception('Unsupported file format: $extension');
+      }
+
+      if (parsedRows.length < 2) {
+        errorMessage = 'File is empty or missing headers.';
+        return;
+      }
+
+      final parsed = RetailImportParser.parse(
+        parsedRows.toList(),
+        catalogue: _catalogue(),
+      );
+      preview = parsed;
+
+      if (!parsed.hasAnythingToImport) {
+        errorMessage = parsed.errors.isEmpty
+            ? 'No product rows found in this file.'
+            : 'Nothing can be imported — ${parsed.errors.length} row '
+                  '${parsed.errors.length == 1 ? 'problem' : 'problems'} '
+                  'need fixing first.';
+        return;
+      }
+
+      successMessage =
+          'Loaded ${parsed.groups.length} products / ${parsed.variantCount} '
+          'variants. Review and confirm.';
     } catch (e) {
       errorMessage = 'Error parsing file: $e';
     } finally {
@@ -255,11 +302,27 @@ abstract class _BulkImportStore with Store {
     }
   }
 
-  /// Execute Import Process
+  /// Catalogue-aware rules handed to the pure parser.
+  RetailImportCatalogue _catalogue() => RetailImportCatalogue(
+    // Reads the BOX, not the MobX list, which goes stale mid-import.
+    isBarcodeTaken: (barcode) => _variantRepository.isBarcodeTaken(barcode),
+    existingVariantKeys: (name) {
+      final product = _findProductByName(name);
+      if (product == null) return null;
+      return _existingVariantKeys(product.productId);
+    },
+  );
+
+  // ── Import ────────────────────────────────────────────────────────────────
+
+  /// Write the validated groups. Nothing here re-validates row shape — that
+  /// already happened in [pickAndParseFile], which is what keeps a half-written
+  /// product from ever reaching the box.
   @action
   Future<void> importData() async {
-    if (parsedRows.isEmpty) {
-      errorMessage = "No data to import";
+    final parsed = preview;
+    if (parsed == null || parsed.groups.isEmpty) {
+      errorMessage = 'No data to import';
       return;
     }
 
@@ -268,484 +331,478 @@ abstract class _BulkImportStore with Store {
     logMessages.clear();
     errorMessage = null;
     successMessage = null;
+    outcome = null;
 
     if (!TaxFeature.enabled) {
       logMessages.add(
-          'ℹ Tax data in file ignored — tax is disabled for this business.');
+        'ℹ Tax data in file ignored — tax is disabled for this business.',
+      );
     }
 
-    // Ensure AttributeStore has loaded existing attributes before we start importing
+    // Every parse-time finding is surfaced before the first write, so a
+    // rejected row is never invisible.
+    for (final issue in parsed.issues) {
+      logMessages.add('${issue.isError ? '✗' : 'ℹ'} $issue');
+    }
+
+    // Attributes must be loaded before we start matching names against them.
     try {
       await _attributeStore.loadAttributes();
-    } catch (e) {
-      // Continue anyway - attributes will be created as needed
+    } catch (_) {
+      // Continue anyway — attributes are created as needed.
     }
 
+    var created = 0;
+    var updated = 0;
+    var variantsImported = 0;
+    var variantsSkipped = 0;
+    var blockedByLimit = 0;
+    var failed = 0;
+
     try {
-      // 1. Group rows by 'Handle' (Column 0)
-      // The downloaded template has a second "instruction" row (yellow,
-      // italic) with per-column hint text instead of real data — e.g. its
-      // Selling Price cell literally says "Required: number only". Detect
-      // and drop it instead of assuming a fixed single header row, so a
-      // hand-typed CSV without an instruction row still imports its first
-      // real row correctly.
-      final rawRows = parsedRows.skip(1).toList();
-      final dataRows = rawRows.isNotEmpty && !_looksLikeRealDataRow(rawRows.first)
-          ? rawRows.skip(1).toList()
-          : rawRows;
-
-      Map<String, List<List<dynamic>>> groups = {};
-
-      for (var row in dataRows) {
-        if (row.isEmpty) {
-          continue;
-        }
-
-        // Ensure row has enough columns (pad if needed)
-        if (row.length < 18) {
-           while (row.length < 18) {
-             row.add('');
-           }
-        }
-
-        String handle = row[0].toString().trim();
-
-        if (handle.isEmpty) {
-          continue;
-        }
-
-        if (!groups.containsKey(handle)) {
-          groups[handle] = [];
-        }
-        groups[handle]!.add(row);
-      }
-
-
-      int totalGroups = groups.length;
-      int processedGroups = 0;
-      int successCount = 0;
-      int errorCount = 0;
-
-      // 2. Process Groups
-      for (var entry in groups.entries) {
-        String handle = entry.key;
-        List<List<dynamic>> groupRows = entry.value;
-
+      var processed = 0;
+      for (final group in parsed.groups) {
         try {
-          await _processGroup(handle, groupRows);
-          logMessages.add('✓ Success: Imported $handle');
-          successCount++;
+          final before = _variantsAdded;
+          final result = await _processGroup(group);
+          variantsImported += _variantsAdded - before;
+
+          switch (result) {
+            case _GroupResult.created:
+              created++;
+              logMessages.add('✓ Imported "${group.name}"');
+            case _GroupResult.updated:
+              updated++;
+              logMessages.add('✓ Updated "${group.name}"');
+            case _GroupResult.blockedByLimit:
+              blockedByLimit++;
+            case _GroupResult.failed:
+              failed++;
+          }
+          variantsSkipped += _variantsSkippedInGroup;
         } catch (e) {
-          logMessages.add('✗ Error: Failed to import $handle - $e');
-          errorCount++;
+          failed++;
+          logMessages.add(
+            '✗ Row ${group.parentRowNumber}: "${group.name}" was not '
+            'imported — $e',
+          );
         }
 
-        processedGroups++;
-        progress = processedGroups / totalGroups;
+        processed++;
+        progress = processed / parsed.groups.length;
       }
 
-      // This store writes through its own repositories, so ProductStore's
-      // in-memory lists are stale until refreshed.
+      // Re-read from the boxes. ProductStore.addVariant mirrors the variant it
+      // was HANDED into its list, but VariantRepository writes a prepared copy
+      // — so a barcode minted for a blank cell exists on disk and not in
+      // memory until this runs.
       await productStore.loadProducts();
       await productStore.loadVariants();
 
-      if (errorCount == 0) {
-        successMessage = "Import completed! Successfully imported $successCount products.";
-      } else {
-        successMessage = "Import completed with errors. Success: $successCount, Failed: $errorCount";
+      if (blockedByLimit > 0) {
+        final limit = productStore.productLimit;
+        logMessages.add(
+          '✗ Product limit reached'
+          '${limit == null ? '' : ' (${productStore.products.length} of $limit)'}'
+          ' — $blockedByLimit '
+          '${blockedByLimit == 1 ? 'product was' : 'products were'} not '
+          'imported. Upgrade your plan to add more.',
+        );
       }
+
+      outcome = RetailImportOutcome(
+        productsCreated: created,
+        productsUpdated: updated,
+        variantsImported: variantsImported,
+        variantsSkipped: variantsSkipped,
+        rowsRejected: parsed.errors.length,
+        productsBlockedByLimit: blockedByLimit,
+        groupsFailed: failed,
+      );
+
+      successMessage = outcome!.hadProblems
+          ? 'Import finished with issues — $created created, $updated updated.'
+          : 'Import completed! $created products imported.';
     } catch (e) {
-      errorMessage = "Import failed: $e";
+      errorMessage = 'Import failed: $e';
     }
-    // Note: We keep isProcessing=true so the user stays on the results screen
-    // It will be set to false when they click "Done" and clear() is called
+    // isProcessing stays true so the user lands on the results screen; clear()
+    // resets it when they press Done.
   }
 
-  Future<void> _processGroup(String handle, List<List<dynamic>> rows) async {
-    var parentRow = rows[0];
+  /// Variants written so far this import — a running total so each group's
+  /// contribution can be measured without threading a result object through.
+  int _variantsAdded = 0;
+  int _variantsSkippedInGroup = 0;
 
-    String name = parentRow[1].toString().trim();
-    String categoryName = parentRow[2].toString().trim();
-    String description = parentRow[3].toString().trim();
+  Future<_GroupResult> _processGroup(RetailImportGroup group) async {
+    _variantsSkippedInGroup = 0;
 
-    if (name.isEmpty) throw Exception("Product Name is required");
+    final existing = _findProductByName(group.name);
+    if (existing != null) return _appendToExistingProduct(existing, group);
 
-    String categoryId = '';
-    if (categoryName.isNotEmpty) {
-      Category? category;
-      try {
-        category = categoryStore.categories.firstWhere(
-          (c) => c.name.toLowerCase() == categoryName.toLowerCase(),
-        );
-      } catch (_) {
-        category = null;
-      }
+    // Bulk import is an entrance like any other: it may not exceed the plan's
+    // product cap just because it writes in a loop.
+    if (!productStore.canAddProduct) return _GroupResult.blockedByLimit;
 
-      if (category != null) {
-        categoryId = category.id;
-      } else {
-        final newCategory = Category(
-          id: const Uuid().v4(),
-          name: categoryName,
-          createdTime: DateTime.now(),
-        );
-        final success = await categoryStore.addCategory(newCategory);
-        if (success) {
-          categoryId = newCategory.id;
-        } else {
-          try {
-            final retry = categoryStore.categories.firstWhere(
-              (c) => c.name.toLowerCase() == categoryName.toLowerCase(),
-            );
-            categoryId = retry.id;
-          } catch (_) {
-            categoryId = '';
-          }
-        }
-      }
-    } else {
-      final uncategorizedName = "Uncategorized";
-      Category? category;
-      try {
-        category = categoryStore.categories.firstWhere(
-          (c) => c.name.toLowerCase() == uncategorizedName.toLowerCase(),
-        );
-      } catch (_) {
-        category = null;
-      }
+    final categoryId = await _resolveCategoryId(group.categoryName);
+    final tax = _resolveTaxFromLabel(group.taxLabel);
+    final productId = const Uuid().v4();
+    final now = DateTime.now().toIso8601String();
 
-      if (category != null) {
-        categoryId = category.id;
-      } else {
-        final newCategory = Category(
-          id: const Uuid().v4(),
-          name: uncategorizedName,
-          createdTime: DateTime.now(),
-        );
-        await categoryStore.addCategory(newCategory);
-        categoryId = newCategory.id;
-      }
-    }
-
-    bool hasVariants = rows.length > 1 || _rowHasVariants(parentRow);
-    String productId = const Uuid().v4();
-
-    // Tax Rate and HSN Code are read from the parent row only — apply to the
-    // product and every variant in this group, same as Category above.
-    final taxLabel = parentRow.length > 16 ? parentRow[16].toString().trim() : '';
-    final resolvedTax = _resolveTaxFromLabel(taxLabel);
-    final hsnCode = parentRow.length > 17 ? parentRow[17].toString().trim() : '';
-
-    ProductModel product = ProductModel(
+    final product = ProductModel(
       productId: productId,
-      productName: name,
-      description: description.isNotEmpty ? description : null,
+      productName: group.name,
+      description: group.description,
       category: categoryId,
-      hasVariants: hasVariants,
+      hasVariants: group.hasVariants,
       brandName: '',
-      hsnCode: hsnCode.isNotEmpty ? hsnCode : null,
-      gstRate: resolvedTax.gstRate,
-      taxId: resolvedTax.taxId,
-      createdAt: DateTime.now().toIso8601String(),
-      updateAt: DateTime.now().toIso8601String(),
-      productType: hasVariants ? 'variable' : 'simple',
+      hsnCode: group.hsnCode,
+      gstRate: tax.gstRate,
+      taxId: tax.taxId,
+      createdAt: now,
+      updateAt: now,
+      productType: group.hasVariants ? 'variable' : 'simple',
     );
 
-    await _productRepository.addProduct(product);
+    await productStore.addProduct(product);
 
-    // Collect all unique attributes from all variants
-    Set<String> allAttributeNames = {};
-    for (var row in rows) {
-      if (row[4].toString().isNotEmpty) allAttributeNames.add(row[4].toString().trim());
-      if (row[6].toString().isNotEmpty) allAttributeNames.add(row[6].toString().trim());
-      if (row[8].toString().isNotEmpty) allAttributeNames.add(row[8].toString().trim());
+    try {
+      await _linkAttributes(productId, group);
+      for (final row in group.variants) {
+        await _createVariant(
+          productId: productId,
+          categoryName: group.categoryName,
+          row: row,
+          taxId: tax.taxId,
+          gstRate: tax.gstRate,
+          unit: group.unit,
+          isDecimalQuantity: group.isDecimalQuantity,
+          expiryDate: group.expiryDate,
+        );
+      }
+    } catch (e) {
+      // Compensating delete: a product with only some of its variants is worse
+      // than no product at all, and there is no cross-box transaction to lean
+      // on. deleteProduct cascades its variants.
+      await productStore.deleteProduct(productId);
+      rethrow;
     }
 
-    // Link attributes to product in global attribute system
-    if (allAttributeNames.isNotEmpty) {
-      await _linkAttributesToProduct(productId, allAttributeNames, rows);
+    return _GroupResult.created;
+  }
+
+  /// Adds this group's genuinely new variants to a product that already exists.
+  ///
+  /// The product itself is left alone — an import that adds variants must not
+  /// silently rewrite the shop's tax, HSN, unit or expiry settings. The new
+  /// variants therefore inherit the EXISTING product's unit/expiry/tax so the
+  /// product stays internally consistent with what the edit screen shows.
+  Future<_GroupResult> _appendToExistingProduct(
+    ProductModel product,
+    RetailImportGroup group,
+  ) async {
+    final siblings = productStore.variantsFor(product.productId);
+    final split = splitAgainstExisting(
+      group,
+      _existingVariantKeys(product.productId),
+    );
+
+    for (final row in split.alreadyPresent) {
+      _variantsSkippedInGroup++;
+      logMessages.add(
+        'ℹ Row ${row.rowNumber}: this variant already exists on '
+        '"${product.productName}" — skipped.',
+      );
     }
 
-    for (var row in rows) {
-      await _createVariant(productId, row, resolvedTax.taxId, resolvedTax.gstRate);
+    if (split.toCreate.isEmpty) return _GroupResult.updated;
+
+    // Inherit from the product's existing stock, not from the file.
+    final template = siblings.isNotEmpty ? siblings.first : null;
+    final unit = template?.effectiveUnit ?? group.unit;
+    final isDecimal = template?.isDecimalQuantity ?? group.isDecimalQuantity;
+    final expiryDate = template?.expiryDate ?? group.expiryDate;
+    final taxId = product.taxId;
+    final gstRate = product.gstRate;
+
+    if (template != null && unit != group.unit) {
+      logMessages.add(
+        'ℹ Row ${group.parentRowNumber}: "${product.productName}" is already '
+        'sold in $unit — the file\'s "${group.unit}" was ignored.',
+      );
+    }
+
+    final writtenIds = <String>[];
+    try {
+      await _linkAttributes(product.productId, group);
+      for (final row in split.toCreate) {
+        final id = await _createVariant(
+          productId: product.productId,
+          categoryName: group.categoryName,
+          row: row,
+          taxId: taxId,
+          gstRate: gstRate,
+          unit: unit,
+          isDecimalQuantity: isDecimal,
+          expiryDate: expiryDate,
+        );
+        writtenIds.add(id);
+      }
+    } catch (e) {
+      // Roll back only what this group added — the product and its original
+      // variants were here first and must survive.
+      for (final id in writtenIds) {
+        await productStore.deleteVariant(id);
+      }
+      rethrow;
+    }
+
+    // Structural correction only: a product that now holds more than one
+    // variant genuinely IS variable, and screens branch on this.
+    final total = productStore.variantsFor(product.productId).length;
+    if (total > 1 && !product.isVariable) {
+      await productStore.updateProduct(
+        product.copyWith(hasVariants: true, productType: 'variable'),
+      );
+    }
+
+    return _GroupResult.updated;
+  }
+
+  /// Writes one variant. Returns its id so a failed group can be rolled back.
+  Future<String> _createVariant({
+    required String productId,
+    required String categoryName,
+    required RetailImportVariantRow row,
+    required String? taxId,
+    required double? gstRate,
+    required String unit,
+    required bool isDecimalQuantity,
+    required String? expiryDate,
+  }) async {
+    final variantId = const Uuid().v4();
+
+    // A blank barcode is left blank on purpose: VariantRepository.addVariant
+    // mints a BB-prefixed Code 128 value for it, which is the one place that
+    // knows the sequence. Minting one here would duplicate that logic.
+    final variant = VarianteModel.create(
+      varianteId: variantId,
+      productId: productId,
+      sku: row.sku ?? await _generateSku(categoryName),
+      barcode: row.barcode,
+      costPrice: row.costPrice,
+      // The column labelled "Selling Price" must land in sellingPrice — that is
+      // what the cart bills (sellingPrice ?? mrp ?? 0).
+      sellingPrice: row.sellingPrice,
+      mrp: row.mrp,
+      stockQty: row.stockQty,
+      minStock: row.minStock,
+      customAttributes: row.attributes.isEmpty ? null : row.attributes,
+      status: 'active',
+      taxId: taxId,
+      taxRate: gstRate,
+      isDecimalQuantity: isDecimalQuantity,
+      unit: unit,
+      expiryDate: expiryDate,
+    );
+
+    final result = await productStore.addVariant(variant);
+    if (!result.success) {
+      // Previously this result was discarded, so a refused variant vanished
+      // while its row still reported success.
+      throw Exception('row ${row.rowNumber}: ${result.errorMessage}');
+    }
+
+    _variantsAdded++;
+    return variantId;
+  }
+
+  /// Mints a SKU the same way Add Variant does. Non-fatal: a variant without a
+  /// SKU is far better than a lost product.
+  Future<String?> _generateSku(String categoryName) async {
+    try {
+      return await skuGeneratorService.generate(
+        categoryName.isEmpty ? null : categoryName,
+      );
+    } catch (_) {
+      return null;
     }
   }
 
-  /// Resolves a "Name (Rate%)" dropdown label (from the Tax Rate column) back
-  /// to the matching shared Tax entity's id + percentage. Falls back to
-  /// parsing just the trailing "(NN%)" as a raw rate if no exact name+rate
-  /// match is found (e.g. the owner typed a value not in the dropdown).
+  // ── Lookups ───────────────────────────────────────────────────────────────
+
+  /// Case-insensitive product-name match — the same rule the restaurant
+  /// importer uses. Handle is only a grouping key and is never stored, so the
+  /// name is the only thing a re-import can match on.
+  ProductModel? _findProductByName(String name) {
+    final target = name.trim().toLowerCase();
+    if (target.isEmpty) return null;
+    for (final product in productStore.products) {
+      if (product.productName.trim().toLowerCase() == target) return product;
+    }
+    return null;
+  }
+
+  Set<String> _existingVariantKeys(String productId) => productStore
+      .variantsFor(productId)
+      .map((v) => attributeSignature(v.customAttributes))
+      .toSet();
+
+  /// Finds or creates the category, falling back to "Uncategorized".
+  Future<String> _resolveCategoryId(String categoryName) async {
+    final wanted = categoryName.trim().isEmpty
+        ? 'Uncategorized'
+        : categoryName.trim();
+
+    Category? existing;
+    for (final category in categoryStore.categories) {
+      if (category.name.toLowerCase() == wanted.toLowerCase()) {
+        existing = category;
+        break;
+      }
+    }
+    if (existing != null) return existing.id;
+
+    final created = Category(
+      id: const Uuid().v4(),
+      name: wanted,
+      createdTime: DateTime.now(),
+    );
+    final ok = await categoryStore.addCategory(created);
+    if (ok) return created.id;
+
+    // addCategory refuses duplicates and plan-capped adds; re-look-up covers
+    // the duplicate case, and an empty id leaves the product uncategorised
+    // rather than failing the whole import.
+    for (final category in categoryStore.categories) {
+      if (category.name.toLowerCase() == wanted.toLowerCase()) {
+        return category.id;
+      }
+    }
+    return '';
+  }
+
+  /// Resolves a "Name (Rate%)" dropdown label back to the shared Tax entity's
+  /// id + percentage. Falls back to the trailing "(NN%)" as a raw rate when no
+  /// exact match is found (the owner typed something not in the dropdown).
   ({String? taxId, double? gstRate}) _resolveTaxFromLabel(String label) {
-    if (label.isEmpty || !TaxFeature.enabled) return (taxId: null, gstRate: null);
+    if (label.isEmpty || !TaxFeature.enabled) {
+      return (taxId: null, gstRate: null);
+    }
 
     for (final tax in taxStore.taxes) {
       final rate = tax.taxperecentage ?? 0;
-      if (label == '${tax.taxname} (${rate}%)') {
+      if (label == '${tax.taxname} ($rate%)') {
         return (taxId: tax.id, gstRate: rate);
       }
     }
 
     final match = RegExp(r'\(([\d.]+)%\)').firstMatch(label);
-    final rate = match != null ? double.tryParse(match.group(1)!) : double.tryParse(label);
+    final rate = match != null
+        ? double.tryParse(match.group(1)!)
+        : double.tryParse(label);
     return (taxId: null, gstRate: rate);
   }
 
-  bool _rowHasVariants(List<dynamic> row) {
-    return row[4].toString().isNotEmpty;
-  }
+  // ── Attributes ────────────────────────────────────────────────────────────
 
-  /// A real product row always has a numeric Selling Price (it's required).
-  /// The template's instruction row has hint text there instead — use that
-  /// to tell the two apart rather than assuming a fixed header-row count.
-  bool _looksLikeRealDataRow(List<dynamic> row) {
-    if (row.length <= 11) return false;
-    return double.tryParse(row[11].toString().trim()) != null;
-  }
-
-  /// Ensure an attribute exists in the global attribute system
-  /// Returns the attribute ID (existing or newly created)
-  Future<String?> _ensureAttributeExists(String attributeName) async {
-    final trimmedName = attributeName.trim();
-
-    try {
-      // Check existing attributes from the observable store
-      final existingAttr = _attributeStore.attributes.cast<AttributeModel?>().firstWhere(
-        (attr) => attr != null && attr.name.toLowerCase() == trimmedName.toLowerCase(),
-        orElse: () => null,
-      );
-
-      if (existingAttr != null) {
-        return existingAttr.attributeId;
-      }
-    } catch (e) {
-    }
-
-    // Create new attribute using AttributeStore (updates both DB and observable list)
-    try {
-      final success = await _attributeStore.addAttribute(trimmedName);
-      if (success) {
-        // Find the newly created attribute
-        final newAttr = _attributeStore.attributes.cast<AttributeModel?>().firstWhere(
-          (attr) => attr != null && attr.name.toLowerCase() == trimmedName.toLowerCase(),
-          orElse: () => null,
-        );
-        if (newAttr != null) {
-          return newAttr.attributeId;
-        }
-      } else {
-        // Try to find it again in case it already existed
-        final existingAttr = _attributeStore.attributes.cast<AttributeModel?>().firstWhere(
-          (attr) => attr != null && attr.name.toLowerCase() == trimmedName.toLowerCase(),
-          orElse: () => null,
-        );
-        return existingAttr?.attributeId;
-      }
-    } catch (e) {
-    }
-    return null;
-  }
-
-  /// Ensure an attribute value exists in the global attribute system
-  /// Returns the value ID (existing or newly created), or null if failed
-  Future<String?> _ensureAttributeValueExists(String attributeId, String valueName) async {
-    final trimmedValue = valueName.trim();
-
-    try {
-      // Get values from AttributeStore's observable list
-      final existingValues = _attributeStore.getValuesForAttribute(attributeId);
-
-      // Check if value already exists (case-insensitive)
-      for (var value in existingValues) {
-        if (value.value.toLowerCase() == trimmedValue.toLowerCase()) {
-          return value.valueId;
-        }
-      }
-    } catch (e) {
-    }
-
-    // Create new value using AttributeStore (updates both DB and observable list)
-    try {
-      final success = await _attributeStore.addValue(attributeId, trimmedValue);
-      if (success) {
-        // Find the newly created value
-        final values = _attributeStore.getValuesForAttribute(attributeId);
-        for (var value in values) {
-          if (value.value.toLowerCase() == trimmedValue.toLowerCase()) {
-            return value.valueId;
-          }
-        }
-      } else {
-        // Try to find it again
-        final values = _attributeStore.getValuesForAttribute(attributeId);
-        for (var value in values) {
-          if (value.value.toLowerCase() == trimmedValue.toLowerCase()) {
-            return value.valueId;
-          }
-        }
-      }
-    } catch (e) {
-    }
-    return null;
-  }
-
-  /// Link attributes to product in the global attribute system
-  /// Returns true if successful, false if attributes couldn't be synced
-  Future<bool> _linkAttributesToProduct(
+  /// Creates any missing attribute/value and assigns the set to the product.
+  Future<void> _linkAttributes(
     String productId,
-    Set<String> attributeNames,
-    List<List<dynamic>> rows,
+    RetailImportGroup group,
   ) async {
+    final valueIdsByAttribute = <String, Set<String>>{};
+
+    for (final row in group.variants) {
+      for (final entry in row.attributes.entries) {
+        final attributeId = await _ensureAttribute(entry.key);
+        if (attributeId == null) continue;
+        final valueId = await _ensureAttributeValue(attributeId, entry.value);
+        if (valueId == null) continue;
+        valueIdsByAttribute.putIfAbsent(attributeId, () => {}).add(valueId);
+      }
+    }
+
+    if (valueIdsByAttribute.isEmpty) return;
+
+    final assignments = valueIdsByAttribute.entries
+        .map(
+          (e) => {
+            'attributeId': e.key,
+            'valueIds': e.value.toList(),
+            'usedForVariants': true,
+            'isVisible': true,
+          },
+        )
+        .toList();
+
     try {
-      // Map to store attribute IDs and their value IDs
-      Map<String, Set<String>> attributeValueMap = {};
-
-      // Process each row to collect all attribute values
-      for (var row in rows) {
-        // Process Option1 (columns 4-5)
-        if (row[4].toString().isNotEmpty && row[5].toString().isNotEmpty) {
-          final attrName = row[4].toString().trim();
-          final attrValue = row[5].toString().trim();
-
-          final attrId = await _ensureAttributeExists(attrName);
-          if (attrId != null) {
-            final valueId = await _ensureAttributeValueExists(attrId, attrValue);
-            if (valueId != null) {
-              attributeValueMap.putIfAbsent(attrId, () => {});
-              attributeValueMap[attrId]!.add(valueId);
-            }
-          }
-        }
-
-        // Process Option2 (columns 6-7)
-        if (row[6].toString().isNotEmpty && row[7].toString().isNotEmpty) {
-          final attrName = row[6].toString().trim();
-          final attrValue = row[7].toString().trim();
-
-          final attrId = await _ensureAttributeExists(attrName);
-          if (attrId != null) {
-            final valueId = await _ensureAttributeValueExists(attrId, attrValue);
-            if (valueId != null) {
-              attributeValueMap.putIfAbsent(attrId, () => {});
-              attributeValueMap[attrId]!.add(valueId);
-            }
-          }
-        }
-
-        // Process Option3 (columns 8-9)
-        if (row[8].toString().isNotEmpty && row[9].toString().isNotEmpty) {
-          final attrName = row[8].toString().trim();
-          final attrValue = row[9].toString().trim();
-
-          final attrId = await _ensureAttributeExists(attrName);
-          if (attrId != null) {
-            final valueId = await _ensureAttributeValueExists(attrId, attrValue);
-            if (valueId != null) {
-              attributeValueMap.putIfAbsent(attrId, () => {});
-              attributeValueMap[attrId]!.add(valueId);
-            }
-          }
-        }
-      }
-
-      if (attributeValueMap.isEmpty) {
-        return false;
-      }
-
-      // Create assignment data for AttributeStore
-      List<Map<String, dynamic>> attributeAssignments = [];
-      for (var entry in attributeValueMap.entries) {
-        attributeAssignments.add({
-          'attributeId': entry.key,
-          'valueIds': entry.value.toList(),
-          'usedForVariants': true,
-          'isVisible': true,
-        });
-      }
-
-      // Assign all attributes to the product using AttributeStore
-      try {
-        final success = await _attributeStore.assignAttributesToProduct(
-          productId,
-          attributeAssignments,
-        );
-        if (success) {
-          return true;
-        } else {
-          return false;
-        }
-      } catch (e) {
-        return false;
-      }
-    } catch (e) {
-      return false;
+      await _attributeStore.assignAttributesToProduct(productId, assignments);
+    } catch (_) {
+      // Attribute taxonomy is a convenience layer; the variants themselves
+      // already carry customAttributes, so this must not fail the import.
     }
   }
 
-  /// Generate URL-friendly slug from name
-  String _generateSlug(String name) {
-    return name
-        .toLowerCase()
-        .trim()
-        .replaceAll(RegExp(r'[^a-z0-9\s-]'), '')
-        .replaceAll(RegExp(r'\s+'), '-');
-  }
+  Future<String?> _ensureAttribute(String name) async {
+    final wanted = name.trim().toLowerCase();
 
-  Future<void> _createVariant(
-      String productId, List<dynamic> row, String? taxId, double? gstRate) async {
-    double cost = double.tryParse(row[10].toString()) ?? 0.0;
-    double price = double.tryParse(row[11].toString()) ?? 0.0;
-    double? mrp = double.tryParse(row[12].toString());
-    double stock = double.tryParse(row[13].toString()) ?? 0;
-    String barcode = row[14].toString().trim();
-    double minStock = double.tryParse(row[15].toString()) ?? 5;
-
-    Map<String, String> attributes = {};
-    
-    if (row[4].toString().isNotEmpty && row[5].toString().isNotEmpty) {
-      attributes[row[4].toString()] = row[5].toString();
-    }
-    if (row[6].toString().isNotEmpty && row[7].toString().isNotEmpty) {
-      attributes[row[6].toString()] = row[7].toString();
-    }
-    if (row[8].toString().isNotEmpty && row[9].toString().isNotEmpty) {
-      attributes[row[8].toString()] = row[9].toString();
-    }
-
-    if (barcode.isNotEmpty) {
-      final existing = await _variantRepository.findByBarcode(barcode);
-      if (existing != null) {
-        throw Exception("Barcode $barcode already exists");
+    AttributeModel? find() {
+      for (final attribute in _attributeStore.attributes) {
+        if (attribute.name.toLowerCase() == wanted) return attribute;
       }
+      return null;
     }
 
-    VarianteModel variant = VarianteModel(
-      varianteId: const Uuid().v4(),
-      productId: productId,
-      costPrice: cost,
-      sellingPrice: price,
-      mrp: mrp,
-      stockQty: stock,
-      minStock: minStock,
-      barcode: barcode,
-      sku: barcode,
-      customAttributes: attributes,
-      status: 'active',
-      taxId: taxId,
-      taxRate: gstRate,
-      createdAt: DateTime.now().toIso8601String(),
-      updateAt: DateTime.now().toIso8601String(),
-    );
+    final existing = find();
+    if (existing != null) return existing.attributeId;
 
-    await _variantRepository.addVariant(variant);
+    try {
+      await _attributeStore.addAttribute(name.trim());
+    } catch (_) {
+      // Fall through — the re-look-up below covers an add that raced.
+    }
+    return find()?.attributeId;
   }
-  
+
+  Future<String?> _ensureAttributeValue(
+    String attributeId,
+    String value,
+  ) async {
+    final wanted = value.trim().toLowerCase();
+
+    String? find() {
+      for (final entry in _attributeStore.getValuesForAttribute(attributeId)) {
+        if (entry.value.toLowerCase() == wanted) return entry.valueId;
+      }
+      return null;
+    }
+
+    final existing = find();
+    if (existing != null) return existing;
+
+    try {
+      await _attributeStore.addValue(attributeId, value.trim());
+    } catch (_) {
+      // Fall through — re-look-up below.
+    }
+    return find();
+  }
+
+  // ── Reset ─────────────────────────────────────────────────────────────────
+
   @action
   void clear() {
     parsedRows.clear();
     logMessages.clear();
+    preview = null;
+    outcome = null;
     errorMessage = null;
     successMessage = null;
     progress = 0.0;
     isProcessing = false;
+    _variantsAdded = 0;
+    _variantsSkippedInGroup = 0;
   }
 }

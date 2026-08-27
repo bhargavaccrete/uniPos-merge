@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/domain/store/retail/product_store.dart';
 import 'package:billberrylite/domain/services/common/notification_service.dart';
+import 'package:billberrylite/domain/services/retail/retail_import_schema.dart';
 import 'package:billberrylite/stores/import_product/bulk_import_store.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
@@ -283,7 +284,7 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                                     ),
                                     decoration: BoxDecoration(
                                       color:
-                                          (_failedCount == 0
+                                          (!_hadProblems
                                                   ? AppColors.success
                                                   : AppColors.danger)
                                               .withOpacity(0.1),
@@ -294,10 +295,10 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                                       ),
                                     ),
                                     child: Icon(
-                                      _failedCount == 0
+                                      !_hadProblems
                                           ? Icons.check_circle
                                           : Icons.error,
-                                      color: _failedCount == 0
+                                      color: !_hadProblems
                                           ? AppColors.success
                                           : AppColors.danger,
                                       size: AppResponsive.largeIconSize(
@@ -326,23 +327,64 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
                                 thickness: 1,
                                 color: AppColors.divider,
                               ),
+                              // Every number the import produced is shown, so
+                              // nothing that happened to the file is invisible.
                               _buildResultItem(
                                 context,
                                 Icons.inventory_2_rounded,
-                                'Products Imported',
-                                '$_successCount',
+                                'Products Created',
+                                '${_outcome.productsCreated}',
                                 AppColors.primary,
                               ),
-                              if (_failedCount > 0) ...[
+                              if (_outcome.productsUpdated > 0)
+                                _buildResultItem(
+                                  context,
+                                  Icons.playlist_add_check_rounded,
+                                  'Existing Products Updated',
+                                  '${_outcome.productsUpdated}',
+                                  AppColors.primary,
+                                ),
+                              _buildResultItem(
+                                context,
+                                Icons.style_rounded,
+                                'Variants Imported',
+                                '${_outcome.variantsImported}',
+                                AppColors.success,
+                              ),
+                              if (_outcome.variantsSkipped > 0)
+                                _buildResultItem(
+                                  context,
+                                  Icons.skip_next_rounded,
+                                  'Variants Already Present',
+                                  '${_outcome.variantsSkipped}',
+                                  AppColors.warning,
+                                ),
+                              if (_outcome.rowsRejected > 0)
+                                _buildResultItem(
+                                  context,
+                                  Icons.rule_rounded,
+                                  'Rows Rejected',
+                                  '${_outcome.rowsRejected}',
+                                  AppColors.danger,
+                                ),
+                              if (_outcome.productsBlockedByLimit > 0)
+                                _buildResultItem(
+                                  context,
+                                  Icons.lock_outline_rounded,
+                                  'Blocked by Product Limit',
+                                  '${_outcome.productsBlockedByLimit}',
+                                  AppColors.danger,
+                                ),
+                              if (_outcome.groupsFailed > 0)
                                 _buildResultItem(
                                   context,
                                   Icons.error_outline_rounded,
-                                  'Failed Rows',
-                                  '$_failedCount',
+                                  'Products Failed',
+                                  '${_outcome.groupsFailed}',
                                   AppColors.danger,
                                 ),
+                              if (_failedLines.isNotEmpty)
                                 _buildFailedRowsDetail(context),
-                              ],
                               if (_notices.isNotEmpty) ...[
                                 _buildResultItem(
                                   context,
@@ -493,13 +535,18 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
     );
   }
 
-  int get _successCount =>
-      _store.logMessages.where((m) => m.startsWith('✓')).length;
-  int get _failedCount =>
-      _store.logMessages.where((m) => m.startsWith('✗')).length;
-  List<String> get _notices => _store.logMessages
-      .where((m) => !m.startsWith('✓') && !m.startsWith('✗'))
-      .toList();
+  /// Counts of the finished import. Empty until [BulkImportStore.importData]
+  /// completes, which is also the only time the results panel is shown.
+  RetailImportOutcome get _outcome =>
+      _store.outcome ?? const RetailImportOutcome();
+
+  bool get _hadProblems => _outcome.hadProblems;
+
+  List<String> get _failedLines =>
+      _store.logMessages.where((m) => m.startsWith('✗')).toList();
+
+  List<String> get _notices =>
+      _store.logMessages.where((m) => m.startsWith('ℹ')).toList();
 
   Widget _buildInstructionStep(
     BuildContext context,
@@ -572,67 +619,96 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
     );
   }
 
-  /// Counts distinct products (Handle) and categories from the parsed rows,
-  /// for the pre-import confirm dialog. Pure UI-layer computation over the
-  /// store's existing public `parsedRows` — no store changes.
-  ({int products, int categories}) _countsFromParsedRows() {
-    final dataRows = _store.parsedRows.skip(1);
-    final handles = <String>{};
-    final categories = <String>{};
-    for (final row in dataRows) {
-      if (row.isEmpty) continue;
-      final handle = row[0].toString().trim();
-      if (handle.isNotEmpty) handles.add(handle);
-      if (row.length > 2) {
-        final category = row[2].toString().trim();
-        if (category.isNotEmpty) categories.add(category);
-      }
-    }
-    return (products: handles.length, categories: categories.length);
-  }
+  /// Preview of what the file will do, shown BEFORE anything is written.
+  ///
+  /// Every row problem is listed with its sheet row number here rather than
+  /// after the fact, so a shop can close the dialog, fix the spreadsheet and
+  /// try again without having half-imported it.
+  Future<bool> _confirmImport(RetailImportParseResult parsed) async {
+    final errors = parsed.errors;
+    final notices = parsed.notices;
 
-  Future<bool> _confirmImport(int productCount, int categoryCount) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AppDialogShell(
-        title: 'Confirm Import',
-        accent: AppColors.primary,
+        title: 'Review Import',
+        accent: errors.isEmpty ? AppColors.primary : AppColors.warning,
         icon: Icons.inventory_2_rounded,
-        body: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Found in this file:',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.bodyFontSize(context),
-                color: AppColors.textSecondary,
-              ),
+        body: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.5,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ready to import:',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
+                _buildResultItem(
+                  context,
+                  Icons.inventory_2_rounded,
+                  'Products',
+                  '${parsed.groups.length}',
+                  AppColors.primary,
+                ),
+                _buildResultItem(
+                  context,
+                  Icons.style_rounded,
+                  'Variants',
+                  '${parsed.variantCount}',
+                  AppColors.success,
+                ),
+                _buildResultItem(
+                  context,
+                  Icons.category_rounded,
+                  'Categories',
+                  '${parsed.categoryNames.length}',
+                  AppColors.success,
+                ),
+                if (errors.isNotEmpty) ...[
+                  _buildResultItem(
+                    context,
+                    Icons.rule_rounded,
+                    'Rows with errors',
+                    '${errors.length}',
+                    AppColors.danger,
+                  ),
+                  _buildIssueList(
+                    context,
+                    'View rows that will NOT be imported',
+                    errors.map((e) => e.toString()).toList(),
+                    AppColors.danger,
+                  ),
+                ],
+                if (notices.isNotEmpty)
+                  _buildIssueList(
+                    context,
+                    'View ${notices.length} notice${notices.length == 1 ? '' : 's'}',
+                    notices.map((n) => n.toString()).toList(),
+                    AppColors.warning,
+                  ),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
+                Text(
+                  errors.isEmpty
+                      ? 'Products, variants and any missing categories will be '
+                            'created. Continue?'
+                      : 'Only the rows above without errors will be imported. '
+                            'Fix the file and re-import to add the rest. Continue?',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
-            SizedBox(height: AppResponsive.mediumSpacing(context)),
-            _buildResultItem(
-              context,
-              Icons.inventory_2_rounded,
-              'Products',
-              '$productCount',
-              AppColors.primary,
-            ),
-            _buildResultItem(
-              context,
-              Icons.category_rounded,
-              'Categories',
-              '$categoryCount',
-              AppColors.success,
-            ),
-            SizedBox(height: AppResponsive.smallSpacing(context)),
-            Text(
-              'New products, variants, and categories will be created. Continue?',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.smallFontSize(context),
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
+          ),
         ),
         actions: [
           appDialogCancelButton(ctx, label: 'Cancel'),
@@ -646,6 +722,58 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
       ),
     );
     return confirmed ?? false;
+  }
+
+  /// Collapsed list of row-level findings, shared by the preview dialog and
+  /// the results panel.
+  Widget _buildIssueList(
+    BuildContext context,
+    String title,
+    List<String> lines,
+    Color accent,
+  ) {
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        expandedCrossAxisAlignment: CrossAxisAlignment.start,
+        childrenPadding: EdgeInsets.only(
+          bottom: AppResponsive.smallSpacing(context),
+        ),
+        title: Text(
+          title,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.smallFontSize(context),
+            fontWeight: FontWeight.w500,
+            color: accent,
+          ),
+        ),
+        children: lines.map((line) {
+          return Container(
+            width: double.infinity,
+            margin: EdgeInsets.only(
+              bottom: AppResponsive.smallSpacing(context),
+            ),
+            padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
+            decoration: BoxDecoration(
+              color: accent.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
+              border: Border.all(color: accent.withOpacity(0.2)),
+            ),
+            child: Text(
+              line,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
   }
 
   Future<void> _downloadTemplate() async {
@@ -668,10 +796,13 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
       return;
     }
 
-    if (_store.parsedRows.isEmpty) return; // user cancelled the file picker
+    final parsed = _store.preview;
+    // Null means the user cancelled the file picker; an empty group list means
+    // the file was read but nothing in it is importable — pickAndParseFile has
+    // already set errorMessage in that case.
+    if (parsed == null || !parsed.hasAnythingToImport) return;
 
-    final counts = _countsFromParsedRows();
-    final confirmed = await _confirmImport(counts.products, counts.categories);
+    final confirmed = await _confirmImport(parsed);
     if (!confirmed) {
       _store.clear();
       return;
@@ -691,89 +822,19 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
     if (mounted) Navigator.pop(context);
   }
 
-  /// Expandable list of failed rows (each ✗ log line already contains the
-  /// handle + error reason).
-  Widget _buildFailedRowsDetail(BuildContext context) {
-    final failed = _store.logMessages.where((m) => m.startsWith('✗')).toList();
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        tilePadding: EdgeInsets.zero,
-        expandedCrossAxisAlignment: CrossAxisAlignment.start,
-        childrenPadding: EdgeInsets.only(
-          bottom: AppResponsive.smallSpacing(context),
-        ),
-        title: Text(
-          'View failed rows',
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.smallFontSize(context),
-            fontWeight: FontWeight.w500,
-            color: AppColors.danger,
-          ),
-        ),
-        children: failed.map((f) {
-          return Container(
-            margin: EdgeInsets.only(
-              bottom: AppResponsive.smallSpacing(context),
-            ),
-            padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
-            decoration: BoxDecoration(
-              color: AppColors.danger.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(
-                AppResponsive.smallBorderRadius(context),
-              ),
-              border: Border.all(color: AppColors.danger.withOpacity(0.2)),
-            ),
-            child: Text(
-              f,
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.smallFontSize(context),
-                color: AppColors.textSecondary,
-                height: 1.4,
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
+  /// Expandable list of the products that could not be written. Each line
+  /// already carries its row number and the reason.
+  Widget _buildFailedRowsDetail(BuildContext context) => _buildIssueList(
+    context,
+    'View failed rows',
+    _failedLines,
+    AppColors.danger,
+  );
 
-  /// Expandable list of import notices (e.g. "tax disabled for this business").
-  Widget _buildNoticesDetail(BuildContext context) {
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        tilePadding: EdgeInsets.zero,
-        expandedCrossAxisAlignment: CrossAxisAlignment.start,
-        childrenPadding: EdgeInsets.only(
-          bottom: AppResponsive.smallSpacing(context),
-        ),
-        title: Text(
-          'View notices',
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.smallFontSize(context),
-            fontWeight: FontWeight.w500,
-            color: AppColors.warning,
-          ),
-        ),
-        children: _notices.map((w) {
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: AppResponsive.smallSpacing(context) / 2,
-            ),
-            child: Text(
-              w,
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.smallFontSize(context),
-                color: AppColors.textSecondary,
-                height: 1.4,
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
+  /// Expandable list of import notices (skipped duplicate variants, ignored
+  /// product-level values, "tax disabled for this business", and so on).
+  Widget _buildNoticesDetail(BuildContext context) =>
+      _buildIssueList(context, 'View notices', _notices, AppColors.warning);
 
   Widget _buildResultItem(
     BuildContext context,

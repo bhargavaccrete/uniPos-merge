@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'package:billberrylite/presentation/screens/retail/add_product_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/category_management_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/import_product/bulk_import_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/inventory_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/stock_take_list_screen.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
@@ -94,6 +95,15 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
   /// Bulk counting belongs to the Products tab, and the hub owns the only
   /// AppBar — the embedded InventoryScreen has none, so this action cannot live
   /// there.
+  /// The importer refreshes the product/category stores itself on Done, so the
+  /// hub picks up whatever it created without any extra plumbing here.
+  void _openBulkImport() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const BulkImportScreen()),
+    );
+  }
+
   void _openStockTakes() {
     if (!PlanGuard.allowedOr(
       context,
@@ -132,6 +142,21 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
                 icon: const Icon(Icons.fact_check_outlined),
                 tooltip: 'Stock Takes',
                 onPressed: _openStockTakes,
+              );
+            },
+          ),
+          // Products tab only. Bulk import was previously reachable only from
+          // the onboarding wizard, so an existing shop had no way back to it.
+          AnimatedBuilder(
+            animation: _tabController.animation!,
+            builder: (_, child) {
+              if (_tabController.animation!.value.round() != 0) {
+                return const SizedBox.shrink();
+              }
+              return IconButton(
+                icon: const Icon(Icons.upload_file),
+                tooltip: 'Bulk Import',
+                onPressed: _openBulkImport,
               );
             },
           ),

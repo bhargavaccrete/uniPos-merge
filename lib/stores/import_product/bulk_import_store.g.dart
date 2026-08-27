@@ -105,6 +105,38 @@ mixin _$BulkImportStore on _BulkImportStore, Store {
     });
   }
 
+  late final _$previewAtom =
+      Atom(name: '_BulkImportStore.preview', context: context);
+
+  @override
+  RetailImportParseResult? get preview {
+    _$previewAtom.reportRead();
+    return super.preview;
+  }
+
+  @override
+  set preview(RetailImportParseResult? value) {
+    _$previewAtom.reportWrite(value, super.preview, () {
+      super.preview = value;
+    });
+  }
+
+  late final _$outcomeAtom =
+      Atom(name: '_BulkImportStore.outcome', context: context);
+
+  @override
+  RetailImportOutcome? get outcome {
+    _$outcomeAtom.reportRead();
+    return super.outcome;
+  }
+
+  @override
+  set outcome(RetailImportOutcome? value) {
+    _$outcomeAtom.reportWrite(value, super.outcome, () {
+      super.outcome = value;
+    });
+  }
+
   late final _$logMessagesAtom =
       Atom(name: '_BulkImportStore.logMessages', context: context);
 
@@ -168,6 +200,8 @@ errorMessage: ${errorMessage},
 successMessage: ${successMessage},
 progress: ${progress},
 parsedRows: ${parsedRows},
+preview: ${preview},
+outcome: ${outcome},
 logMessages: ${logMessages}
     ''';
   }
