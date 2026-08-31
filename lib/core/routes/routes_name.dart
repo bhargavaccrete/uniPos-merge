@@ -123,6 +123,11 @@ class RouteNames {
   static const retailBilling = '/retail-billing';
   static const retailMenu = '/retail-menu';
 
+  /// Shared notification feed, retail entrance. The screen behind this and
+  /// behind [restaurantNotifications] is the same widget — the two names exist
+  /// only so each vertical applies its own route guard.
+  static const notifications = '/notifications';
+
   // Retail – Sales
   static const checkout = '/checkout';
   static const parkedSales = '/parked-sales';
@@ -134,6 +139,7 @@ class RouteNames {
   static const addProduct = '/add-product';
   static const categories = '/categories';
   static const stockAlerts = '/stock-alerts';
+  static const expiryAlerts = '/expiry-alerts';
 
   // Retail – Customers
   static const customers = '/customers';

@@ -92,7 +92,8 @@ class HiveTypeIds {
 
   static const int restaurantSession = 131; // RestaurantSessionModel — Session-based day management
   static const int restaurantAttendance = 132; // AttendanceModel — Staff clock-in/clock-out
-  static const int restaurantAppNotification = 133; // AppNotificationModel — persisted notifications
+  // SHARED (restaurant + retail) — id and box name are historical, do not change.
+  static const int appNotification = 133; // AppNotificationModel — persisted notifications
   static const int restaurantItemCancellation = 134; // ItemCancellationModel — item-level cancel audit
 
   // Recipe / BOM (135-137) — see docs/inventory_recipe_system_plan.md
@@ -281,7 +282,7 @@ class HiveTypeIds {
     savedPrinter,
     restaurantSession,
     restaurantAttendance,
-    restaurantAppNotification,
+    appNotification,
     restaurantItemCancellation,
     restaurantRecipe,
     restaurantRecipeIngredient,

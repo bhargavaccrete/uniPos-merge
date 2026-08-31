@@ -34,7 +34,7 @@ import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 // Restaurant - Home & Dashboard
 import 'package:billberrylite/presentation/screens/restaurant/welcome_Admin.dart';
 import 'package:billberrylite/presentation/screens/restaurant/usage_limit_screen.dart';
-import 'package:billberrylite/presentation/screens/restaurant/notifications/notifications_screen.dart';
+import 'package:billberrylite/presentation/screens/common/notifications/notifications_screen.dart';
 
 // Restaurant - Orders
 import 'package:billberrylite/presentation/screens/restaurant/start%20order/startorder.dart';

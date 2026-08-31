@@ -2,10 +2,10 @@ import 'dart:convert';
 
 import 'package:mobx/mobx.dart';
 import 'package:uuid/uuid.dart';
-import 'package:billberrylite/data/models/restaurant/dashboard_alert.dart';
-import 'package:billberrylite/data/models/restaurant/db/app_notification_model.dart';
-import 'package:billberrylite/data/models/restaurant/notification_presenter.dart';
-import 'package:billberrylite/data/repositories/restaurant/notification_repository.dart';
+import 'package:billberrylite/data/models/common/dashboard_alert.dart';
+import 'package:billberrylite/data/models/common/app_notification_model.dart';
+import 'package:billberrylite/data/models/common/notification_presenter.dart';
+import 'package:billberrylite/data/repositories/common/notification_repository.dart';
 import 'package:billberrylite/domain/services/common/local_notification_service.dart';
 
 part 'notification_store.g.dart';
@@ -43,6 +43,21 @@ abstract class _NotificationStore with Store {
   List<AppNotificationModel> _bySeverity(AlertSeverity s) => active
       .where((n) => NotificationPresenter.present(n).severity == s)
       .toList();
+
+  /// Unresolved records for one [eventCode] (optionally narrowed to a
+  /// [subjectType]).
+  ///
+  /// A reconciling trigger — one that recomputes the whole alerting set on
+  /// every run rather than reacting to a single stock movement — needs this to
+  /// answer "what did I raise last time that is no longer true?" and resolve
+  /// the difference. Restaurant's triggers are event-driven and know their own
+  /// subject, so nothing there calls it.
+  List<AppNotificationModel> activeOf(String eventCode, {String? subjectType}) =>
+      active
+          .where((n) =>
+              n.eventCode == eventCode &&
+              (subjectType == null || n.subjectType == subjectType))
+          .toList();
 
   @action
   Future<void> load() async {

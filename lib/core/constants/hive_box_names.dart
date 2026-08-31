@@ -17,6 +17,12 @@ class HiveBoxNames {
 
   // ==================== COMMON BOXES ====================
 
+  /// Persisted app notifications (low stock, expiry, EOD, backup, license).
+  /// SHARED by restaurant and retail — one physical box, and only one business
+  /// mode is ever active. The string value is historical: renaming it would
+  /// orphan every existing restaurant install's notification history.
+  static const String appNotifications = 'restaurantNotificationsBox';
+
   /// Application configuration box
   static const String appConfig = 'appConfigBox';
 
@@ -218,9 +224,6 @@ class HiveBoxNames {
   /// Staff attendance clock-in/out records
   static const String restaurantAttendance = 'restaurantAttendanceBox';
 
-  /// Persisted app notifications (low stock, EOD, backup, license, etc.)
-  static const String restaurantNotifications = 'restaurantNotificationsBox';
-
   /// Item-level cancellation audit (items cancelled from a placed order, with reason)
   static const String restaurantItemCancellations = 'restaurantItemCancellationsBox';
 
@@ -365,7 +368,6 @@ class HiveBoxNames {
     restaurantPrinters,
     restaurantSessions,
     restaurantAttendance,
-    restaurantNotifications,
     restaurantItemCancellations,
     restaurantRecipes,
     restaurantRecipeProductions,
@@ -394,5 +396,6 @@ class HiveBoxNames {
     businessDetailsBox,
     paymentMethods,
     dayManagementBox,
+    appNotifications,
   ];
 }

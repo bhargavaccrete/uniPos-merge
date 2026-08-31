@@ -96,13 +96,13 @@ import 'package:billberrylite/domain/store/restaurant/eod_store.dart';
 import 'package:billberrylite/domain/store/restaurant/appStore.dart';
 import 'package:billberrylite/domain/store/restaurant/printer_store.dart';
 import 'package:billberrylite/domain/store/restaurant/attendance_store.dart';
-import 'package:billberrylite/domain/store/restaurant/notification_store.dart';
+import 'package:billberrylite/domain/store/common/notification_store.dart';
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 import 'package:billberrylite/domain/services/common/license_api_service.dart';
 import 'package:billberrylite/domain/services/restaurant/thermal_printer_service.dart';
 
 import 'package:billberrylite/data/repositories/restaurant/attendance_repository.dart';
-import 'package:billberrylite/data/repositories/restaurant/notification_repository.dart';
+import 'package:billberrylite/data/repositories/common/notification_repository.dart';
 import '../../domain/services/retail/barcode_generator_service.dart';
 
 // Type aliases for convenience getters (to avoid prefixing with 'restaurant.')
@@ -189,6 +189,18 @@ Future<void> setupServiceLocator() async {
   locator.registerLazySingleton<ThermalPrinterService>(() => ThermalPrinterService());
   locator.registerLazySingleton<PrinterStore>(
     () => PrinterStore(locator<PrinterRepository>(), locator<ThermalPrinterService>()),
+  );
+
+  // Notification feed — common to both modes for the same reason as the
+  // printer stack above. Restaurant raises low-stock/EOD/backup/license
+  // events, retail raises low-stock/expiry; both persist to the one shared
+  // box (HiveBoxNames.appNotifications) and render through the one shared
+  // screen. Registered here rather than per-mode so `notificationStore` is
+  // never "not registered inside GetIt" in retail, and so it survives the
+  // setup wizard's business-mode switch (the box is common, so nothing dangles).
+  locator.registerLazySingleton<NotificationRepository>(() => NotificationRepository());
+  locator.registerLazySingleton<NotificationStore>(
+    () => NotificationStore(locator<NotificationRepository>()),
   );
 
   // LicenseStore is common — needed in setup wizard before business mode is selected
@@ -378,9 +390,9 @@ Future<void> _registerRestaurantDependencies() async {
   _regBusiness<ItemCancellationRepository>(
       () => ItemCancellationRepository());
   _regBusiness<AttendanceRepository>(() => AttendanceRepository());
-  _regBusiness<NotificationRepository>(() => NotificationRepository());
-  // PrinterRepository / ThermalPrinterService / PrinterStore are COMMON —
-  // registered in setupServiceLocator(), see the printer block there.
+  // PrinterRepository / ThermalPrinterService / PrinterStore and the
+  // Notification stack are COMMON — registered in setupServiceLocator(),
+  // see the printer block there.
 
   // ==================== RESTAURANT STORES ====================
   _regBusiness<CategoryStore>(
@@ -457,7 +469,6 @@ Future<void> _registerRestaurantDependencies() async {
   );
   _regBusiness<AppStore>(() => AppStore());
   _regBusiness<AttendanceStore>(() => AttendanceStore(locator<AttendanceRepository>()));
-  _regBusiness<NotificationStore>(() => NotificationStore(locator<NotificationRepository>()));
 }
 
 /// Register business dependencies dynamically (called during setup wizard)
@@ -505,6 +516,10 @@ BusinessDetailsRepository get businessDetailsRepository =>
     locator<BusinessDetailsRepository>();
 
 // ==================== MODE-AWARE CONVENIENCE GETTERS ====================
+
+/// Persisted notification feed — shared by both modes (see the common
+/// registration in setupServiceLocator).
+NotificationStore get notificationStore => locator<NotificationStore>();
 
 /// Mode-aware cart store getter - works for both retail and restaurant
 dynamic get cartStore {
@@ -587,7 +602,6 @@ EodStore get eodStore => locator<EodStore>();
 AppStore get appStore => locator<AppStore>();
 PrinterStore get printerStore => locator<PrinterStore>();
 AttendanceStore get attendanceStore => locator<AttendanceStore>();
-NotificationStore get notificationStore => locator<NotificationStore>();
 LicenseStore get licenseStore => locator<LicenseStore>();
 
 /// Restaurant Repositories

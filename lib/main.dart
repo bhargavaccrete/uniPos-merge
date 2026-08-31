@@ -22,7 +22,7 @@ import 'domain/services/retail/retail_printer_settings_service.dart';
 import 'domain/services/restaurant/auto_backup_service.dart';
 import 'domain/services/common/local_notification_service.dart';
 import 'domain/services/common/firebase_messaging_service.dart';
-import 'domain/services/restaurant/notification_sync_service.dart';
+import 'domain/services/common/notification_sync.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 final appStore = AppStore();
 
@@ -66,7 +66,7 @@ void main() async {
     // first frame paints during the launch-screen transition, before the
     // Android 13+ activity resumes, so the POST_NOTIFICATIONS dialog is
     // silently dropped (it only appeared on the *second* launch).
-    if (AppConfig.isRestaurant) {
+    if (AppConfig.isBusinessModeSet) {
       _NotificationPermissionRequester.scheduleOnResume();
     }
   }, (error, stackTrace) {
@@ -204,32 +204,6 @@ Future<void> _initializeApp() async {
       print('   ⚠️  Failed to start Bill Berry Lite Local Server: $e');
     });
 
-    // Local notifications: init OS plugin, seed history + schedule reminders.
-    // Runs after the server is already binding — not time-critical.
-    // Wrapped so a notification failure (e.g. exact-alarm permission denied on
-    // Android 13/14) can never break or block app startup.
-    // Permission is requested AFTER the first frame (see main()) because the
-    // Android 13+ prompt needs a resumed activity.
-    try {
-      await LocalNotificationService.instance.init();
-      await notificationStore.load();
-      await NotificationSyncService.runStartupChecks();
-      print('   ✅ Local notifications ready');
-    } catch (e) {
-      print('   ⚠️  Local notifications init failed (non-fatal): $e');
-    }
-
-    // Firebase Cloud Messaging (push). Runs after local notifications because
-    // foreground pushes are rendered through that plugin's channels. Wrapped so
-    // a missing/invalid Firebase config can never break startup. No-op on
-    // desktop/web (no google-services config in this project).
-    try {
-      await FirebaseMessagingService.instance.init();
-      print('   ✅ Firebase push notifications ready');
-    } catch (e) {
-      print('   ⚠️  Firebase messaging init failed (non-fatal): $e');
-    }
-
   } else if (AppConfig.isRetail) {
     print('   Loading retail settings...');
     await Future.wait([
@@ -240,6 +214,39 @@ Future<void> _initializeApp() async {
     print('   ✅ Retail settings loaded');
   } else {
     print('   ⚠️  No business mode set - running in setup mode');
+  }
+
+  // ==================== NOTIFICATIONS (both modes) ====================
+  // Shared by restaurant and retail: one Hive box, one store, one screen.
+  // `NotificationSync` picks which startup checks to run for the active mode.
+  //
+  // Deliberately placed AFTER the mode branches so restaurant keeps its
+  // original ordering — the local server is already binding by now, and
+  // notifications are slow enough that they must not delay it.
+  //
+  // Both blocks are wrapped so a failure (exact-alarm permission denied on
+  // Android 13/14, a missing Firebase config) can never break or block
+  // startup. Permission is requested AFTER the first frame (see main()),
+  // because the Android 13+ prompt needs a resumed activity.
+  if (AppConfig.isBusinessModeSet) {
+    try {
+      await LocalNotificationService.instance.init();
+      await notificationStore.load();
+      await NotificationSync.runStartupChecks();
+      print('   ✅ Local notifications ready');
+    } catch (e) {
+      print('   ⚠️  Local notifications init failed (non-fatal): $e');
+    }
+
+    // Firebase Cloud Messaging (push). Runs after local notifications because
+    // foreground pushes are rendered through that plugin's channels. No-op on
+    // desktop/web (no google-services config for those platforms here).
+    try {
+      await FirebaseMessagingService.instance.init();
+      print('   ✅ Firebase push notifications ready');
+    } catch (e) {
+      print('   ⚠️  Firebase messaging init failed (non-fatal): $e');
+    }
   }
 
   // Debug: Print initialization status

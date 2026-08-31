@@ -9,6 +9,8 @@ import 'package:billberrylite/presentation/screens/retail/product_management_scr
 import 'package:billberrylite/presentation/screens/retail/add_product_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/category_management_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/stock_alerts_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/expiry_alerts_screen.dart';
+import 'package:billberrylite/presentation/screens/common/notifications/notifications_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/checkout_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/parked_sales_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/customer_list_screen.dart';
@@ -42,6 +44,10 @@ class RetailRoutes {
   static Map<String, WidgetBuilder> get routes => {
     RouteNames.retailBilling: _guard(const RetailPosScreen(), RetailEntKeys.billing),
     RouteNames.retailMenu: _guard(const HomeScreen()), // home — always open
+    // Shared notifications feed. Always open: a notification must stay
+    // reachable even when the plan doesn't include the module it came from —
+    // the screen checks the entitlement before navigating onward.
+    RouteNames.notifications: _guard(const NotificationsScreen()),
 
     // Mid-sale flows stay open; the billing entrance above is the gate.
     RouteNames.checkout: _guard(const CheckoutScreen()),
@@ -52,6 +58,7 @@ class RetailRoutes {
     RouteNames.addProduct: _guard(const AddProductScreen(), RetailEntKeys.catalog),
     RouteNames.categories: _guard(const CategoryManagementScreen(), RetailEntKeys.catalogCategories),
     RouteNames.stockAlerts: _guard(const StockAlertsScreen(), RetailEntKeys.inventory),
+    RouteNames.expiryAlerts: _guard(const ExpiryAlertsScreen(), RetailEntKeys.inventory),
 
     RouteNames.customers: _guard(const CustomerListScreen(), RetailEntKeys.customers),
     RouteNames.creditReports: _guard(const CreditReportsScreen(), RetailEntKeys.billingCredit),

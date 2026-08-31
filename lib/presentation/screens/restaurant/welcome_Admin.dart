@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:billberrylite/presentation/widget/componets/common/notification_bell.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -242,54 +243,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
           ],
         ),
         actions: [
-          Observer(
-            builder: (context) {
-              final count = notificationStore.unreadCount;
-              return Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: Center(
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          count > 0 ? Icons.notifications_rounded : Icons.notifications_none_rounded,
-                          color: Colors.white,
-                          size: isTablet ? 24 : 22,
-                        ),
-                        onPressed: () => Navigator.pushNamed(context, RouteNames.restaurantNotifications),
-                      ),
-                      if (count > 0)
-                        Positioned(
-                          right: 4,
-                          top: 4,
-                          child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: BoxDecoration(
-                              color: Colors.red,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            constraints: const BoxConstraints(
-                              minWidth: 16,
-                              minHeight: 16,
-                            ),
-                            child: Text(
-                              '$count',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
+          NotificationBell(iconSize: isTablet ? 24 : 22),
         ],
       ),
       body: Stack(children: [

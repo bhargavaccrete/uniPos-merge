@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/presentation/widget/componets/common/notification_bell.dart';
 import 'package:billberrylite/presentation/screens/retail/expiry_alerts_screen.dart';
 import 'package:billberrylite/domain/services/retail/expiry_alert_service.dart';
 import 'package:flutter/services.dart';
@@ -221,9 +222,12 @@ class _HomeScreenState extends State<HomeScreen> {
   // ==================== HEADERS ====================
   /// Action widgets shown on the right of the dashboard AppBar (mobile/tablet).
   List<Widget> _buildDashboardAppBarActions(BuildContext context) {
-    // The account menu (change PIN, logout). White tint to read on the
-    // primary AppBar.
+    // Notification bell, then the account menu (change PIN, logout). White
+    // tint to read on the primary AppBar.
     return [
+      NotificationBell(
+        iconSize: AppResponsive.isMobile(context) ? 22 : 24,
+      ),
       _buildUserMenuButton(context, Colors.white),
       const SizedBox(width: 4),
     ];
@@ -272,6 +276,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
+          // Desktop renders a sidebar + this header instead of an AppBar, so
+          // the bell has to be placed here too — same control, primary tint
+          // against the light header.
+          const NotificationBell(tint: AppColors.primary, iconSize: 24),
           _buildUserMenuButton(context, AppColors.primary),
         ],
       ),

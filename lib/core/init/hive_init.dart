@@ -85,7 +85,7 @@ import 'package:billberrylite/data/models/restaurant/db/cash_handover_model.dart
 import 'package:billberrylite/data/models/restaurant/db/saved_printer_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/session_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/attendance_model.dart';
-import 'package:billberrylite/data/models/restaurant/db/app_notification_model.dart';
+import 'package:billberrylite/data/models/common/app_notification_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/item_cancellation_model_134.dart';
 
 /// Hive Initialization Class
@@ -135,6 +135,13 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.savedPrinter)) {
       Hive.registerAdapter(SavedPrinterModelAdapter());
     }
+    // AppNotificationModel - typeId: 133. Same story as SavedPrinterModel: it
+    // sits in the restaurant range for historical reasons, but the notification
+    // feed is COMMON to both modes (retail raises low-stock and expiry events
+    // through the same store), so it registers regardless of business mode.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.appNotification)) {
+      Hive.registerAdapter(AppNotificationModelAdapter());
+    }
   }
 
   /// Open common boxes (needed regardless of business mode)
@@ -154,6 +161,11 @@ class HiveInit {
     // modes. PrinterRepository's constructor does a synchronous Hive.box()
     // lookup, so this must be open before the service locator builds it.
     await Hive.openBox<SavedPrinterModel>(HiveBoxNames.restaurantPrinters);
+
+    // Persisted app notifications — one physical box for both modes.
+    // NotificationRepository does a synchronous Hive.box() lookup, so this
+    // must be open before the service locator builds the store.
+    await Hive.openBox<AppNotificationModel>(HiveBoxNames.appNotifications);
 
     // Open and initialize payment methods box with defaults
     final paymentBox = await Hive.openBox<pm.PaymentMethod>(HiveBoxNames.paymentMethods);
@@ -649,10 +661,6 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantAttendance)) {
       Hive.registerAdapter(AttendanceModelAdapter());
     }
-    // AppNotificationModel - 133: persisted notifications
-    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantAppNotification)) {
-      Hive.registerAdapter(AppNotificationModelAdapter());
-    }
     // ItemCancellationModel - 134: item-level cancellation audit
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantItemCancellation)) {
       Hive.registerAdapter(ItemCancellationModelAdapter());
@@ -784,8 +792,6 @@ class HiveInit {
 
     // Staff attendance
     await Hive.openBox<AttendanceModel>(HiveBoxNames.restaurantAttendance);
-    // App notifications
-    await Hive.openBox<AppNotificationModel>(HiveBoxNames.restaurantNotifications);
     // Item-level cancellation audit
     await Hive.openBox<ItemCancellationModel>(HiveBoxNames.restaurantItemCancellations);
 

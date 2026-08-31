@@ -1,6 +1,6 @@
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/routes/routes_name.dart';
-import 'package:billberrylite/data/models/restaurant/notification_presenter.dart';
+import 'package:billberrylite/data/models/common/notification_presenter.dart';
 import 'package:billberrylite/domain/services/common/auto_backup_service.dart';
 import 'package:billberrylite/domain/services/common/local_notification_service.dart';
 import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';

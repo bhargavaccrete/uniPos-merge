@@ -1,22 +1,21 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
-import 'package:billberrylite/core/plan/entitlement_keys.dart';
-import 'package:billberrylite/core/plan/entitlements.dart';
+import 'package:billberrylite/core/plan/mode_keys.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
-import 'package:billberrylite/core/routes/routes_name.dart';
-import 'package:billberrylite/domain/store/restaurant/license_store.dart';
+import 'package:billberrylite/core/routes/notification_routes.dart';
 import 'package:billberrylite/domain/services/common/local_notification_service.dart';
-import 'package:billberrylite/domain/services/restaurant/notification_sync_service.dart';
+import 'package:billberrylite/domain/services/common/notification_sync.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/domain/services/common/notification_service.dart';
-import 'package:billberrylite/data/models/restaurant/dashboard_alert.dart';
-import 'package:billberrylite/data/models/restaurant/db/app_notification_model.dart';
-import 'package:billberrylite/data/models/restaurant/notification_presenter.dart';
+import 'package:billberrylite/data/models/common/dashboard_alert.dart';
+import 'package:billberrylite/data/models/common/app_notification_model.dart';
+import 'package:billberrylite/data/models/common/notification_presenter.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -34,19 +33,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _refresh() async {
     await notificationStore.load();
-    await NotificationSyncService.runStartupChecks();
+    await NotificationSync.runStartupChecks();
   }
 
   /// Entitlement key a notification's target route requires, or null when the
   /// route is intentionally ungated (EndDay, Licensing stay reachable). Keeps
   /// notification taps from landing on AccessDenied for an ungranted module.
+  ///
+  /// Compared against the resolved route rather than a literal, because the
+  /// same event lands on a different screen per vertical — restaurant's
+  /// Inventory, retail's Stock Alerts / Expiry Alerts. `ModeKeys.inventory`
+  /// picks the matching entitlement namespace.
   String? _routeEntitlement(String route) {
-    switch (route) {
-      case RouteNames.restaurantInventory:
-        return EntKeys.inventory;
-      default:
-        return null;
+    if (route == NotificationRoutes.lowStock ||
+        route == NotificationRoutes.expiry) {
+      return ModeKeys.inventory;
     }
+    return null;
   }
 
   Future<void> _confirmClearAll() async {
@@ -73,9 +76,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         title: 'Notifications',
         centerTitle: false,
         actions: [
-          // TEMP diagnostic: fires the OS plugin directly, bypassing the store
-          // throttle. Remove once notifications are confirmed working.
-          IconButton(
+          // Diagnostic: fires the OS plugin directly, bypassing the store
+          // throttle. Debug builds only — it is a developer tool, and the
+          // screen is now shared with retail.
+          if (kDebugMode)
+            IconButton(
             tooltip: 'Diagnose notifications',
             icon: const Icon(Icons.bug_report, color: Colors.white),
             onPressed: () async {

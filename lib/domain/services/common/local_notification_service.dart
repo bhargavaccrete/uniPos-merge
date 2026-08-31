@@ -5,7 +5,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
-import 'package:billberrylite/data/models/restaurant/notification_presenter.dart';
+import 'package:billberrylite/data/models/common/notification_presenter.dart';
 import 'package:billberrylite/main.dart' show navigatorKey;
 
 class LocalNotificationService {
@@ -156,11 +156,13 @@ class LocalNotificationService {
     NotificationChannels.lowStock: 'Low Stock Alerts',
     NotificationChannels.appAlerts: 'App Alerts',
     NotificationChannels.orders: 'New Orders',
+    NotificationChannels.expiry: 'Expiry Alerts',
   };
 
   static const Set<String> _highChannels = {
     NotificationChannels.lowStock,
     NotificationChannels.orders,
+    NotificationChannels.expiry,
   };
 
   Future<void> _createAndroidChannels() async {

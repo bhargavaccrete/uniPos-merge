@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:billberrylite/core/routes/routes_name.dart';
-import 'package:billberrylite/data/models/restaurant/dashboard_alert.dart';
-import 'package:billberrylite/data/models/restaurant/db/app_notification_model.dart';
+import 'package:billberrylite/core/routes/notification_routes.dart';
+import 'package:billberrylite/data/models/common/dashboard_alert.dart';
+import 'package:billberrylite/data/models/common/app_notification_model.dart';
 
 /// Android notification channel ids (created in LocalNotificationService).
 class NotificationChannels {
@@ -9,6 +9,7 @@ class NotificationChannels {
   static const String lowStock = 'low_stock';
   static const String appAlerts = 'app_alerts';
   static const String orders = 'orders'; // captain orders / KOT — high + sound
+  static const String expiry = 'expiry'; // retail expiry alerts — high
 }
 
 class NotificationView {
@@ -49,27 +50,27 @@ class NotificationPresenter {
           body: body,
           severity: AlertSeverity.warning,
           icon: Icons.inventory_2_outlined,
-          route: RouteNames.restaurantInventory,
+          route: NotificationRoutes.lowStock,
           channelId: NotificationChannels.lowStock,
         );
 
       case 'pending_eod':
-        return const NotificationView(
+        return NotificationView(
           title: 'End of Day Pending',
           body: 'Previous day session is still open. Please complete EOD.',
           severity: AlertSeverity.critical,
           icon: Icons.warning_amber_rounded,
-          route: RouteNames.restaurantEndDay,
+          route: NotificationRoutes.endDay,
           channelId: NotificationChannels.appAlerts,
         );
 
       case 'license_expired':
-        return const NotificationView(
+        return NotificationView(
           title: 'License Expired',
           body: 'License expired! Renew now to avoid service interruption.',
           severity: AlertSeverity.critical,
           icon: Icons.error_outline_rounded,
-          route: RouteNames.restaurantLicensing,
+          route: NotificationRoutes.licensing,
           channelId: NotificationChannels.appAlerts,
         );
 
@@ -83,8 +84,34 @@ class NotificationPresenter {
           body: 'Your license expires $dayText. Renew to avoid interruption.',
           severity: AlertSeverity.warning,
           icon: Icons.timer_outlined,
-          route: RouteNames.restaurantLicensing,
+          route: NotificationRoutes.licensing,
           channelId: NotificationChannels.appAlerts,
+        );
+
+      // Retail expiry. One event per variant; severity follows the CURRENT
+      // status in `data`, which the sync service refreshes in place — so a
+      // date pushed further out downgrades the same row instead of leaving a
+      // stale "Expired" behind.
+      case 'expiry_alert':
+        final name = d['name'] ?? 'A product';
+        final status = d['status'] as String?;
+        final days = d['daysUntil'];
+        final isExpired = status == 'expired';
+        final String body;
+        if (isExpired) {
+          body = '$name has expired.';
+        } else if (days == null || days == 0) {
+          body = '$name expires today.';
+        } else {
+          body = '$name expires in $days day${days == 1 ? '' : 's'}.';
+        }
+        return NotificationView(
+          title: isExpired ? 'Product Expired' : 'Expiring Soon',
+          body: body,
+          severity: isExpired ? AlertSeverity.critical : AlertSeverity.warning,
+          icon: Icons.event_busy_rounded,
+          route: NotificationRoutes.expiry,
+          channelId: NotificationChannels.expiry,
         );
 
       case 'backup_due':

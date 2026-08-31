@@ -46,6 +46,12 @@ class ModeKeys {
   static String get usersMax =>
       AppConfig.isRetail ? RetailEntKeys.usersMax : EntKeys.usersMax;
 
+  // ── Inventory (shared notification screen's tap guard) ────────────────────
+  // A low-stock or expiry notification can fire for a module the plan doesn't
+  // include; the shared notifications screen checks this before navigating.
+  static String get inventory =>
+      AppConfig.isRetail ? RetailEntKeys.inventory : EntKeys.inventory;
+
   // ── Shared report window (ReportHistoryWindow, both verticals' reports) ────
   static String get reportsHistoryLimitDays => AppConfig.isRetail
       ? RetailEntKeys.reportsHistoryLimitDays

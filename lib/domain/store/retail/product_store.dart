@@ -42,10 +42,13 @@ abstract class _ProductStore with Store {
   @observable
   ObservableList<VarianteModel> variants = ObservableList<VarianteModel>();
 
+  /// The constructor's hydration, kept so callers can await it.
+  late final Future<void> _hydration;
+
   _ProductStore() {
     _productRepository = ProductRepository();
     _variantRepository = VariantRepository();
-    _init();
+    _hydration = _init();
   }
 
   Future<void> _init() async {
@@ -53,6 +56,16 @@ abstract class _ProductStore with Store {
     await loadProducts();
     await loadVariants();
   }
+
+  /// Completes once the constructor's initial load has finished.
+  ///
+  /// The store hydrates asynchronously from its constructor, so a caller that
+  /// touches `products` in the same turn it first reads `productStore` sees an
+  /// empty catalogue. Screens don't notice — they sit inside an `Observer` and
+  /// repaint when the load lands — but a one-shot startup job (the notification
+  /// sync) would silently conclude nothing is low on stock. Awaiting this
+  /// returns the in-flight future rather than re-reading Hive.
+  Future<void> ensureLoaded() => _hydration;
 
   // ==================== PRODUCT OPERATIONS ====================
 

@@ -5,7 +5,7 @@ import 'package:billberrylite/core/constants/hive_type_ids.dart';
 
 part 'app_notification_model.g.dart';
 
-@HiveType(typeId: HiveTypeIds.restaurantAppNotification)
+@HiveType(typeId: HiveTypeIds.appNotification)
 class AppNotificationModel extends HiveObject {
   @HiveField(0)
   final String id;
