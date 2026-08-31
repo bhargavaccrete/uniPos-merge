@@ -800,9 +800,9 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
 
       final closingBalance = actualCash - w;
       final note = '$closerName ended day. '
-          'Counted: Rs.${actualCash.toStringAsFixed(2)}, '
-          'Took to safe: Rs.${w.toStringAsFixed(2)}, '
-          'Left in drawer: Rs.${closingBalance.toStringAsFixed(2)}';
+          'Counted: ${CurrencyHelper.currentSymbol}${actualCash.toStringAsFixed(2)}, '
+          'Took to safe: ${CurrencyHelper.currentSymbol}${w.toStringAsFixed(2)}, '
+          'Left in drawer: ${CurrencyHelper.currentSymbol}${closingBalance.toStringAsFixed(2)}';
 
       try {
         if (discrepancy.abs() > 0.01) {
@@ -810,8 +810,8 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
           await cashMovementStore.addAdjustment(
             signedAmount: discrepancy,
             reason: discrepancy < 0 ? 'EOD Shortage' : 'EOD Overage',
-            note: 'Expected: Rs.${expectedAmt.toStringAsFixed(2)}, '
-                'Counted: Rs.${actualCash.toStringAsFixed(2)}',
+            note: 'Expected: ${CurrencyHelper.currentSymbol}${expectedAmt.toStringAsFixed(2)}, '
+                'Counted: ${CurrencyHelper.currentSymbol}${actualCash.toStringAsFixed(2)}',
             staffName: closerName,
           );
         }
@@ -831,7 +831,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       await DayManagementService.markDayEnded(closingBalance: closingBalance);
 
       NotificationService.instance
-          .showSuccess('Day closed. Rs.${closingBalance.toStringAsFixed(2)} left in drawer.');
+          .showSuccess('Day closed. ${CurrencyHelper.currentSymbol}${closingBalance.toStringAsFixed(2)} left in drawer.');
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('restaurant_is_logged_in', false);
@@ -987,7 +987,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                                               fontWeight: FontWeight.w600,
                                               color: Colors.teal.shade800)),
                                       Text(
-                                          'Rs. ${actualCash.toStringAsFixed(2)}',
+                                          '${CurrencyHelper.currentSymbol}${actualCash.toStringAsFixed(2)}',
                                           style: GoogleFonts.poppins(
                                               fontSize: 15,
                                               fontWeight: FontWeight.w700,
@@ -1014,8 +1014,8 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                                           Expanded(
                                             child: Text(
                                               discrepancy < 0
-                                                  ? 'Shortage Rs.${discrepancy.abs().toStringAsFixed(2)} — logged as ADJUSTMENT'
-                                                  : 'Overage Rs.${discrepancy.toStringAsFixed(2)} — logged as ADJUSTMENT',
+                                                  ? 'Shortage ${CurrencyHelper.currentSymbol}${discrepancy.abs().toStringAsFixed(2)} — logged as ADJUSTMENT'
+                                                  : 'Overage ${CurrencyHelper.currentSymbol}${discrepancy.toStringAsFixed(2)} — logged as ADJUSTMENT',
                                               style: GoogleFonts.poppins(
                                                 fontSize: 11,
                                                 color: discrepancy < 0 ? Colors.red.shade700 : Colors.green.shade700,
@@ -1049,7 +1049,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                               onChanged: (_) => setDialogState(() => fieldError = null),
                               prefixWidget: Padding(
                                 padding: const EdgeInsets.only(left: 12, right: 4),
-                                child: Text('Rs. ', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: AppColors.primary)),
+                                child: Text('${CurrencyHelper.currentSymbol} ', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: AppColors.primary)),
                               ),
                             ),
 
@@ -1084,7 +1084,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    'Rs. ${remaining.toStringAsFixed(2)}',
+                                    '${CurrencyHelper.currentSymbol}${remaining.toStringAsFixed(2)}',
                                     style: GoogleFonts.poppins(
                                       fontSize: 20,
                                       fontWeight: FontWeight.w700,
@@ -1164,7 +1164,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
           Text(label,
               style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600])),
           Text(
-            '${isNeg ? '-' : '+'} Rs. ${amount.abs().toStringAsFixed(2)}',
+            '${isNeg ? '-' : '+'} ${CurrencyHelper.currentSymbol}${amount.abs().toStringAsFixed(2)}',
             style: GoogleFonts.poppins(
                 fontSize: 12, fontWeight: FontWeight.w500, color: color),
           ),

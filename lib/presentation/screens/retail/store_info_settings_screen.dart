@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/domain/services/common/notification_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -7,6 +6,9 @@ import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
+import 'package:billberrylite/core/config/food_license_rule.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:flutter/services.dart';
 import 'package:billberrylite/util/color.dart';
 
 class StoreInfoSettingsScreen extends StatefulWidget {
@@ -31,6 +33,7 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _gstNumberController = TextEditingController();
+  final _foodLicenseController = TextEditingController();
 
   // Logo
   Uint8List? _logoBytes;
@@ -62,6 +65,10 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
     _emailController.text = await _storeSettingsService.getStoreEmail() ?? '';
     _gstNumberController.text =
         await _storeSettingsService.getGSTNumber() ?? '';
+    // Food licence is stored in Hive only — StoreSettingsService has no key
+    // for it, and the receipt builders read it straight off BusinessDetails.
+    _foodLicenseController.text =
+        businessDetailsRepository.get()?.foodLicenseNo ?? '';
     _logoBytes = await _storeSettingsService.getStoreLogo();
 
     setState(() => _isLoading = false);
@@ -135,6 +142,21 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
           : null,
     );
 
+    // Food licence has no prefs key — persist it to the Hive record the
+    // receipt builders and FoodLicenseRule read.
+    bool licenseSuccess = true;
+    try {
+      final details = businessDetailsRepository.get();
+      if (details != null) {
+        await businessDetailsRepository.save(
+          details.copyWith(foodLicenseNo: _foodLicenseController.text.trim()),
+        );
+      }
+    } catch (e) {
+      licenseSuccess = false;
+      debugPrint('StoreInfoSettings: failed to save food licence: $e');
+    }
+
     // Save logo if it was changed
     bool logoSuccess = true;
     if (_logoChanged) {
@@ -148,7 +170,7 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
     setState(() => _isSaving = false);
 
     if (mounted) {
-      final bool allSuccess = success && logoSuccess;
+      final bool allSuccess = success && logoSuccess && licenseSuccess;
       if (allSuccess) {
         NotificationService.instance.showSuccess(
           'Store information saved successfully',
@@ -174,6 +196,7 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
     _phoneController.dispose();
     _emailController.dispose();
     _gstNumberController.dispose();
+    _foodLicenseController.dispose();
     super.dispose();
   }
 
@@ -268,6 +291,22 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                         icon: Icons.account_balance_wallet,
                         hint: 'e.g., 22AAAAA0000A1Z5',
                         textCapitalization: TextCapitalization.characters,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _foodLicenseController,
+                        label: FoodLicenseRule.label,
+                        icon: Icons.verified_user_outlined,
+                        hint: FoodLicenseRule.hint,
+                        maxLength: FoodLicenseRule.maxLength,
+                        keyboardType: FoodLicenseRule.digitsOnly
+                            ? TextInputType.number
+                            : TextInputType.text,
+                        textCapitalization: TextCapitalization.characters,
+                        inputFormatters: FoodLicenseRule.digitsOnly
+                            ? [FilteringTextInputFormatter.digitsOnly]
+                            : null,
+                        validator: FoodLicenseRule.validate,
                       ),
                       const SizedBox(height: 24),
 
@@ -401,6 +440,7 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
     int maxLines = 1,
     int? maxLength,
     TextCapitalization textCapitalization = TextCapitalization.words,
+    List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
   }) {
     return AppTextField(
@@ -412,6 +452,7 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
       maxLines: maxLines,
       maxLength: maxLength,
       textCapitalization: textCapitalization,
+      inputFormatters: inputFormatters,
       validator: validator,
     );
   }

@@ -7,6 +7,7 @@ import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:billberrylite/domain/services/restaurant/eod_service.dart';
 import 'package:billberrylite/presentation/screens/retail/eod_report_detail_screen.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
 
 /// EOD Reports List Screen - Shows all saved EOD reports
 class EODReportsListScreen extends StatefulWidget {
@@ -198,7 +199,7 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                 children: [
                   _buildStatColumn(
                     'Total Sales',
-                    'Rs. ${report.totalSales.toStringAsFixed(2)}',
+                    '${CurrencyHelper.currentSymbol}${report.totalSales.toStringAsFixed(2)}',
                     Colors.green,
                   ),
                   _buildStatColumn(
@@ -217,12 +218,12 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                 children: [
                   _buildStatColumn(
                     'Expected Cash',
-                    'Rs. ${report.cashReconciliation.systemExpectedCash.toStringAsFixed(2)}',
+                    '${CurrencyHelper.currentSymbol}${report.cashReconciliation.systemExpectedCash.toStringAsFixed(2)}',
                     Colors.orange,
                   ),
                   _buildStatColumn(
                     'Actual Cash',
-                    'Rs. ${report.cashReconciliation.actualCash.toStringAsFixed(2)}',
+                    '${CurrencyHelper.currentSymbol}${report.cashReconciliation.actualCash.toStringAsFixed(2)}',
                     Colors.teal,
                   ),
                 ],
@@ -252,7 +253,7 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        'Difference: Rs. ${report.cashReconciliation.difference.abs().toStringAsFixed(2)}',
+                        'Difference: ${CurrencyHelper.currentSymbol}${report.cashReconciliation.difference.abs().toStringAsFixed(2)}',
                         style: GoogleFonts.poppins(
                           fontSize: AppResponsive.captionFontSize(context),
                           fontWeight: FontWeight.w600,

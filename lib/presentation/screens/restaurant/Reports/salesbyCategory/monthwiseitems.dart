@@ -5,6 +5,7 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Textform.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
 class MonthWiseCategory extends StatefulWidget {
   const MonthWiseCategory({super.key});
 
@@ -271,7 +272,7 @@ class _MonthWiseCategoryState extends State<MonthWiseCategory> {
                                   bottomLeft: Radius.circular(10),
                                 ),
                               ),
-                              child: Text('Total (Rs)',
+                              child: Text('Total (${CurrencyHelper.currentSymbol})',
                                   textScaler: TextScaler.linear(1),
                                   style: GoogleFonts.poppins(fontSize: 14),
                                   textAlign: TextAlign.center))),

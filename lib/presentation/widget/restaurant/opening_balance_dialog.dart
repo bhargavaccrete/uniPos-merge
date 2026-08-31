@@ -52,15 +52,15 @@ Future<bool> promptStartDay(BuildContext context) async {
     await cashMovementStore.addAdjustment(
       signedAmount: diff,
       reason: 'Opening balance modified',
-      note: 'Previous closing: Rs.${lastClosing.toStringAsFixed(2)}, '
-          'Opened at: Rs.${balance.toStringAsFixed(2)}',
+      note: 'Previous closing: ${CurrencyHelper.currentSymbol}${lastClosing.toStringAsFixed(2)}, '
+          'Opened at: ${CurrencyHelper.currentSymbol}${balance.toStringAsFixed(2)}',
       staffName: byName,
     );
   }
 
   await DayManagementService.setOpeningBalance(balance); // marks day started
   NotificationService.instance.showSuccess(
-    'Day started with opening balance: Rs. ${balance.toStringAsFixed(2)}',
+    'Day started with opening balance: ${CurrencyHelper.currentSymbol}${balance.toStringAsFixed(2)}',
   );
   return true;
 }

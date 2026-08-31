@@ -1,4 +1,5 @@
 import 'package:intl/intl.dart';
+import 'package:billberrylite/core/config/food_license_rule.dart';
 import 'package:billberrylite/domain/services/retail/receipt_pdf_service.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
@@ -269,6 +270,13 @@ class EscPosReceiptBuilder {
         receiptData.gstNumber != null &&
         receiptData.gstNumber!.isNotEmpty) {
       bytes.addAll(_text('GSTIN: ${receiptData.gstNumber}'));
+    }
+    // Food licence (FSSAI in India) — read live rather than threaded through
+    // ReceiptData: it is a standing business identifier, not a per-order value.
+    // NOT gated on taxEnabled; a food licence is not a tax registration.
+    final foodLicense = FoodLicenseRule.number;
+    if (foodLicense != null) {
+      bytes.addAll(_text('${FoodLicenseRule.label}: $foodLicense'));
     }
 
     bytes.addAll(_alignLeft);

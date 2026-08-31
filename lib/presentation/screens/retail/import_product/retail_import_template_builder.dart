@@ -1,5 +1,6 @@
 import 'package:syncfusion_flutter_xlsio/xlsio.dart';
 
+import '../../../../core/config/tariff_code_rule.dart';
 import '../../../../core/constants/item_units.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../domain/services/retail/retail_import_schema.dart';
@@ -197,7 +198,7 @@ class RetailImportTemplateBuilder {
     r++;
     line('UNIT, STOCK AND EXPIRY', style: section);
     line(
-      '• Unit, Expiry Date, Tax Rate and HSN Code belong to the PRODUCT — fill them on the first row of each Handle only.',
+      '• Unit, Expiry Date, Tax Rate and ${TariffCodeRule.label} belong to the PRODUCT — fill them on the first row of each Handle only.',
     );
     line(
       '• Unit "piece" means the product is counted in whole numbers; Stock must then be a whole number.',

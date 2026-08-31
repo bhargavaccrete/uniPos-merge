@@ -109,9 +109,15 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                     _buildTaxRatesCard(),
                     const SizedBox(height: 24),
 
-                    _buildSectionTitle('Common GST Rates (India)'),
-                    const SizedBox(height: 12),
-                    _buildGstRateReferenceCard(),
+                    // India-only reference: these are Indian GST slabs and the
+                    // thresholds are stated in rupees, so the card is meaningless
+                    // (and misleading) for any other country. The setup wizard's
+                    // tax step gates its presets the same way.
+                    if (_isIndia) ...[
+                      _buildSectionTitle('Common GST Rates (India)'),
+                      const SizedBox(height: 12),
+                      _buildGstRateReferenceCard(),
+                    ],
                   ],
                 ),
               ),
@@ -497,6 +503,12 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
       );
     }
   }
+
+  /// True when the business is registered in India. Reads the saved
+  /// BusinessDetails — unlike the wizard, this screen runs after setup.
+  bool get _isIndia =>
+      (businessDetailsRepository.get()?.country ?? '').trim().toLowerCase() ==
+      'india';
 
   Widget _buildGstRateReferenceCard() {
     final rates = [

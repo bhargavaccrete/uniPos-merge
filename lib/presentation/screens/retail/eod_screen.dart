@@ -13,6 +13,7 @@ import 'package:billberrylite/domain/services/restaurant/day_management_service.
 import 'package:billberrylite/domain/services/restaurant/eod_service.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/core/routes/routes_name.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
 
 class RetailEODScreen extends StatefulWidget {
   const RetailEODScreen({super.key});
@@ -300,8 +301,8 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
       title: 'Complete End of Day?',
       message:
           'The day will be closed and the report saved.\n\n'
-          'Counted cash: Rs. ${counted.toStringAsFixed(2)}\n'
-          'Variance: Rs. ${variance.toStringAsFixed(2)}\n\n'
+          'Counted cash: ${CurrencyHelper.currentSymbol}${counted.toStringAsFixed(2)}\n'
+          'Variance: ${CurrencyHelper.currentSymbol}${variance.toStringAsFixed(2)}\n\n'
           'This cash becomes tomorrow\'s opening balance. The day cannot be '
           'reopened.',
       confirmLabel: 'Complete',
@@ -436,7 +437,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                     Builder(
                       builder: (context) {
                         return Text(
-                          'Rs. ${openingBalance.toStringAsFixed(2)}',
+                          '${CurrencyHelper.currentSymbol}${openingBalance.toStringAsFixed(2)}',
                           style: GoogleFonts.poppins(
                             fontSize: AppResponsive.subheadingFontSize(context),
                             fontWeight: FontWeight.w600,
@@ -487,7 +488,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                           ),
                         ),
                         Text(
-                          'Rs. ${payment.totalAmount.toStringAsFixed(2)}',
+                          '${CurrencyHelper.currentSymbol}${payment.totalAmount.toStringAsFixed(2)}',
                           style: GoogleFonts.poppins(
                             fontWeight: FontWeight.w500,
                           ),
@@ -520,7 +521,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                       style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
                     ),
                     Text(
-                      'Rs. ${_currentReport?.totalSales.toStringAsFixed(2) ?? '0.00'}',
+                      '${CurrencyHelper.currentSymbol}${_currentReport?.totalSales.toStringAsFixed(2) ?? '0.00'}',
                       style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
                     ),
                   ],
@@ -557,7 +558,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                         style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
                       ),
                       Text(
-                        'Rs. ${_currentReport?.totalDiscount.toStringAsFixed(2) ?? '0.00'}',
+                        '${CurrencyHelper.currentSymbol}${_currentReport?.totalDiscount.toStringAsFixed(2) ?? '0.00'}',
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w500,
                           color: AppColors.danger,
@@ -600,7 +601,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                           ),
                         ),
                         Text(
-                          'Rs. ${tax.taxAmount.toStringAsFixed(2)}',
+                          '${CurrencyHelper.currentSymbol}${tax.taxAmount.toStringAsFixed(2)}',
                           style: GoogleFonts.poppins(
                             fontWeight: FontWeight.w500,
                           ),
@@ -627,7 +628,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                         style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
                       ),
                       Text(
-                        'Rs. ${_currentReport?.totalTax.toStringAsFixed(2) ?? '0.00'}',
+                        '${CurrencyHelper.currentSymbol}${_currentReport?.totalTax.toStringAsFixed(2) ?? '0.00'}',
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w600,
                           color: AppColors.info,
@@ -723,7 +724,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                                 ),
                               ),
                               Text(
-                                'Rs. ${_expectedTotalCash.toStringAsFixed(2)}',
+                                '${CurrencyHelper.currentSymbol}${_expectedTotalCash.toStringAsFixed(2)}',
                                 style: GoogleFonts.poppins(
                                   fontSize: AppResponsive.bodyFontSize(context),
                                   fontWeight: FontWeight.w600,
@@ -858,7 +859,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
             ),
           ),
           Text(
-            '${isNegative ? '-' : ''} Rs. ${amount.toStringAsFixed(2)}',
+            '${isNegative ? '-' : ''} ${CurrencyHelper.currentSymbol}${amount.toStringAsFixed(2)}',
             style: GoogleFonts.poppins(
               fontSize: AppResponsive.captionFontSize(context),
               fontWeight: FontWeight.w500,
@@ -894,7 +895,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
             ],
           ),
           Text(
-            'Rs. ${amount.toStringAsFixed(2)}',
+            '${CurrencyHelper.currentSymbol}${amount.toStringAsFixed(2)}',
             style: GoogleFonts.poppins(
               fontSize: AppResponsive.captionFontSize(context),
               fontWeight: FontWeight.w500,

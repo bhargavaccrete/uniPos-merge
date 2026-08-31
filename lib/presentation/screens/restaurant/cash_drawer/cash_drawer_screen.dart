@@ -1475,7 +1475,7 @@ class _CashHandoverCloseDialogState extends State<CashHandoverCloseDialog> {
                 controller: _noteCtrl,
                 focusNode: _noteFocus,
                 label: 'Note',
-                hint: 'e.g. "Left ₹1500, all good" (optional)',
+                hint: 'e.g. "Left ${CurrencyHelper.currentSymbol}1500, all good" (optional)',
                 icon: Icons.notes_rounded,
                 textInputAction: TextInputAction.done,
                 onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),

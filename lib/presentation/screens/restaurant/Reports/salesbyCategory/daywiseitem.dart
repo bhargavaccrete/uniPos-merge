@@ -5,6 +5,7 @@ import 'package:billberrylite/presentation/widget/componets/restaurant/componets
 import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Textform.dart';
 import 'package:billberrylite/util/color.dart';
 import '../../../../../constants/restaurant/color.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
 
 class DayWiseCategory extends StatefulWidget {
   const DayWiseCategory({super.key});
@@ -194,7 +195,7 @@ class _DayWiseCategoryState extends State<DayWiseCategory> {
                                   bottomLeft: Radius.circular(10),
                                 ),
                               ),
-                              child: Text('Total (Rs)',  textScaler: TextScaler.linear(1),
+                              child: Text('Total (${CurrencyHelper.currentSymbol})',  textScaler: TextScaler.linear(1),
                                   style: GoogleFonts.poppins(fontSize: 14),
                                   textAlign: TextAlign.center))),
                     ],

@@ -344,6 +344,54 @@ mixin _$AddProductFormStore on _AddProductFormStore, Store {
     });
   }
 
+  late final _$selectedTaxIdAtom =
+      Atom(name: '_AddProductFormStore.selectedTaxId', context: context);
+
+  @override
+  String? get selectedTaxId {
+    _$selectedTaxIdAtom.reportRead();
+    return super.selectedTaxId;
+  }
+
+  @override
+  set selectedTaxId(String? value) {
+    _$selectedTaxIdAtom.reportWrite(value, super.selectedTaxId, () {
+      super.selectedTaxId = value;
+    });
+  }
+
+  late final _$isDecimalQuantityAtom =
+      Atom(name: '_AddProductFormStore.isDecimalQuantity', context: context);
+
+  @override
+  bool get isDecimalQuantity {
+    _$isDecimalQuantityAtom.reportRead();
+    return super.isDecimalQuantity;
+  }
+
+  @override
+  set isDecimalQuantity(bool value) {
+    _$isDecimalQuantityAtom.reportWrite(value, super.isDecimalQuantity, () {
+      super.isDecimalQuantity = value;
+    });
+  }
+
+  late final _$expiryDateAtom =
+      Atom(name: '_AddProductFormStore.expiryDate', context: context);
+
+  @override
+  DateTime? get expiryDate {
+    _$expiryDateAtom.reportRead();
+    return super.expiryDate;
+  }
+
+  @override
+  set expiryDate(DateTime? value) {
+    _$expiryDateAtom.reportWrite(value, super.expiryDate, () {
+      super.expiryDate = value;
+    });
+  }
+
   late final _$productTypeAtom =
       Atom(name: '_AddProductFormStore.productType', context: context);
 
@@ -940,6 +988,39 @@ mixin _$AddProductFormStore on _AddProductFormStore, Store {
   }
 
   @override
+  void setSelectedTaxId(String? value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setSelectedTaxId');
+    try {
+      return super.setSelectedTaxId(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setIsDecimalQuantity(bool value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setIsDecimalQuantity');
+    try {
+      return super.setIsDecimalQuantity(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setExpiryDate(DateTime? value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setExpiryDate');
+    try {
+      return super.setExpiryDate(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
   void setIsVeg(String value) {
     final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
         name: '_AddProductFormStore.setIsVeg');
@@ -1113,6 +1194,9 @@ sku: ${sku},
 barcode: ${barcode},
 stockQuantity: ${stockQuantity},
 minStock: ${minStock},
+selectedTaxId: ${selectedTaxId},
+isDecimalQuantity: ${isDecimalQuantity},
+expiryDate: ${expiryDate},
 productType: ${productType},
 selectedAttributeIds: ${selectedAttributeIds},
 selectedAttributeValues: ${selectedAttributeValues},

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
 
 class ThisWeekTab extends StatefulWidget {
   const ThisWeekTab({super.key});
@@ -41,7 +42,7 @@ class _ThisWeekTabState extends State<ThisWeekTab> {
 
               SizedBox(height: 25,),
 
-              Text('Total Sales Of Today(Rs.)=0',                          textScaler: TextScaler.linear(1),
+              Text('Total Sales Of Today(${CurrencyHelper.currentSymbol})=0',                          textScaler: TextScaler.linear(1),
                 style: GoogleFonts.poppins(fontSize: 16,fontWeight:FontWeight.w500, color: Colors.black),),
               SizedBox(height: 25,),
 
@@ -169,7 +170,7 @@ class _ThisWeekTabState extends State<ThisWeekTab> {
                                   bottomLeft: Radius.circular(10),
                                 ),
                               ),
-                              child: Text('Total Amount(Rs.)',
+                              child: Text('Total Amount(${CurrencyHelper.currentSymbol})',
                                 textScaler: TextScaler.linear(1),
                                 style: GoogleFonts.poppins(fontSize: 14),
                                 textAlign: TextAlign.center,))),

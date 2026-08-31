@@ -161,11 +161,6 @@ class RetailPrinterSettingsService {
     await _saveSettings();
   }
 
-  Future<void> setShowHSNCode(bool show) async {
-    _settings = _settings.copyWith(showHSNCode: show);
-    await _saveSettings();
-  }
-
   // ==================== PRICING & TAX ====================
 
   Future<void> setShowMRP(bool show) async {
@@ -304,11 +299,6 @@ class RetailPrinterSettingsService {
   }
 
   // ==================== LANGUAGE & FORMAT ====================
-
-  Future<void> setCurrencySymbol(String symbol) async {
-    _settings = _settings.copyWith(currencySymbol: symbol);
-    await _saveSettings();
-  }
 
   Future<void> setDateFormat(String format) async {
     _settings = _settings.copyWith(dateFormat: format);

@@ -3,10 +3,12 @@ import 'package:billberrylite/util/common/quantity_format.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/retail/hive_model/grn_item_model_214.dart';
 import 'package:billberrylite/data/models/retail/hive_model/grn_model_213.dart';
+import 'package:billberrylite/data/models/retail/hive_model/purchase_order_item_model_212.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model_211.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/domain/store/retail/damaged_goods_store.dart';
@@ -18,6 +20,7 @@ import 'package:billberrylite/presentation/screens/retail/inventory_loss_list_sc
 import 'package:billberrylite/presentation/screens/retail/purchase_return_list_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/supplier_claim_list_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/supplier_claim_detail_screen.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
@@ -65,6 +68,94 @@ String poStatusLabel(POStatus status) {
 String poFormatDate(String isoDate) {
   final date = DateTime.parse(isoDate);
   return '${date.day}/${date.month}/${date.year}';
+}
+
+/// Digits only — wa.me rejects spaces, dashes and a leading '+'.
+String cleanRetailSupplierPhone(String phone) {
+  return phone.replaceAll(RegExp(r'[^0-9]'), '');
+}
+
+/// Supplier-facing text for a purchase order.
+///
+/// Reads each line's denormalized [PurchaseOrderItemModel.productName] and
+/// `variantInfo` instead of looking products up, so a PO still reads correctly
+/// after a product is renamed or deleted. [unitsByVariantId] is resolved by the
+/// caller because the unit lives on the variant, not on the PO line.
+String buildRetailWhatsAppPOMessage({
+  required PurchaseOrderModel po,
+  required List<PurchaseOrderItemModel> items,
+  Map<String, String> unitsByVariantId = const {},
+}) {
+  final buffer = StringBuffer();
+  buffer.writeln('Purchase Order: ${po.poNumber}');
+  buffer.writeln('Supplier: ${po.supplierName ?? 'Unknown'}');
+  buffer.writeln('Expected Delivery: ${poFormatDate(po.expectedDeliveryDate)}');
+  if (po.notes?.isNotEmpty == true) {
+    buffer.writeln('Notes: ${po.notes}');
+  }
+  buffer.writeln();
+  buffer.writeln('Items:');
+  for (final item in items) {
+    final unit = unitsByVariantId[item.variantId] ?? '';
+    final unitStr = unit.isEmpty ? '' : ' $unit';
+    final variantInfo = item.variantInfo;
+    final variantStr = (variantInfo == null || variantInfo.isEmpty)
+        ? ''
+        : ' ($variantInfo)';
+    buffer.writeln(
+      '- ${item.productName ?? 'Unknown Product'}$variantStr'
+      ' — Qty: ${formatQty(item.orderedQty)}$unitStr',
+    );
+  }
+  if (po.estimatedTotal > 0) {
+    buffer.writeln();
+    buffer.writeln('Estimated Total: ${formatMoney(po.estimatedTotal)}');
+  }
+
+  return buffer.toString().trim();
+}
+
+/// Opens WhatsApp with the purchase order prefilled for [phone].
+Future<void> shareRetailPOToWhatsApp({
+  required PurchaseOrderModel po,
+  required List<PurchaseOrderItemModel> items,
+  required String phone,
+}) async {
+  final cleanPhone = cleanRetailSupplierPhone(phone);
+  if (cleanPhone.isEmpty) {
+    NotificationService.instance.showError(
+      'Supplier mobile number is not available.',
+    );
+    return;
+  }
+
+  // Units are resolved here rather than in the builder: a bare "Qty: 2.5" is
+  // ambiguous for anything sold by weight or volume, and the PO line doesn't
+  // carry the unit. Cached per variant so a repeated product costs one read.
+  final units = <String, String>{};
+  for (final item in items) {
+    if (units.containsKey(item.variantId)) continue;
+    final variant = await productStore.getVariantById(item.variantId);
+    if (variant != null) units[item.variantId] = variant.effectiveUnit;
+  }
+
+  final message = buildRetailWhatsAppPOMessage(
+    po: po,
+    items: items,
+    unitsByVariantId: units,
+  );
+  final uri = Uri.parse(
+    'https://wa.me/$cleanPhone?text=${Uri.encodeComponent(message)}',
+  );
+
+  try {
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok) {
+      NotificationService.instance.showError('Could not launch WhatsApp.');
+    }
+  } catch (e) {
+    NotificationService.instance.showError('Could not launch WhatsApp: $e');
+  }
 }
 
 /// Open the detail sheet for [po].
@@ -146,8 +237,31 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
     }
   }
 
+  /// Supplier phone for this PO, or null when there isn't a usable one.
+  ///
+  /// Reads [supplierStore] because the PO only denormalizes the supplier's
+  /// name, not their number.
+  String? get _supplierPhone {
+    for (final s in supplierStore.suppliers) {
+      if (s.supplierId != po.supplierId) continue;
+      final phone = s.phone?.trim() ?? '';
+      return phone.isEmpty ? null : phone;
+    }
+    return null;
+  }
+
+  /// A PO is shareable once it has left draft — there is nothing to send a
+  /// supplier before that, and a cancelled order shouldn't be re-sent.
+  bool get _canShare =>
+      po.statusEnum != POStatus.draft && po.statusEnum != POStatus.cancelled;
+
   Future<void> _markSent(BuildContext context) async {
     final navigator = Navigator.of(context);
+    // Captured before the write: `onChanged` can reload the store's selection,
+    // and the share offered below still needs this order's lines.
+    final items = purchaseOrderStore.currentPOItems.toList();
+    final phone = _supplierPhone;
+
     await purchaseOrderStore.updatePOStatus(po.poId, POStatus.sent);
 
     // Guard the gap: if the sheet was dismissed while the store was writing,
@@ -156,6 +270,41 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
     navigator.pop();
     NotificationService.instance.showSuccess('${po.poNumber} marked as sent');
     onChanged?.call();
+
+    if (phone == null) return;
+
+    // The navigator's context, not `context` — the sheet's element died with
+    // the pop above, so the guard has to be on the context actually used.
+    final navContext = navigator.context;
+    if (!navContext.mounted) return;
+    final wantShare = await showAppConfirmDialog(
+      context: navContext,
+      title: 'Purchase Order sent',
+      message:
+          'Would you like to share this Purchase Order with the supplier on WhatsApp?',
+      confirmLabel: 'Share on WhatsApp',
+      cancelLabel: 'Not Now',
+      accent: AppColors.success,
+      icon: Icons.share_rounded,
+    );
+    if (!wantShare) return;
+
+    await shareRetailPOToWhatsApp(po: po, items: items, phone: phone);
+  }
+
+  Future<void> _shareToWhatsApp() async {
+    final phone = _supplierPhone;
+    if (phone == null) {
+      NotificationService.instance.showError(
+        'Supplier mobile number is not available.',
+      );
+      return;
+    }
+    await shareRetailPOToWhatsApp(
+      po: po,
+      items: purchaseOrderStore.currentPOItems.toList(),
+      phone: phone,
+    );
   }
 
   /// Ordered / Received / Accepted / Damaged / Remaining for one PO line.
@@ -508,6 +657,10 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                 ),
                 child: SizedBox(
                   height: AppResponsive.buttonHeight(context),
+                  // Additive, not an if/else chain: sharing is orthogonal to
+                  // receiving, so a sent PO has to be able to offer both. The
+                  // old chain let exactly one branch render, which is why the
+                  // WhatsApp action had nowhere to live.
                   child: Row(
                     children: [
                       if (po.canEdit) ...[
@@ -529,14 +682,45 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                               Icons.send,
                               size: AppResponsive.smallIconSize(context),
                             ),
-                            label: const Text('Mark Sent'),
+                            label: const Text(
+                              'Mark Sent',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.info,
                               foregroundColor: AppColors.white,
                             ),
                           ),
                         ),
-                      ] else if (po.canReceive) ...[
+                      ],
+                      if (_canShare) ...[
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            // Stays tappable without a number so it can say
+                            // why, rather than vanishing unexplained.
+                            onPressed: _shareToWhatsApp,
+                            icon: Icon(
+                              Icons.share_rounded,
+                              size: AppResponsive.smallIconSize(context),
+                            ),
+                            label: const Text(
+                              'WhatsApp PO',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _supplierPhone == null
+                                  ? AppColors.textSecondary
+                                  : AppColors.success,
+                              foregroundColor: AppColors.white,
+                            ),
+                          ),
+                        ),
+                        if (po.canReceive)
+                          SizedBox(width: AppResponsive.mediumSpacing(context)),
+                      ],
+                      if (po.canReceive)
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () => _openReceiving(context),
@@ -544,21 +728,25 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                               Icons.local_shipping,
                               size: AppResponsive.smallIconSize(context),
                             ),
-                            label: const Text('Receive Items'),
+                            label: const Text(
+                              'Receive Items',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
                               foregroundColor: AppColors.white,
                             ),
                           ),
                         ),
-                      ] else ...[
+                      // Only when nothing else rendered — a cancelled order.
+                      if (!po.canEdit && !_canShare && !po.canReceive)
                         Expanded(
                           child: OutlinedButton(
                             onPressed: () => Navigator.pop(context),
                             child: const Text('Close'),
                           ),
                         ),
-                      ],
                     ],
                   ),
                 ),

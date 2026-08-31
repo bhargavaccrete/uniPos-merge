@@ -5,6 +5,7 @@ import 'package:billberrylite/presentation/widget/componets/restaurant/componets
 
 import '../../../../../constants/restaurant/color.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
 class CustomeTab extends StatefulWidget {
   const CustomeTab({super.key});
 
@@ -312,7 +313,7 @@ class _CustomeTabState extends State<CustomeTab> {
                                   bottomLeft: Radius.circular(10),
                                 ),
                               ),
-                              child: Text('Total Amount(Rs.)',
+                              child: Text('Total Amount(${CurrencyHelper.currentSymbol})',
                                 textScaler: TextScaler.linear(1),
                                 style: GoogleFonts.poppins(fontSize: 14),
                                 textAlign: TextAlign.center,))),

@@ -87,6 +87,21 @@ class ProductModel extends HiveObject {
   @HiveField(18)
   final String? stockMode;
 
+  /// Sell this product even once its stock reaches zero.
+  ///
+  /// Retail's counterpart to restaurant's `Items.allowOrderWhenOutOfStock`, and
+  /// the ONLY escape from `CartStore.addItem`'s zero-stock refusal — a shop
+  /// whose counts have drifted otherwise cannot ring up goods that are visibly
+  /// on the shelf.
+  ///
+  /// A product-level policy rather than a per-variant one: it answers "may this
+  /// line go negative", which is the same answer for every size/colour.
+  ///
+  /// Null is treated as false, so existing products keep today's behaviour with
+  /// no migration.
+  @HiveField(19)
+  final bool? allowOrderWhenOutOfStock;
+
   ProductModel({
     required this.productId,
     required this.productName,
@@ -107,6 +122,7 @@ class ProductModel extends HiveObject {
     this.taxId,
     this.imageBytes,
     this.stockMode,
+    this.allowOrderWhenOutOfStock,
   });
 
   /// Check if this is a variable product
@@ -114,6 +130,9 @@ class ProductModel extends HiveObject {
 
   /// Check if this is a simple product
   bool get isSimple => productType == 'simple' && !hasVariants;
+
+  /// Null means "not allowed" — the safe default for existing rows.
+  bool get sellsWhenOutOfStock => allowOrderWhenOutOfStock ?? false;
 
   String get effectiveStockMode => stockMode ?? 'standard';
   bool get isBundle => effectiveStockMode == 'bundle';
@@ -143,6 +162,7 @@ class ProductModel extends HiveObject {
     String? taxId,
     Uint8List? imageBytes,
     String? stockMode,
+    bool? allowOrderWhenOutOfStock,
   }) {
     final now = DateTime.now().toIso8601String();
     return ProductModel(
@@ -165,6 +185,7 @@ class ProductModel extends HiveObject {
       taxId: taxId,
       imageBytes: imageBytes,
       stockMode: stockMode,
+      allowOrderWhenOutOfStock: allowOrderWhenOutOfStock,
     );
   }
 
@@ -191,6 +212,7 @@ class ProductModel extends HiveObject {
       // List<int> so the backup JSON stays serialisable, matching Items.toMap.
       'imageBytes': imageBytes?.toList(),
       'stockMode': stockMode,
+      'allowOrderWhenOutOfStock': allowOrderWhenOutOfStock,
     };
   }
 
@@ -216,6 +238,7 @@ class ProductModel extends HiveObject {
       taxId: map['taxId'] as String?,
       imageBytes: _bytesFrom(map['imageBytes']),
       stockMode: map['stockMode'] as String?,
+      allowOrderWhenOutOfStock: map['allowOrderWhenOutOfStock'] as bool?,
     );
   }
 
@@ -248,6 +271,7 @@ class ProductModel extends HiveObject {
     String? taxId,
     Uint8List? imageBytes,
     String? stockMode,
+    bool? allowOrderWhenOutOfStock,
     // `x ?? this.x` can never put a nullable field back to null, so an edit
     // form has no way to clear an optional value. These say so explicitly,
     // instead of forcing callers to hand-build the model.
@@ -278,6 +302,8 @@ class ProductModel extends HiveObject {
       taxId: clearTax ? null : (taxId ?? this.taxId),
       imageBytes: clearImage ? null : (imageBytes ?? this.imageBytes),
       stockMode: clearStockMode ? null : (stockMode ?? this.stockMode),
+      allowOrderWhenOutOfStock:
+          allowOrderWhenOutOfStock ?? this.allowOrderWhenOutOfStock,
     );
   }
 }

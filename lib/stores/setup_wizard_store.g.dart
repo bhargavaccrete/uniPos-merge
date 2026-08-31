@@ -285,6 +285,22 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
     });
   }
 
+  late final _$foodLicenseNoAtom =
+      Atom(name: '_SetupWizardStore.foodLicenseNo', context: context);
+
+  @override
+  String get foodLicenseNo {
+    _$foodLicenseNoAtom.reportRead();
+    return super.foodLicenseNo;
+  }
+
+  @override
+  set foodLicenseNo(String value) {
+    _$foodLicenseNoAtom.reportWrite(value, super.foodLicenseNo, () {
+      super.foodLicenseNo = value;
+    });
+  }
+
   late final _$cityAtom =
       Atom(name: '_SetupWizardStore.city', context: context);
 
@@ -755,6 +771,17 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
   }
 
   @override
+  void setFoodLicenseNo(String value) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.setFoodLicenseNo');
+    try {
+      return super.setFoodLicenseNo(value);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
   void setCity(String value) {
     final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
         name: '_SetupWizardStore.setCity');
@@ -935,6 +962,7 @@ email: ${email},
 address: ${address},
 gstin: ${gstin},
 pan: ${pan},
+foodLicenseNo: ${foodLicenseNo},
 city: ${city},
 state: ${state},
 country: ${country},

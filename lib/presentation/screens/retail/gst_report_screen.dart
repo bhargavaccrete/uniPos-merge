@@ -6,6 +6,7 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 
 import 'package:billberrylite/domain/services/retail/report_service.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
 
 class GstReportScreen extends StatefulWidget {
   const GstReportScreen({super.key});
@@ -265,22 +266,22 @@ class _GstReportScreenState extends State<GstReportScreen>
                 const Divider(height: 24),
                 _buildSummaryRow(
                   'Total Taxable Amount',
-                  'Rs. ${_totalTaxableAmount.toStringAsFixed(2)}',
+                  '${CurrencyHelper.currentSymbol}${_totalTaxableAmount.toStringAsFixed(2)}',
                 ),
                 const SizedBox(height: 12),
                 _buildSummaryRow(
                   'Total CGST',
-                  'Rs. ${_totalCgstAmount.toStringAsFixed(2)}',
+                  '${CurrencyHelper.currentSymbol}${_totalCgstAmount.toStringAsFixed(2)}',
                 ),
                 const SizedBox(height: 8),
                 _buildSummaryRow(
                   'Total SGST',
-                  'Rs. ${_totalSgstAmount.toStringAsFixed(2)}',
+                  '${CurrencyHelper.currentSymbol}${_totalSgstAmount.toStringAsFixed(2)}',
                 ),
                 const Divider(height: 24),
                 _buildSummaryRow(
                   'Total GST Collected',
-                  'Rs. ${_totalGstAmount.toStringAsFixed(2)}',
+                  '${CurrencyHelper.currentSymbol}${_totalGstAmount.toStringAsFixed(2)}',
                   isBold: true,
                   fontSize: AppResponsive.subheadingFontSize(context),
                 ),
@@ -335,7 +336,7 @@ class _GstReportScreenState extends State<GstReportScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Rs. ${summary.totalGst.toStringAsFixed(2)}',
+                              '${CurrencyHelper.currentSymbol}${summary.totalGst.toStringAsFixed(2)}',
                               style: const TextStyle(
                                 fontWeight: FontWeight.w500,
                               ),
@@ -414,22 +415,22 @@ class _GstReportScreenState extends State<GstReportScreen>
               const Divider(height: 24),
               _buildDetailRow(
                 'Taxable Amount',
-                'Rs. ${summary.taxableAmount.toStringAsFixed(2)}',
+                '${CurrencyHelper.currentSymbol}${summary.taxableAmount.toStringAsFixed(2)}',
               ),
               const SizedBox(height: 8),
               _buildDetailRow(
                 'CGST (${(entry.key / 2).toStringAsFixed(1)}%)',
-                'Rs. ${summary.cgst.toStringAsFixed(2)}',
+                '${CurrencyHelper.currentSymbol}${summary.cgst.toStringAsFixed(2)}',
               ),
               const SizedBox(height: 8),
               _buildDetailRow(
                 'SGST (${(entry.key / 2).toStringAsFixed(1)}%)',
-                'Rs. ${summary.sgst.toStringAsFixed(2)}',
+                '${CurrencyHelper.currentSymbol}${summary.sgst.toStringAsFixed(2)}',
               ),
               const Divider(height: 16),
               _buildDetailRow(
                 'Total GST',
-                'Rs. ${summary.totalGst.toStringAsFixed(2)}',
+                '${CurrencyHelper.currentSymbol}${summary.totalGst.toStringAsFixed(2)}',
                 isBold: true,
               ),
             ],
@@ -484,7 +485,7 @@ class _GstReportScreenState extends State<GstReportScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Taxable: Rs. ${summary.taxableAmount.toStringAsFixed(2)}',
+                        'Taxable: ${CurrencyHelper.currentSymbol}${summary.taxableAmount.toStringAsFixed(2)}',
                         style: TextStyle(
                           fontSize: AppResponsive.smallFontSize(context),
                           color: Colors.grey[600],
@@ -510,7 +511,7 @@ class _GstReportScreenState extends State<GstReportScreen>
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      'GST: Rs. ${summary.totalGst.toStringAsFixed(2)}',
+                      'GST: ${CurrencyHelper.currentSymbol}${summary.totalGst.toStringAsFixed(2)}',
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF4CAF50),
@@ -582,16 +583,16 @@ class _GstReportScreenState extends State<GstReportScreen>
               const SizedBox(height: 8),
               _buildDetailRow(
                 'Taxable Amount',
-                'Rs. ${summary.taxableAmount.toStringAsFixed(2)}',
+                '${CurrencyHelper.currentSymbol}${summary.taxableAmount.toStringAsFixed(2)}',
               ),
               const SizedBox(height: 8),
-              _buildDetailRow('CGST', 'Rs. ${summary.cgst.toStringAsFixed(2)}'),
+              _buildDetailRow('CGST', '${CurrencyHelper.currentSymbol}${summary.cgst.toStringAsFixed(2)}'),
               const SizedBox(height: 8),
-              _buildDetailRow('SGST', 'Rs. ${summary.sgst.toStringAsFixed(2)}'),
+              _buildDetailRow('SGST', '${CurrencyHelper.currentSymbol}${summary.sgst.toStringAsFixed(2)}'),
               const Divider(height: 16),
               _buildDetailRow(
                 'Total GST',
-                'Rs. ${summary.totalGst.toStringAsFixed(2)}',
+                '${CurrencyHelper.currentSymbol}${summary.totalGst.toStringAsFixed(2)}',
                 isBold: true,
               ),
             ],

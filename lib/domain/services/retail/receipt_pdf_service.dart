@@ -19,6 +19,8 @@ import '../../../core/di/service_locator.dart' show taxStore;
 import '../../store/retail/attribute_store.dart' show describeAttributeMap;
 import '../../../util/restaurant/staticswitch.dart';
 import '../restaurant/tax_breakdown.dart';
+import 'package:billberrylite/core/config/food_license_rule.dart';
+import 'package:billberrylite/core/config/tariff_code_rule.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/common/loyalty_points.dart';
@@ -408,12 +410,17 @@ class ReceiptPdfService {
     final showStorePhone = isKot ? false : (isRetail ? (retailSettings?.showStorePhone ?? true) : PrintSettings.showRestaurantMobile);
     final showGST = data.taxEnabled &&
         (isKot ? false : (isRetail ? (retailSettings?.showGSTNumber ?? true) : true));
+    // Food licence (FSSAI in India) — read live, not threaded through
+    // ReceiptData: it is a standing business identifier, not a per-order value.
+    // NOT gated on taxEnabled; a food licence is not a tax registration.
+    final foodLicense = isKot ? null : FoodLicenseRule.number;
 
     final bool hasHeaderDetails = (showLogo && data.logoBytes != null) ||
         showStoreName ||
         showStoreAddress ||
         showStorePhone ||
-        (showGST && data.gstNumber != null);
+        (showGST && data.gstNumber != null) ||
+        foodLicense != null;
 
     final showInvoiceNumber = isRetail ? (retailSettings?.showInvoiceNumber ?? true) : PrintSettings.showOrderId;
     final showInvoiceDate = isRetail ? (retailSettings?.showInvoiceDate ?? true) : PrintSettings.showOrderedTime;
@@ -511,6 +518,12 @@ class ReceiptPdfService {
         if (showGST && data.gstNumber != null) ...[
           pw.Text(
             'GSTIN: ${data.gstNumber}',
+            style: pw.TextStyle(fontSize: bodySize),
+          ),
+        ],
+        if (foodLicense != null) ...[
+          pw.Text(
+            '${FoodLicenseRule.label}: $foodLicense',
             style: pw.TextStyle(fontSize: bodySize),
           ),
         ],
@@ -689,7 +702,7 @@ class ReceiptPdfService {
               if (AppConfig.isRetail)
                 pw.Expanded(
                   flex: 2,
-                  child: pw.Text('HSN', style: pw.TextStyle(fontSize: tableHeaderSize, fontWeight: pw.FontWeight.bold)),
+                  child: pw.Text(TariffCodeRule.shortLabel, style: pw.TextStyle(fontSize: tableHeaderSize, fontWeight: pw.FontWeight.bold)),
                 ),
               pw.Expanded(
                 flex: 3,
@@ -1055,6 +1068,8 @@ class ReceiptPdfService {
                           pw.Text('Email: $storeEmail', style: const pw.TextStyle(fontSize: 10)),
                         if (showGST && data.gstNumber != null)
                           pw.Text('GST No: ${data.gstNumber}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                        if (FoodLicenseRule.number != null)
+                          pw.Text('${FoodLicenseRule.label}: ${FoodLicenseRule.number}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
                       ],
                     ),
                   ),
@@ -1975,7 +1990,7 @@ class ReceiptPdfService {
           decoration: const pw.BoxDecoration(color: PdfColors.green800),
           children: [
             _buildTableHeader('#'),
-            if (isRetail) _buildTableHeader('HSN'),
+            if (isRetail) _buildTableHeader(TariffCodeRule.shortLabel),
             _buildTableHeader('Product'),
             _buildTableHeader('Unit Price'),
             _buildTableHeader('Qty'),

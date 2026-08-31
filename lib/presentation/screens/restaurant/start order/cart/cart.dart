@@ -17,6 +17,7 @@ import '../../../../../core/plan/plan_guard.dart';
 import '../../tabbar/table.dart';
 import '../startorder.dart';
 import '../../../../../util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
 
 class CartItemStatus {
   final CartItem item;
@@ -816,7 +817,7 @@ class _CartScreenState extends State<CartScreen>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '${order.items.length} items • ₹${order.totalPrice.toStringAsFixed(2)}',
+                                '${order.items.length} items • ${CurrencyHelper.currentSymbol}${order.totalPrice.toStringAsFixed(2)}',
                                 style: GoogleFonts.poppins(fontSize: 12),
                               ),
                               Text(

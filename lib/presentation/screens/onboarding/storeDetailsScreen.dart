@@ -7,6 +7,7 @@ import '../../../presentation/widget/componets/common/app_text_field.dart';
 import '../../../presentation/widget/componets/common/location_dropdown_field.dart';
 import '../../../presentation/widget/componets/retail/retail_store_type_field.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/config/food_license_rule.dart';
 import '../../../domain/services/common/notification_service.dart';
 import '../../../util/common/country_state_city_data.dart';
 import '../../../util/color.dart';
@@ -43,6 +44,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
   late TextEditingController _pincodeController;
   late TextEditingController _gstController;
   late TextEditingController _panController;
+  late TextEditingController _foodLicenseController;
 
   // Focus nodes — chained so the keyboard "next" jumps to the following field.
   final _storeNameFocus = FocusNode();
@@ -53,6 +55,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
   final _pincodeFocus = FocusNode();
   final _gstFocus = FocusNode();
   final _panFocus = FocusNode();
+  final _foodLicenseFocus = FocusNode();
 
   // Cascading location options for the Country → State → City dropdowns.
   final _location = CountryStateCityData.instance;
@@ -165,6 +168,8 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
     _pincodeController = TextEditingController(text: widget.store.pincode ?? '');
     _gstController = TextEditingController(text: widget.store.gstin ?? '');
     _panController = TextEditingController(text: widget.store.pan ?? '');
+    _foodLicenseController =
+        TextEditingController(text: widget.store.foodLicenseNo);
   }
 
   @override
@@ -180,6 +185,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
     _pincodeController.dispose();
     _gstController.dispose();
     _panController.dispose();
+    _foodLicenseController.dispose();
     _storeNameFocus.dispose();
     _ownerNameFocus.dispose();
     _phoneFocus.dispose();
@@ -188,6 +194,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
     _pincodeFocus.dispose();
     _gstFocus.dispose();
     _panFocus.dispose();
+    _foodLicenseFocus.dispose();
     super.dispose();
   }
 
@@ -203,6 +210,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
     widget.store.setPincode(_pincodeController.text);
     widget.store.setGstin(_gstController.text);
     widget.store.setPan(_panController.text);
+    widget.store.setFoodLicenseNo(_foodLicenseController.text);
   }
 
   @override
@@ -731,6 +739,11 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
     }
     final pinErr = _validatePincode(_pincodeController.text);
     if (pinErr != null) return (focus: _pincodeFocus, message: pinErr);
+    final licErr = FoodLicenseRule.validateFor(
+        _countryController.text, _foodLicenseController.text);
+    if (licErr != null) {
+      return (focus: _foodLicenseFocus, message: licErr);
+    }
     if (_isRegisteredForTax) {
       final gstErr = _validateGstin(_gstController.text);
       if (gstErr != null) return (focus: _gstFocus, message: gstErr);
@@ -865,7 +878,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                   controller: _pincodeController,
                   focusNode: _pincodeFocus,
                   textInputAction: TextInputAction.next,
-                  onFieldSubmitted: (_) => _gstFocus.requestFocus(),
+                  onFieldSubmitted: (_) => _foodLicenseFocus.requestFocus(),
                   label: 'Pincode',
                   hint: 'e.g. 382355',
                   icon: Icons.pin_drop_rounded,
@@ -895,6 +908,11 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // First in the section, and outside the _isRegisteredForTax gate: a
+          // food licence is independent of tax registration, so a business that
+          // answers "Not Registered" must still be able to enter one.
+          _buildFoodLicenseField(context),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
           _buildTaxRegistrationSelector(context, isIndia: isIndia),
           if (_isRegisteredForTax) ...[
             SizedBox(height: AppResponsive.mediumSpacing(context)),
@@ -948,6 +966,30 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
           ],
         ],
       ),
+    );
+  }
+
+  /// Country-adaptive food-business licence (FSSAI in India). Always optional.
+  /// Reads the LOCAL country controller, not the persisted record — nothing is
+  /// saved yet while the user is still on this step.
+  Widget _buildFoodLicenseField(BuildContext context) {
+    final country = _countryController.text;
+    final digitsOnly = FoodLicenseRule.digitsOnlyFor(country);
+
+    return AppTextField(
+      controller: _foodLicenseController,
+      focusNode: _foodLicenseFocus,
+      textInputAction: TextInputAction.done,
+      onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
+      label: FoodLicenseRule.labelFor(country),
+      hint: FoodLicenseRule.hintFor(country),
+      icon: Icons.verified_user_outlined,
+      maxLength: FoodLicenseRule.maxLengthFor(country),
+      keyboardType: digitsOnly ? TextInputType.number : TextInputType.text,
+      inputFormatters:
+          digitsOnly ? [FilteringTextInputFormatter.digitsOnly] : null,
+      onChanged: (v) => widget.store.setFoodLicenseNo(v),
+      validator: (v) => FoodLicenseRule.validateFor(country, v),
     );
   }
 

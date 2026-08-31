@@ -321,13 +321,19 @@ abstract class _CartStore with Store {
     final currentQtyInCart = index != -1 ? items[index].qty : 0;
     final requestedQty = currentQtyInCart + qty;
 
-    // Stock validation: Check if item is out of stock
-    if (availableStock <= 0) {
+    // Stock validation — both gates are lifted by the product's
+    // `allowOrderWhenOutOfStock` policy (restaurant's `Items` flag, mirrored).
+    // A shop whose counts have drifted can then still ring up goods that are
+    // visibly on the shelf; stock simply goes negative and is reconciled later.
+    final sellsWhenOut = product.sellsWhenOutOfStock;
+
+    // Check if item is out of stock
+    if (availableStock <= 0 && !sellsWhenOut) {
       return CartOperationResult.outOfStock();
     }
 
-    // Stock validation: Check if requested quantity exceeds available stock
-    if (requestedQty > availableStock) {
+    // Check if requested quantity exceeds available stock
+    if (requestedQty > availableStock && !sellsWhenOut) {
       return CartOperationResult.insufficientStock(
         available: availableStock,
         requested: requestedQty,

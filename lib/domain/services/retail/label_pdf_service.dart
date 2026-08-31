@@ -4,6 +4,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../../../core/config/tariff_code_rule.dart';
 import '../../../core/constants/label_layouts.dart';
 import '../../../util/common/currency_helper.dart';
 import '../../../util/common/decimal_settings.dart';
@@ -409,8 +410,8 @@ class LabelPdfService {
       barcodeValue: spec.hasBarcode ? spec.barcode.trim() : '',
       barcodeFallback: 'no barcode',
       skuText: sku.isEmpty ? '' : 'SKU: $sku',
-      // An absent HSN prints nothing at all — no label, no reserved line.
-      hsnText: hsn.isEmpty ? '' : 'HSN $hsn',
+      // An absent code prints nothing at all — no label, no reserved line.
+      hsnText: hsn.isEmpty ? '' : '${TariffCodeRule.shortLabel} $hsn',
     );
   }
 

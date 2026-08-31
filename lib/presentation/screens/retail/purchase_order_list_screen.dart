@@ -64,6 +64,9 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
     _tabController = TabController(length: _tabStatuses.length, vsync: this);
     _supplierFilter = widget.initialSupplier;
     purchaseOrderStore.loadPurchaseOrders();
+    // The filter dropdown and the detail sheet's WhatsApp share both read
+    // supplierStore, which nothing on this route was hydrating.
+    supplierStore.loadSuppliers();
   }
 
   bool get _hasExtraFilters => _supplierFilter != null || _dateFilter != null;

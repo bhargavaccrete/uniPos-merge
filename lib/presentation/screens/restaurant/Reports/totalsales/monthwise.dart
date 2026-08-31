@@ -5,6 +5,7 @@ import 'package:billberrylite/util/color.dart';
 
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
 class MonthWiseTab extends StatefulWidget {
   const MonthWiseTab({super.key});
 
@@ -389,7 +390,7 @@ class _MonthWiseTabState extends State<MonthWiseTab> {
                                 ),
                               ),
                               child: Text(
-                                'Total Amount(Rs.)',
+                                'Total Amount(${CurrencyHelper.currentSymbol})',
                                 textScaler: TextScaler.linear(1),
                                 style: GoogleFonts.poppins(fontSize: 14),
                                 textAlign: TextAlign.center,

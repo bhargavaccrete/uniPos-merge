@@ -642,7 +642,7 @@ class PrintService {
     int? billNumber, // Bill number for completed orders
     List<int>? kotNumbers, // KOT numbers for restaurant orders
     double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
-    String? paymentBreakdown, // Split payment breakdown (e.g., "cash: ₹100, card: ₹200")
+    String? paymentBreakdown, // Split payment breakdown (e.g., "cash: 100, card: 200")
     int? loyaltyPointsDiscount, // Loyalty points redeemed
     double? serviceCharge, // Service or delivery charge amount
     bool? isDeliveryOrder, // True if delivery order

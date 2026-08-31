@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../../util/common/app_responsive.dart';
 import '../../../../../util/color.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
 
 
 class OrderCard extends StatelessWidget {
@@ -320,9 +321,9 @@ class OrderCard extends StatelessWidget {
                                       final double price = data['price'] as double;
 
                                       if (qty > 1) {
-                                        return '${qty}x $name(₹${price.toStringAsFixed(2)})';
+                                        return '${qty}x $name(${CurrencyHelper.currentSymbol}${price.toStringAsFixed(2)})';
                                       } else {
-                                        return '$name(₹${price.toStringAsFixed(2)})';
+                                        return '$name(${CurrencyHelper.currentSymbol}${price.toStringAsFixed(2)})';
                                       }
                                     }).join(', ');
 

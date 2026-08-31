@@ -90,6 +90,21 @@ abstract class _AddProductFormStore with Store {
   @observable
   double minStock = 0;
 
+  /// Selected shared Tax entity. The canonical link — [taxRate] is only a
+  /// cached percentage derived from it (see [setSelectedTaxId]).
+  @observable
+  String? selectedTaxId;
+
+  /// Sells by weight/volume rather than whole pieces. The one switch that lets
+  /// a fractional quantity be typed anywhere in the app for these variants;
+  /// when on, [unit] names the measure.
+  @observable
+  bool isDecimalQuantity = false;
+
+  /// Optional expiry for this product's variants. Null = does not expire.
+  @observable
+  DateTime? expiryDate;
+
   @observable
   String productType = 'simple'; // 'simple' or 'variable'
 
@@ -113,6 +128,8 @@ abstract class _AddProductFormStore with Store {
   @observable
   String isVeg = 'veg'; // 'veg' or 'non-veg'
 
+  /// Unit of measure. Restaurant always sets it; retail sets it only when
+  /// [isDecimalQuantity] is on (otherwise the variant is counted in pieces).
   @observable
   String? unit;
 
@@ -432,6 +449,34 @@ abstract class _AddProductFormStore with Store {
 
   // ==================== ACTIONS - RESTAURANT ====================
 
+  /// Sets the tax link AND refreshes the cached [taxRate] from it, so the two
+  /// can never disagree. Passing null clears both.
+  @action
+  void setSelectedTaxId(String? value) {
+    selectedTaxId = value;
+    if (value == null) {
+      taxRate = 0;
+      return;
+    }
+    for (final t in taxStore.taxes) {
+      if (t.id == value) {
+        taxRate = (t.taxperecentage ?? 0).toDouble();
+        return;
+      }
+    }
+    taxRate = 0;
+  }
+
+  @action
+  void setIsDecimalQuantity(bool value) {
+    isDecimalQuantity = value;
+    // Collapsing back to pieces must not leave a stale 'kg' behind.
+    unit = value ? (unit == null || unit == 'piece' ? 'kg' : unit) : 'piece';
+  }
+
+  @action
+  void setExpiryDate(DateTime? value) => expiryDate = value;
+
   @action
   void setIsVeg(String value) => isVeg = value;
 
@@ -561,6 +606,17 @@ abstract class _AddProductFormStore with Store {
 
   Future<void> _submitRetailProduct() async {
     final productStore = locator<ProductStore>();
+
+    // Plan gate — a capped plan must not be seeded past its product limit
+    // during onboarding either. Same guard the POS add-product screen uses.
+    if (!productStore.canAddProduct) {
+      final max = productStore.productLimit;
+      throw StateError(
+        'Product limit reached${max != null ? ' (max $max)' : ''}. '
+        'Upgrade your plan to add more.',
+      );
+    }
+
     final productId = _uuid.v4();
 
     // Create product
@@ -571,6 +627,7 @@ abstract class _AddProductFormStore with Store {
       subCategory: subCategory,
       brandName: brandName,
       imagePath: imagePath,
+      imageBytes: imageBytes,
       description: description.isNotEmpty ? description : null,
       hasVariants: isVariableProduct,
       productType: productType,
@@ -578,7 +635,9 @@ abstract class _AddProductFormStore with Store {
       defaultMrp: isSimpleProduct ? mrp : null,
       defaultCostPrice: isSimpleProduct ? costPrice : null,
       gstRate: taxRate > 0 ? taxRate : null,
+      taxId: selectedTaxId,
       hsnCode: hsnCode,
+      allowOrderWhenOutOfStock: allowOrderWhenOutOfStock,
     );
 
     await productStore.addProduct(product);
@@ -600,6 +659,10 @@ abstract class _AddProductFormStore with Store {
           stockQty: variantData.stockQuantity,
           minStock: minStock,
           taxRate: taxRate > 0 ? taxRate : null,
+          taxId: selectedTaxId,
+          isDecimalQuantity: isDecimalQuantity,
+          unit: unit,
+          expiryDate: expiryDate?.toIso8601String(),
         );
         // A refused variant must not pass silently — the product is already
         // written, so ignoring this would leave it with no variant at all.
@@ -623,6 +686,10 @@ abstract class _AddProductFormStore with Store {
         minStock: minStock,
         isDefault: true,
         taxRate: taxRate > 0 ? taxRate : null,
+        taxId: selectedTaxId,
+        isDecimalQuantity: isDecimalQuantity,
+        unit: unit,
+        expiryDate: expiryDate?.toIso8601String(),
         customAttributes: mergeVariantAttributes(Map.of(simpleFieldValues)),
       );
       final result = await productStore.addVariant(variant);
@@ -722,6 +789,9 @@ abstract class _AddProductFormStore with Store {
     barcode = '';
     stockQuantity = 0;
     minStock = 0;
+    selectedTaxId = null;
+    isDecimalQuantity = false;
+    expiryDate = null;
     productType = 'simple';
     selectedAttributeIds.clear();
     selectedAttributeValues.clear();

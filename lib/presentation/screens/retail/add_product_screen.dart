@@ -32,6 +32,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/di/service_locator.dart';
+import '../../../core/config/tariff_code_rule.dart';
 import '../../../core/config/tax_feature.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
@@ -281,6 +282,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
   // onChanged fires on every keystroke), so switching which variant is being
   // configured never loses in-progress edits — see [_buildBundleBuilderFor].
   String _stockMode = 'standard'; // 'standard' | 'bundle' | 'repack'
+
+  /// Sell on even at zero stock. Mirrors restaurant's
+  /// `Items.allowOrderWhenOutOfStock`; the only escape from the cart's
+  /// zero-stock refusal.
+  bool _allowOrderWhenOutOfStock = false;
   final Map<String, List<BundleComponentModel>> _bundleComponentsByVariant =
       {};
 
@@ -311,6 +317,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       _taxManuallyChanged = true;
       _imageBytes = product.imageBytes;
       _stockMode = product.effectiveStockMode;
+      _allowOrderWhenOutOfStock = product.sellsWhenOutOfStock;
       // Unit of measure lives on the variants; they always agree, so the first
       // one speaks for the product. Absent/legacy variants read as pieces.
       final firstVariant =
@@ -426,7 +433,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       if (suggestedTaxId != null && suggestedTaxId != _selectedTaxId) {
         setState(() => _selectedTaxId = suggestedTaxId);
         NotificationService.instance.showInfo(
-          'Tax rate auto-filled from HSN $value',
+          'Tax rate auto-filled from ${TariffCodeRule.shortLabel} $value',
         );
       }
     });
@@ -508,6 +515,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       imageBytes: _imageBytes,
       clearImage: _imageCleared,
       stockMode: _stockMode == 'standard' ? null : _stockMode,
+      allowOrderWhenOutOfStock: _allowOrderWhenOutOfStock,
       clearStockMode: _stockMode == 'standard',
     );
 
@@ -694,6 +702,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       taxId: _selectedTaxId,
       imageBytes: _imageBytes,
       stockMode: _stockMode == 'standard' ? null : _stockMode,
+      allowOrderWhenOutOfStock: _allowOrderWhenOutOfStock,
     );
 
     await productStore.addProduct(product);
@@ -966,7 +975,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 const SizedBox(height: 12),
                 _buildTextField(
                   controller: _hsnCodeController,
-                  label: 'HSN Code (Optional)',
+                  label: '${TariffCodeRule.label} (Optional)',
                   hint: 'e.g., 6109',
                   onChanged: _onHsnCodeChanged,
                 ),
@@ -984,6 +993,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 _buildSectionHeader('Stock Mode'),
                 const SizedBox(height: 10),
                 _buildStockModeSection(),
+                const SizedBox(height: 10),
+                _buildAllowOutOfStockSection(),
                 const SizedBox(height: 16),
 
                 // ── Unit of Measure ───────────────────────────────────────
@@ -1613,6 +1624,34 @@ class _AddProductScreenState extends State<AddProductScreen> {
           ),
         ],
       ],
+    );
+  }
+
+  /// Lets a sale go through once stock hits zero. Off by default, so every
+  /// existing product keeps today's refusal untouched.
+  Widget _buildAllowOutOfStockSection() {
+    return SwitchListTile.adaptive(
+      value: _allowOrderWhenOutOfStock,
+      onChanged: (v) => setState(() => _allowOrderWhenOutOfStock = v),
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      title: Text(
+        'Allow Order When Out of Stock',
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.bodyFontSize(context),
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
+      ),
+      subtitle: Text(
+        _allowOrderWhenOutOfStock
+            ? 'Sells on at zero stock — the count goes negative'
+            : 'Refused once stock reaches zero',
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.smallFontSize(context),
+          color: AppColors.textSecondary,
+        ),
+      ),
     );
   }
 

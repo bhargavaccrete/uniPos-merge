@@ -52,7 +52,6 @@ class RetailPrinterSettings {
 
   // Item Details
   final bool showProductCode;
-  final bool showHSNCode;
   final bool showBarcode;
   final bool showVariantDetails; // size, color, weight
   final bool showItemDiscount;
@@ -97,7 +96,6 @@ class RetailPrinterSettings {
   final String lineStyle; // 'solid', 'dashed', 'dotted'
 
   // Language & Format
-  final String currencySymbol;
   final String dateFormat; // 'dd/MM/yyyy', 'MM/dd/yyyy', etc.
   final String timeFormat; // '12h', '24h'
 
@@ -133,7 +131,6 @@ class RetailPrinterSettings {
 
     // Item Details
     this.showProductCode = false,
-    this.showHSNCode = false,
     this.showBarcode = false,
     this.showVariantDetails = true,
     this.showItemDiscount = true,
@@ -178,7 +175,6 @@ class RetailPrinterSettings {
     this.lineStyle = 'dashed',
 
     // Language & Format
-    this.currencySymbol = '₹',
     this.dateFormat = 'dd/MM/yyyy',
     this.timeFormat = '12h',
   });
@@ -204,7 +200,6 @@ class RetailPrinterSettings {
       'showCustomerDetails': showCustomerDetails,
       'showCustomerGST': showCustomerGST,
       'showProductCode': showProductCode,
-      'showHSNCode': showHSNCode,
       'showBarcode': showBarcode,
       'showVariantDetails': showVariantDetails,
       'showItemDiscount': showItemDiscount,
@@ -235,7 +230,6 @@ class RetailPrinterSettings {
       'boldProductNames': boldProductNames,
       'showBorders': showBorders,
       'lineStyle': lineStyle,
-      'currencySymbol': currencySymbol,
       'dateFormat': dateFormat,
       'timeFormat': timeFormat,
       'billTemplate': billTemplate.index,
@@ -268,7 +262,6 @@ class RetailPrinterSettings {
       showCustomerDetails: json['showCustomerDetails'] ?? true,
       showCustomerGST: json['showCustomerGST'] ?? false,
       showProductCode: json['showProductCode'] ?? false,
-      showHSNCode: json['showHSNCode'] ?? false,
       showBarcode: json['showBarcode'] ?? false,
       showVariantDetails: json['showVariantDetails'] ?? true,
       showItemDiscount: json['showItemDiscount'] ?? true,
@@ -299,7 +292,6 @@ class RetailPrinterSettings {
       boldProductNames: json['boldProductNames'] ?? true,
       showBorders: json['showBorders'] ?? false,
       lineStyle: json['lineStyle'] ?? 'dashed',
-      currencySymbol: json['currencySymbol'] ?? '₹',
       dateFormat: json['dateFormat'] ?? 'dd/MM/yyyy',
       timeFormat: json['timeFormat'] ?? '12h',
     );
@@ -326,7 +318,6 @@ class RetailPrinterSettings {
     bool? showCustomerDetails,
     bool? showCustomerGST,
     bool? showProductCode,
-    bool? showHSNCode,
     bool? showBarcode,
     bool? showVariantDetails,
     bool? showItemDiscount,
@@ -357,7 +348,6 @@ class RetailPrinterSettings {
     bool? boldProductNames,
     bool? showBorders,
     String? lineStyle,
-    String? currencySymbol,
     String? dateFormat,
     String? timeFormat,
   }) {
@@ -381,7 +371,6 @@ class RetailPrinterSettings {
       showCustomerDetails: showCustomerDetails ?? this.showCustomerDetails,
       showCustomerGST: showCustomerGST ?? this.showCustomerGST,
       showProductCode: showProductCode ?? this.showProductCode,
-      showHSNCode: showHSNCode ?? this.showHSNCode,
       showBarcode: showBarcode ?? this.showBarcode,
       showVariantDetails: showVariantDetails ?? this.showVariantDetails,
       showItemDiscount: showItemDiscount ?? this.showItemDiscount,
@@ -412,7 +401,6 @@ class RetailPrinterSettings {
       boldProductNames: boldProductNames ?? this.boldProductNames,
       showBorders: showBorders ?? this.showBorders,
       lineStyle: lineStyle ?? this.lineStyle,
-      currencySymbol: currencySymbol ?? this.currencySymbol,
       dateFormat: dateFormat ?? this.dateFormat,
       timeFormat: timeFormat ?? this.timeFormat,
     );

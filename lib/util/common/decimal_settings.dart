@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
 
 /// Decimal Precision Settings Manager for Restaurant
 /// Controls decimal places for prices and amounts
@@ -54,24 +55,26 @@ class DecimalSettings {
     return amount.toStringAsFixed(precision);
   }
 
-  /// Format currency with symbol
-  static String formatCurrency(double amount, {String symbol = '₹'}) {
-    return '$symbol${formatAmount(amount)}';
+  /// Format currency with symbol. Defaults to the selected currency rather
+  /// than a fixed one.
+  static String formatCurrency(double amount, {String? symbol}) {
+    return '${symbol ?? CurrencyHelper.currentSymbol}${formatAmount(amount)}';
   }
 
-  /// Get precision description for UI
+  /// Get precision description for UI. The worked example follows the selected
+  /// currency — this label is shown in retail Settings.
   static String getPrecisionLabel(int precision) {
+    final s = CurrencyHelper.currentSymbol;
     switch (precision) {
       case 0:
-        return 'No decimals (₹100)';
+        return 'No decimals (${s}100)';
       case 1:
-        return '1 decimal place (₹100.5)';
-      case 2:
-        return '2 decimal places (₹100.50)';
+        return '1 decimal place (${s}100.5)';
       case 3:
-        return '3 decimal places (₹100.500)';
+        return '3 decimal places (${s}100.500)';
+      case 2:
       default:
-        return '2 decimal places (₹100.50)';
+        return '2 decimal places (${s}100.50)';
     }
   }
 }

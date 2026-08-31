@@ -36,6 +36,7 @@ import 'package:billberrylite/presentation/widget/componets/common/primary_app_b
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/add_item_form_state.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/widgets/category_selector_button.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/widgets/selling_method_selector.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
 
 /// Complete Restaurant Add Item Screen for Setup Wizard
 /// Production-ready with full validation, image upload, and category management
@@ -271,7 +272,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       } else if (price <= 0) {
         errors.add('Price must be greater than 0');
       } else if (price > 99999.99) {
-        errors.add('Price cannot exceed ₹99,999.99');
+        errors.add('Price cannot exceed ${CurrencyHelper.currentSymbol}99,999.99');
       } else {
         // Allow max 2 decimal places
         final parts = _priceController.text.trim().split('.');

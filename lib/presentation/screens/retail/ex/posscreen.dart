@@ -39,6 +39,7 @@ import 'package:billberrylite/presentation/widget/restaurant/opening_balance_dia
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/data/models/common/categorymodel_300.dart';
+import 'package:billberrylite/presentation/widget/componets/common/weight_item_dialog.dart';
 
 /// House card elevation — the same soft lift ReportCard/parked sales use.
 const List<BoxShadow> _cardShadow = [
@@ -454,6 +455,36 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     );
   }
 
+  /// How many of [variant] to add.
+  ///
+  /// A piece product is always 1 — the tap-adds-one behaviour is untouched. A
+  /// variant flagged `isDecimalQuantity` (loose goods sold by kg/ml) instead
+  /// opens the SAME weight sheet restaurant uses, so the cashier can enter what
+  /// the scale says, or an amount and let the weight be derived.
+  ///
+  /// Returns null when the sheet was dismissed, meaning "don't add anything".
+  Future<double?> _resolveQuantity(
+    ProductModel product,
+    VarianteModel variant,
+  ) async {
+    if (!variant.isDecimalQuantity) return 1;
+    if (!mounted) return null;
+
+    final selection = await showWeightItemDialog(
+      context,
+      name: product.productName,
+      unitPrice: variant.sellingPrice ?? variant.mrp ?? 0,
+      unit: variant.unit,
+      stockQuantity: variant.stockQty,
+      // `cartStore.addItem` already refuses `requestedQty > stockQty`, so the
+      // sheet enforcing the same rule changes nothing about what can be sold —
+      // it just reports it here, beside the numbers, instead of as a toast
+      // after the sheet has closed and the entry is lost.
+      trackInventory: true,
+    );
+    return selection?.quantity;
+  }
+
   Future<void> _onProductSelected(ProductModel product) async {
     // Inactive variants stay in the catalogue but never reach a till.
     final variants = (await productStore.getVariantsForProduct(
@@ -471,7 +502,10 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
 
     if (variants.length == 1) {
       if (!await _confirmExpiredSale(product, variants.first)) return;
-      final result = await cartStore.addItemToTab(product, variants.first);
+      final qty = await _resolveQuantity(product, variants.first);
+      if (qty == null) return;
+      final result =
+          await cartStore.addItemToTab(product, variants.first, qty: qty);
       _clearSearch();
       if (mounted) {
         if (result.success) {
@@ -525,7 +559,13 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
           if (mounted) _clearSearch();
           return;
         }
-        final result = await cartStore.addItemToTab(product, variant);
+        final qty = await _resolveQuantity(product, variant);
+        if (qty == null) {
+          if (mounted) _clearSearch();
+          return;
+        }
+        final result =
+            await cartStore.addItemToTab(product, variant, qty: qty);
 
         if (mounted) {
           _clearSearch();
@@ -567,7 +607,10 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
 
     if (selectedVariant != null && mounted) {
       if (!await _confirmExpiredSale(product, selectedVariant)) return;
-      final result = await cartStore.addItemToTab(product, selectedVariant);
+      final qty = await _resolveQuantity(product, selectedVariant);
+      if (qty == null) return;
+      final result =
+          await cartStore.addItemToTab(product, selectedVariant, qty: qty);
       if (result.success) {
         NotificationService.instance.showSuccess(
           '${product.productName} ${selectedVariant.shortDescription} added to cart',

@@ -5,6 +5,7 @@ import 'package:billberrylite/presentation/widget/componets/common/primary_app_b
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
 
 /// EOD Report Detail Screen - Shows detailed view of a single EOD report
 class EODReportDetailScreen extends StatelessWidget {
@@ -76,12 +77,12 @@ class EODReportDetailScreen extends StatelessWidget {
                   _buildRow(
                     context,
                     'Opening Balance',
-                    'Rs. ${report.openingBalance.toStringAsFixed(2)}',
+                    '${CurrencyHelper.currentSymbol}${report.openingBalance.toStringAsFixed(2)}',
                   ),
                   _buildRow(
                     context,
                     'Closing Balance',
-                    'Rs. ${report.closingBalance.toStringAsFixed(2)}',
+                    '${CurrencyHelper.currentSymbol}${report.closingBalance.toStringAsFixed(2)}',
                   ),
                 ],
               ),
@@ -98,7 +99,7 @@ class EODReportDetailScreen extends StatelessWidget {
                   _buildRow(
                     context,
                     'Total Sales',
-                    'Rs. ${report.totalSales.toStringAsFixed(2)}',
+                    '${CurrencyHelper.currentSymbol}${report.totalSales.toStringAsFixed(2)}',
                     isBold: true,
                   ),
                   _buildRow(
@@ -110,14 +111,14 @@ class EODReportDetailScreen extends StatelessWidget {
                     _buildRow(
                       context,
                       'Discount',
-                      'Rs. ${report.totalDiscount.toStringAsFixed(2)}',
+                      '${CurrencyHelper.currentSymbol}${report.totalDiscount.toStringAsFixed(2)}',
                       color: Colors.red,
                     ),
                   if (report.totalRefunds > 0)
                     _buildRow(
                       context,
                       'Refunds',
-                      'Rs. ${report.totalRefunds.toStringAsFixed(2)}',
+                      '${CurrencyHelper.currentSymbol}${report.totalRefunds.toStringAsFixed(2)}',
                       color: Colors.orange,
                     ),
                 ],
@@ -136,7 +137,7 @@ class EODReportDetailScreen extends StatelessWidget {
                     return _buildRow(
                       context,
                       '${payment.paymentType} (${payment.transactionCount} txns)',
-                      'Rs. ${payment.totalAmount.toStringAsFixed(2)}',
+                      '${CurrencyHelper.currentSymbol}${payment.totalAmount.toStringAsFixed(2)}',
                     );
                   }).toList(),
                 ),
@@ -155,14 +156,14 @@ class EODReportDetailScreen extends StatelessWidget {
                       return _buildRow(
                         context,
                         tax.taxName,
-                        'Rs. ${tax.taxAmount.toStringAsFixed(2)}',
+                        '${CurrencyHelper.currentSymbol}${tax.taxAmount.toStringAsFixed(2)}',
                       );
                     }),
                     const Divider(),
                     _buildRow(
                       context,
                       'Total Tax',
-                      'Rs. ${report.totalTax.toStringAsFixed(2)}',
+                      '${CurrencyHelper.currentSymbol}${report.totalTax.toStringAsFixed(2)}',
                       isBold: true,
                     ),
                   ],
@@ -176,19 +177,19 @@ class EODReportDetailScreen extends StatelessWidget {
                   _buildRow(
                     context,
                     'Total Expenses',
-                    'Rs. ${report.totalExpenses.toStringAsFixed(2)}',
+                    '${CurrencyHelper.currentSymbol}${report.totalExpenses.toStringAsFixed(2)}',
                   ),
                   _buildRow(
                     context,
                     'Cash Expenses',
-                    'Rs. ${report.cashExpenses.toStringAsFixed(2)}',
+                    '${CurrencyHelper.currentSymbol}${report.cashExpenses.toStringAsFixed(2)}',
                     color: Colors.red[700]!,
                   ),
                   if (report.totalExpenses > report.cashExpenses)
                     _buildRow(
                       context,
                       'Non-Cash Expenses',
-                      'Rs. ${(report.totalExpenses - report.cashExpenses).toStringAsFixed(2)}',
+                      '${CurrencyHelper.currentSymbol}${(report.totalExpenses - report.cashExpenses).toStringAsFixed(2)}',
                       color: Colors.grey,
                     ),
                 ]),
@@ -209,25 +210,25 @@ class EODReportDetailScreen extends StatelessWidget {
                       _buildRow(
                         context,
                         'Cash',
-                        'Rs. ${report.cashCollections.toStringAsFixed(2)}',
+                        '${CurrencyHelper.currentSymbol}${report.cashCollections.toStringAsFixed(2)}',
                       ),
                     if (report.cardCollections > 0)
                       _buildRow(
                         context,
                         'Card',
-                        'Rs. ${report.cardCollections.toStringAsFixed(2)}',
+                        '${CurrencyHelper.currentSymbol}${report.cardCollections.toStringAsFixed(2)}',
                       ),
                     if (report.upiCollections > 0)
                       _buildRow(
                         context,
                         'UPI',
-                        'Rs. ${report.upiCollections.toStringAsFixed(2)}',
+                        '${CurrencyHelper.currentSymbol}${report.upiCollections.toStringAsFixed(2)}',
                       ),
                     const Divider(),
                     _buildRow(
                       context,
                       'Total Collected',
-                      'Rs. ${report.totalCollections.toStringAsFixed(2)}',
+                      '${CurrencyHelper.currentSymbol}${report.totalCollections.toStringAsFixed(2)}',
                       isBold: true,
                     ),
                   ],
@@ -247,18 +248,18 @@ class EODReportDetailScreen extends StatelessWidget {
                     _buildRow(
                       context,
                       'Revenue (excl. tax)',
-                      'Rs. ${(report.totalSales - report.totalTax).toStringAsFixed(2)}',
+                      '${CurrencyHelper.currentSymbol}${(report.totalSales - report.totalTax).toStringAsFixed(2)}',
                     ),
                     _buildRow(
                       context,
                       'Cost of Goods',
-                      'Rs. ${report.totalCost.toStringAsFixed(2)}',
+                      '${CurrencyHelper.currentSymbol}${report.totalCost.toStringAsFixed(2)}',
                     ),
                     const Divider(),
                     _buildRow(
                       context,
                       'Gross Profit',
-                      'Rs. ${report.grossProfit.toStringAsFixed(2)}',
+                      '${CurrencyHelper.currentSymbol}${report.grossProfit.toStringAsFixed(2)}',
                       isBold: true,
                       color: report.grossProfit >= 0
                           ? Colors.green[700]!
@@ -291,7 +292,7 @@ class EODReportDetailScreen extends StatelessWidget {
                     _buildRow(
                       context,
                       'Total Outstanding',
-                      'Rs. ${report.totalOutstanding.toStringAsFixed(2)}',
+                      '${CurrencyHelper.currentSymbol}${report.totalOutstanding.toStringAsFixed(2)}',
                       isBold: true,
                       color: Colors.brown[700]!,
                     ),
@@ -482,18 +483,18 @@ class EODReportDetailScreen extends StatelessWidget {
                 _buildRow(
                   context,
                   'Expected Cash',
-                  'Rs. ${reconciliation.systemExpectedCash.toStringAsFixed(2)}',
+                  '${CurrencyHelper.currentSymbol}${reconciliation.systemExpectedCash.toStringAsFixed(2)}',
                 ),
                 _buildRow(
                   context,
                   'Actual Cash',
-                  'Rs. ${reconciliation.actualCash.toStringAsFixed(2)}',
+                  '${CurrencyHelper.currentSymbol}${reconciliation.actualCash.toStringAsFixed(2)}',
                 ),
                 const Divider(),
                 _buildRow(
                   context,
                   'Difference',
-                  '${reconciliation.difference >= 0 ? '+' : ''}Rs. ${reconciliation.difference.toStringAsFixed(2)}',
+                  '${reconciliation.difference >= 0 ? '+' : ''}${CurrencyHelper.currentSymbol}${reconciliation.difference.toStringAsFixed(2)}',
                   isBold: true,
                   color: reconciliation.difference == 0
                       ? Colors.green

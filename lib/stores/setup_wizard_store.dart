@@ -77,6 +77,11 @@ abstract class _SetupWizardStore with Store {
   @observable
   String pan = '';
 
+  /// Food-business licence number (FSSAI in India). Optional everywhere —
+  /// `FoodLicenseRule` owns the country-specific label and validation.
+  @observable
+  String foodLicenseNo = '';
+
   @observable
   String city = '';
 
@@ -327,6 +332,11 @@ abstract class _SetupWizardStore with Store {
   }
 
   @action
+  void setFoodLicenseNo(String value) {
+    foodLicenseNo = value;
+  }
+
+  @action
   void setCity(String value) {
     city = value;
   }
@@ -452,6 +462,7 @@ abstract class _SetupWizardStore with Store {
         address = savedDetails.address ?? '';
         gstin = savedDetails.gstin ?? '';
         pan = savedDetails.pan ?? '';
+        foodLicenseNo = savedDetails.foodLicenseNo ?? '';
         city = savedDetails.city ?? '';
         state = savedDetails.state ?? '';
         country = savedDetails.country ?? '';
@@ -538,6 +549,7 @@ abstract class _SetupWizardStore with Store {
         address: address,
         gstin: gstin,
         pan: pan,
+        foodLicenseNo: foodLicenseNo,
         city: city,
         state: state,
         country: country,
@@ -630,6 +642,7 @@ abstract class _SetupWizardStore with Store {
         address: address,
         gstin: gstin,
         pan: pan,
+        foodLicenseNo: foodLicenseNo,
         city: city,
         state: state,
         country: country,
@@ -710,6 +723,7 @@ abstract class _SetupWizardStore with Store {
       address = '';
       gstin = '';
       pan = '';
+      foodLicenseNo = '';
       city = '';
       state = '';
       country = '';

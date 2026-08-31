@@ -79,6 +79,12 @@ class BusinessDetails extends HiveObject {
   @HiveField(19)
   final String? retailStoreType;
 
+  /// Food-business licence/registration number. Country-adaptive in meaning —
+  /// FSSAI in India, the local permit/registration elsewhere. Always optional;
+  /// `FoodLicenseRule` owns the label and validation.
+  @HiveField(20)
+  final String? foodLicenseNo;
+
   BusinessDetails({
     this.businessTypeId,
     this.businessTypeName,
@@ -98,6 +104,7 @@ class BusinessDetails extends HiveObject {
     this.taxEnabled = true,
     this.isRegisteredForTax = true,
     this.retailStoreType,
+    this.foodLicenseNo,
     DateTime? createdAt,
     DateTime? updatedAt,
   })  : createdAt = createdAt ?? DateTime.now(),
@@ -122,6 +129,7 @@ class BusinessDetails extends HiveObject {
     bool? taxEnabled,
     bool? isRegisteredForTax,
     String? retailStoreType,
+    String? foodLicenseNo,
     /// `logo: null` cannot clear the logo — `??` falls back to the old value.
     /// Pass `clearLogo: true` to remove it.
     bool clearLogo = false,
@@ -150,6 +158,7 @@ class BusinessDetails extends HiveObject {
       retailStoreType: clearRetailStoreType
           ? null
           : (retailStoreType ?? this.retailStoreType),
+      foodLicenseNo: foodLicenseNo ?? this.foodLicenseNo,
       createdAt: createdAt,
       updatedAt: DateTime.now(),
     );
@@ -176,6 +185,7 @@ class BusinessDetails extends HiveObject {
       'taxEnabled': taxEnabled,
       'isRegisteredForTax': isRegisteredForTax,
       'retailStoreType': retailStoreType,
+      'foodLicenseNo': foodLicenseNo,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
@@ -204,6 +214,7 @@ class BusinessDetails extends HiveObject {
       taxEnabled: map['taxEnabled'] as bool? ?? true,
       isRegisteredForTax: map['isRegisteredForTax'] as bool? ?? true,
       retailStoreType: map['retailStoreType'] as String?,
+      foodLicenseNo: map['foodLicenseNo'] as String?,
       createdAt: DateTime.tryParse(map['createdAt'] ?? ''),
       updatedAt: DateTime.tryParse(map['updatedAt'] ?? ''),
     );

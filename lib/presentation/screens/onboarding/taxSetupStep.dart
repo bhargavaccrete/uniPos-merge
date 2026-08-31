@@ -14,6 +14,7 @@ import '../../../presentation/widget/componets/common/app_text_field.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/di/service_locator.dart';
 import 'package:billberrylite/util/restaurant/staticswitch.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
 
 class TaxSetupStep extends StatefulWidget {
   final SetupWizardStore store;
@@ -336,14 +337,14 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
                 _buildModeOption(
                   selected: isInclusive,
                   title: 'Tax Included in Price',
-                  example: '₹112 (GST included)',
+                  example: '${CurrencyHelper.currentSymbol}112 (GST included)',
                   onTap: () => _setInclusive(true),
                 ),
                 const SizedBox(height: 12),
                 _buildModeOption(
                   selected: !isInclusive,
                   title: 'Tax Added at Billing',
-                  example: '₹100 + GST = ₹112',
+                  example: '${CurrencyHelper.currentSymbol}100 + GST = ${CurrencyHelper.currentSymbol}112',
                   onTap: () => _setInclusive(false),
                 ),
               ],

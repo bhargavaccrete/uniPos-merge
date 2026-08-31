@@ -35,6 +35,7 @@ class BusinessDetailsAdapter extends TypeAdapter<BusinessDetails> {
       taxEnabled: fields[17] as bool,
       isRegisteredForTax: fields[18] as bool,
       retailStoreType: fields[19] as String?,
+      foodLicenseNo: fields[20] as String?,
       createdAt: fields[15] as DateTime?,
       updatedAt: fields[16] as DateTime?,
     );
@@ -43,7 +44,7 @@ class BusinessDetailsAdapter extends TypeAdapter<BusinessDetails> {
   @override
   void write(BinaryWriter writer, BusinessDetails obj) {
     writer
-      ..writeByte(20)
+      ..writeByte(21)
       ..writeByte(0)
       ..write(obj.businessTypeId)
       ..writeByte(1)
@@ -83,7 +84,9 @@ class BusinessDetailsAdapter extends TypeAdapter<BusinessDetails> {
       ..writeByte(18)
       ..write(obj.isRegisteredForTax)
       ..writeByte(19)
-      ..write(obj.retailStoreType);
+      ..write(obj.retailStoreType)
+      ..writeByte(20)
+      ..write(obj.foodLicenseNo);
   }
 
   @override

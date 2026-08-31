@@ -55,6 +55,10 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen>
     super.initState();
     _supplier = widget.supplier;
     _tabController = TabController(length: 3, vsync: this);
+    // This screen holds its own supplier, but the PO detail sheet it opens
+    // resolves the WhatsApp number out of supplierStore — which nothing on
+    // this route was hydrating.
+    supplierStore.loadSuppliers();
     _load();
   }
 

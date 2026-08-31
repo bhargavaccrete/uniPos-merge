@@ -12,7 +12,9 @@
 /// [RetailImportCatalogue], so tests supply a fake without any mocking package.
 library;
 
+import 'package:billberrylite/core/config/tariff_code_rule.dart';
 import 'package:billberrylite/core/constants/item_units.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Columns
@@ -75,10 +77,23 @@ const Map<RetailImportColumn, String> kRetailImportHeaders = {
   RetailImportColumn.expiryDate: 'Expiry Date',
 };
 
+/// Display label for one header cell.
+///
+/// Every column is fixed except the tariff-code one, whose name varies by
+/// country — HSN in India, HTS in the US, CN/TARIC across the EU. The canonical
+/// 'HSN Code' stays in [kRetailImportHeaders] as the storage-side name, and
+/// every country's spelling is accepted on read via [_headerAliases], so a
+/// template generated in one country still imports on a device set to another.
+String retailImportHeaderLabel(RetailImportColumn column) =>
+    column == RetailImportColumn.hsnCode
+        ? TariffCodeRule.label
+        : kRetailImportHeaders[column]!;
+
 /// The ordered header row, for the template builder.
-List<String> get kRetailImportHeaderRow => RetailImportColumn.values
-    .map((c) => kRetailImportHeaders[c]!)
-    .toList(growable: false);
+List<String> get kRetailImportHeaderRow =>
+    RetailImportColumn.values.map(retailImportHeaderLabel).toList(
+          growable: false,
+        );
 
 /// Extra spellings accepted when reading a hand-made file. The canonical header
 /// always matches first; these only widen what a shop is allowed to type.
@@ -98,7 +113,30 @@ const Map<String, RetailImportColumn> _headerAliases = {
   'unitofmeasure': RetailImportColumn.unit,
   'expiry': RetailImportColumn.expiryDate,
   'tax': RetailImportColumn.taxRate,
+  // Every country's name for the tariff-code column, so a template downloaded
+  // in one country still imports on a device set to another. See
+  // [retailImportHeaderLabel].
   'hsn': RetailImportColumn.hsnCode,
+  'hsncode': RetailImportColumn.hsnCode,
+  'hs': RetailImportColumn.hsnCode,
+  'hscode': RetailImportColumn.hsnCode,
+  'hts': RetailImportColumn.hsnCode,
+  'htscode': RetailImportColumn.hsnCode,
+  'commodity': RetailImportColumn.hsnCode,
+  'commoditycode': RetailImportColumn.hsnCode,
+  'tariff': RetailImportColumn.hsnCode,
+  'tariffcode': RetailImportColumn.hsnCode,
+  'hstariffcode': RetailImportColumn.hsnCode,
+  'ahtn': RetailImportColumn.hsnCode,
+  'ahtncode': RetailImportColumn.hsnCode,
+  'hsahtncode': RetailImportColumn.hsnCode,
+  'customscode': RetailImportColumn.hsnCode,
+  'hscustomscode': RetailImportColumn.hsnCode,
+  'cn': RetailImportColumn.hsnCode,
+  'cncode': RetailImportColumn.hsnCode,
+  'taric': RetailImportColumn.hsnCode,
+  'tariccode': RetailImportColumn.hsnCode,
+  'cntariccode': RetailImportColumn.hsnCode,
 };
 
 /// Reduces a header cell to a comparison key: case, spacing, punctuation and
@@ -587,7 +625,7 @@ class RetailImportParser {
         if (value.toLowerCase() == parentValue.toLowerCase()) return;
         notice(
           row.rowNumber,
-          kRetailImportHeaders[column]!.replaceAll('*', ''),
+          retailImportHeaderLabel(column).replaceAll('*', ''),
           'Product-level value "$value" ignored — the first row of '
           '"${parent.handle}" applies to the whole product.',
         );
@@ -839,8 +877,16 @@ class RetailImportParser {
 
   /// Tolerates a currency symbol and stray spaces; deliberately rejects
   /// thousands separators, whose meaning differs by locale.
+  ///
+  /// Strips EVERY symbol the app can be configured with, not just the four
+  /// Latin ones — a UAE or Japanese shop pasting its own symbol used to get a
+  /// null price and a silently dropped row.
   static double? _number(String raw) {
-    final cleaned = raw.trim().replaceAll(RegExp(r'[₹\$€£\s]'), '');
+    var cleaned = raw.trim();
+    for (final info in CurrencyHelper.currencies.values) {
+      cleaned = cleaned.replaceAll(info.symbol, '');
+    }
+    cleaned = cleaned.replaceAll(RegExp(r'\s'), '');
     if (cleaned.isEmpty) return null;
     return double.tryParse(cleaned);
   }

@@ -4,6 +4,7 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 import '../../../util/common/app_responsive.dart';
 import '../../../util/common/upi_qr_helper.dart';
@@ -305,10 +306,61 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
   Future<void> _initializeStore() async {
     try {
       await _store.init();
+      await _applyCountryDefaultsOnce();
     } catch (e) {
       debugPrint('PaymentSetupStep: Error during init: $e');
     }
     if (mounted) setState(() => _isInitialized = true);
+  }
+
+  /// Key marking that the country-derived defaults below have already run.
+  static const String _countryDefaultsKey = 'payment_country_defaults_applied';
+
+  /// Adapts the seeded defaults to the country chosen back on Store Details.
+  ///
+  /// The six built-in methods are seeded by `PaymentMethodRepository` at app
+  /// STARTUP, long before a country exists, so they cannot be seeded per
+  /// country — they can only be adjusted here, once the answer is known.
+  ///
+  /// Runs at most once per install, and never for India (whose seeded defaults
+  /// are already correct). Guarded so a user who deliberately switches UPI on
+  /// in the UK does not have it switched off again on every revisit.
+  Future<void> _applyCountryDefaultsOnce() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_countryDefaultsKey) ?? false) return;
+
+    final country = businessDetailsRepository.get()?.country;
+    // No country yet (the step was reached out of order) — leave everything
+    // alone AND do not burn the flag, so this can still apply later.
+    if (country == null || country.trim().isEmpty) return;
+
+    await prefs.setBool(_countryDefaultsKey, true);
+
+    final isIndia = country.trim().toLowerCase() == 'india';
+
+    // UPI is an India-only rail. Switched OFF rather than removed: the value
+    // 'upi' is a reporting bucket key, so the row must keep existing, and the
+    // user can turn it back on from this very screen.
+    if (!isIndia) {
+      // Resolve the id BEFORE toggling: togglePaymentMethod reloads the store,
+      // which clears and refills `paymentMethods` mid-iteration.
+      String? upiId;
+      for (final m in _store.paymentMethods) {
+        if (m.value == 'upi' && m.isEnabled) {
+          upiId = m.id;
+          break;
+        }
+      }
+      if (upiId != null) await _store.togglePaymentMethod(upiId);
+    }
+
+    // Currency defaults to INR app-wide; preselect the country's own so a
+    // non-India business is not billing in rupees by accident. Unknown
+    // countries keep whatever is already selected — never a guess.
+    final code = CurrencyHelper.currencyCodeForCountry(country);
+    if (code != null && code != CurrencyHelper.currentCurrencyCode) {
+      await CurrencyHelper.setCurrency(code);
+    }
   }
 
   bool _isDefault(String value) => _defaultValues.contains(value);

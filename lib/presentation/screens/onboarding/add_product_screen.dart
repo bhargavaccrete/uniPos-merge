@@ -13,6 +13,7 @@ import 'package:uuid/uuid.dart';
 import 'dart:io';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/config/tariff_code_rule.dart';
 import '../../../core/config/tax_feature.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/retail/hive_model/attribute_model_219.dart';
@@ -34,6 +35,11 @@ import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/category_selector_sheet.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
 import 'package:billberrylite/domain/services/common/notification_service.dart';
+import 'package:billberrylite/core/constants/item_units.dart';
+import 'package:billberrylite/domain/services/retail/expiry_status.dart';
+import 'package:billberrylite/presentation/widget/componets/retail/expiry_date_field.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/presentation/widget/componets/common/row_action_button.dart';
 
 class AddProductScreen extends StatefulWidget {
   final VoidCallback? onNext;
@@ -346,7 +352,10 @@ class _AddProductScreenState extends State<AddProductScreen>
         defaultMrp: _formStore.isSimpleProduct ? _formStore.mrp : null,
         defaultCostPrice: _formStore.isSimpleProduct ? _formStore.costPrice : null,
         gstRate: _formStore.taxRate > 0 ? _formStore.taxRate : null,
+        taxId: _formStore.selectedTaxId,
+        imageBytes: _formStore.imageBytes,
         hsnCode: _formStore.hsnCode,
+        allowOrderWhenOutOfStock: _formStore.allowOrderWhenOutOfStock,
       );
 
       // Update product in database
@@ -369,6 +378,10 @@ class _AddProductScreenState extends State<AddProductScreen>
             stockQty: variantData.stockQuantity,
             minStock: _formStore.minStock,
             taxRate: _formStore.taxRate > 0 ? _formStore.taxRate : null,
+            taxId: _formStore.selectedTaxId,
+            isDecimalQuantity: _formStore.isDecimalQuantity,
+            unit: _formStore.unit,
+            expiryDate: _formStore.expiryDate?.toIso8601String(),
           );
 
           // Check if variant exists, if so update, otherwise add
@@ -404,6 +417,11 @@ class _AddProductScreenState extends State<AddProductScreen>
             stockQty: _formStore.stockQuantity,
             minStock: _formStore.minStock,
             taxRate: _formStore.taxRate > 0 ? _formStore.taxRate : null,
+            taxId: _formStore.selectedTaxId,
+            isDecimalQuantity: _formStore.isDecimalQuantity,
+            unit: _formStore.unit,
+            expiryDate: _formStore.expiryDate?.toIso8601String(),
+            clearExpiryDate: _formStore.expiryDate == null,
           );
 
           final result = await productStore.updateVariant(updatedVariant);
@@ -962,19 +980,12 @@ class _AddProductScreenState extends State<AddProductScreen>
     );
   }
 
+  /// Picks the shared Tax ENTITY, not a bare percentage. `taxId` is the
+  /// canonical link (the POS screen does the same); the rate is only a cached
+  /// number the store derives via `setSelectedTaxId`, so a later edit to the
+  /// tax record still reaches products created here.
   Widget _buildGstDropdown() {
-    // Fetch tax rates from the shared TaxStore (retail) — same source
-    // restaurant's dropdown below already uses.
     final taxes = taxStore.taxes;
-
-    // Get tax rates from the store, or use default if none added yet
-    List<String> gstRates = [];
-    if (taxes.isNotEmpty) {
-      gstRates = taxes.map((tax) => (tax.taxperecentage ?? 0).toString()).toList();
-    } else {
-      // Fallback to common GST rates if no tax rates were added during setup
-      gstRates = ['0', '5', '12', '18', '28'];
-    }
 
     return Theme(
       data: Theme.of(context).copyWith(
@@ -982,23 +993,122 @@ class _AddProductScreenState extends State<AddProductScreen>
         splashColor: AppColors.primary.withOpacity(0.08),
         hoverColor: AppColors.primary.withOpacity(0.06),
       ),
-      child: DropdownButtonFormField<String>(
-        value: _taxRateController.text.isEmpty ? null : _taxRateController.text,
-        decoration: _fieldDec('GST Rate (%)', Icons.percent),
-        style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
-        dropdownColor: Colors.white,
-        items: gstRates.map((rate) {
-          return DropdownMenuItem(
-            value: rate,
-            child: Text('$rate%', style: GoogleFonts.poppins(fontSize: 14)),
-          );
-        }).toList(),
-        onChanged: (value) {
-          setState(() {
-            _taxRateController.text = value ?? '';
-          });
-        },
-        hint: Text('Select GST rate', style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textSecondary)),
+      child: Observer(
+        builder: (_) => DropdownButtonFormField<String>(
+          value: taxes.any((t) => t.id == _formStore.selectedTaxId)
+              ? _formStore.selectedTaxId
+              : null,
+          isExpanded: true,
+          decoration: _fieldDec('Tax Rate (Optional)', Icons.percent),
+          style: GoogleFonts.poppins(fontSize: 14, color: AppColors.textPrimary),
+          dropdownColor: Colors.white,
+          items: [
+            DropdownMenuItem(
+              value: null,
+              child: Text('No tax', style: GoogleFonts.poppins(fontSize: 14)),
+            ),
+            ...taxes.map(
+              (tax) => DropdownMenuItem(
+                value: tax.id,
+                child: Text(
+                  '${tax.taxname} (${tax.taxperecentage ?? 0}%)',
+                  style: GoogleFonts.poppins(fontSize: 14),
+                ),
+              ),
+            ),
+          ],
+          onChanged: (value) => setState(() {
+            _formStore.setSelectedTaxId(value);
+            // Keep the controller in step: _submitForm reads it back into the
+            // store, and a stale value there would overwrite the derived rate.
+            _taxRateController.text =
+                _formStore.taxRate > 0 ? _formStore.taxRate.toString() : '';
+          }),
+        ),
+      ),
+    );
+  }
+
+  /// Sells by weight/volume rather than whole pieces, plus the unit that names
+  /// the measure. Mirrors the POS screen's control - isDecimalQuantity is the
+  /// single switch that permits a fractional quantity anywhere in the app.
+  Widget _buildUnitOfMeasureSection() {
+    return Observer(
+      builder: (_) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SwitchListTile(
+            value: _formStore.isDecimalQuantity,
+            onChanged: (v) => setState(() => _formStore.setIsDecimalQuantity(v)),
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            activeColor: AppColors.primary,
+            title: const Text('Sold by weight / volume'),
+            subtitle: Text(
+              _formStore.isDecimalQuantity
+                  ? 'Quantities may be fractional, e.g. 1.75 ${_formStore.unit ?? 'kg'}'
+                  : 'Counted in whole pieces',
+            ),
+          ),
+          if (_formStore.isDecimalQuantity) ...[
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              initialValue:
+                  kItemUnits.contains(_formStore.unit) ? _formStore.unit : 'kg',
+              decoration: _fieldDec('Unit', Icons.straighten),
+              style: GoogleFonts.poppins(
+                  fontSize: 14, color: AppColors.textPrimary),
+              dropdownColor: Colors.white,
+              // Reuses restaurant's canonical list so the two sides can never
+              // drift apart on what a unit is called.
+              items: kItemUnits
+                  .where((u) => u != 'piece')
+                  .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _formStore.setUnit(v));
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Optional expiry for this product's variants. Turning the switch OFF clears
+  /// the date, so nothing stale can survive.
+  Widget _buildExpirySection() {
+    return Observer(
+      builder: (_) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SwitchListTile(
+            value: _formStore.expiryDate != null,
+            onChanged: (on) => setState(() {
+              _formStore.setExpiryDate(on
+                  ? dateOnly(DateTime.now().add(const Duration(days: 7)))
+                  : null);
+            }),
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            activeColor: AppColors.primary,
+            title: const Text('Has an expiry date'),
+            subtitle: Text(
+              _formStore.expiryDate == null
+                  ? 'This product does not expire'
+                  : 'Alerts $kExpiryWarningDays days before it expires',
+            ),
+          ),
+          if (_formStore.expiryDate != null) ...[
+            const SizedBox(height: 10),
+            ExpiryDateField(
+              value: _formStore.expiryDate,
+              onPick: (picked) =>
+                  setState(() => _formStore.setExpiryDate(picked)),
+              onClear: () => setState(() => _formStore.setExpiryDate(null)),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -1109,7 +1219,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                       const SizedBox(height: 16),
                       _buildTextField(
                         controller: _hsnCodeController,
-                        label: 'HSN Code',
+                        label: TariffCodeRule.label,
                         icon: Icons.qr_code_2,
                       ),
                     ],
@@ -1146,7 +1256,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                     const SizedBox(height: 16),
                     _buildTextField(
                       controller: _hsnCodeController,
-                      label: 'HSN Code',
+                      label: TariffCodeRule.label,
                       icon: Icons.qr_code_2,
                     ),
                   ],
@@ -1192,7 +1302,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                         Expanded(
                           child: _buildTextField(
                             controller: _hsnCodeController,
-                            label: 'HSN Code',
+                            label: TariffCodeRule.label,
                             icon: Icons.qr_code_2,
                           ),
                         ),
@@ -1231,7 +1341,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Profit: ₹${profit.toStringAsFixed(2)} (${margin.toStringAsFixed(1)}%)',
+                        'Profit: ${CurrencyHelper.currentSymbol}${profit.toStringAsFixed(2)} (${margin.toStringAsFixed(1)}%)',
                         style: TextStyle(
                           color: profit >= 0 ? AppColors.success : AppColors.danger,
                           fontWeight: FontWeight.w600,
@@ -1916,7 +2026,7 @@ class _AddProductScreenState extends State<AddProductScreen>
         ),
         subtitle: Text(
           'SKU: ${variant.sku.trim().isEmpty ? "Auto" : variant.sku} | '
-          'Price: ₹${variant.price} | Stock: ${variant.stockQuantity}',
+          'Price: ${CurrencyHelper.currentSymbol}${variant.price} | Stock: ${variant.stockQuantity}',
           style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary),
         ),
         trailing: IconButton(
@@ -2205,7 +2315,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                 initialValue: size.price > 0 ? size.price.toString() : '',
                 decoration: InputDecoration(
                   labelText: 'Price',
-                  prefixText: '₹',
+                  prefixText: CurrencyHelper.currentSymbol,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   isDense: true,
                 ),
@@ -2406,6 +2516,16 @@ class _AddProductScreenState extends State<AddProductScreen>
       children: [
         _buildSubSectionTitle('Inventory Details'),
 
+        // Unit of measure + expiry apply to every variant of the product, so
+        // they sit above the per-variant stock fields and stay visible for
+        // variable products too (where the stock inputs are hidden).
+        if (AppConfig.isRetail) ...[
+          _buildUnitOfMeasureSection(),
+          const SizedBox(height: 8),
+          _buildExpirySection(),
+          const SizedBox(height: 16),
+        ],
+
         if (AppConfig.isRetail) ...[
           // Retail Inventory (Simple product only)
           Observer(
@@ -2485,6 +2605,18 @@ class _AddProductScreenState extends State<AddProductScreen>
                       ],
                     ),
                   ],
+                  // Mirrors the restaurant switch below. Only meaningful when
+                  // stock is being tracked at all.
+                  if (_formStore.trackInventory)
+                    SwitchListTile(
+                      title: const Text('Allow Order When Out of Stock'),
+                      subtitle: const Text(
+                          'Sells on at zero stock — the count goes negative'),
+                      value: _formStore.allowOrderWhenOutOfStock,
+                      onChanged: (v) =>
+                          _formStore.setAllowOrderWhenOutOfStock(v),
+                      activeColor: AppColors.warning,
+                    ),
                 ],
               );
             },
@@ -3114,7 +3246,15 @@ class _AddProductScreenState extends State<AddProductScreen>
 
     // Update form store
     _formStore.setSelectedCategoryId(product.category);
-    _formStore.setTaxRate(product.gstRate ?? 0);
+    // setSelectedTaxId re-derives the rate; fall back to the stored gstRate for
+    // products saved before taxId existed (or whose tax record is gone).
+    _formStore.setSelectedTaxId(product.taxId);
+    _formStore.setAllowOrderWhenOutOfStock(product.sellsWhenOutOfStock);
+    if (_formStore.taxRate == 0 && (product.gstRate ?? 0) > 0) {
+      _formStore.setTaxRate(product.gstRate!);
+    }
+    _taxRateController.text =
+        _formStore.taxRate > 0 ? _formStore.taxRate.toString() : '';
     _formStore.setProductType(product.hasVariants ? 'variable' : 'simple');
     // Round-trip the descriptor fields from the product's default variant.
     if (!product.hasVariants) {
@@ -3140,6 +3280,17 @@ class _AddProductScreenState extends State<AddProductScreen>
     // Load variants from the database
     final productStore = locator<ProductStore>();
     final variants = await productStore.getVariantsForProduct(product.productId);
+
+    // Unit / decimal-quantity / expiry are written identically onto every
+    // variant, so the first one is authoritative for the form.
+    if (variants.isNotEmpty) {
+      final first = variants.first;
+      _formStore.setIsDecimalQuantity(first.isDecimalQuantity);
+      if (first.isDecimalQuantity && first.unit != null) {
+        _formStore.setUnit(first.unit);
+      }
+      _formStore.setExpiryDate(first.expiryDateTime);
+    }
 
     if (product.hasVariants && variants.isNotEmpty) {
       // Variable product: Load all variants into the form
@@ -3259,81 +3410,6 @@ class _AddProductScreenState extends State<AddProductScreen>
     );
   }
 
-  /// A single tappable action row inside the product actions dialog.
-  Widget _productActionRow({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) =>
-      InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const SizedBox(width: 14),
-              Text(
-                label,
-                style: GoogleFonts.poppins(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-
-  /// Edit/Delete for a product, behind long-press or the ⋮ button so a
-  /// destructive action can't be hit by a stray tap on the row.
-  Future<void> _showProductActionsDialog(ProductModel product) async {
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AppDialogShell(
-        title: 'Product Actions',
-        subtitle: product.productName,
-        accent: AppColors.primary,
-        icon: Icons.tune_rounded,
-        body: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _productActionRow(
-              icon: Icons.edit,
-              label: 'Edit',
-              color: AppColors.primary,
-              onTap: () {
-                Navigator.pop(dialogContext);
-                _editRetailProduct(product);
-              },
-            ),
-            const Divider(height: 8),
-            _productActionRow(
-              icon: Icons.delete_outline_rounded,
-              label: 'Delete',
-              color: AppColors.danger,
-              onTap: () {
-                Navigator.pop(dialogContext);
-                _confirmDeleteRetailProduct(product);
-              },
-            ),
-          ],
-        ),
-        actions: [appDialogCancelButton(dialogContext, label: 'Close')],
-      ),
-    );
-  }
-
   /// Deleting a product also cascades to all its variants, so confirm first.
   Future<void> _confirmDeleteRetailProduct(ProductModel product) async {
     final confirmed = await showAppConfirmDialog(
@@ -3389,7 +3465,6 @@ class _AddProductScreenState extends State<AddProductScreen>
                           itemBuilder: (context, index) {
                             final product = filteredProducts[index];
                             return ListTile(
-                              onLongPress: () => _showProductActionsDialog(product),
                               leading: _buildProductThumb(product.imagePath),
                               title: Text(
                                 product.productName,
@@ -3398,10 +3473,27 @@ class _AddProductScreenState extends State<AddProductScreen>
                               subtitle: Text(
                                 '${categoryStore.getCategoryById(product.category)?.name ?? product.category} • ${product.hasVariants ? "Variable" : "Simple"}',
                               ),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.more_vert, size: 20),
-                                tooltip: 'Actions',
-                                onPressed: () => _showProductActionsDialog(product),
+                              // Visible edit/delete rather than an overflow
+                              // menu: same as the restaurant item list below and
+                              // retail's category/product/variant rows.
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  RowActionButton(
+                                    icon: Icons.edit_outlined,
+                                    color: AppColors.primary,
+                                    tooltip: 'Edit',
+                                    onTap: () => _editRetailProduct(product),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  RowActionButton(
+                                    icon: Icons.delete_outline_rounded,
+                                    color: AppColors.danger,
+                                    tooltip: 'Delete',
+                                    onTap: () =>
+                                        _confirmDeleteRetailProduct(product),
+                                  ),
+                                ],
                               ),
                             );
                           },
@@ -3486,7 +3578,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                         subtitle: Text(
-                          '₹${item.price ?? "Multiple sizes"} • ${item.isEnabled ? "Active" : "Disabled"}',
+                          '${CurrencyHelper.currentSymbol}${item.price ?? "Multiple sizes"} • ${item.isEnabled ? "Active" : "Disabled"}',
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,

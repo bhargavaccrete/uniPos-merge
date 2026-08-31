@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
 
 
 
@@ -244,7 +245,7 @@ class _TodayByposUserState extends State<TodayByposUser> {
                                   bottomLeft: Radius.circular(10),
                                 ),
                               ),
-                              child: Text('Total Amount(Rs.)',textScaler: TextScaler.linear(1),
+                              child: Text('Total Amount(${CurrencyHelper.currentSymbol})',textScaler: TextScaler.linear(1),
                                   style: GoogleFonts.poppins(fontSize: 14),
                                   textAlign: TextAlign.center))),
                       DataColumn(

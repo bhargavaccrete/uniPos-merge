@@ -350,7 +350,7 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
                 ),
               ),
               Text(
-                '₹${widget.billTotal.toStringAsFixed(2)}',
+                '${CurrencyHelper.currentSymbol}${widget.billTotal.toStringAsFixed(2)}',
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,

@@ -18,7 +18,7 @@ import '../../../../util/restaurant/staticswitch.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../widget/componets/common/app_text_field.dart';
 import '../../../widget/componets/common/app_empty_state.dart';
-import 'WeightItemDialog.dart';
+import 'weight_item_dialog_restaurant.dart';
 import 'item_options_dialog.dart';
 import '../../../../util/common/app_responsive.dart';
 import '../../../../util/common/currency_helper.dart';

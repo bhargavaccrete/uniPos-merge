@@ -15,6 +15,7 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 
 import '../../../core/di/service_locator.dart';
+import '../../../core/config/tariff_code_rule.dart';
 import '../../../core/config/tax_feature.dart';
 import '../../../data/models/common/taxmodel_314.dart';
 import '../../../data/models/retail/hive_model/attribute_model_219.dart';
@@ -389,7 +390,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final bits = <String>[
       if (categoryName.isNotEmpty) categoryName,
       if (product.brandName?.isNotEmpty ?? false) product.brandName!,
-      if (product.hsnCode?.isNotEmpty ?? false) 'HSN ${product.hsnCode}',
+      if (product.hsnCode?.isNotEmpty ?? false)
+        '${TariffCodeRule.shortLabel} ${product.hsnCode}',
       if (product.gstRate != null) 'GST ${product.gstRate}%',
     ];
 

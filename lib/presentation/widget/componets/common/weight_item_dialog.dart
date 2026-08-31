@@ -1,37 +1,92 @@
-
-import 'package:flutter/material.dart';   // Make sure this path is correct
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../../data/models/restaurant/db/cartmodel_308.dart';
-import '../../../../data/models/restaurant/db/itemmodel_302.dart';
-import '../../../../domain/services/restaurant/notification_service.dart';
-import '../../../../util/color.dart';
-import '../../../../util/common/currency_helper.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 
 // Enum to manage which mode is currently active
 enum EditMode { amount, quantity, price }
 
-// The function you will call from your MenuScreen
-Future<CartItem?> showWeightItemDialog(BuildContext context, Items item) async {
-  if (!item.isSoldByWeight) return null;
+/// What the cashier settled on: how much, and what it comes to.
+///
+/// Deliberately model-free — this is what lets both verticals share the dialog.
+/// Restaurant turns it into its `CartItem`; retail passes [quantity] to
+/// `cartStore.addItemToTab(qty:)`.
+class WeightSelection {
+  /// Amount weighed / measured, in the item's own unit.
+  final double quantity;
 
-  return showModalBottomSheet<CartItem>(
+  /// quantity x unit price — what the line comes to.
+  final double amount;
+
+  /// Pre-formatted for display, e.g. "1.75KG" or "250GM".
+  final String display;
+
+  const WeightSelection({
+    required this.quantity,
+    required this.amount,
+    required this.display,
+  });
+}
+
+/// Asks how much of a loose (weighed / measured) item to sell.
+///
+/// SHARED by both verticals: restaurant reaches it for `Items.isSoldByWeight`
+/// (via `showRestaurantWeightItemDialog`), retail for a variant flagged
+/// `isDecimalQuantity`. Callers pass plain values instead of their own model and
+/// build their own cart line from the result, so neither cart model leaks in.
+///
+/// Returns null when dismissed.
+Future<WeightSelection?> showWeightItemDialog(
+  BuildContext context, {
+  required String name,
+  required double unitPrice,
+  required String? unit,
+  double stockQuantity = 0,
+  bool trackInventory = false,
+}) async {
+  return showModalBottomSheet<WeightSelection>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-    builder: (_) => WeightItemDialog(item: item),
+    builder: (_) => WeightItemDialog(
+      name: name,
+      unitPrice: unitPrice,
+      unit: unit,
+      stockQuantity: stockQuantity,
+      trackInventory: trackInventory,
+    ),
   );
 }
 
 // The main widget for the dialog content
 class WeightItemDialog extends StatefulWidget {
-  final Items item;
-  const WeightItemDialog({Key? key, required this.item}) : super(key: key);
+  final String name;
+  final double unitPrice;
+  final String? unit;
+  final double stockQuantity;
+
+  /// Shows the available figure AND refuses more than [stockQuantity].
+  ///
+  /// Both verticals already refuse an oversell in their own cart store, so this
+  /// does not change what can be sold — it reports the problem here, beside the
+  /// numbers, rather than as a toast after the sheet has closed.
+  final bool trackInventory;
+
+  const WeightItemDialog({
+    super.key,
+    required this.name,
+    required this.unitPrice,
+    required this.unit,
+    this.stockQuantity = 0,
+    this.trackInventory = false,
+  });
 
   @override
-  _WeightItemDialogState createState() => _WeightItemDialogState();
+  State<WeightItemDialog> createState() => _WeightItemDialogState();
 }
 
 class _WeightItemDialogState extends State<WeightItemDialog> {
@@ -45,7 +100,7 @@ class _WeightItemDialogState extends State<WeightItemDialog> {
   @override
   void initState() {
     super.initState();
-    _displayAmount = widget.item.price ?? 0.0;
+    _displayAmount = widget.unitPrice;
     _inputController.text = '1';
     _inputController.addListener(_updateCalculations);
   }
@@ -60,7 +115,7 @@ class _WeightItemDialogState extends State<WeightItemDialog> {
   void _updateCalculations() {
     final textValue = _inputController.text;
     final inputValue = double.tryParse(textValue) ?? 0.0;
-    final pricePerUnit = widget.item.price ?? 1.0; // Avoid division by zero
+    final pricePerUnit = widget.unitPrice; // may be 0 — guarded below
 
     setState(() {
       switch (_currentMode) {
@@ -177,7 +232,7 @@ class _WeightItemDialogState extends State<WeightItemDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          widget.item.name,
+                          widget.name,
                           style: GoogleFonts.poppins(
                             fontSize: 20,
                             fontWeight: FontWeight.w700,
@@ -192,27 +247,27 @@ class _WeightItemDialogState extends State<WeightItemDialog> {
                           ),
                         ),
                         // ✅ Show available stock
-                        if (widget.item.trackInventory == true)
+                        if (widget.trackInventory)
                           Container(
                             margin: EdgeInsets.only(top: 4),
                             padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: widget.item.stockQuantity > 0
+                              color: widget.stockQuantity > 0
                                   ? Colors.green.withOpacity(0.1)
                                   : Colors.red.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(6),
                               border: Border.all(
-                                color: widget.item.stockQuantity > 0
+                                color: widget.stockQuantity > 0
                                     ? Colors.green.withOpacity(0.3)
                                     : Colors.red.withOpacity(0.3),
                               ),
                             ),
                             child: Text(
-                              'Available: ${_formatWeightDisplay(widget.item.stockQuantity, widget.item.unit)}',
+                              'Available: ${_formatWeightDisplay(widget.stockQuantity, widget.unit)}',
                               style: GoogleFonts.poppins(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: widget.item.stockQuantity > 0
+                                color: widget.stockQuantity > 0
                                     ? Colors.green.shade700
                                     : Colors.red.shade700,
                               ),
@@ -280,29 +335,28 @@ class _WeightItemDialogState extends State<WeightItemDialog> {
                 onTap: () {
                   if (_displayWeight > 0 && _displayAmount > 0) {
                     // ✅ VALIDATION: Check stock availability for weight-based items
-                    if (widget.item.trackInventory == true) {
-                      final availableStock = widget.item.stockQuantity;
+                    if (widget.trackInventory) {
+                      final availableStock = widget.stockQuantity;
 
                       if (_displayWeight > availableStock) {
                         NotificationService.instance.showError(
                           'Insufficient stock!\n'
-                          'You requested: ${_formatWeightDisplay(_displayWeight, widget.item.unit)}\n'
-                          'Available: ${_formatWeightDisplay(availableStock, widget.item.unit)}'
+                          'You requested: ${_formatWeightDisplay(_displayWeight, widget.unit)}\n'
+                          'Available: ${_formatWeightDisplay(availableStock, widget.unit)}'
                         );
                         return;
                       }
                     }
 
-                    final cartItem = CartItem(
-                      productId: widget.item.id,
-                      id: widget.item.id,
-                      title: widget.item.name,
-                      price: _displayAmount,
-                      quantity: 1,
-                      taxRate: widget.item.taxRate,
-                      weightDisplay: _formatWeightDisplay(_displayWeight, widget.item.unit),
+                    Navigator.pop(
+                      context,
+                      WeightSelection(
+                        quantity: _displayWeight,
+                        amount: _displayAmount,
+                        display: _formatWeightDisplay(
+                            _displayWeight, widget.unit),
+                      ),
                     );
-                    Navigator.pop(context, cartItem);
                   }
                 },
                 child: Container(
@@ -380,9 +434,9 @@ class _WeightItemDialogState extends State<WeightItemDialog> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildDisplayItem(Icons.restaurant_menu, 'Item', widget.item.name),
+          _buildDisplayItem(Icons.restaurant_menu, 'Item', widget.name),
           Container(width: 1, height: 40, color: AppColors.divider),
-          _buildDisplayItem(Icons.scale, 'Weight', _formatWeightDisplay(_displayWeight, widget.item.unit)),
+          _buildDisplayItem(Icons.scale, 'Weight', _formatWeightDisplay(_displayWeight, widget.unit)),
           Container(width: 1, height: 40, color: AppColors.divider),
           _buildDisplayItem(Icons.payments, 'Amount', '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_displayAmount)}'),
         ],

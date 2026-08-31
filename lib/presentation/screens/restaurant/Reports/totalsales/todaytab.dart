@@ -76,7 +76,7 @@ class _TodaytabState extends State<Todaytab> {
       'Customer Name',
       'Payment Method',
       'Order Type',
-      'Total Amount (Rs.)'
+      'Total Amount (${CurrencyHelper.currentSymbol})'
     ];
 
     // Map your order data to rows
@@ -169,7 +169,7 @@ class _TodaytabState extends State<Todaytab> {
                       DataColumn(label: Text('Mobile No')),
                       DataColumn(label: Text('Payment Method')),
                       DataColumn(label: Text('Order Type')),
-                      DataColumn(label: Text('Total (Rs.)')),
+                      DataColumn(label: Text('Total (${CurrencyHelper.currentSymbol})')),
                       DataColumn(label: Text('Details')),
                     ],
                     rows: todaysOrders.map((order) {
