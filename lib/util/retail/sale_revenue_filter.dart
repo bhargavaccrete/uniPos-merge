@@ -33,6 +33,19 @@ class RetailSaleFilter {
   /// returned 8 read as 10 sold at full revenue.
   static int revenueSign(SaleModel sale) => isReturn(sale) ? -1 : 1;
 
+  /// Item count a sale contributes to a period, signed.
+  ///
+  /// `totalItems` is the ONE return-header field stored POSITIVE
+  /// (`return_service.dart:361`) — `subtotal`, `discountAmount`, `taxAmount` and
+  /// `totalAmount` beside it are all negated. So it is the one header field that
+  /// cannot be netted by a plain fold: doing that adds returned units to the
+  /// day's sales instead of removing them.
+  ///
+  /// Quantities are `double` because retail sells loose goods by weight; never
+  /// truncate this to an int.
+  static double signedItemCount(SaleModel sale) =>
+      sale.totalItems * revenueSign(sale);
+
   /// Sales that must not contribute to revenue *at all*, in either direction.
   ///
   /// Nothing qualifies today: retail has no void or cancel state — [SaleStatus]

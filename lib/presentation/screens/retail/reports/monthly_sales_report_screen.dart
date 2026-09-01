@@ -7,6 +7,7 @@ import 'package:billberrylite/presentation/widget/componets/common/report_app_ba
 import 'package:billberrylite/presentation/widget/componets/common/report_date_step_bar.dart';
 import 'package:billberrylite/util/restaurant/report_history_window.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 /// Sales totals for a single month.
 ///
@@ -62,12 +63,23 @@ class _MonthlySalesReportScreenState extends State<MonthlySalesReportScreen> {
   }
 
   Future<void> _pickMonth() async {
+    final first = ReportDateStepBar.pickerFirstDate();
+    // A month may be only PARTLY inside the plan's history window — [_canStepBack]
+    // allows stepping to it as long as its end clears the cutoff — so
+    // `_selectedMonth`, which is that month's first day, can legitimately sit
+    // before `first`. showDatePicker asserts `!initialDate.isBefore(firstDate)`,
+    // so passing it straight through crashed on opening the picker.
+    //
+    // Daily cannot reach this state: a day is wholly inside the window or
+    // wholly outside it, and its own step guard stops above the cutoff.
+    final initial = _selectedMonth.isBefore(first) ? first : _selectedMonth;
+
     // Flutter has no month picker; the day is discarded on selection.
     final picked = await showDatePicker(
       context: context,
-      initialDate: _selectedMonth,
+      initialDate: initial,
       // Clamped to the plan's history window, like every other report picker.
-      firstDate: ReportDateStepBar.pickerFirstDate(),
+      firstDate: first,
       lastDate: DateTime.now(),
       helpText: 'Select any day in the month',
     );
@@ -109,12 +121,14 @@ class _MonthlySalesReportScreenState extends State<MonthlySalesReportScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: reportAppBar(
-        title: 'Monthly Sales',
-        subtitle: DateFormat('MMMM yyyy').format(_selectedMonth),
-      ),
+      // No subtitle: the step bar below already shows the selected month, and
+      // repeating it in the app bar was the same fact twice, 40px apart.
+      appBar: reportAppBar(title: 'Monthly Sales'),
       body: Column(
         children: [
+          // Same rhythm the period bar gets inside ReportPageScaffold, so the
+          // band sits identically on every sales report.
+          AppResponsive.verticalSpace(context, size: SpacingSize.small),
           ReportDateStepBar(
             value: _selectedMonth,
             label: DateFormat('MMMM yyyy').format(_selectedMonth),
@@ -122,6 +136,7 @@ class _MonthlySalesReportScreenState extends State<MonthlySalesReportScreen> {
             onNext: _canStepForward ? () => _step(1) : null,
             onPick: _pickMonth,
           ),
+          AppResponsive.verticalSpace(context, size: SpacingSize.small),
           Expanded(
             child: SalesTotalsReportView(
               isLoading: _isLoading,

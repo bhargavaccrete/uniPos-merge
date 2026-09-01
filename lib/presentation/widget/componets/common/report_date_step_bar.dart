@@ -51,8 +51,9 @@ class ReportDateStepBar extends StatelessWidget {
       color: AppColors.white,
       // Same white band and padding as ReportFilterBar, so a report with this
       // bar and a report with the period bar line up.
-      padding:
-          AppResponsive.horizontalPadding(context).copyWith(top: 12, bottom: 12),
+      padding: AppResponsive.horizontalPadding(
+        context,
+      ).copyWith(top: 12, bottom: 12),
       child: Row(
         children: [
           _StepButton(
@@ -71,7 +72,9 @@ class ReportDateStepBar extends StatelessWidget {
                   onTap: onPick,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -141,12 +144,23 @@ class _StepButton extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(radius),
           onTap: onPressed,
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Icon(
-              icon,
-              size: AppResponsive.iconSize(context),
-              color: enabled ? AppColors.primary : AppColors.divider,
+          // 8px of padding around a 20px icon gave a 36×36 target — under the
+          // 48dp minimum, on the primary navigation control of the Daily and
+          // Monthly reports. The icon keeps its size; only the box it sits in
+          // grows to meet the minimum.
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            child: Center(
+              widthFactor: 1,
+              heightFactor: 1,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Icon(
+                  icon,
+                  size: AppResponsive.iconSize(context),
+                  color: enabled ? AppColors.primary : AppColors.divider,
+                ),
+              ),
             ),
           ),
         ),

@@ -8,6 +8,7 @@ import 'package:billberrylite/presentation/widget/componets/common/money_scope.d
 import 'package:billberrylite/presentation/widget/componets/common/report_summary_card.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_table.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 
 /// Best performers by revenue.
 ///
@@ -30,7 +31,10 @@ class TopSellingProductsReportScreen extends StatelessWidget {
       rowUnit: 'products',
       emptyIcon: Icons.trending_up_rounded,
       emptyTitle: 'No sales',
-      emptyMessage: 'Nothing was sold in this period.',
+      // Not "nothing was sold": a period CAN have sales and still rank nothing,
+      // when every product was returned as much as it sold. Top-Selling
+      // specific — the shared scaffold's behaviour is unchanged.
+      emptyMessage: 'No products had net sales above zero in this period.',
       loader: (start, end) async {
         final rows = await service.getTopSellingProductsReport(
           limit: _limit,
@@ -52,7 +56,8 @@ class TopSellingProductsReportScreen extends StatelessWidget {
           color: AppColors.accent,
         ),
         ReportSummaryCard(
-          title: 'Revenue',
+          // Net of returns, like the three sibling line-level reports.
+          title: 'Net Revenue',
           value: formatMoney(
             rows.fold<double>(0, (s, r) => s + (r['totalRevenue'] as double)),
           ),
@@ -85,7 +90,7 @@ class TopSellingProductsReportScreen extends StatelessWidget {
               ),
             ),
             DataCell(Text(row['productName'] as String)),
-            DataCell(Text('${row['totalQuantity']}')),
+            DataCell(Text(formatQty((row['totalQuantity'] as num).toDouble()))),
             DataCell(Text(formatMoney(row['totalRevenue'] as double))),
           ],
         );
@@ -97,7 +102,7 @@ class TopSellingProductsReportScreen extends StatelessWidget {
               (r) => [
                 r['__rank'],
                 r['productName'],
-                r['totalQuantity'],
+                exportQty((r['totalQuantity'] as num).toDouble()),
                 ReportExportService.formatCurrency(r['totalRevenue'] as double),
               ],
             )

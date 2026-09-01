@@ -22,3 +22,15 @@ String formatQtyWithUnit(double qty, String? unit) {
   final u = (unit ?? '').trim();
   return u.isEmpty ? formatQty(qty) : '${formatQty(qty)} $u';
 }
+
+/// A quantity for an export cell: still a number, but integral when the value
+/// is whole.
+///
+/// The two exporters read the same cell differently — Excel keeps a `num` as a
+/// real numeric cell (`report_export_service.dart:229`), while the PDF calls
+/// `toString()` on it (`:464`). Passing a plain `double` therefore gave a
+/// correct spreadsheet and a PDF reading "3.0"; passing a formatted string
+/// would fix the PDF and turn the spreadsheet column into text that cannot be
+/// summed. Returning an `int` for a whole quantity satisfies both.
+num exportQty(double qty) =>
+    qty == qty.roundToDouble() ? qty.toInt() : qty;

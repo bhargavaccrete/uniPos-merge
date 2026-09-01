@@ -6,6 +6,7 @@ import 'package:billberrylite/presentation/screens/retail/reports/sales_totals_r
 import 'package:billberrylite/presentation/widget/componets/common/report_app_bar.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_date_step_bar.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/restaurant/report_history_window.dart';
 
 /// Sales totals for a single day.
@@ -101,12 +102,14 @@ class _DailySalesReportScreenState extends State<DailySalesReportScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: reportAppBar(
-        title: 'Daily Sales',
-        subtitle: DateFormat('dd MMM yyyy').format(_selectedDate),
-      ),
+      // No subtitle: the step bar below already shows the selected day, and
+      // repeating it in the app bar was the same fact twice, 40px apart.
+      appBar: reportAppBar(title: 'Daily Sales'),
       body: Column(
         children: [
+          // Same rhythm the period bar gets inside ReportPageScaffold, so the
+          // band sits identically on every sales report.
+          AppResponsive.verticalSpace(context, size: SpacingSize.small),
           ReportDateStepBar(
             value: _selectedDate,
             label: DateFormat('EEE, dd MMM yyyy').format(_selectedDate),
@@ -114,6 +117,7 @@ class _DailySalesReportScreenState extends State<DailySalesReportScreen> {
             onNext: _canStepForward ? () => _step(1) : null,
             onPick: _pickDate,
           ),
+          AppResponsive.verticalSpace(context, size: SpacingSize.small),
           Expanded(
             child: SalesTotalsReportView(
               isLoading: _isLoading,

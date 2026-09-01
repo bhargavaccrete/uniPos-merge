@@ -7,6 +7,7 @@ import 'package:billberrylite/presentation/widget/componets/common/money_scope.d
 import 'package:billberrylite/presentation/widget/componets/common/report_summary_card.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_table.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 
 /// Revenue grouped by product category.
 class CategoryWiseSalesReportScreen extends StatelessWidget {
@@ -24,24 +25,30 @@ class CategoryWiseSalesReportScreen extends StatelessWidget {
       rowUnit: 'categories',
       emptyIcon: Icons.category_outlined,
       emptyTitle: 'No sales',
-      emptyMessage: 'Nothing was sold in this period.',
+      emptyMessage: 'No categories had sales in this period.',
       loader: (start, end) =>
           service.getCategoryWiseSalesReport(startDate: start, endDate: end),
       summaryCards: (rows) => [
         ReportSummaryCard(
-          title: 'Revenue',
+          title: 'Net Revenue',
           value: formatMoney(
             rows.fold<double>(0, (s, r) => s + (r['totalRevenue'] as double)),
           ),
-          subtitle: '${rows.length} categories',
+          subtitle: 'after returns, ${rows.length} categories',
           icon: Icons.payments_rounded,
           color: AppColors.success,
         ),
         ReportSummaryCard(
-          title: 'Units Sold',
-          value:
-              '${rows.fold<int>(0, (s, r) => s + (r['totalQuantity'] as int))}',
-          subtitle: 'across all categories',
+          title: 'Net Units',
+          // `totalQuantity` is a DOUBLE — retail sells by weight. Reading it
+          // back `as int` threw on every non-empty period.
+          value: formatQty(
+            rows.fold<double>(
+              0,
+              (s, r) => s + (r['totalQuantity'] as num).toDouble(),
+            ),
+          ),
+          subtitle: 'after returns',
           icon: Icons.inventory_2_rounded,
           color: AppColors.primary,
         ),
@@ -51,14 +58,18 @@ class CategoryWiseSalesReportScreen extends StatelessWidget {
         ReportTable.column(context, 'Products', numeric: true),
         ReportTable.column(context, 'Qty', numeric: true),
         ReportTable.column(context, 'Discount', numeric: true),
+        // 'of which': Revenue already CONTAINS this tax, it is not an addend.
+        // Added so the screen matches the six columns the export already wrote.
+        ReportTable.column(context, 'of which Tax', numeric: true),
         ReportTable.column(context, 'Revenue', numeric: true),
       ],
       rowBuilder: (context, row) => DataRow(
         cells: [
-          DataCell(Text(row['category'] as String)),
+          DataCell(Text(row['category'] as String? ?? 'Uncategorized')),
           DataCell(Text('${row['productCount']}')),
-          DataCell(Text('${row['totalQuantity']}')),
+          DataCell(Text(formatQty((row['totalQuantity'] as num).toDouble()))),
           DataCell(Text(formatMoney(row['totalDiscount'] as double))),
+          DataCell(Text(formatMoney(row['totalTax'] as double))),
           DataCell(Text(formatMoney(row['totalRevenue'] as double))),
         ],
       ),
@@ -68,15 +79,15 @@ class CategoryWiseSalesReportScreen extends StatelessWidget {
           'Products',
           'Qty',
           'Discount',
-          'Tax',
+          'of which Tax',
           'Revenue',
         ],
         rows: rows
             .map(
               (r) => [
-                r['category'],
+                r['category'] ?? 'Uncategorized',
                 r['productCount'],
-                r['totalQuantity'],
+                exportQty((r['totalQuantity'] as num).toDouble()),
                 ReportExportService.formatCurrency(
                   r['totalDiscount'] as double,
                 ),

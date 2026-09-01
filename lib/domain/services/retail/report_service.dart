@@ -11,6 +11,7 @@ import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart'
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
 import 'package:billberrylite/data/repositories/retail/grn_item_repository.dart';
 import 'package:billberrylite/domain/services/retail/inventory_service.dart';
+import 'package:billberrylite/domain/services/retail/sales_totals.dart';
 import 'package:billberrylite/domain/services/retail/stock_adjustment_service.dart';
 import 'package:billberrylite/util/restaurant/report_history_window.dart';
 import 'package:billberrylite/util/retail/sale_revenue_filter.dart';
@@ -64,6 +65,14 @@ class _SaleWindow {
 /// lines and make a reprint disagree with the original receipt. So expect a
 /// drift of up to the round-off per sale between the two families of report.
 /// That gap is the round-off, not a bug — do not "fix" it by redistributing.
+///
+/// **Gross and net are named, never implied.** On the totals reports every key
+/// declares its own basis: bare keys (`totalRevenue`, `totalTax`,
+/// `totalDiscount`) cover forward sales only, `net*` keys include returns. They
+/// used to be mixed — revenue folded over forward sales while tax and discount
+/// folded over both — and were then rendered as consecutive rows that could not
+/// be reconciled. See [RetailSalesTotals], which owns that arithmetic for both
+/// the daily and the monthly report.
 class ReportService {
   /// Inclusive start, **exclusive** end — the single date rule for every report
   /// in this service.
@@ -92,6 +101,41 @@ class ReportService {
     if (start != null && at.isBefore(start)) return false;
     if (end != null && !at.isBefore(end)) return false;
     return true;
+  }
+
+  /// Money lands on paise; quantities keep a digit more than they are ever
+  /// displayed with.
+  ///
+  /// Applied at EMIT time, never per line: rounding each line first would move
+  /// a group's total by up to half a paisa per row. Line figures are already
+  /// 2dp from the billing engine, so this only strips float noise — the reason
+  /// a quantity could surface as `0.30000000000000004`.
+  static double _r2(double v) => double.parse(v.toStringAsFixed(2));
+  static double _r3(double v) => double.parse(v.toStringAsFixed(3));
+
+  /// Deterministic order for a line-level report row: revenue desc, then
+  /// quantity desc, then the group's own id ascending.
+  ///
+  /// Revenue alone is not enough. `List.sort` is NOT stable in Dart, so two rows
+  /// on the same revenue fell in whatever order `getAllSaleItems()` happened to
+  /// return their lines — which meant Top Selling's rank could change between
+  /// two loads of one period, and could even change which product made the cut.
+  /// Quantity, then the id, break the tie on values that do not move.
+  ///
+  /// [idKey] is the report's own grouping key: `productId`, `variantId` or
+  /// `categoryId`. Ordering only — no figure is altered.
+  static int _byRevenueDesc(
+    Map<String, dynamic> a,
+    Map<String, dynamic> b,
+    String idKey,
+  ) {
+    final byRevenue =
+        (b['totalRevenue'] as num).compareTo(a['totalRevenue'] as num);
+    if (byRevenue != 0) return byRevenue;
+    final byQuantity =
+        (b['totalQuantity'] as num).compareTo(a['totalQuantity'] as num);
+    if (byQuantity != 0) return byQuantity;
+    return (a[idKey] as String).compareTo(b[idKey] as String);
   }
 
   /// Never `DateTime.parse` a stored date in a filter.
@@ -231,38 +275,14 @@ class ReportService {
     final endOfDay = startOfDay.add(const Duration(days: 1));
 
     final window = await _salesInWindow(startOfDay, endOfDay);
-    final dailySales = window.forward;
-    final dailyReturns = window.returns;
-
-    final totalSales = dailySales.length;
-    final totalRevenue = dailySales.fold<double>(0.0, (sum, sale) => sum + sale.totalAmount);
-    final totalItems = dailySales.fold<double>(0.0, (sum, sale) => sum + sale.totalItems);
-
-    // Discount and tax net the credit notes out. Return headers are stored
-    // already negated, so folding over forward sales AND returns nets by
-    // itself. Without this the GST figure ignored refunds while `netRevenue`
-    // right below it did not.
-    final totalDiscount =
-        window.all.fold<double>(0.0, (sum, sale) => sum + sale.discountAmount);
-    final totalTax =
-        window.all.fold<double>(0.0, (sum, sale) => sum + sale.taxAmount);
-
-    final totalReturns = dailyReturns.length;
-    final totalReturnAmount = dailyReturns.fold<double>(0.0, (sum, sale) => sum + sale.totalAmount.abs());
 
     return {
       'date': date,
-      'totalSales': totalSales,
-      'totalRevenue': totalRevenue,
-      'totalItems': totalItems,
-      'totalDiscount': totalDiscount,
-      'totalTax': totalTax,
-      'totalReturns': totalReturns,
-      'totalReturnAmount': totalReturnAmount,
-      'netRevenue': totalRevenue - totalReturnAmount,
-      'averageSaleValue': totalSales != 0 ? totalRevenue / totalSales : 0.0,
-      'skippedRows': window.skippedRows,
-      'sales': dailySales,
+      ...RetailSalesTotals.compute(
+        forward: window.forward,
+        returns: window.returns,
+        skippedRows: window.skippedRows,
+      ),
     };
   }
 
@@ -276,25 +296,13 @@ class ReportService {
     final endOfMonth = DateTime(year, month + 1, 1);
 
     final window = await _salesInWindow(startOfMonth, endOfMonth);
-    final monthlySales = window.forward;
-    final monthlyReturns = window.returns;
-
-    final totalSales = monthlySales.length;
-    final totalRevenue = monthlySales.fold<double>(0.0, (sum, sale) => sum + sale.totalAmount);
-    final totalItems = monthlySales.fold<double>(0.0, (sum, sale) => sum + sale.totalItems);
-
-    // Net of credit notes — see the equivalent note on the daily report.
-    final totalDiscount =
-        window.all.fold<double>(0.0, (sum, sale) => sum + sale.discountAmount);
-    final totalTax =
-        window.all.fold<double>(0.0, (sum, sale) => sum + sale.taxAmount);
-
-    final totalReturns = monthlyReturns.length;
-    final totalReturnAmount = monthlyReturns.fold<double>(0.0, (sum, sale) => sum + sale.totalAmount.abs());
 
     // Day-by-day trend, net of returns: a refund pulls its own day down rather
     // than vanishing. Return headers are already negative, so adding them is
     // the netting.
+    //
+    // Nothing renders this yet — it is kept as the ready-made series for a
+    // monthly trend chart, which is the only reason it is still computed.
     final dailyBreakdown = <int, double>{};
     for (var sale in window.all) {
       final saleDate = _reportedAt(sale);
@@ -306,22 +314,41 @@ class ReportService {
     return {
       'year': year,
       'month': month,
-      'totalSales': totalSales,
-      'totalRevenue': totalRevenue,
-      'totalItems': totalItems,
-      'totalDiscount': totalDiscount,
-      'totalTax': totalTax,
-      'totalReturns': totalReturns,
-      'totalReturnAmount': totalReturnAmount,
-      'netRevenue': totalRevenue - totalReturnAmount,
-      'averageSaleValue': totalSales != 0 ? totalRevenue / totalSales : 0.0,
+      // Same builder as the daily report, so the two can never drift apart
+      // again — they were copies of one another, bugs included.
+      ...RetailSalesTotals.compute(
+        forward: window.forward,
+        returns: window.returns,
+        skippedRows: window.skippedRows,
+      ),
       'dailyBreakdown': dailyBreakdown,
-      'skippedRows': window.skippedRows,
-      'sales': monthlySales,
     };
   }
 
   // ==================== Product-wise Sales Report ====================
+
+  /// The line-level contract shared by the product, variant and category
+  /// reports. All three run it; only the grouping key and the row's descriptive
+  /// fields differ.
+  ///
+  /// - **line**      — every `SaleItemModel` whose sale falls in the window
+  /// - **sign**      — `RetailSaleFilter.revenueSign`; return LINES are stored
+  ///                   positive, so the sign is what nets them
+  /// - **quantity**  — `Σ qty × sign`, a double: retail sells by weight
+  /// - **revenue**   — `Σ total × sign`. `total` is `taxable + gst`, so it is
+  ///                   tax-INCLUSIVE and discount-applied, and it EXCLUDES
+  ///                   round-off, which lives only on the sale header. That is
+  ///                   the whole of the gap against Daily/Monthly revenue, and
+  ///                   it must not be allocated down to lines.
+  /// - **discount**  — `Σ discountAmount × sign`; already the line's own share
+  ///                   plus its portion of the bill discount, allocated by the
+  ///                   billing engine. Nothing to re-derive.
+  /// - **tax**       — `Σ taxAmount × sign`; `fromCalculated` writes
+  ///                   `taxAmount = gstAmount` on forward AND return lines, so
+  ///                   refunds net correctly.
+  ///
+  /// Deliberately three functions rather than one for now: the sharing question
+  /// is open until these reports are corrected and covered.
 
   /// Get sales report grouped by products
   Future<List<Map<String, dynamic>>> getProductWiseSalesReport({DateTime? startDate, DateTime? endDate}) async {
@@ -350,12 +377,21 @@ class ReportService {
       productStats[item.productId]!['totalTax'] += (item.taxAmount ?? 0.0) * sign;
     }
 
-    // Convert to list and sort by revenue
-    final statsList = productStats.values.toList()
-      ..sort((a, b) => (b['totalRevenue'] as double).compareTo(a['totalRevenue'] as double));
+    // Rounded here, then sorted, so the order matches the figures shown.
+    final statsList = productStats.values.map(_rounded).toList()
+      ..sort((a, b) => _byRevenueDesc(a, b, 'productId'));
 
     return statsList;
   }
+
+  /// Emit-time rounding for a line-level row. Leaves every other key alone.
+  static Map<String, dynamic> _rounded(Map<String, dynamic> row) => {
+        ...row,
+        'totalQuantity': _r3(row['totalQuantity'] as double),
+        'totalRevenue': _r2(row['totalRevenue'] as double),
+        'totalDiscount': _r2(row['totalDiscount'] as double),
+        'totalTax': _r2(row['totalTax'] as double),
+      };
 
   // ==================== Variant-wise Sales Report ====================
 
@@ -393,9 +429,9 @@ class ReportService {
       variantStats[item.varianteId]!['totalTax'] += (item.taxAmount ?? 0.0) * sign;
     }
 
-    // Convert to list and sort by revenue
-    final statsList = variantStats.values.toList()
-      ..sort((a, b) => (b['totalRevenue'] as double).compareTo(a['totalRevenue'] as double));
+    // Rounded here, then sorted, so the order matches the figures shown.
+    final statsList = variantStats.values.map(_rounded).toList()
+      ..sort((a, b) => _byRevenueDesc(a, b, 'variantId'));
 
     return statsList;
   }
@@ -452,7 +488,7 @@ class ReportService {
 
     // Convert to list and calculate product count
     final statsList = categoryStats.values.map((stat) {
-      return {
+      return _rounded({
         'categoryId': stat['categoryId'],
         'category': stat['category'],
         'totalQuantity': stat['totalQuantity'],
@@ -460,9 +496,9 @@ class ReportService {
         'totalDiscount': stat['totalDiscount'],
         'totalTax': stat['totalTax'],
         'productCount': (stat['productCount'] as Set<String>).length,
-      };
+      });
     }).toList()
-      ..sort((a, b) => (b['totalRevenue'] as double).compareTo(a['totalRevenue'] as double));
+      ..sort((a, b) => _byRevenueDesc(a, b, 'categoryId'));
 
     return statsList;
   }
@@ -781,7 +817,20 @@ class ReportService {
   /// Get top selling products
   Future<List<Map<String, dynamic>>> getTopSellingProductsReport({int limit = 20, DateTime? startDate, DateTime? endDate}) async {
     final productWiseReport = await getProductWiseSalesReport(startDate: startDate, endDate: endDate);
-    return productWiseReport.take(limit).toList();
+    // Eligibility: a product that was returned as much as it sold, or more, has
+    // not sold on balance and is not a top seller.
+    //
+    // Filtered BEFORE `take`: reversing these lets an excluded row consume one
+    // of the N slots, so a "top 20" would come back holding fewer than 20
+    // eligible products. Rows are already rounded here, so a residual fraction
+    // of a paisa correctly reads as zero.
+    //
+    // Top Selling only. Product-wise still reports every product, these
+    // included.
+    return productWiseReport
+        .where((row) => (row['totalRevenue'] as num) > 0)
+        .take(limit)
+        .toList();
   }
 
   // ==================== Profit Report ====================
@@ -987,7 +1036,7 @@ class ReportService {
         // disagree with the period the report claims to cover.
         'date': sale.createdAt,
         'customerId': sale.customerId,
-        'totalItems': sale.totalItems * sign,
+        'totalItems': RetailSaleFilter.signedItemCount(sale),
         'totalRevenue': totalRevenue,
         'totalCost': totalCost,
         'profit': profit,
@@ -1054,7 +1103,7 @@ class ReportService {
       day['totalRevenue'] += saleRevenue;
       day['totalCost'] += saleCost;
       day['totalProfit'] += saleRevenue - saleCost;
-      day['totalItems'] += sale.totalItems * sign;
+      day['totalItems'] += RetailSaleFilter.signedItemCount(sale);
     }
 
     // Calculate profit margin for each day

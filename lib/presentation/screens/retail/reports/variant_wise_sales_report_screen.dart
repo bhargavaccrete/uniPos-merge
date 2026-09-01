@@ -7,6 +7,7 @@ import 'package:billberrylite/presentation/widget/componets/common/money_scope.d
 import 'package:billberrylite/presentation/widget/componets/common/report_summary_card.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_table.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 
 /// Units and revenue per product variant (size / colour / attribute combo).
 class VariantWiseSalesReportScreen extends StatelessWidget {
@@ -29,19 +30,25 @@ class VariantWiseSalesReportScreen extends StatelessWidget {
           service.getVariantWiseSalesReport(startDate: start, endDate: end),
       summaryCards: (rows) => [
         ReportSummaryCard(
-          title: 'Revenue',
+          title: 'Net Revenue',
           value: formatMoney(
             rows.fold<double>(0, (s, r) => s + (r['totalRevenue'] as double)),
           ),
-          subtitle: '${rows.length} variants',
+          subtitle: 'after returns, ${rows.length} variants',
           icon: Icons.payments_rounded,
           color: AppColors.success,
         ),
         ReportSummaryCard(
-          title: 'Units Sold',
-          value:
-              '${rows.fold<int>(0, (s, r) => s + (r['totalQuantity'] as int))}',
-          subtitle: 'across all variants',
+          title: 'Net Units',
+          // `totalQuantity` is a DOUBLE — retail sells by weight. Reading it
+          // back `as int` threw on every non-empty period.
+          value: formatQty(
+            rows.fold<double>(
+              0,
+              (s, r) => s + (r['totalQuantity'] as num).toDouble(),
+            ),
+          ),
+          subtitle: 'after returns',
           icon: Icons.inventory_2_rounded,
           color: AppColors.primary,
         ),
@@ -51,14 +58,18 @@ class VariantWiseSalesReportScreen extends StatelessWidget {
         ReportTable.column(context, 'Variant'),
         ReportTable.column(context, 'Qty', numeric: true),
         ReportTable.column(context, 'Discount', numeric: true),
+        // 'of which': Revenue already CONTAINS this tax, it is not an addend.
+        // Added so the screen matches the six columns the export already wrote.
+        ReportTable.column(context, 'of which Tax', numeric: true),
         ReportTable.column(context, 'Revenue', numeric: true),
       ],
       rowBuilder: (context, row) => DataRow(
         cells: [
-          DataCell(Text(row['productName'] as String)),
-          DataCell(Text(row['variantLabel'] as String)),
-          DataCell(Text('${row['totalQuantity']}')),
+          DataCell(Text(row['productName'] as String? ?? 'Unknown')),
+          DataCell(Text(row['variantLabel'] as String? ?? '')),
+          DataCell(Text(formatQty((row['totalQuantity'] as num).toDouble()))),
           DataCell(Text(formatMoney(row['totalDiscount'] as double))),
+          DataCell(Text(formatMoney(row['totalTax'] as double))),
           DataCell(Text(formatMoney(row['totalRevenue'] as double))),
         ],
       ),
@@ -68,15 +79,15 @@ class VariantWiseSalesReportScreen extends StatelessWidget {
           'Variant',
           'Qty',
           'Discount',
-          'Tax',
+          'of which Tax',
           'Revenue',
         ],
         rows: rows
             .map(
               (r) => [
-                r['productName'],
-                r['variantLabel'],
-                r['totalQuantity'],
+                r['productName'] ?? 'Unknown',
+                r['variantLabel'] ?? '',
+                exportQty((r['totalQuantity'] as num).toDouble()),
                 ReportExportService.formatCurrency(
                   r['totalDiscount'] as double,
                 ),

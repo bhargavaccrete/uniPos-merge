@@ -14,6 +14,7 @@ import 'package:billberrylite/presentation/widget/componets/common/report_table.
 import 'package:billberrylite/presentation/widget/componets/common/report_summary_row.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 
 /// Body shared by the Daily and Monthly sales reports.
 ///
@@ -77,7 +78,15 @@ class _SalesTotalsReportViewState extends State<SalesTotalsReportView> {
   String get periodLabel => widget.periodLabel;
 
   double _amount(String key) => (data![key] as num?)?.toDouble() ?? 0;
+
+  /// Only for genuine integer counts — bills and credit notes. Quantities go
+  /// through [_qty]: they are `double` so loose goods can be sold by weight,
+  /// and `.toInt()` reported a 2.5 kg day as "2".
   int _count(String key) => (data![key] as num?)?.toInt() ?? 0;
+
+  double _qtyValue(String key) => (data![key] as num?)?.toDouble() ?? 0;
+
+  String _qty(String key) => formatQty(_qtyValue(key));
 
   @override
   Widget build(BuildContext context) {
@@ -95,44 +104,54 @@ class _SalesTotalsReportViewState extends State<SalesTotalsReportView> {
     // reachable either way.
     final noActivity = _count('totalSales') == 0 && _count('totalReturns') == 0;
 
+    // Returned BEFORE ReportBody, like the branch above it. Inside a
+    // SingleChildScrollView a `Center` has no bounded height to centre against,
+    // so the empty state sat top-aligned here while every other report centred
+    // it. Handing it straight to the parent's Expanded restores that.
+    if (noActivity) {
+      return const ReportEmptyState(
+        icon: Icons.receipt_long_outlined,
+        title: 'No sales',
+        message: 'Nothing was sold in this period.',
+      );
+    }
+
     return MoneyScope(
       child: ReportBody(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (noActivity)
-              const ReportEmptyState(
-                icon: Icons.receipt_long_outlined,
-                title: 'No sales',
-                message: 'Nothing was sold in this period.',
-              )
-            else ...[
-              ReportSummaryRow(
-                cards: [
-                  ReportSummaryCard(
-                    title: 'Sales',
-                    value: '${_count('totalSales')}',
-                    subtitle: '${_count('totalItems')} items',
-                    icon: Icons.receipt_long_rounded,
-                    color: AppColors.primary,
-                  ),
-                  ReportSummaryCard(
-                    title: 'Net Revenue',
-                    value: formatMoney(_amount('netRevenue')),
-                    subtitle: 'after returns',
-                    icon: Icons.payments_rounded,
-                    color: AppColors.success,
-                  ),
-                ],
-              ),
+            if (_count('skippedRows') > 0) ...[
+              _skippedNotice(context),
               AppResponsive.verticalSpace(context),
-              ReportExportButton(onPressed: () => _export(context)),
-              AppResponsive.verticalSpace(context),
-              _statsCard(),
-              if (widget.items.isNotEmpty) ...[
-                AppResponsive.verticalSpace(context),
-                _itemsSold(context),
+            ],
+            ReportSummaryRow(
+              cards: [
+                ReportSummaryCard(
+                  title: 'Sales',
+                  value: '${_count('totalSales')}',
+                  // Net of returns, so it agrees with the Items Sold table
+                  // below rather than contradicting it.
+                  subtitle: '${_qty('totalItems')} items',
+                  icon: Icons.receipt_long_rounded,
+                  color: AppColors.primary,
+                ),
+                ReportSummaryCard(
+                  title: 'Net Revenue',
+                  value: formatMoney(_amount('netRevenue')),
+                  subtitle: 'after returns',
+                  icon: Icons.payments_rounded,
+                  color: AppColors.success,
+                ),
               ],
+            ),
+            AppResponsive.verticalSpace(context),
+            ReportExportButton(onPressed: () => _export(context)),
+            AppResponsive.verticalSpace(context),
+            _statsCard(),
+            if (widget.items.isNotEmpty) ...[
+              AppResponsive.verticalSpace(context),
+              _itemsSold(context),
             ],
           ],
         ),
@@ -170,24 +189,106 @@ class _SalesTotalsReportViewState extends State<SalesTotalsReportView> {
             ),
           ),
           children: [
-            _row('Gross Revenue', formatMoney(_amount('totalRevenue'))),
-            _row('Items Sold', '${_count('totalItems')}'),
-            _row('Discount', formatMoney(_amount('totalDiscount'))),
+            // ── Gross block ────────────────────────────────────────────
+            // Ends in its own total under a rule, so the sum is visible:
+            // Taxable Value + Tax + Round Off = Gross Revenue. Holds in both
+            // tax modes because Taxable Value is derived as the residual.
+            _blockLabel('Sales (before returns)'),
+            _row('Items Sold', _qty('grossItems')),
+            _row('Discount Given', formatMoney(_amount('totalDiscount'))),
+            _row('Taxable Value', formatMoney(_amount('totalTaxable'))),
             _row('Tax', formatMoney(_amount('totalTax'))),
-            _row('Returns', '${_count('totalReturns')}'),
+            // Only when it moved the total — a zero row on every bill-rounded
+            // store would be noise.
+            if (_amount('totalRoundOff') != 0)
+              _row('Round Off', formatMoney(_amount('totalRoundOff'))),
+            const Divider(height: 20, color: AppColors.divider),
             _row(
-              'Return Amount',
-              formatMoney(_amount('totalReturnAmount')),
-              color: _amount('totalReturnAmount') > 0 ? AppColors.danger : null,
-            ),
-            const Divider(height: 24, color: AppColors.divider),
-            _row(
-              'Net Revenue',
-              formatMoney(_amount('netRevenue')),
+              'Gross Revenue',
+              formatMoney(_amount('totalRevenue')),
               highlighted: true,
             ),
-            _row('Avg Sale Value', formatMoney(_amount('averageSaleValue'))),
+
+            // ── Returns, and the net position they produce ─────────────
+            // Hidden entirely on a day with no refund: Net Revenue would just
+            // repeat Gross Revenue, and Net Tax would repeat Tax.
+            if (hasReturns) ...[
+              AppResponsive.verticalSpace(context),
+              _blockLabel('Returns'),
+              _row('Returns', '${_count('totalReturns')}'),
+              _row('Items Returned', _qty('returnedItems')),
+              _row(
+                'Return Amount',
+                '-${formatMoney(_amount('totalReturnAmount'))}',
+                color: AppColors.danger,
+              ),
+              AppResponsive.verticalSpace(context),
+              _blockLabel('After returns'),
+              const Divider(height: 20, color: AppColors.divider),
+              _row(
+                'Net Revenue',
+                formatMoney(_amount('netRevenue')),
+                highlighted: true,
+                // The second identity, stated rather than left to be inferred.
+                caption: 'Gross Revenue − Return Amount',
+              ),
+              _row('Net Tax', formatMoney(_amount('netTax'))),
+            ],
+
+            // Outside every block: gross revenue over bills rung up. Neither
+            // figure counts returns, so it belongs to neither the gross nor
+            // the net column.
+            AppResponsive.verticalSpace(context),
+            _row('Avg Bill Value', formatMoney(_amount('averageSaleValue'))),
           ],
+        ),
+      ),
+    );
+  }
+
+  bool get hasReturns => _count('totalReturns') > 0;
+
+  /// Sales the window had to drop because their stored date could not be read.
+  ///
+  /// Counted by the service since it was written; nothing rendered it, so the
+  /// loss it exists to expose stayed invisible.
+  Widget _skippedNotice(BuildContext context) {
+    final n = _count('skippedRows');
+
+    return ReportCard(
+      child: Row(
+        children: [
+          Icon(
+            Icons.warning_amber_rounded,
+            size: AppResponsive.iconSize(context),
+            color: AppColors.warning,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '$n ${n == 1 ? 'sale' : 'sales'} skipped — unreadable date. '
+              'Not included in any figure below.',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _blockLabel(String text) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
+      child: Text(
+        text.toUpperCase(),
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.smallFontSize(context) - 1,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.6,
+          color: AppColors.textSecondary,
         ),
       ),
     );
@@ -225,7 +326,7 @@ class _SalesTotalsReportViewState extends State<SalesTotalsReportView> {
             ReportTable.column(context, 'Revenue', numeric: true),
           ],
           rows: pageRows.map((row) {
-            final qty = (row['totalQuantity'] as num).toInt();
+            final qty = (row['totalQuantity'] as num).toDouble();
             final revenue = (row['totalRevenue'] as num).toDouble();
             // Returns net against sales, so a variant returned more than it
             // sold shows negative — flagged in red rather than looking like a
@@ -237,7 +338,7 @@ class _SalesTotalsReportViewState extends State<SalesTotalsReportView> {
                 DataCell(Text(_itemLabel(row))),
                 DataCell(
                   Text(
-                    '$qty',
+                    formatQty(qty),
                     style: isNegative
                         ? const TextStyle(color: AppColors.danger)
                         : null,
@@ -279,21 +380,37 @@ class _SalesTotalsReportViewState extends State<SalesTotalsReportView> {
     String value, {
     bool highlighted = false,
     Color? color,
+    String? caption,
   }) {
     return Padding(
       padding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: AppResponsive.smallFontSize(context),
-              fontWeight: highlighted ? FontWeight.w600 : FontWeight.w400,
-              color: highlighted
-                  ? AppColors.textPrimary
-                  : AppColors.textSecondary,
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  fontWeight: highlighted ? FontWeight.w600 : FontWeight.w400,
+                  color: highlighted
+                      ? AppColors.textPrimary
+                      : AppColors.textSecondary,
+                ),
+              ),
+              if (caption != null)
+                Text(
+                  caption,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context) - 2,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+            ],
           ),
           Text(
             value,
@@ -312,23 +429,42 @@ class _SalesTotalsReportViewState extends State<SalesTotalsReportView> {
     );
   }
 
-  /// The nine headline figures, as a summary block.
+  /// The headline figures, in the order the screen shows them.
+  ///
+  /// Both exporters render `summary` as a flat label/value list with no section
+  /// headings (`report_export_service.dart:106` and `:191`), preserving
+  /// insertion order — so the blocks live in the labels themselves, and the
+  /// conditional rows drop out exactly as they do on screen.
+  ///
+  /// Every value comes from the same `data` map the card reads. Nothing is
+  /// recomputed here, so an export cannot disagree with what was on screen.
   Map<String, dynamic> get _metrics => {
     'Sales': _count('totalSales'),
-    'Items Sold': _count('totalItems'),
+    'Items Sold': _qty('grossItems'),
+    'Discount Given': ReportExportService.formatCurrency(
+      _amount('totalDiscount'),
+    ),
+    'Taxable Value': ReportExportService.formatCurrency(
+      _amount('totalTaxable'),
+    ),
+    'Tax': ReportExportService.formatCurrency(_amount('totalTax')),
+    if (_amount('totalRoundOff') != 0)
+      'Round Off': ReportExportService.formatCurrency(_amount('totalRoundOff')),
     'Gross Revenue': ReportExportService.formatCurrency(
       _amount('totalRevenue'),
     ),
-    'Discount': ReportExportService.formatCurrency(_amount('totalDiscount')),
-    'Tax': ReportExportService.formatCurrency(_amount('totalTax')),
-    'Returns': _count('totalReturns'),
-    'Return Amount': ReportExportService.formatCurrency(
-      _amount('totalReturnAmount'),
-    ),
-    'Net Revenue': ReportExportService.formatCurrency(_amount('netRevenue')),
-    'Avg Sale Value': ReportExportService.formatCurrency(
+    if (hasReturns) ...{
+      'Returns': _count('totalReturns'),
+      'Items Returned': _qty('returnedItems'),
+      'Return Amount':
+          '-${ReportExportService.formatCurrency(_amount('totalReturnAmount'))}',
+      'Net Revenue': ReportExportService.formatCurrency(_amount('netRevenue')),
+      'Net Tax': ReportExportService.formatCurrency(_amount('netTax')),
+    },
+    'Avg Bill Value': ReportExportService.formatCurrency(
       _amount('averageSaleValue'),
     ),
+    if (_count('skippedRows') > 0) 'Skipped Rows': _count('skippedRows'),
   };
 
   Future<void> _export(BuildContext context) async {
@@ -351,7 +487,13 @@ class _SalesTotalsReportViewState extends State<SalesTotalsReportView> {
                 .map(
                   (row) => [
                     _itemLabel(row),
-                    (row['totalQuantity'] as num).toInt(),
+                    // Same helper the four line-level sales reports use, so a
+                    // quantity exports identically from every sales report:
+                    // still a `num`, so Excel keeps a real numeric cell
+                    // (`report_export_service.dart:229`), but integral when the
+                    // value is whole, so the PDF prints "3" rather than "3.0"
+                    // (`:464` stringifies the cell).
+                    exportQty((row['totalQuantity'] as num).toDouble()),
                     ReportExportService.formatCurrency(
                       (row['totalRevenue'] as num).toDouble(),
                     ),
