@@ -35,6 +35,9 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
   DateTime _receivedDate = DateTime.now();
   final TextEditingController _invoiceController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
+  // Owned here because the Scrollbar and the ListView must share one controller
+  // for the thumb to be measurable.
+  final ScrollController _itemsScrollController = ScrollController();
   final List<ReceivingItemData> _receivingItems = [];
   bool _isLoading = true;
 
@@ -42,6 +45,14 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
   void initState() {
     super.initState();
     _loadPOItems();
+  }
+
+  @override
+  void dispose() {
+    _invoiceController.dispose();
+    _notesController.dispose();
+    _itemsScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadPOItems() async {
@@ -142,8 +153,8 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
               return AppDialogShell(
                 title: item.productName,
                 subtitle: item.variantInfo?.isNotEmpty == true
-                    ? '${item.variantInfo} • Ordered ${item.orderedQty}'
-                    : 'Ordered ${item.orderedQty}',
+                    ? '${item.variantInfo} • Ordered ${formatQty(item.orderedQty)}'
+                    : 'Ordered ${formatQty(item.orderedQty)}',
                 accent: AppColors.primary,
                 icon: Icons.inventory_2_outlined,
                 body: Column(
@@ -389,13 +400,13 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
           const SizedBox(height: 8),
           _summaryLine(
             'Accepted (to stock)',
-            '$accepted items',
+            '${formatQty(accepted)} items',
             overDamaged ? AppColors.danger : AppColors.success,
           ),
           if (damaged > 0)
             _summaryLine(
               'Damaged',
-              '$damaged items (${formatMoney(damaged * price)})',
+              '${formatQty(damaged)} items (${formatMoney(damaged * price)})',
               AppColors.danger,
             ),
           _summaryLine(
@@ -576,12 +587,41 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Header facts first: everything typed on the screen that gets
+              // written to the GRN is repeated here, so the last thing seen
+              // before an irreversible save is what will actually be saved.
+              _confirmMetaCard([
+                _metaLine(
+                  'Supplier',
+                  widget.purchaseOrder.supplierName ?? 'Unknown Supplier',
+                ),
+                _metaLine('Received on', _formatDate(_receivedDate)),
+                _metaLine(
+                  'Supplier invoice',
+                  _invoiceController.text.trim().isEmpty
+                      ? 'Not entered'
+                      : _invoiceController.text.trim(),
+                  muted: _invoiceController.text.trim().isEmpty,
+                ),
+                _metaLine(
+                  'Items',
+                  grnItems.length == _receivingItems.length
+                      ? '${grnItems.length} line${grnItems.length == 1 ? '' : 's'}'
+                      : '${grnItems.length} of ${_receivingItems.length} lines '
+                          '• ${_receivingItems.length - grnItems.length} not received at all',
+                ),
+                if (_notesController.text.trim().isNotEmpty)
+                  _metaLine('Notes', _notesController.text.trim()),
+              ]),
+              const SizedBox(height: 16),
               _confirmSection(
                 'Goes into stock',
                 Icons.inventory_2_rounded,
                 AppColors.success,
               ),
-              _buildConfirmItem('$totalAccepted items added to inventory'),
+              _buildConfirmItem(
+                '${formatQty(totalAccepted)} items added to inventory',
+              ),
               _buildConfirmItem(
                 'Stock value ${formatMoney(totalAcceptedAmount)}',
               ),
@@ -609,7 +649,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                   AppColors.danger,
                 ),
                 _buildConfirmItem(
-                  '$totalDamaged damaged, worth ${formatMoney(totalDamagedAmount)}',
+                  '${formatQty(totalDamaged)} damaged, worth ${formatMoney(totalDamagedAmount)}',
                   color: AppColors.danger,
                 ),
                 if (returnToSupplierItems.isNotEmpty)
@@ -637,7 +677,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                   AppColors.warning,
                 ),
                 _buildConfirmItem(
-                  '${totalOrdered - totalReceived} items not received — the order stays open',
+                  '${formatQty(totalOrdered - totalReceived)} items not received — the order stays open',
                   color: AppColors.warning,
                 ),
               ],
@@ -665,7 +705,11 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
             appDialogCancelButton(dialogContext),
             const SizedBox(width: 12),
             appDialogPrimaryButton(
-              label: 'Confirm & Update Stock',
+              // Short label on purpose: the actions row splits the dialog in
+              // half, and the old "Confirm & Update Stock" wrapped to three
+              // cramped lines on a phone. What it updates is spelled out in
+              // the body above.
+              label: 'Confirm',
               onPressed: () => Navigator.pop(dialogContext, true),
             ),
           ],
@@ -727,9 +771,9 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
     if (mounted) {
       Navigator.pop(context, true);
 
-      String message = 'Added $totalAccepted items to stock';
+      String message = 'Added ${formatQty(totalAccepted)} items to stock';
       if (totalDamaged > 0) {
-        message += ' ($totalDamaged damaged)';
+        message += ' (${formatQty(totalDamaged)} damaged)';
       }
       if (!damagedOutcome.isEmpty) {
         message += ' • ${damagedOutcome.summary}';
@@ -737,6 +781,57 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
 
       NotificationService.instance.showSuccess(message);
     }
+  }
+
+  /// Grey card at the top of the confirmation dialog holding the header facts
+  /// (supplier, date, invoice, line count, notes) — the fields typed on the
+  /// screen that are about to be written to the GRN.
+  Widget _confirmMetaCard(List<Widget> lines) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMedium,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: lines,
+      ),
+    );
+  }
+
+  Widget _metaLine(String label, String value, {bool muted = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 108,
+            child: Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                fontWeight: muted ? FontWeight.w400 : FontWeight.w600,
+                fontStyle: muted ? FontStyle.italic : FontStyle.normal,
+                color: muted ? AppColors.textSecondary : AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Heading above a group of confirmation lines.
@@ -1053,28 +1148,28 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                             Expanded(
                               child: _buildSummaryItem(
                                 'Ordered',
-                                totalOrdered.toString(),
+                                formatQty(totalOrdered),
                                 AppColors.textSecondary,
                               ),
                             ),
                             Expanded(
                               child: _buildSummaryItem(
                                 'Received',
-                                totalReceived.toString(),
+                                formatQty(totalReceived),
                                 AppColors.success,
                               ),
                             ),
                             Expanded(
                               child: _buildSummaryItem(
                                 'To Stock',
-                                totalAccepted.toString(),
+                                formatQty(totalAccepted),
                                 AppColors.info,
                               ),
                             ),
                             Expanded(
                               child: _buildSummaryItem(
                                 'Damaged',
-                                totalDamaged.toString(),
+                                formatQty(totalDamaged),
                                 totalDamaged > 0
                                     ? AppColors.danger
                                     : AppColors.textSecondary,
@@ -1107,10 +1202,10 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                                 Expanded(
                                   child: Text(
                                     totalDamaged > 0 && shortage > 0
-                                        ? '$totalDamaged damaged, $shortage not received'
+                                        ? '${formatQty(totalDamaged)} damaged, ${formatQty(shortage)} not received'
                                         : totalDamaged > 0
-                                        ? '$totalDamaged items damaged'
-                                        : '$shortage items not received',
+                                        ? '${formatQty(totalDamaged)} items damaged'
+                                        : '${formatQty(shortage)} items not received',
                                     style: TextStyle(
                                       fontSize: AppResponsive.smallFontSize(
                                         context,
@@ -1192,18 +1287,30 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                   ),
                 ),
 
-                // Items List
+                // Items List — always-visible scrollbar so a long PO reads as
+                // scrollable at a glance (the list is squeezed between the
+                // summary and the notes/action block, so a cut-off card is the
+                // only other hint there is more below).
                 Expanded(
                   child: _capped(
                     context,
-                    ListView.builder(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: AppResponsive.padding(context).left,
+                    Scrollbar(
+                      controller: _itemsScrollController,
+                      thumbVisibility: true,
+                      thickness: 5,
+                      radius: const Radius.circular(3),
+                      child: ListView.builder(
+                        controller: _itemsScrollController,
+                        padding: EdgeInsets.only(
+                          left: AppResponsive.padding(context).left,
+                          // Extra right inset keeps the thumb off the cards.
+                          right: AppResponsive.padding(context).left + 6,
+                        ),
+                        itemCount: _receivingItems.length,
+                        itemBuilder: (context, index) {
+                          return _buildReceivingItemCard(index);
+                        },
                       ),
-                      itemCount: _receivingItems.length,
-                      itemBuilder: (context, index) {
-                        return _buildReceivingItemCard(index);
-                      },
                     ),
                   ),
                 ),
@@ -1243,8 +1350,12 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
+                          elevation: 0,
                           padding: EdgeInsets.symmetric(
                             vertical: AppResponsive.largeSpacing(context),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
                           ),
                           textStyle: TextStyle(
                             fontSize: AppResponsive.subheadingFontSize(context),
@@ -1391,7 +1502,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                     children: [
                       if (isShortage)
                         Text(
-                          'Shortage: ${item.orderedQty - item.receivedQty}',
+                          'Shortage: ${formatQty(item.orderedQty - item.receivedQty)}',
                           style: TextStyle(
                             fontSize: AppResponsive.smallFontSize(context),
                             color: AppColors.warning,

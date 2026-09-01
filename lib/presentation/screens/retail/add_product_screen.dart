@@ -116,14 +116,31 @@ class VariantFormData {
   /// controllers so a shop can use Flavour, Volume, Capacity instead.
   final Map<String, TextEditingController> fieldControllers = {};
 
-  VariantFormData({required this.id})
+  /// [onFilledChanged] fires whenever one of the fields that decides "is this
+  /// row filled in" changes, so the variant count in the header and on the save
+  /// button can stay truthful as the user types. Deliberately only the six
+  /// fields `_isVariantRowFilled` inspects — the descriptor fields never make a
+  /// row saveable on their own.
+  VariantFormData({required this.id, VoidCallback? onFilledChanged})
     : barcodeController = TextEditingController(),
       costPriceController = TextEditingController(),
       priceController = TextEditingController(),
       mrpController = TextEditingController(),
       stockController = TextEditingController(),
       skuController = TextEditingController(),
-      customAttributes = [];
+      customAttributes = [] {
+    if (onFilledChanged == null) return;
+    for (final controller in [
+      barcodeController,
+      costPriceController,
+      priceController,
+      mrpController,
+      stockController,
+      skuController,
+    ]) {
+      controller.addListener(onFilledChanged);
+    }
+  }
 
   /// Controller for a configured field, created on first use.
   TextEditingController fieldController(String attributeId) =>
@@ -442,7 +459,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
   void _addVariant() {
     setState(() {
       _variants.add(
-        VariantFormData(id: DateTime.now().millisecondsSinceEpoch.toString()),
+        VariantFormData(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          onFilledChanged: _onVariantRowFilledChanged,
+        ),
       );
     });
   }
@@ -451,6 +471,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     setState(() {
       _variants[index].dispose();
       _variants.removeAt(index);
+      _filledManualCount = _filledManualVariants.length;
     });
   }
 
@@ -595,12 +616,53 @@ class _AddProductScreenState extends State<AddProductScreen> {
       variant.barcodeController.text.trim().isNotEmpty ||
       variant.skuController.text.trim().isNotEmpty;
 
+  /// The manual rows that will actually be written.
+  ///
+  /// `_variants` always carries at least one row, and an untouched one is
+  /// dropped on save — so counting the raw list told the user "13 variants"
+  /// while creating 12. One definition, shared by the section header, the save
+  /// button and the save itself, so the three can never disagree again.
+  List<VariantFormData> get _filledManualVariants =>
+      _variants.where(_isVariantRowFilled).toList();
+
+  /// How many variants this form will create, manual + generated.
+  int get _effectiveVariantCount =>
+      _filledManualVariants.length + _generatedVariants.length;
+
+  /// Whether to show the manual rows and their "Add variant" button.
+  ///
+  /// They step aside while the Bulk add panel is open: the two paths were
+  /// competing for the same screen, with an empty "Variant 1" sitting directly
+  /// above the generator and no way to tell which one was in charge.
+  bool get _showManualVariants =>
+      !_showAttributeGenerator || !_manualHiddenByBulk;
+
+  /// Snapshotted when the Bulk add panel is OPENED, not recomputed each build.
+  ///
+  /// Two reasons. Rows the user has already filled in must stay visible — they
+  /// will be saved, and hiding data that still gets written is worse than the
+  /// clutter. And deciding once means the section cannot appear or vanish under
+  /// the user's fingers as they clear a field mid-edit.
+  bool _manualHiddenByBulk = false;
+
+  /// Rebuild when a row crosses the empty↔filled line, so the variant count
+  /// stays truthful. Guarded on the count actually changing, so ordinary typing
+  /// inside an already-filled row costs nothing.
+  int _filledManualCount = 0;
+
+  void _onVariantRowFilledChanged() {
+    if (!mounted) return;
+    final filled = _filledManualVariants.length;
+    if (filled == _filledManualCount) return;
+    setState(() => _filledManualCount = filled);
+  }
+
   Future<void> _saveProduct() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    final manualVariants = _variants.where(_isVariantRowFilled).toList();
+    final manualVariants = _filledManualVariants;
 
     if (manualVariants.isEmpty && _generatedVariants.isEmpty) {
       NotificationService.instance.showError(
@@ -1025,7 +1087,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   // both. The POS already decides how to behave by counting
                   // them (posscreen: variants.length == 1 → straight to cart).
                   _buildSectionHeader(
-                    'Variants (${_variants.length + _generatedVariants.length})',
+                    'Variants ($_effectiveVariantCount)',
                     trailing: IconButton(
                       icon: const Icon(
                         Icons.tune,
@@ -1039,41 +1101,67 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Manually entered variants.
-                  ..._variants.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final variant = entry.value;
-                    return _buildVariantCard(variant, index);
-                  }),
+                  // Manually entered variants — hidden while Bulk add is open
+                  // unless one is filled in. See [_showManualVariants].
+                  if (_showManualVariants) ...[
+                    ..._variants.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final variant = entry.value;
+                      return _buildVariantCard(variant, index);
+                    }),
 
-                  // Bundle/repack products can have multiple variants too
-                  // (e.g. a "Combo Meal" in Small/Medium/Large) — "Add
-                  // variant" and bulk-generate work exactly like a standard
-                  // product; each variant gets its own component list below.
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _addVariant,
-                      icon: const Icon(
-                        Icons.add,
-                        size: 18,
-                        color: AppColors.primary,
-                      ),
-                      label: Text(
-                        'Add variant',
-                        style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                        side: const BorderSide(color: AppColors.primary),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                    // Bundle/repack products can have multiple variants too
+                    // (e.g. a "Combo Meal" in Small/Medium/Large) — "Add
+                    // variant" and bulk-generate work exactly like a standard
+                    // product; each variant gets its own component list below.
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _addVariant,
+                        icon: const Icon(
+                          Icons.add,
+                          size: 18,
+                          color: AppColors.primary,
+                        ),
+                        label: Text(
+                          'Add variant',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: const BorderSide(color: AppColors.primary),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                  ] else
+                    // Hiding the manual path must not lose it. Closing Bulk add
+                    // brings the rows straight back — nothing typed is
+                    // discarded, the controllers stay alive either way.
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () => setState(
+                          () => _showAttributeGenerator = false,
+                        ),
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: Text(
+                          'Type variants in manually instead',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                        ),
+                      ),
+                    ),
 
                   // ── Bulk add: many variants at once, from attributes ─────
                   const SizedBox(height: 16),
@@ -1115,7 +1203,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     child: Text(
                       _isEditing
                           ? 'Save Changes'
-                          : 'Add Product with ${_variants.length + _generatedVariants.length} Variant(s)',
+                          : 'Add Product with $_effectiveVariantCount Variant(s)',
                       style: GoogleFonts.poppins(
                         fontSize: AppResponsive.subheadingFontSize(context),
                         fontWeight: FontWeight.w600,
@@ -1161,9 +1249,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
         children: [
           InkWell(
             borderRadius: BorderRadius.circular(12),
-            onTap: () => setState(
-              () => _showAttributeGenerator = !_showAttributeGenerator,
-            ),
+            onTap: () => setState(() {
+              _showAttributeGenerator = !_showAttributeGenerator;
+              // Decide ONCE, on open, whether the manual rows step aside —
+              // see [_manualHiddenByBulk].
+              if (_showAttributeGenerator) {
+                _manualHiddenByBulk = _filledManualVariants.isEmpty;
+              }
+            }),
             child: Padding(
               padding: const EdgeInsets.all(14),
               child: Row(
@@ -1321,7 +1414,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
               Expanded(
                 child: _buildTextField(
                   controller: variant.costPriceController,
-                  label: 'Cost Price*',
+                  // No asterisk: _saveProduct validates selling price and stock
+                  // only — cost is bookkeeping and has always been optional.
+                  // The marker claimed otherwise for every product ever added.
+                  label: 'Cost Price',
                   hint: '0.00',
                   keyboardType: TextInputType.number,
                   inputFormatters: _moneyFormatters,

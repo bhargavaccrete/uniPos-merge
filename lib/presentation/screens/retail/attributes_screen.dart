@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/data/models/retail/hive_model/attribute_model_219.dart';
 import 'package:billberrylite/data/models/retail/hive_model/attribute_value_model_220.dart';
 import 'package:billberrylite/domain/services/common/notification_service.dart';
+import 'package:billberrylite/domain/services/retail/store_type_attribute_defaults_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -36,7 +37,20 @@ class _AttributesScreenState extends State<AttributesScreen> {
   @override
   void initState() {
     super.initState();
-    _attributeStore.loadAttributes();
+    _init();
+  }
+
+  /// Seed before loading, so a shop that finished the wizard and came straight
+  /// here sees its store type's default attributes instead of an empty list —
+  /// previously they only appeared once a product form had been opened.
+  ///
+  /// A no-op after the first run (a SharedPreferences read), and a no-op
+  /// entirely for `other` or a business with no store type. It never
+  /// resurrects an attribute deleted from this very screen.
+  Future<void> _init() async {
+    await StoreTypeAttributeDefaultsService().ensureStoreTypeDefaults();
+    if (!mounted) return;
+    await _attributeStore.loadAttributes();
   }
 
   @override

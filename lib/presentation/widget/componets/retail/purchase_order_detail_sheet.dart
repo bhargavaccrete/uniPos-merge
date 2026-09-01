@@ -75,17 +75,57 @@ String cleanRetailSupplierPhone(String phone) {
   return phone.replaceAll(RegExp(r'[^0-9]'), '');
 }
 
+/// One PO line as "Name (Variant)".
+///
+/// Reads the line's denormalized [PurchaseOrderItemModel.productName] and
+/// `variantInfo` instead of looking the product up, so a PO still reads
+/// correctly after a product is renamed or deleted.
+String _poLineLabel(PurchaseOrderItemModel item) {
+  final variantInfo = item.variantInfo;
+  final variantStr = (variantInfo == null || variantInfo.isEmpty)
+      ? ''
+      : ' ($variantInfo)';
+  return '${item.productName ?? 'Unknown Product'}$variantStr';
+}
+
 /// Supplier-facing text for a purchase order.
 ///
-/// Reads each line's denormalized [PurchaseOrderItemModel.productName] and
-/// `variantInfo` instead of looking products up, so a PO still reads correctly
-/// after a product is renamed or deleted. [unitsByVariantId] is resolved by the
-/// caller because the unit lives on the variant, not on the PO line.
+/// The wording follows the order's status, because the same button is on the
+/// sheet from "sent" all the way to "completed" and one text cannot serve all
+/// three: asking a supplier to deliver goods they already delivered reads as a
+/// duplicate order. [receipts] (keyed by `poItemId`, from
+/// `purchaseOrderStore.getPOItemReceipts`) is what makes the received/pending
+/// split possible; without it every line is treated as still outstanding.
+///
+/// [unitsByVariantId] is resolved by the caller because the unit lives on the
+/// variant, not on the PO line.
 String buildRetailWhatsAppPOMessage({
   required PurchaseOrderModel po,
   required List<PurchaseOrderItemModel> items,
   Map<String, String> unitsByVariantId = const {},
+  Map<String, POItemReceipt> receipts = const {},
 }) {
+  String unitOf(PurchaseOrderItemModel item) =>
+      unitsByVariantId[item.variantId] ?? '';
+
+  switch (po.statusEnum) {
+    case POStatus.fullyCompleted:
+      return _completedPOMessage(po, items, unitOf, receipts);
+    case POStatus.partiallyCompleted:
+      return _partialPOMessage(po, items, unitOf, receipts);
+    case POStatus.draft:
+    case POStatus.sent:
+    case POStatus.cancelled:
+      return _openPOMessage(po, items, unitOf);
+  }
+}
+
+/// Nothing received yet — the original "please supply this" order.
+String _openPOMessage(
+  PurchaseOrderModel po,
+  List<PurchaseOrderItemModel> items,
+  String Function(PurchaseOrderItemModel) unitOf,
+) {
   final buffer = StringBuffer();
   buffer.writeln('Purchase Order: ${po.poNumber}');
   buffer.writeln('Supplier: ${po.supplierName ?? 'Unknown'}');
@@ -96,15 +136,9 @@ String buildRetailWhatsAppPOMessage({
   buffer.writeln();
   buffer.writeln('Items:');
   for (final item in items) {
-    final unit = unitsByVariantId[item.variantId] ?? '';
-    final unitStr = unit.isEmpty ? '' : ' $unit';
-    final variantInfo = item.variantInfo;
-    final variantStr = (variantInfo == null || variantInfo.isEmpty)
-        ? ''
-        : ' ($variantInfo)';
     buffer.writeln(
-      '- ${item.productName ?? 'Unknown Product'}$variantStr'
-      ' — Qty: ${formatQty(item.orderedQty)}$unitStr',
+      '- ${_poLineLabel(item)}'
+      ' — Qty: ${formatQtyWithUnit(item.orderedQty, unitOf(item))}',
     );
   }
   if (po.estimatedTotal > 0) {
@@ -115,11 +149,100 @@ String buildRetailWhatsAppPOMessage({
   return buffer.toString().trim();
 }
 
+/// Part-delivered — a follow-up on what is still owed, with what already
+/// arrived acknowledged so the supplier can reconcile against their own record.
+String _partialPOMessage(
+  PurchaseOrderModel po,
+  List<PurchaseOrderItemModel> items,
+  String Function(PurchaseOrderItemModel) unitOf,
+  Map<String, POItemReceipt> receipts,
+) {
+  final buffer = StringBuffer();
+  buffer.writeln('Purchase Order: ${po.poNumber}');
+  buffer.writeln('Supplier: ${po.supplierName ?? 'Unknown'}');
+  buffer.writeln('Status: Partially received');
+  buffer.writeln('Expected Delivery: ${poFormatDate(po.expectedDeliveryDate)}');
+  buffer.writeln();
+
+  final pending = <String>[];
+  final received = <String>[];
+  for (final item in items) {
+    final receipt = receipts[item.poItemId];
+    // No receipt row means nothing was confirmed against the line, so the whole
+    // ordered quantity is still outstanding.
+    final got = receipt?.received ?? 0;
+    final left = receipt?.remaining ?? item.orderedQty;
+    if (left > 0) {
+      pending.add(
+        '- ${_poLineLabel(item)} — Pending:'
+        ' ${formatQtyWithUnit(left, unitOf(item))}'
+        ' (of ${formatQty(item.orderedQty)})',
+      );
+    }
+    if (got > 0) {
+      received.add(
+        '- ${_poLineLabel(item)} — ${formatQtyWithUnit(got, unitOf(item))}',
+      );
+    }
+  }
+
+  if (pending.isNotEmpty) {
+    buffer.writeln('Still pending:');
+    pending.forEach(buffer.writeln);
+    buffer.writeln();
+  }
+  if (received.isNotEmpty) {
+    buffer.writeln('Already received:');
+    received.forEach(buffer.writeln);
+    buffer.writeln();
+  }
+
+  buffer.writeln(
+    'Please confirm when the pending items will be delivered. Thank you.',
+  );
+
+  return buffer.toString().trim();
+}
+
+/// Everything delivered — an acknowledgement, not a request. Quantities are
+/// what the supplier DELIVERED (received), not what passed inspection: damaged
+/// units are settled through their own return or claim document.
+String _completedPOMessage(
+  PurchaseOrderModel po,
+  List<PurchaseOrderItemModel> items,
+  String Function(PurchaseOrderItemModel) unitOf,
+  Map<String, POItemReceipt> receipts,
+) {
+  final buffer = StringBuffer();
+  buffer.writeln('Purchase Order: ${po.poNumber}');
+  buffer.writeln('Supplier: ${po.supplierName ?? 'Unknown'}');
+  buffer.writeln('Status: Fully received');
+  buffer.writeln();
+  buffer.writeln('Received items:');
+  for (final item in items) {
+    final got = receipts[item.poItemId]?.received ?? item.orderedQty;
+    buffer.writeln(
+      '- ${_poLineLabel(item)} — ${formatQtyWithUnit(got, unitOf(item))}',
+    );
+  }
+  if (po.estimatedTotal > 0) {
+    buffer.writeln();
+    buffer.writeln('Order Value: ${formatMoney(po.estimatedTotal)}');
+  }
+  buffer.writeln();
+  buffer.writeln(
+    'This order is now complete. Thank you for the delivery.',
+  );
+
+  return buffer.toString().trim();
+}
+
 /// Opens WhatsApp with the purchase order prefilled for [phone].
 Future<void> shareRetailPOToWhatsApp({
   required PurchaseOrderModel po,
   required List<PurchaseOrderItemModel> items,
   required String phone,
+  Map<String, POItemReceipt> receipts = const {},
 }) async {
   final cleanPhone = cleanRetailSupplierPhone(phone);
   if (cleanPhone.isEmpty) {
@@ -143,6 +266,7 @@ Future<void> shareRetailPOToWhatsApp({
     po: po,
     items: items,
     unitsByVariantId: units,
+    receipts: receipts,
   );
   final uri = Uri.parse(
     'https://wa.me/$cleanPhone?text=${Uri.encodeComponent(message)}',
@@ -304,7 +428,22 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
       po: po,
       items: purchaseOrderStore.currentPOItems.toList(),
       phone: phone,
+      receipts: receipts,
     );
+  }
+
+  /// What the share button says, matched to what the message will actually be.
+  String get _shareLabel {
+    switch (po.statusEnum) {
+      case POStatus.partiallyCompleted:
+        return 'Follow Up';
+      case POStatus.fullyCompleted:
+        return 'Confirm Delivery';
+      case POStatus.draft:
+      case POStatus.sent:
+      case POStatus.cancelled:
+        return 'WhatsApp PO';
+    }
   }
 
   /// Ordered / Received / Accepted / Damaged / Remaining for one PO line.
@@ -704,8 +843,8 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                               Icons.share_rounded,
                               size: AppResponsive.smallIconSize(context),
                             ),
-                            label: const Text(
-                              'WhatsApp PO',
+                            label: Text(
+                              _shareLabel,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),

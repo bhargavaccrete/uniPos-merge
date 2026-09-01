@@ -49,7 +49,7 @@ class RetailStoreTypes {
     name: 'Garment Store',
     description: 'Clothing and apparel',
     iconName: 'apparel',
-    defaultAttributeNames: ['Size', 'Color'],
+    defaultAttributeNames: ['Size', 'Color', 'Material', 'Pattern'],
   );
 
   static const RetailStoreType footwear = RetailStoreType(
@@ -57,7 +57,7 @@ class RetailStoreTypes {
     name: 'Footwear Store',
     description: 'Shoes, sandals and slippers',
     iconName: 'footwear',
-    defaultAttributeNames: ['Size', 'Color'],
+    defaultAttributeNames: ['Size', 'Color', 'Material', 'Sole Type'],
   );
 
   static const RetailStoreType sports = RetailStoreType(
@@ -65,7 +65,7 @@ class RetailStoreTypes {
     name: 'Sports Store',
     description: 'Sportswear, equipment and accessories',
     iconName: 'sports',
-    defaultAttributeNames: ['Size', 'Color'],
+    defaultAttributeNames: ['Size', 'Color', 'Material', 'Sport Type'],
   );
 
   static const RetailStoreType cosmeticsBeauty = RetailStoreType(
@@ -73,7 +73,7 @@ class RetailStoreTypes {
     name: 'Cosmetics & Beauty Store',
     description: 'Makeup, skincare and personal care',
     iconName: 'cosmetics',
-    defaultAttributeNames: ['Shade', 'Volume'],
+    defaultAttributeNames: ['Shade', 'Color', 'Skin Type', 'Finish', 'Volume'],
   );
 
   static const RetailStoreType stationery = RetailStoreType(
@@ -81,7 +81,7 @@ class RetailStoreTypes {
     name: 'Stationery Store',
     description: 'Books, office and school supplies',
     iconName: 'stationery',
-    defaultAttributeNames: ['Pack Size'],
+    defaultAttributeNames: ['Color', 'Size', 'Paper Type', 'GSM', 'Binding Type'],
   );
 
   static const RetailStoreType giftGeneral = RetailStoreType(
@@ -89,9 +89,7 @@ class RetailStoreTypes {
     name: 'Gift & General Store',
     description: 'Gifts, novelty and general merchandise',
     iconName: 'gift',
-    // Deliberately none — general merchandise is mostly
-    // single-variant, so an empty descriptor set is the honest default.
-    defaultAttributeNames: [],
+    defaultAttributeNames: ['Color', 'Size', 'Material', 'Pattern'],
   );
 
   static const RetailStoreType other = RetailStoreType(
@@ -139,10 +137,14 @@ class RetailStoreTypes {
   /// Default attribute names for a persisted key.
   ///
   /// Returns null — not an empty list — when the key is absent or unknown, so
-  /// a caller can tell "this business has no store type, use the app-wide
-  /// fallback" apart from "this store type genuinely wants no attributes"
-  /// (Gift & General, Other). Both of those return `[]`, and returning `null`
-  /// for them instead would silently seed the fallback set onto every product.
+  /// a caller can tell "this business has no store type" apart from "this store
+  /// type genuinely wants no attributes" (Other). Returning `null` for Other
+  /// instead would silently seed the fallback set onto every product.
+  ///
+  /// The two cases are handled very differently by
+  /// `StoreTypeAttributeDefaultsService.ensureStoreTypeDefaults`: `[]` means
+  /// "seed nothing, deliberately", while `null` means "this feature does not
+  /// apply — leave the legacy fallback alone".
   static List<String>? defaultAttributeNamesFor(String? key) =>
       byKey(key)?.defaultAttributeNames;
 }

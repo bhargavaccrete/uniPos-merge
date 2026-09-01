@@ -6,6 +6,7 @@ import '../../../core/constants/retail_store_types.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/retail/hive_model/attribute_model_219.dart';
 import '../../store/retail/attribute_store.dart';
+import 'store_type_attribute_defaults_service.dart';
 
 /// Which descriptor fields appear on a **Simple** product's variant card.
 ///
@@ -26,6 +27,9 @@ import '../../store/retail/attribute_store.dart';
 /// branches on store type.
 class SimpleProductFieldsService {
   static const String _key = 'simple_product_fields';
+
+  final StoreTypeAttributeDefaultsService _storeTypeDefaults =
+      StoreTypeAttributeDefaultsService();
 
   /// Configured attribute ids, in display order.
   ///
@@ -54,18 +58,28 @@ class SimpleProductFieldsService {
     return prefs.setString(_key, jsonEncode(attributeIds));
   }
 
-  /// Forget the configuration entirely, so the base fields are seeded again.
+  /// Forget the configuration entirely, so the default fields are seeded again.
+  ///
+  /// Also clears the store-type seed marker, so an explicit Reset genuinely
+  /// restores defaults the merchant had deleted. This is the ONLY path that
+  /// re-seeds, and it is user-initiated — no silent path may clear that marker.
   Future<bool> resetToDefaults() async {
+    await _storeTypeDefaults.clearSeedMarker();
     final prefs = await SharedPreferences.getInstance();
     return prefs.remove(_key);
   }
 
-  /// Attribute names this business STARTS with, from its retail store type.
+  /// Which descriptor fields a simple product RENDERS by default.
   ///
   /// Falls back to [kBaseAttributeNames] when there is no store type on record
   /// — an older retail install, or a restaurant — so behaviour for existing
-  /// data is unchanged. A store type that genuinely wants none (Gift & General)
+  /// data is unchanged. A store type that genuinely wants none (`other`)
   /// correctly returns an empty list rather than falling back.
+  ///
+  /// **Not the seeding decision.** Which attributes get CREATED is
+  /// [StoreTypeAttributeDefaultsService.ensureStoreTypeDefaults]'s call, and it
+  /// never uses this fallback. This method only answers "which boxes does the
+  /// form show", and also names the defaults in the Reset confirm message.
   ///
   /// Never throws: this sits on the product-form hot path, so an unreadable
   /// business record degrades to the fallback instead of breaking product
@@ -87,13 +101,35 @@ class SimpleProductFieldsService {
   /// Simple Product Fields screen's initial load and Reset action — so all
   /// three can never disagree.
   Future<List<AttributeModel>> resolveDefaultFields() async {
-    final names = defaultFieldNames();
-    await attributeStore.ensureBaseAttributes(names: names);
-    await attributeStore.loadAttributes();
-    return names
+    await _ensureDefaultsExist();
+    return defaultFieldNames()
         .map(attributeStore.getAttributeByName)
         .whereType<AttributeModel>()
         .toList();
+  }
+
+  /// Make sure this business's default attributes exist, then load the cache.
+  ///
+  /// Two sources, deliberately kept apart:
+  ///
+  /// 1. **Store-type defaults** — seeded exactly once for a KNOWN store type by
+  ///    [StoreTypeAttributeDefaultsService], so a default the merchant deletes
+  ///    is never resurrected.
+  /// 2. **The legacy app-wide fallback** — unchanged behaviour for an older
+  ///    retail install that predates store types. Gated on the store type being
+  ///    unknown/absent, so a known type (including `other`, which wants no
+  ///    attributes at all) can never be handed Size/Color/Weight.
+  ///
+  /// A name that resolves to nothing afterwards has been deleted by the
+  /// merchant, and correctly drops out of the returned fields.
+  Future<void> _ensureDefaultsExist() async {
+    await _storeTypeDefaults.ensureStoreTypeDefaults();
+
+    if (!RetailStoreTypes.isKnown(_storeTypeDefaults.storeTypeKey())) {
+      await attributeStore.ensureBaseAttributes(names: kBaseAttributeNames);
+    }
+
+    await attributeStore.loadAttributes();
   }
 
   /// The configured fields as attribute models, ready to render.
@@ -110,8 +146,7 @@ class SimpleProductFieldsService {
 
     // Still seed + load: the saved ids must resolve against a populated store,
     // and a shop that removed every field still needs its attributes to exist.
-    await attributeStore.ensureBaseAttributes(names: defaultFieldNames());
-    await attributeStore.loadAttributes();
+    await _ensureDefaultsExist();
     return attributeStore.attributesByIds(savedIds);
   }
 }

@@ -79,17 +79,32 @@ void main() {
   group('store-type default attributes', () {
     test('each store type seeds the agreed attribute names', () {
       expect(RetailStoreTypes.garment.defaultAttributeNames,
-          equals(['Size', 'Color']));
+          equals(['Size', 'Color', 'Material', 'Pattern']));
       expect(RetailStoreTypes.footwear.defaultAttributeNames,
-          equals(['Size', 'Color']));
+          equals(['Size', 'Color', 'Material', 'Sole Type']));
       expect(RetailStoreTypes.sports.defaultAttributeNames,
-          equals(['Size', 'Color']));
+          equals(['Size', 'Color', 'Material', 'Sport Type']));
       expect(RetailStoreTypes.cosmeticsBeauty.defaultAttributeNames,
-          equals(['Shade', 'Volume']));
+          equals(['Shade', 'Color', 'Skin Type', 'Finish', 'Volume']));
       expect(RetailStoreTypes.stationery.defaultAttributeNames,
-          equals(['Pack Size']));
-      expect(RetailStoreTypes.giftGeneral.defaultAttributeNames, isEmpty);
+          equals(['Color', 'Size', 'Paper Type', 'GSM', 'Binding Type']));
+      expect(RetailStoreTypes.giftGeneral.defaultAttributeNames,
+          equals(['Color', 'Size', 'Material', 'Pattern']));
+
+      // The ONLY type with no store-type defaults.
       expect(RetailStoreTypes.other.defaultAttributeNames, isEmpty);
+    });
+
+    // Brand and Expiry Date are first-class fields already (ProductModel
+    // .brandName, VarianteModel.expiryDate); Gender does not exist at all.
+    // Seeding any of them as an attribute would duplicate an existing field.
+    test('no store type duplicates an existing first-class product field', () {
+      for (final type in RetailStoreTypes.all) {
+        for (final banned in const ['Brand', 'Gender', 'Expiry Date']) {
+          expect(type.defaultAttributeNames, isNot(contains(banned)),
+              reason: '${type.key} must not redeclare $banned');
+        }
+      }
     });
 
     // The whole point of the Other type: it must seed NOTHING. Declaring its
@@ -100,23 +115,28 @@ void main() {
       expect(RetailStoreTypes.isKnown('other'), isTrue);
       expect(RetailStoreTypes.defaultAttributeNamesFor('other'), isEmpty);
       expect(RetailStoreTypes.defaultAttributeNamesFor('other'), isNotNull);
-      // Same contract as Gift & General — the two differ only in label.
-      expect(
-        RetailStoreTypes.defaultAttributeNamesFor('other'),
-        equals(RetailStoreTypes.defaultAttributeNamesFor('gift_general')),
-      );
     });
 
-    // The distinction the fallback depends on: an unknown key means "no store
-    // type, use kBaseAttributeNames"; gift_general means "genuinely none".
+    // Gift & General used to share Other's empty contract. It no longer does —
+    // it is a normal mapped type, and Other stands alone as "no defaults".
+    test('Other is the only type with no defaults', () {
+      final empty = RetailStoreTypes.all
+          .where((t) => t.defaultAttributeNames.isEmpty)
+          .map((t) => t.key)
+          .toList();
+      expect(empty, equals(['other']));
+    });
+
+    // The distinction the whole feature depends on: an unknown key means "no
+    // store type — this feature does not apply, leave the legacy fallback
+    // alone"; `other` means "genuinely none, seed nothing".
     test('defaultAttributeNamesFor separates unknown from deliberately empty',
         () {
-      expect(RetailStoreTypes.defaultAttributeNamesFor('gift_general'),
-          isEmpty);
+      expect(RetailStoreTypes.defaultAttributeNamesFor('other'), isEmpty);
       expect(RetailStoreTypes.defaultAttributeNamesFor(null), isNull);
       expect(RetailStoreTypes.defaultAttributeNamesFor('grocery'), isNull);
       expect(RetailStoreTypes.defaultAttributeNamesFor('garment'),
-          equals(['Size', 'Color']));
+          equals(['Size', 'Color', 'Material', 'Pattern']));
     });
 
     // Contract: a default name misspelled here would create an attribute with

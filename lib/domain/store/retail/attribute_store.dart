@@ -85,6 +85,19 @@ const Map<String, List<String>> kSeedAttributeValues = <String, List<String>>{
   'Shade': ['Nude', 'Pink', 'Red', 'Berry', 'Brown'],
   'Volume': ['30ml', '50ml', '100ml', '200ml'],
   'Pack Size': ['Pack of 5', 'Pack of 10', 'Pack of 12', 'Box of 12', 'Ream (500)'],
+  // Apparel / footwear / sports descriptors.
+  'Material': ['Cotton', 'Polyester', 'Silk', 'Denim', 'Leather'],
+  'Pattern': ['Solid', 'Printed', 'Striped', 'Checked', 'Floral'],
+  'Sole Type': ['Rubber', 'EVA', 'PU', 'Leather', 'TPR'],
+  'Sport Type': ['Cricket', 'Football', 'Badminton', 'Gym', 'Running'],
+  // Cosmetics: how a product suits the buyer and how it sits on the skin.
+  'Skin Type': ['Normal', 'Dry', 'Oily', 'Combination', 'Sensitive'],
+  'Finish': ['Matte', 'Glossy', 'Satin', 'Dewy', 'Shimmer'],
+  // Stationery. GSM values are bare numbers — the attribute name supplies the
+  // unit, so a variant reads "GSM: 80" rather than "GSM: 80 GSM".
+  'Paper Type': ['Ruled', 'Unruled', 'Graph', 'Art Paper'],
+  'GSM': ['70', '80', '100', '120', '150'],
+  'Binding Type': ['Spiral', 'Perfect', 'Stapled', 'Hardbound'],
 };
 
 /// Hex swatches for the attributes whose values are colours, index-aligned with
@@ -580,11 +593,26 @@ abstract class _AttributeStoreBase with Store {
   /// that already exists, so values are only seeded alongside a freshly created
   /// attribute and a user's edits are never overwritten. Passing an empty list
   /// is valid and seeds nothing.
+  ///
+  /// New attributes are given an increasing [AttributeModel.sortOrder] starting
+  /// after the highest already in use, so they list in the order [names]
+  /// declares them (Size before Pattern) instead of the arbitrary order a
+  /// shared `sortOrder: 0` produces, and so a later seed appends rather than
+  /// interleaving with what is already there.
   @action
   Future<void> ensureBaseAttributes({List<String>? names}) async {
+    // Read the box, not the `attributes` observable: callers seed BEFORE
+    // loadAttributes(), so on a cold start the observable is still empty while
+    // the box already holds the shop's attributes.
+    final existing = await _repository.getAllAttributes();
+    var sortOrder = existing.isEmpty
+        ? 0
+        : existing.map((a) => a.sortOrder).reduce((a, b) => a > b ? a : b) + 1;
+
     for (final name in names ?? kBaseAttributeNames) {
-      final created = await addAttribute(name);
+      final created = await addAttribute(name, sortOrder: sortOrder);
       if (!created) continue; // already present — leave the user's edits alone
+      sortOrder++;
 
       final attribute = getAttributeByName(name);
       if (attribute == null) continue;

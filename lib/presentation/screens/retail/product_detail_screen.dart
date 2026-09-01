@@ -16,20 +16,21 @@ import 'package:billberrylite/util/common/app_responsive.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../core/config/tariff_code_rule.dart';
-import '../../../core/config/tax_feature.dart';
-import '../../../data/models/common/taxmodel_314.dart';
 import '../../../data/models/retail/hive_model/attribute_model_219.dart';
+import '../../../data/models/retail/hive_model/attribute_value_model_220.dart';
 import '../../../data/models/retail/hive_model/product_model_200.dart';
 import '../../../data/models/retail/hive_model/variante_model_201.dart';
 import '../../../domain/services/common/notification_service.dart';
 import '../../../domain/services/retail/simple_product_fields_service.dart';
 import '../../../domain/services/retail/stock_adjustment_service.dart';
 import '../../../domain/services/retail/variant_attribute_mapper.dart';
+import '../../../domain/services/retail/variant_generator_service.dart';
 import '../../../domain/store/retail/product_store.dart';
 import 'package:billberrylite/presentation/widget/componets/retail/stock_adjustment_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/retail/stock_history_dialog.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
+import 'package:billberrylite/presentation/screens/retail/attributes_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/scanner_screen.dart';
 import 'package:billberrylite/domain/services/retail/barcode_generator_service.dart';
 import 'package:billberrylite/presentation/widget/componets/retail/print_labels_sheet.dart';
@@ -194,8 +195,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (!BarcodeLabelPermission.canPrint) return;
     final variants = productStore.variantsFor(widget.product.productId);
     if (variants.isEmpty) {
-      NotificationService.instance
-          .showWarning('Add a variant before printing labels.');
+      NotificationService.instance.showWarning(
+        'Add a variant before printing labels.',
+      );
       return;
     }
     await showPrintLabelsSheet(
@@ -753,36 +755,36 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 104),
               child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                // The selling price is what the POS actually charges.
-                Text(
-                  formatMoney(variant.effectivePrice),
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.smallFontSize(context),
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.success,
-                  ),
-                ),
-                if (variant.mrp != null)
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  // The selling price is what the POS actually charges.
                   Text(
-                    'MRP: ${formatMoney(variant.mrp!)}',
+                    formatMoney(variant.effectivePrice),
                     style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.captionFontSize(context),
-                      color: AppColors.textSecondary,
-                      decoration: TextDecoration.lineThrough,
+                      fontSize: AppResponsive.smallFontSize(context),
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.success,
                     ),
                   ),
-                if (variant.costPrice != null)
-                  Text(
-                    'Cost: ${formatMoney(variant.costPrice!)}',
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.captionFontSize(context),
-                      color: AppColors.textSecondary,
+                  if (variant.mrp != null)
+                    Text(
+                      'MRP: ${formatMoney(variant.mrp!)}',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.captionFontSize(context),
+                        color: AppColors.textSecondary,
+                        decoration: TextDecoration.lineThrough,
+                      ),
                     ),
-                  ),
-              ],
+                  if (variant.costPrice != null)
+                    Text(
+                      'Cost: ${formatMoney(variant.costPrice!)}',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.captionFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                ],
               ),
             ),
             const SizedBox(width: 6),
@@ -930,10 +932,11 @@ class _AddVariantDialog extends StatefulWidget {
 class _AddVariantDialogState extends State<_AddVariantDialog> {
   final _formKey = GlobalKey<FormState>();
 
-  /// Descriptor fields from Settings → Simple Product Fields, replacing the
-  /// previously hardcoded Size / Color / Weight inputs.
-  List<AttributeModel> _fields = [];
-  final Map<String, TextEditingController> _fieldControllers = {};
+  /// This variant's descriptors, seeded from Settings → Simple Product Fields
+  /// and then owned by the user — they can drop one or add any attribute from
+  /// the catalogue. See [_AttributesSection].
+  final List<_AttrRow> _attrRows = [];
+  bool _rowsSeeded = false;
 
   final _skuController = TextEditingController();
   final _barcodeController = TextEditingController();
@@ -942,7 +945,6 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
   final _mrpController = TextEditingController();
   final _stockController = TextEditingController();
   final _minStockController = TextEditingController();
-  String? _selectedTaxId;
 
   /// An existing sibling variant, purely to inherit the product's unit of
   /// measure. They all agree, so the first one speaks for the product — the
@@ -953,29 +955,34 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
   /// Whether this product's variants are stocked in fractional amounts.
   bool get _allowDecimal => _siblingUnitSource?.isDecimalQuantity ?? false;
 
-  final List<_CustomAttrData> _customAttributes = [];
   bool _saving = false;
+
+  /// Min Stock and Tax Rate start folded — see the [_MoreOptions] block below.
+  bool _showMoreOptions = false;
 
   @override
   void initState() {
     super.initState();
-    taxStore.loadTaxes();
     _loadFields();
   }
 
   Future<void> _loadFields() async {
     final fields = await SimpleProductFieldsService().resolveFields();
     if (!mounted) return;
-    setState(() => _fields = fields);
+    setState(() {
+      // Seed once. Re-seeding on a later rebuild would resurrect a row the user
+      // had just removed.
+      if (!_rowsSeeded) {
+        _attrRows.addAll(_seedRowsFromFields(fields));
+        _rowsSeeded = true;
+      }
+    });
   }
-
-  TextEditingController _fieldController(String attributeId) =>
-      _fieldControllers.putIfAbsent(attributeId, () => TextEditingController());
 
   @override
   void dispose() {
-    for (final controller in _fieldControllers.values) {
-      controller.dispose();
+    for (final row in _attrRows) {
+      row.dispose();
     }
     _skuController.dispose();
     _barcodeController.dispose();
@@ -984,17 +991,18 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
     _mrpController.dispose();
     _stockController.dispose();
     _minStockController.dispose();
-    for (final attr in _customAttributes) {
-      attr.dispose();
-    }
     super.dispose();
   }
 
-  /// Hint from the attribute's own defined values, so a grocery shop sees
-  /// "e.g. 500ml" rather than a hardcoded apparel example.
-  String? _hintForAttribute(AttributeModel attribute) {
-    final values = attributeStore.getValues(attribute.attributeId);
-    return values.isEmpty ? null : 'e.g. ${values.first.value}';
+  /// Push the shared scanner and drop the result into the field. Mirrors the
+  /// Add Product form and the Edit Variant dialog, both of which could already
+  /// scan while this one could not.
+  Future<void> _scanBarcode() async {
+    final code = await Navigator.of(
+      context,
+    ).push<String>(MaterialPageRoute(builder: (_) => const ScannerScreen()));
+    if (code == null || !mounted) return;
+    setState(() => _barcodeController.text = code.trim());
   }
 
   Future<void> _save() async {
@@ -1025,18 +1033,9 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
     final variantId =
         '${widget.productId}_${DateTime.now().millisecondsSinceEpoch}';
 
-    // Configured fields + any one-off rows, projected onto the legacy columns
-    // by the one shared rule so receipts and reports keep working.
-    final entered = <String, String>{
-      for (final attribute in _fields)
-        if ((_fieldControllers[attribute.attributeId]?.text.trim() ?? '')
-            .isNotEmpty)
-          attribute.name: _fieldControllers[attribute.attributeId]!.text.trim(),
-    };
-    final attributes = mergeVariantAttributes(
-      entered,
-      extraCustomAttributes: _customAttributesMap(_customAttributes),
-    );
+    // Catalogue attributes and one-off pairs are the same flat map to the
+    // model, so one call covers both.
+    final attributes = _attrRowsMap(_attrRows);
 
     final variant = VarianteModel.create(
       varianteId: variantId,
@@ -1056,8 +1055,11 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
       minStock: _minStockController.text.trim().isEmpty
           ? null
           : double.tryParse(_minStockController.text.trim()),
-      taxRate: _taxRateFor(_selectedTaxId),
-      taxId: _selectedTaxId,
+      // Tax is a PRODUCT-level decision and is deliberately not set here:
+      // cart_store's _getEffectiveGstRate already resolves Variant → Product →
+      // default, so leaving these null makes the variant inherit the product's
+      // rate. A per-variant override could be created here but changed nowhere
+      // — Edit Variant has no tax field — so it could never be corrected.
       // Unit of measure is a PRODUCT-level decision stored per variant, so a
       // variant added here must inherit it. Without this a new variant of a
       // loose-goods product silently defaulted to whole pieces, and its stock
@@ -1086,15 +1088,14 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            for (final attribute in _fields) ...[
-              AppTextField(
-                controller: _fieldController(attribute.attributeId),
-                label: attribute.name,
-                hint: _hintForAttribute(attribute),
-                icon: Icons.label_outline_rounded,
-              ),
-              const SizedBox(height: 12),
-            ],
+            // First, not buried: what this variant IS comes before what it
+            // costs. Descriptors used to render unlabelled here and a generic
+            // "One-off details" box sat at the very bottom under More options.
+            _AttributesSection(
+              rows: _attrRows,
+              onChanged: () => setState(() {}),
+            ),
+            const SizedBox(height: 8),
             AppTextField(
               controller: _sellingPriceController,
               label: 'Selling Price',
@@ -1109,7 +1110,7 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
             const SizedBox(height: 12),
             AppTextField(
               controller: _costPriceController,
-              label: 'Cost Price (Optional)',
+              label: 'Cost Price',
               hint: '0.00',
               icon: Icons.payments_outlined,
               keyboardType: TextInputType.number,
@@ -1118,7 +1119,7 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
             const SizedBox(height: 12),
             AppTextField(
               controller: _mrpController,
-              label: 'MRP (Optional)',
+              label: 'MRP',
               hint: '0.00',
               icon: Icons.local_offer_outlined,
               keyboardType: TextInputType.number,
@@ -1136,49 +1137,61 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
               keyboardType: _allowDecimal
                   ? const TextInputType.numberWithOptions(decimal: true)
                   : TextInputType.number,
-              inputFormatters:
-                  _allowDecimal ? _decimalQtyFormatters : _qtyFormatters,
+              inputFormatters: _allowDecimal
+                  ? _decimalQtyFormatters
+                  : _qtyFormatters,
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Required' : null,
             ),
             const SizedBox(height: 12),
             AppTextField(
-              controller: _minStockController,
-              label: 'Min Stock (Optional)',
-              hint: '0',
-              icon: Icons.warning_amber_outlined,
-              keyboardType: _allowDecimal
-                  ? const TextInputType.numberWithOptions(decimal: true)
-                  : TextInputType.number,
-              inputFormatters:
-                  _allowDecimal ? _decimalQtyFormatters : _qtyFormatters,
-            ),
-            const SizedBox(height: 12),
-            AppTextField(
               controller: _barcodeController,
-              label: 'Barcode (Optional)',
-              hint: 'Scan, or leave blank to auto-generate',
+              label: 'Barcode',
+              hint: 'Scan or enter',
+              // helperText, not hint: Material hides the hint behind the
+              // resting label, so this only appeared once the user had already
+              // tapped in and started wondering.
+              helperText: 'Generated automatically if left blank',
               icon: Icons.qr_code_rounded,
+              // The Add Product form and Edit Variant both scan; only this
+              // dialog made you type a barcode by hand.
+              suffixIcon: IconButton(
+                tooltip: 'Scan barcode',
+                icon: const Icon(Icons.qr_code_scanner, size: 20),
+                onPressed: _scanBarcode,
+              ),
             ),
             const SizedBox(height: 12),
             AppTextField(
               controller: _skuController,
-              label: 'SKU (Optional)',
-              hint: 'Generated when left blank',
+              label: 'SKU',
+              helperText: 'Generated automatically if left blank',
               icon: Icons.tag_rounded,
             ),
-            if (TaxFeature.enabled) ...[
-              const SizedBox(height: 12),
-              _taxDropdown(
-                context,
-                _selectedTaxId,
-                (value) => setState(() => _selectedTaxId = value),
-              ),
-            ],
-            _CustomAttributesSection(
-              attributes: _customAttributes,
-              emptyHint: 'Add custom attributes like Material, Flavor, etc.',
-              onChanged: () => setState(() {}),
+
+            // Min Stock and Tax Rate are real, live settings — variant minStock
+            // overrides the global alert threshold and taxId is read at billing
+            // — but neither is needed to create a variant, and above the fold
+            // they made this dialog look like it wanted twice the Add Product
+            // form. Folded away, not removed; Edit Variant shows them outright.
+            _MoreOptions(
+              expanded: _showMoreOptions,
+              onToggle: () =>
+                  setState(() => _showMoreOptions = !_showMoreOptions),
+              children: [
+                AppTextField(
+                  controller: _minStockController,
+                  label: 'Min Stock',
+                  hint: '0',
+                  icon: Icons.warning_amber_outlined,
+                  keyboardType: _allowDecimal
+                      ? const TextInputType.numberWithOptions(decimal: true)
+                      : TextInputType.number,
+                  inputFormatters: _allowDecimal
+                      ? _decimalQtyFormatters
+                      : _qtyFormatters,
+                ),
+              ],
             ),
           ],
         ),
@@ -1226,7 +1239,9 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
   /// from the POS, so a line can be pulled from sale without being deleted.
   late bool _active;
 
-  final List<_CustomAttrData> _customAttributes = [];
+  /// Same section as Add Variant, so the form you edit in matches the form you
+  /// created in.
+  final List<_AttrRow> _attrRows = [];
 
   @override
   void initState() {
@@ -1248,13 +1263,10 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
     // (the save path treats a null `_expiryDate` as an explicit clear).
     _expiryDate = v.expiryDateTime;
 
-    for (final entry
-        in (v.customAttributes ?? const <String, String>{}).entries) {
-      final attr = _CustomAttrData();
-      attr.keyController.text = entry.key;
-      attr.valueController.text = entry.value;
-      _customAttributes.add(attr);
-    }
+    // Keys that match a catalogue attribute become real attribute rows, so an
+    // existing Size keeps its value picker instead of being demoted to a
+    // free-text pair the moment you open the editor.
+    _attrRows.addAll(_seedRowsFromAttributes(v.customAttributes));
   }
 
   @override
@@ -1264,8 +1276,8 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
     _mrpController.dispose();
     _minStockController.dispose();
     _barcodeController.dispose();
-    for (final attr in _customAttributes) {
-      attr.dispose();
+    for (final row in _attrRows) {
+      row.dispose();
     }
     super.dispose();
   }
@@ -1273,9 +1285,9 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
   /// Push the shared scanner and drop the result into the field. Mirrors the
   /// Add Product form's scan button.
   Future<void> _scanBarcode() async {
-    final code = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const ScannerScreen()),
-    );
+    final code = await Navigator.of(
+      context,
+    ).push<String>(MaterialPageRoute(builder: (_) => const ScannerScreen()));
     if (code == null || !mounted) return;
     setState(() => _barcodeController.text = code.trim());
   }
@@ -1312,18 +1324,18 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
       if (newBarcode.isEmpty) {
         message = wasGenerated
             ? 'This variant will have no barcode and will stop scanning until '
-                'one is set. If you already printed labels with "$oldBarcode", '
-                'they will no longer identify it.'
+                  'one is set. If you already printed labels with "$oldBarcode", '
+                  'they will no longer identify it.'
             : 'Labels already printed with "$oldBarcode" will no longer '
-                'identify this variant, and it will stop scanning until a new '
-                'barcode is set.';
+                  'identify this variant, and it will stop scanning until a new '
+                  'barcode is set.';
       } else {
         message = wasGenerated
             ? 'This variant will use "$newBarcode" instead of the '
-                'auto-generated "$oldBarcode". If you already printed labels '
-                'with the old code, they will no longer identify it.'
+                  'auto-generated "$oldBarcode". If you already printed labels '
+                  'with the old code, they will no longer identify it.'
             : 'Labels already printed with "$oldBarcode" will no longer '
-                'identify this variant.';
+                  'identify this variant.';
       }
 
       final confirmed = await showAppConfirmDialog(
@@ -1368,8 +1380,7 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
       status: _active ? kActiveVariantStatus : kInactiveVariantStatus,
       // An empty map rather than null, so removing every row actually clears
       // them instead of falling back to the old values.
-      customAttributes:
-          _customAttributesMap(_customAttributes) ?? const <String, String>{},
+      customAttributes: _attrRowsMap(_attrRows) ?? const <String, String>{},
       // `barcode ?? this.barcode` cannot null the field, so removing one needs
       // the explicit flag — same reason as clearMrp above.
       barcode: newBarcode.isEmpty ? null : newBarcode,
@@ -1381,8 +1392,9 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
     final result = await productStore.updateVariant(updated);
     if (!mounted) return;
     if (!result.success) {
-      NotificationService.instance
-          .showError(result.errorMessage ?? 'Could not save the variant.');
+      NotificationService.instance.showError(
+        result.errorMessage ?? 'Could not save the variant.',
+      );
       return;
     }
     Navigator.pop(context);
@@ -1405,10 +1417,17 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // The ONLY place a variant's barcode can be corrected. Without it a
-            // duplicate or a typo was permanent short of deleting the variant.
+            // Descriptors first, matching Add Variant.
+            _AttributesSection(
+              rows: _attrRows,
+              onChanged: () => setState(() {}),
+            ),
+            const SizedBox(height: 8),
+            // The ONLY place a variant's barcode can be corrected. Without this
+            // a duplicate or a typo was permanent short of deleting the variant.
             AppTextField(
               controller: _barcodeController,
-              label: 'Barcode (Optional)',
+              label: 'Barcode',
               hint: 'Scan or enter',
               icon: Icons.qr_code_2_rounded,
               suffixIcon: IconButton(
@@ -1432,7 +1451,7 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
             const SizedBox(height: 12),
             AppTextField(
               controller: _costPriceController,
-              label: 'Cost Price (Optional)',
+              label: 'Cost Price',
               hint: '0.00',
               icon: Icons.payments_outlined,
               keyboardType: TextInputType.number,
@@ -1441,7 +1460,7 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
             const SizedBox(height: 12),
             AppTextField(
               controller: _mrpController,
-              label: 'MRP (Optional)',
+              label: 'MRP',
               hint: '0.00',
               icon: Icons.local_offer_outlined,
               keyboardType: TextInputType.number,
@@ -1461,14 +1480,15 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
             const SizedBox(height: 12),
             AppTextField(
               controller: _minStockController,
-              label: 'Min Stock (Optional)',
+              label: 'Min Stock',
               hint: '0',
               icon: Icons.warning_amber_outlined,
               keyboardType: _allowDecimal
                   ? const TextInputType.numberWithOptions(decimal: true)
                   : TextInputType.number,
-              inputFormatters:
-                  _allowDecimal ? _decimalQtyFormatters : _qtyFormatters,
+              inputFormatters: _allowDecimal
+                  ? _decimalQtyFormatters
+                  : _qtyFormatters,
             ),
             const SizedBox(height: 12),
             // Per-variant: a 500ml and a 1L of the same product are stocked
@@ -1502,11 +1522,6 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
                   color: AppColors.textSecondary,
                 ),
               ),
-            ),
-            _CustomAttributesSection(
-              attributes: _customAttributes,
-              emptyHint: 'No custom attributes',
-              onChanged: () => setState(() {}),
             ),
           ],
         ),
@@ -1548,27 +1563,46 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
   final _mrpController = TextEditingController();
   final _minStockController = TextEditingController();
   final _baseBarcodeController = TextEditingController();
-  String? _selectedTaxId;
 
   /// Configured descriptor fields (Settings → Simple Product Fields).
+  ///
+  /// These become the "same for all variants" boxes ONLY. They are a display
+  /// choice — which boxes a single variant's form renders — and are deliberately
+  /// not the source of the varying axes; see [_attributes].
   List<AttributeModel> _fields = [];
 
-  /// The attribute that VARIES across the generated variants — one variant per
-  /// selected value. Replaces the old hardcoded "sizes" axis.
-  AttributeModel? _varyingAttribute;
+  /// Every attribute in the catalogue (Settings → Product Attributes), which is
+  /// what a variant can actually be generated from.
+  List<AttributeModel> _attributes = [];
 
-  /// Selected values of [_varyingAttribute], from its defined values plus any
-  /// typed in here.
-  final Set<String> _selectedValues = {};
-  final List<String> _customValues = [];
-  final _customValueController = TextEditingController();
+  bool _loading = true;
 
-  /// Per-variant price and stock, keyed by value. Created the moment a value is
-  /// picked and disposed the moment it is dropped — a row must never outlive
-  /// its value, or it would render an already-disposed controller.
+  /// The attributes that VARY, in display order. Plural on purpose: this used to
+  /// be a single `_varyingAttribute`, so choosing Size cleared Colour and a
+  /// shop could never bulk-create a Colour × Size grid — the one thing bulk add
+  /// is for.
+  final List<AttributeModel> _axes = [];
+
+  /// Selected value ids per axis, keyed by attributeId.
+  final Map<String, Set<String>> _selectedValueIds = {};
+
+  /// "Add a value" input per axis.
+  final Map<String, TextEditingController> _newValueControllers = {};
+
+  /// Per-variant price and stock, keyed by [_comboKey]. Created when a
+  /// combination appears and disposed the moment it stops existing — a row must
+  /// never outlive its combination, or it would render a disposed controller.
   final Map<String, _BulkRow> _rows = {};
 
-  /// Fixed values applied to EVERY generated variant (the other fields).
+  /// Combination keys the user has explicitly UNTICKED.
+  ///
+  /// Tracks the OFF set rather than the ON set on purpose: a combination that
+  /// appears later — because another value was just ticked — then defaults to
+  /// selected, which is what "create these" implies. Tracking the ON set would
+  /// silently exclude every newly appearing row.
+  final Set<String> _skipped = {};
+
+  /// Fixed values applied to EVERY generated variant (the non-axis fields).
   final Map<String, TextEditingController> _fixedControllers = {};
 
   bool _saving = false;
@@ -1576,23 +1610,35 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
   @override
   void initState() {
     super.initState();
-    taxStore.loadTaxes();
     _loadFields();
   }
 
   Future<void> _loadFields() async {
+    // resolveFields() already seeds this store type's defaults and populates the
+    // attribute cache, so read the catalogue after it rather than loading twice.
     final fields = await SimpleProductFieldsService().resolveFields();
     if (!mounted) return;
+
+    final attributes = attributeStore.attributes.toList();
     setState(() {
       _fields = fields;
-      // Default the varying axis to the first configured field.
-      _varyingAttribute = fields.isEmpty ? null : fields.first;
+      _attributes = attributes;
+      _loading = false;
+      // Open on one axis so the dialog is immediately usable; the shop's first
+      // configured field is the one they think about most, falling back to the
+      // catalogue when they have configured none.
+      final first = fields.isNotEmpty
+          ? fields.first
+          : (attributes.isEmpty ? null : attributes.first);
+      if (first != null) _axes.add(first);
     });
   }
 
   @override
   void dispose() {
-    _customValueController.dispose();
+    for (final controller in _newValueControllers.values) {
+      controller.dispose();
+    }
     for (final controller in _fixedControllers.values) {
       controller.dispose();
     }
@@ -1609,57 +1655,197 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
   TextEditingController _fixedController(String attributeId) =>
       _fixedControllers.putIfAbsent(attributeId, () => TextEditingController());
 
-  /// Values offered for the varying attribute: its defined values.
-  List<String> get _availableValues {
-    final attribute = _varyingAttribute;
-    if (attribute == null) return const [];
-    return attributeStore
-        .getValues(attribute.attributeId)
-        .map((v) => v.value)
-        .toList();
+  TextEditingController _newValueController(String attributeId) =>
+      _newValueControllers.putIfAbsent(
+        attributeId,
+        () => TextEditingController(),
+      );
+
+  /// Catalogue attributes not already used as an axis.
+  List<AttributeModel> get _unusedAttributes {
+    final used = _axes.map((a) => a.attributeId).toSet();
+    return _attributes.where((a) => !used.contains(a.attributeId)).toList();
   }
 
-  /// Everything that will become a variant, in a stable display order:
-  /// preset values in their defined order, then anything typed in.
-  List<String> get _chosenValues => [
-    ..._availableValues.where(_selectedValues.contains),
-    ..._customValues,
-  ];
-
-  _BulkRow _rowFor(String value) => _rows.putIfAbsent(value, () => _BulkRow());
-
-  void _dropRow(String value) => _rows.remove(value)?.dispose();
-
-  void _clearRows() {
-    for (final row in _rows.values) {
-      row.dispose();
+  /// Every combination the current selection produces, via the SAME service the
+  /// Add Product screen's generator uses — the Cartesian product is not worth a
+  /// second implementation, and reusing it means bulk variants also carry
+  /// `attributeValueIds` (the real taxonomy link) rather than name strings only.
+  ///
+  /// An axis with nothing selected is skipped rather than collapsing the whole
+  /// result to empty, so adding a second axis does not blank the preview before
+  /// its first value is ticked.
+  List<VariantCombination> get _combinations {
+    final specs = <AttributeWithValues>[];
+    for (final axis in _axes) {
+      final selected = _selectedValueIds[axis.attributeId];
+      if (selected == null || selected.isEmpty) continue;
+      final values = attributeStore.getValues(axis.attributeId);
+      specs.add(
+        AttributeWithValues(
+          attribute: axis,
+          availableValues: values,
+          selectedValues: values
+              .where((v) => selected.contains(v.valueId))
+              .toList(),
+        ),
+      );
     }
-    _rows.clear();
+    if (specs.isEmpty) return const [];
+    return variantGeneratorService.generateCombinations(
+      attributesWithValues: specs,
+    );
   }
 
-  void _addCustomValue() {
-    final value = _customValueController.text.trim();
-    if (value.isEmpty ||
-        _customValues.contains(value) ||
-        _availableValues.contains(value)) {
+  /// Stable identity for a combination — its value ids, in axis order.
+  String _comboKey(VariantCombination combo) =>
+      combo.attributeValuePairs.map((p) => p.value.valueId).join('|');
+
+  /// The combinations that will actually be created.
+  List<VariantCombination> get _activeCombinations =>
+      _combinations.where((c) => !_skipped.contains(_comboKey(c))).toList();
+
+  _BulkRow _rowFor(String key) => _rows.putIfAbsent(key, () => _BulkRow());
+
+  /// Drop rows whose combination no longer exists. Called after every selection
+  /// change; without it, unticking a value would leak its controllers and a
+  /// re-tick would resurrect stale prices.
+  void _pruneRows() {
+    final live = _combinations.map(_comboKey).toSet();
+    for (final key in _rows.keys.toList()) {
+      if (!live.contains(key)) _rows.remove(key)?.dispose();
+    }
+    // Drop stale skips too, or a combination that comes back would return
+    // mysteriously unticked.
+    _skipped.removeWhere((key) => !live.contains(key));
+  }
+
+  void _toggleCombo(String key, bool active) {
+    setState(() {
+      if (active) {
+        _skipped.remove(key);
+      } else {
+        _skipped.add(key);
+      }
+    });
+  }
+
+  /// Tick or clear every value on one axis.
+  void _toggleAllValues(AttributeModel axis, List<AttributeValueModel> values) {
+    setState(() {
+      final set = _selectedValueIds.putIfAbsent(axis.attributeId, () => {});
+      final all = values.map((v) => v.valueId).toSet();
+      if (set.length >= all.length) {
+        set.clear();
+      } else {
+        set
+          ..clear()
+          ..addAll(all);
+      }
+      _pruneRows();
+    });
+  }
+
+  /// Create a brand new attribute without leaving the dialog, then use it as an
+  /// axis straight away — creating one from here is only ever a step towards
+  /// using it.
+  ///
+  /// Reuses the Attributes screen's own prompt so the wording and duplicate
+  /// handling stay in one place. That function returns void, so the newcomer is
+  /// found by diffing the store rather than by return value.
+  Future<void> _createAttribute() async {
+    final before = attributeStore.attributes
+        .map((a) => a.attributeId)
+        .toSet();
+
+    await showAddAttributeDialog(context);
+    if (!mounted) return;
+
+    final all = attributeStore.attributes.toList();
+    setState(() {
+      _attributes = all;
+      for (final attribute in all) {
+        if (!before.contains(attribute.attributeId)) _axes.add(attribute);
+      }
+      _pruneRows();
+    });
+  }
+
+  void _toggleValue(AttributeModel axis, String valueId, bool selected) {
+    setState(() {
+      final set = _selectedValueIds.putIfAbsent(axis.attributeId, () => {});
+      if (selected) {
+        set.add(valueId);
+      } else {
+        set.remove(valueId);
+      }
+      _pruneRows();
+    });
+  }
+
+  void _addAxis(AttributeModel attribute) {
+    setState(() {
+      _axes.add(attribute);
+      _pruneRows();
+    });
+  }
+
+  void _removeAxis(AttributeModel attribute) {
+    setState(() {
+      _axes.remove(attribute);
+      _selectedValueIds.remove(attribute.attributeId);
+      _newValueControllers.remove(attribute.attributeId)?.dispose();
+      _pruneRows();
+    });
+  }
+
+  /// Add a value to an axis and tick it.
+  ///
+  /// The value is SAVED to the attribute (Settings → Product Attributes) rather
+  /// than kept for this batch only, so a shop typing S/M/L here does not retype
+  /// them next time. It must be a real `AttributeValueModel` — the combination
+  /// service works on value ids, so a batch-local string could not take part in
+  /// a Cartesian product at all.
+  Future<void> _addValue(AttributeModel axis) async {
+    final controller = _newValueController(axis.attributeId);
+    final value = controller.text.trim();
+    if (value.isEmpty) return;
+
+    final saved = await attributeStore.addValue(axis.attributeId, value);
+    if (!mounted) return;
+
+    if (!saved) {
+      NotificationService.instance.showError(
+        attributeStore.errorMessage ?? 'Could not add "$value"',
+      );
       return;
     }
+
+    final added = attributeStore
+        .getValues(axis.attributeId)
+        .where((v) => v.value.toLowerCase() == value.toLowerCase())
+        .firstOrNull;
+
     setState(() {
-      _customValues.add(value);
-      _rowFor(value);
-      _customValueController.clear();
+      if (added != null) {
+        _selectedValueIds
+            .putIfAbsent(axis.attributeId, () => {})
+            .add(added.valueId);
+      }
+      controller.clear();
+      _pruneRows();
     });
   }
 
   /// Copies the first row's price and quantity down the rest — the common case
-  /// is "same price for all sizes, tweak one or two".
+  /// is "same price for every colour, tweak one or two".
   void _fillDown() {
-    final values = _chosenValues;
-    if (values.length < 2) return;
-    final first = _rows[values.first];
+    final combos = _activeCombinations;
+    if (combos.length < 2) return;
+    final first = _rows[_comboKey(combos.first)];
     if (first == null) return;
-    for (final value in values.skip(1)) {
-      final row = _rowFor(value);
+    for (final combo in combos.skip(1)) {
+      final row = _rowFor(_comboKey(combo));
       row.priceController.text = first.priceController.text;
       row.stockController.text = first.stockController.text;
     }
@@ -1676,14 +1862,12 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
     }
     if (!_formKey.currentState!.validate() || _saving) return;
 
-    final values = _chosenValues;
-    final varying = _varyingAttribute;
-
-    if (varying == null || values.isEmpty) {
+    final combos = _activeCombinations;
+    if (combos.isEmpty) {
       NotificationService.instance.showError(
-        varying == null
-            ? 'Add a field in Settings → Simple Product Fields first'
-            : 'Select at least one ${varying.name.toLowerCase()}',
+        _combinations.isEmpty
+            ? 'Select at least one value to create variants from'
+            : 'Every combination is unticked — tick at least one to create',
       );
       return;
     }
@@ -1692,7 +1876,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
     // them — a half-saved batch is worse than a rejected one.
     final baseBarcodeText = _baseBarcodeController.text.trim();
     if (baseBarcodeText.isNotEmpty) {
-      for (var i = 1; i <= values.length; i++) {
+      for (var i = 1; i <= combos.length; i++) {
         final candidate = '$baseBarcodeText${i.toString().padLeft(3, '0')}';
         if (productStore.isBarcodeTaken(candidate)) {
           NotificationService.instance.showError(
@@ -1705,10 +1889,12 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
 
     setState(() => _saving = true);
 
-    // Values typed once and applied to every generated variant.
+    // Values typed once and applied to every generated variant. Axes are
+    // excluded — they vary, so they cannot also be fixed.
+    final axisIds = _axes.map((a) => a.attributeId).toSet();
     final fixedValues = <String, String>{
       for (final attribute in _fields)
-        if (attribute.attributeId != varying.attributeId &&
+        if (!axisIds.contains(attribute.attributeId) &&
             (_fixedControllers[attribute.attributeId]?.text.trim() ?? '')
                 .isNotEmpty)
           attribute.name: _fixedControllers[attribute.attributeId]!.text.trim(),
@@ -1724,12 +1910,10 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
         ? null
         : double.tryParse(_minStockController.text.trim());
     final baseBarcode = _baseBarcodeController.text.trim();
-    final taxRate = _taxRateFor(_selectedTaxId);
 
-    // One variant per selected value, each with its own price and stock.
     var counter = 1;
-    for (final value in values) {
-      final row = _rows[value];
+    for (final combo in combos) {
+      final row = _rows[_comboKey(combo)];
       final variantId =
           '${widget.productId}_${DateTime.now().millisecondsSinceEpoch}_$counter';
 
@@ -1747,8 +1931,16 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
           productId: widget.productId,
           customAttributes: mergeVariantAttributes({
             ...fixedValues,
-            varying.name: value,
+            for (final pair in combo.attributeValuePairs)
+              pair.attribute.name: pair.value.value,
           }),
+          // The authoritative link into the taxonomy. Bulk add wrote only the
+          // name strings before, so renaming an attribute later stranded every
+          // variant it had created.
+          attributeValueIds: {
+            for (final pair in combo.attributeValuePairs)
+              pair.attribute.attributeId: pair.value.valueId,
+          },
           sku: sku,
           barcode: barcode,
           // sellingPrice is what the POS bills — see cart_store.dart.
@@ -1756,10 +1948,11 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
               double.tryParse(row?.priceController.text.trim() ?? '') ?? 0.0,
           costPrice: costPrice,
           mrp: mrp,
-          stockQty: double.tryParse(row?.stockController.text.trim() ?? '') ?? 0,
+          stockQty:
+              double.tryParse(row?.stockController.text.trim() ?? '') ?? 0,
           minStock: minStock,
-          taxRate: taxRate,
-          taxId: _selectedTaxId,
+          // Tax deliberately unset — the variant inherits the product's rate
+          // through cart_store's Variant → Product → default resolution.
           // Inherit the product's unit of measure, same as the single-add
           // dialog — otherwise bulk-added rows default to whole pieces.
           isDecimalQuantity: _siblingUnitSource?.isDecimalQuantity ?? false,
@@ -1774,16 +1967,78 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
 
     if (!mounted) return;
     Navigator.pop(context);
-    NotificationService.instance.showSuccess('${values.length} variants added');
+    NotificationService.instance.showSuccess('${combos.length} variants added');
+  }
+
+  /// Shown instead of the form while attributes load, and in place of it when
+  /// the shop has none — with the one action that actually unblocks them.
+  Widget _buildUnavailable(BuildContext context) {
+    return AppDialogShell(
+      title: 'Bulk Add Variants',
+      subtitle: 'One variant per combination, priced individually',
+      accent: AppColors.info,
+      icon: Icons.bolt_rounded,
+      body: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'No attributes yet',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.subheadingFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Bulk add creates one variant per value of an attribute '
+                    '— Size, Colour, Material. Set one up and its values, then '
+                    'come back.',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+      ),
+      actions: _loading
+          ? [appDialogCancelButton(context, label: 'Close')]
+          : [
+              appDialogCancelButton(context),
+              const SizedBox(width: 12),
+              appDialogPrimaryButton(
+                label: 'Set up attributes',
+                color: AppColors.info,
+                onPressed: () {
+                  final navigator = Navigator.of(context);
+                  navigator.pop();
+                  navigator.push(
+                    MaterialPageRoute(builder: (_) => const AttributesScreen()),
+                  );
+                },
+              ),
+            ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final values = _chosenValues;
+    // Entrance guard. Bulk add generates one variant per attribute VALUE, so
+    // with no attributes there is nothing to generate from. Gate the way in.
+    if (_loading || _attributes.isEmpty) return _buildUnavailable(context);
+
+    final combos = _combinations;
+    final active = _activeCombinations;
 
     return AppDialogShell(
       title: 'Bulk Add Variants',
-      subtitle: 'One variant per selected value, priced individually',
+      subtitle: 'One variant per combination, priced individually',
       // Blue rather than the usual primary, so this never reads as the plain
       // Add Variant form at a glance.
       accent: AppColors.info,
@@ -1794,164 +2049,44 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── 1. What varies ────────────────────────────────────────────
-            if (_fields.length > 1)
-              _styledDropdown<String>(
-                context,
-                label: 'Create one variant per',
-                value: _varyingAttribute?.attributeId,
-                items: _fields
-                    .map(
-                      (a) => DropdownMenuItem(
-                        value: a.attributeId,
-                        child: Text(
-                          a.name,
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.bodyFontSize(context),
-                          ),
-                        ),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (id) {
-                  if (id == null) return;
-                  setState(() {
-                    _varyingAttribute = _fields.firstWhere(
-                      (a) => a.attributeId == id,
-                    );
-                    _selectedValues.clear();
-                    _customValues.clear();
-                    _clearRows();
-                  });
-                },
-              )
-            else
-              _sectionLabel(
-                context,
-                _varyingAttribute == null
-                    ? 'No fields configured'
-                    : 'One variant per ${_varyingAttribute!.name}',
-              ),
-            const SizedBox(height: 12),
-
-            // ── 2. Pick the values ────────────────────────────────────────
-            if (_availableValues.isEmpty && _customValues.isEmpty)
+            // ── 1. What varies — one section per axis ─────────────────────
+            Row(
+              children: [
+                Expanded(child: _sectionLabel(context, 'Attributes')),
+                _buildAddAxisButton(context),
+              ],
+            ),
+            if (_axes.isEmpty)
               Text(
-                _varyingAttribute == null
-                    ? 'Add a field in Settings → Simple Product Fields.'
-                    : 'No preset values — type them below.',
+                'Add an attribute to vary, then tick the values to create.',
                 style: GoogleFonts.poppins(
                   fontSize: AppResponsive.captionFontSize(context),
                   color: AppColors.textSecondary,
                 ),
               ),
-            if (_availableValues.isNotEmpty)
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _availableValues.map((value) {
-                  final isSelected = _selectedValues.contains(value);
-                  return FilterChip(
-                    label: Text(
-                      value,
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.smallFontSize(context),
-                        color: isSelected
-                            ? AppColors.white
-                            : AppColors.textPrimary,
-                      ),
-                    ),
-                    selected: isSelected,
-                    onSelected: (selected) => setState(() {
-                      if (selected) {
-                        _selectedValues.add(value);
-                        _rowFor(value);
-                      } else {
-                        _selectedValues.remove(value);
-                        _dropRow(value);
-                      }
-                    }),
-                    selectedColor: AppColors.info,
-                    checkmarkColor: AppColors.white,
-                    backgroundColor: AppColors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      side: const BorderSide(color: AppColors.divider),
-                    ),
-                  );
-                }).toList(),
-              ),
-            if (_customValues.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _customValues
-                    .map(
-                      (value) => Chip(
-                        label: Text(
-                          value,
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.smallFontSize(context),
-                            color: AppColors.white,
-                          ),
-                        ),
-                        deleteIcon: const Icon(
-                          Icons.close,
-                          size: 16,
-                          color: AppColors.white,
-                        ),
-                        onDeleted: () => setState(() {
-                          _customValues.remove(value);
-                          _dropRow(value);
-                        }),
-                        backgroundColor: AppColors.info,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    )
-                    .toList(),
-              ),
-            ],
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: AppTextField(
-                    controller: _customValueController,
-                    label: _varyingAttribute == null
-                        ? 'Value'
-                        : 'Add ${_varyingAttribute!.name}',
-                    hint: 'Type a value and press +',
-                    icon: Icons.label_outline_rounded,
-                    enabled: _varyingAttribute != null,
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) => _addCustomValue(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.add_circle, color: AppColors.info),
-                  onPressed: _varyingAttribute == null ? null : _addCustomValue,
-                ),
-              ],
-            ),
+            for (final axis in _axes) _buildAxis(context, axis),
 
-            // ── 3. Live preview ───────────────────────────────────────────
-            if (values.isNotEmpty) ...[
+            // ── 2. Live preview ───────────────────────────────────────────
+            if (combos.isNotEmpty) ...[
               const SizedBox(height: 12),
-              _buildPreviewBanner(context, values),
+              _buildPreviewBanner(context, combos),
             ],
 
-            // ── 4. Per-variant price and stock ────────────────────────────
-            if (values.isNotEmpty) ...[
+            // ── 3. Per-variant price and stock ────────────────────────────
+            if (combos.isNotEmpty) ...[
               const SizedBox(height: 12),
               const Divider(color: AppColors.divider),
               Row(
                 children: [
-                  Expanded(child: _sectionLabel(context, 'Per variant')),
-                  if (values.length > 1)
+                  Expanded(
+                    child: _sectionLabel(
+                      context,
+                      combos.length == active.length
+                          ? 'Per variant'
+                          : 'Per variant · ${active.length} of ${combos.length} selected',
+                    ),
+                  ),
+                  if (combos.length > 1)
                     TextButton.icon(
                       onPressed: _fillDown,
                       icon: const Icon(Icons.south_rounded, size: 15),
@@ -1969,22 +2104,24 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
                     ),
                 ],
               ),
-              for (final value in values) _buildVariantRow(context, value),
+              for (final combo in combos) _buildVariantRow(context, combo),
             ],
 
-            // ── 5. Everything shared ──────────────────────────────────────
+            // ── 4. Everything shared ──────────────────────────────────────
             const SizedBox(height: 12),
             const Divider(color: AppColors.divider),
             _sectionLabel(
               context,
-              values.isEmpty
+              active.isEmpty
                   ? 'Applies to all variants'
-                  : 'Applies to all ${values.length} variant'
-                        '${values.length == 1 ? '' : 's'}',
+                  : 'Applies to all ${active.length} variant'
+                        '${active.length == 1 ? '' : 's'}',
             ),
             const SizedBox(height: 12),
             for (final attribute in _fields)
-              if (attribute.attributeId != _varyingAttribute?.attributeId) ...[
+              if (!_axes.any(
+                (a) => a.attributeId == attribute.attributeId,
+              )) ...[
                 AppTextField(
                   controller: _fixedController(attribute.attributeId),
                   label: attribute.name,
@@ -1995,7 +2132,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
               ],
             AppTextField(
               controller: _costPriceController,
-              label: 'Cost Price (Optional)',
+              label: 'Cost Price',
               hint: '0.00',
               icon: Icons.payments_outlined,
               keyboardType: TextInputType.number,
@@ -2004,7 +2141,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
             const SizedBox(height: 12),
             AppTextField(
               controller: _mrpController,
-              label: 'MRP (Optional)',
+              label: 'MRP',
               hint: '0.00',
               icon: Icons.local_offer_outlined,
               keyboardType: TextInputType.number,
@@ -2013,30 +2150,36 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
             const SizedBox(height: 12),
             AppTextField(
               controller: _minStockController,
-              label: 'Min Stock (Optional)',
+              label: 'Min Stock',
               hint: '0',
               icon: Icons.warning_amber_outlined,
               keyboardType: _allowDecimal
                   ? const TextInputType.numberWithOptions(decimal: true)
                   : TextInputType.number,
-              inputFormatters:
-                  _allowDecimal ? _decimalQtyFormatters : _qtyFormatters,
+              inputFormatters: _allowDecimal
+                  ? _decimalQtyFormatters
+                  : _qtyFormatters,
             ),
             const SizedBox(height: 12),
             AppTextField(
               controller: _baseBarcodeController,
-              label: 'Base Barcode (Optional)',
-              hint: 'e.g. 789456 → 789456001, 789456002 …',
+              label: 'Base Barcode',
+              // helperText, not hint: this is a PREFIX, not a shared value —
+              // each variant gets its own sequential code — and Material hid
+              // that explanation behind the resting label until focus.
+              helperText: '789456 → 789456001, 789456002 …',
               icon: Icons.qr_code_rounded,
             ),
-            if (TaxFeature.enabled) ...[
-              const SizedBox(height: 12),
-              _taxDropdown(
-                context,
-                _selectedTaxId,
-                (value) => setState(() => _selectedTaxId = value),
+            const SizedBox(height: 10),
+            Text(
+              'Cost, MRP and Min Stock are the same for every variant here. '
+              'Need one to differ? Add them, then open that variant and edit it.',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.captionFontSize(context),
+                color: AppColors.textSecondary,
+                height: 1.4,
               ),
-            ],
+            ),
           ],
         ),
       ),
@@ -2044,7 +2187,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
         appDialogCancelButton(context),
         const SizedBox(width: 12),
         appDialogPrimaryButton(
-          label: values.isEmpty ? 'Add' : 'Add ${values.length}',
+          label: active.isEmpty ? 'Add' : 'Add ${active.length}',
           onPressed: _save,
           color: AppColors.info,
         ),
@@ -2052,7 +2195,215 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
     );
   }
 
-  Widget _buildPreviewBanner(BuildContext context, List<String> values) {
+  /// "+ Add" for a further axis. A menu anchored to the button, matching the
+  /// Add/Edit Variant attribute picker rather than a bottom sheet.
+  Widget _buildAddAxisButton(BuildContext context) {
+    final available = _unusedAttributes;
+
+    return PopupMenuButton<Object>(
+      tooltip: 'Add attribute',
+      color: AppColors.white,
+      position: PopupMenuPosition.under,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      constraints: const BoxConstraints(maxHeight: 320, minWidth: 220),
+      onSelected: (picked) {
+        if (picked is AttributeModel) {
+          _addAxis(picked);
+        } else {
+          _createAttribute();
+        }
+      },
+      itemBuilder: (_) => [
+        for (final attribute in available)
+          PopupMenuItem<Object>(
+            value: attribute,
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.label_outline_rounded,
+                  size: 18,
+                  color: AppColors.info,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  attribute.name,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        // Only a separator when there is something above to separate from.
+        if (available.isNotEmpty) const PopupMenuDivider(),
+        PopupMenuItem<Object>(
+          value: 'new',
+          child: Row(
+            children: [
+              const Icon(
+                Icons.add_circle_outline_rounded,
+                size: 18,
+                color: AppColors.textSecondary,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'New attribute…',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.add, size: 16, color: AppColors.info),
+            const SizedBox(width: 4),
+            Text(
+              'Add',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: AppColors.info,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// One axis: its name, its value chips, and an inline "add a value" box.
+  Widget _buildAxis(BuildContext context, AttributeModel axis) {
+    final values = attributeStore.getValues(axis.attributeId);
+    final selected = _selectedValueIds[axis.attributeId] ?? const <String>{};
+
+    return Padding(
+      key: ValueKey('bulk_axis_${axis.attributeId}'),
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  axis.name,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              if (values.isNotEmpty)
+                TextButton(
+                  onPressed: () => _toggleAllValues(axis, values),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.info,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    selected.length >= values.length
+                        ? 'Clear all'
+                        : 'Select all',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.captionFontSize(context),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              // Only offer removal while a second axis exists — dropping the
+              // last one leaves nothing to generate from.
+              if (_axes.length > 1)
+                IconButton(
+                  tooltip: 'Remove ${axis.name}',
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  color: AppColors.textSecondary,
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _removeAxis(axis),
+                ),
+            ],
+          ),
+          if (values.isEmpty)
+            Text(
+              'No values yet — add them below.',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.captionFontSize(context),
+                color: AppColors.textSecondary,
+              ),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: values.map((value) {
+                final isSelected = selected.contains(value.valueId);
+                return FilterChip(
+                  label: Text(
+                    value.value,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      color: isSelected
+                          ? AppColors.white
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                  selected: isSelected,
+                  onSelected: (on) => _toggleValue(axis, value.valueId, on),
+                  selectedColor: AppColors.info,
+                  checkmarkColor: AppColors.white,
+                  backgroundColor: AppColors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    side: const BorderSide(color: AppColors.divider),
+                  ),
+                );
+              }).toList(),
+            ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: AppTextField(
+                  controller: _newValueController(axis.attributeId),
+                  label: 'Add ${axis.name}',
+                  hint: 'Type a value and press +',
+                  icon: Icons.label_outline_rounded,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => _addValue(axis),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: 'Add this value to ${axis.name}',
+                icon: const Icon(Icons.add_circle, color: AppColors.info),
+                onPressed: () => _addValue(axis),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreviewBanner(
+    BuildContext context,
+    List<VariantCombination> combos,
+  ) {
+    // Naming every combination is unreadable past a handful, and a 4 × 5 grid
+    // is entirely normal here.
+    const maxNamed = 6;
+    final named = combos.take(maxNamed).map((c) => c.displayName).join(', ');
+    final extra = combos.length - maxNamed;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -2072,8 +2423,8 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              '${values.length} variant${values.length == 1 ? '' : 's'} '
-              'will be created: ${values.join(', ')}',
+              '${combos.length} variant${combos.length == 1 ? '' : 's'} '
+              'will be created: $named${extra > 0 ? ' and $extra more' : ''}',
               style: GoogleFonts.poppins(
                 fontSize: AppResponsive.captionFontSize(context),
                 fontWeight: FontWeight.w500,
@@ -2087,25 +2438,41 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
     );
   }
 
-  Widget _buildVariantRow(BuildContext context, String value) {
-    final row = _rowFor(value);
+  Widget _buildVariantRow(BuildContext context, VariantCombination combo) {
+    final key = _comboKey(combo);
+    final row = _rowFor(key);
+    final active = !_skipped.contains(key);
+
     return Padding(
-      // Keyed by value so removing a middle row never shifts another row's
-      // state onto the wrong controller.
-      key: ValueKey('bulk_row_$value'),
+      // Keyed by the combination so unticking a middle value never shifts
+      // another row's state onto the wrong controller.
+      key: ValueKey('bulk_row_$key'),
       padding: const EdgeInsets.only(top: 8),
       child: Row(
         children: [
+          // Skip a single combination without losing the value that produced
+          // it — a 4 x 5 grid almost always has a few pairs the shop does not
+          // stock.
           SizedBox(
-            width: 56,
+            width: 32,
+            child: Checkbox(
+              value: active,
+              onChanged: (on) => _toggleCombo(key, on ?? false),
+              activeColor: AppColors.info,
+              visualDensity: VisualDensity.compact,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+          SizedBox(
+            width: 78,
             child: Text(
-              value,
-              maxLines: 1,
+              combo.displayName,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: GoogleFonts.poppins(
                 fontSize: AppResponsive.smallFontSize(context),
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: active ? AppColors.textPrimary : AppColors.textSecondary,
               ),
             ),
           ),
@@ -2116,11 +2483,17 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
               controller: row.priceController,
               label: 'Price',
               hint: '0.00',
-              required: true,
+              required: active,
+              enabled: active,
               keyboardType: TextInputType.number,
               inputFormatters: _moneyFormatters,
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Required' : null,
+              // An unticked row is not being created, so it must not block the
+              // form. Without this the Add button would refuse over a price the
+              // shop deliberately skipped.
+              validator: (v) {
+                if (_skipped.contains(key)) return null;
+                return (v == null || v.trim().isEmpty) ? 'Required' : null;
+              },
             ),
           ),
           const SizedBox(width: 8),
@@ -2130,11 +2503,13 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
               controller: row.stockController,
               label: 'Qty',
               hint: '0',
+              enabled: active,
               keyboardType: _allowDecimal
                   ? const TextInputType.numberWithOptions(decimal: true)
                   : TextInputType.number,
-              inputFormatters:
-                  _allowDecimal ? _decimalQtyFormatters : _qtyFormatters,
+              inputFormatters: _allowDecimal
+                  ? _decimalQtyFormatters
+                  : _qtyFormatters,
             ),
           ),
         ],
@@ -2160,16 +2535,22 @@ class _BulkRow {
 // SHARED PIECES
 // ============================================================================
 
-/// Custom key/value rows, shared by the Add and Edit dialogs.
-class _CustomAttributesSection extends StatelessWidget {
-  final List<_CustomAttrData> attributes;
-  final String emptyHint;
-  final VoidCallback onChanged;
+/// A folded "More options" group for settings that are real but not needed to
+/// create the thing you are creating.
+///
+/// Used by Add Variant to keep Min Stock and Tax Rate off the first screenful,
+/// so the dialog opens showing the same fields as the Add Product form. Edit
+/// Variant deliberately does NOT use it — by then you came specifically to
+/// change something, and hiding fields would cost a tap for no gain.
+class _MoreOptions extends StatelessWidget {
+  final bool expanded;
+  final VoidCallback onToggle;
+  final List<Widget> children;
 
-  const _CustomAttributesSection({
-    required this.attributes,
-    required this.emptyHint,
-    required this.onChanged,
+  const _MoreOptions({
+    required this.expanded,
+    required this.onToggle,
+    required this.children,
   });
 
   @override
@@ -2177,83 +2558,44 @@ class _CustomAttributesSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 12),
-        const Divider(color: AppColors.divider),
-        Row(
-          children: [
-            Expanded(child: _sectionLabel(context, 'Custom Attributes')),
-            TextButton.icon(
-              onPressed: () {
-                attributes.add(_CustomAttrData());
-                onChanged();
-              },
-              icon: const Icon(Icons.add, size: 16),
-              label: Text(
-                'Add',
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.bodyFontSize(context),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-              ),
-            ),
-          ],
-        ),
-        if (attributes.isEmpty)
-          Text(
-            emptyHint,
-            style: GoogleFonts.poppins(
-              fontSize: AppResponsive.captionFontSize(context),
-              color: AppColors.textSecondary,
-            ),
-          ),
-        for (var index = 0; index < attributes.length; index++)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
+        const SizedBox(height: 4),
+        InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onToggle,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(
               children: [
-                Expanded(
-                  child: AppTextField(
-                    // Keyed by identity so removing a middle row never hands a
-                    // disposed controller to the next field.
-                    key: ValueKey(attributes[index]),
-                    controller: attributes[index].keyController,
-                    label: 'Attribute',
-                    hint: 'e.g. Material',
-                  ),
+                Icon(
+                  expanded
+                      ? Icons.expand_less_rounded
+                      : Icons.expand_more_rounded,
+                  size: 20,
+                  color: AppColors.primary,
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: AppTextField(
-                    key: ValueKey('${attributes[index].hashCode}_value'),
-                    controller: attributes[index].valueController,
-                    label: 'Value',
-                    hint: 'e.g. Cotton',
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(
-                    Icons.remove_circle_outline,
-                    color: AppColors.danger,
-                    size: 20,
-                  ),
-                  onPressed: () {
-                    attributes[index].dispose();
-                    attributes.removeAt(index);
-                    onChanged();
-                  },
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 36,
-                    minHeight: 36,
+                const SizedBox(width: 4),
+                Text(
+                  'More options',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
                   ),
                 ),
               ],
             ),
           ),
+        ),
+        // maintainState so a value typed here survives folding the group away —
+        // it is still submitted, so it must not be silently discarded.
+        Visibility(
+          visible: expanded,
+          maintainState: true,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [const SizedBox(height: 4), ...children],
+          ),
+        ),
       ],
     );
   }
@@ -2270,119 +2612,298 @@ Widget _sectionLabel(BuildContext context, String text) {
   );
 }
 
-/// Dropdown styled to match [AppTextField] — there is no shared dropdown
-/// component, so the decoration is mirrored here rather than hand-rolled twice.
-Widget _styledDropdown<T>(
-  BuildContext context, {
-  required String label,
-  required T? value,
-  required List<DropdownMenuItem<T>> items,
-  required ValueChanged<T?> onChanged,
-}) {
-  return DropdownButtonFormField<T>(
-    initialValue: value,
-    isExpanded: true,
-    style: GoogleFonts.poppins(
-      fontSize: AppResponsive.bodyFontSize(context),
-      color: AppColors.textPrimary,
-    ),
-    decoration: InputDecoration(
-      labelText: label,
-      labelStyle: GoogleFonts.poppins(
-        fontSize: AppResponsive.smallFontSize(context),
-        color: AppColors.textSecondary,
-      ),
-      filled: true,
-      fillColor: AppColors.surfaceLight,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.divider),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.divider),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-      ),
-    ),
-    items: items,
-    onChanged: onChanged,
-  );
-}
+/// One descriptor on a variant.
+///
+/// [attribute] non-null → a catalogue attribute (Settings → Product
+/// Attributes): the name is fixed and the value is picked from its defined
+/// values. Null → a one-off pair the shop invented right here, where the name
+/// is typed too.
+///
+/// One class for both because they are the same thing to `VarianteModel`, which
+/// stores a flat `{name: value}` map either way. Only the input differs.
+class _AttrRow {
+  final AttributeModel? attribute;
+  final TextEditingController nameController;
+  final TextEditingController valueController;
 
-/// Tax picker shared by the Add and Bulk dialogs.
-Widget _taxDropdown(
-  BuildContext context,
-  String? selectedTaxId,
-  ValueChanged<String?> onChanged,
-) {
-  return Observer(
-    builder: (_) {
-      final taxes = taxStore.taxes;
-      return _styledDropdown<String>(
-        context,
-        label: 'Tax Rate (Optional)',
-        value: taxes.any((t) => t.id == selectedTaxId) ? selectedTaxId : null,
-        items: [
-          DropdownMenuItem(
-            value: null,
-            child: Text(
-              'No tax',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.bodyFontSize(context),
-              ),
-            ),
-          ),
-          ...taxes.map(
-            (tax) => DropdownMenuItem(
-              value: tax.id,
-              child: Text(
-                '${tax.taxname} (${tax.taxperecentage ?? 0}%)',
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.bodyFontSize(context),
-                ),
-              ),
-            ),
-          ),
-        ],
-        onChanged: onChanged,
-      );
-    },
-  );
-}
+  _AttrRow({this.attribute, String? name, String? value})
+    : nameController = TextEditingController(text: name ?? ''),
+      valueController = TextEditingController(text: value ?? '');
 
-/// Percentage behind a tax id, or null when nothing is picked.
-double? _taxRateFor(String? taxId) {
-  if (taxId == null) return null;
-  return taxStore.taxes
-      .firstWhere(
-        (t) => t.id == taxId,
-        orElse: () => Tax(id: '', taxname: '', taxperecentage: null),
-      )
-      .taxperecentage;
-}
+  bool get isCustom => attribute == null;
 
-/// Non-empty key/value pairs, or null when there are none.
-Map<String, String>? _customAttributesMap(List<_CustomAttrData> attributes) {
-  final map = <String, String>{};
-  for (final attr in attributes) {
-    final key = attr.keyController.text.trim();
-    final value = attr.valueController.text.trim();
-    if (key.isNotEmpty && value.isNotEmpty) map[key] = value;
-  }
-  return map.isEmpty ? null : map;
-}
+  String get name => (attribute?.name ?? nameController.text).trim();
 
-/// Controller pair for one custom attribute row.
-class _CustomAttrData {
-  final TextEditingController keyController = TextEditingController();
-  final TextEditingController valueController = TextEditingController();
+  String get value => valueController.text.trim();
 
   void dispose() {
-    keyController.dispose();
+    nameController.dispose();
     valueController.dispose();
+  }
+}
+
+/// Rows → the map `VarianteModel.customAttributes` stores. Incomplete rows drop
+/// out silently, so a half-typed row can never write a blank descriptor.
+Map<String, String>? _attrRowsMap(List<_AttrRow> rows) =>
+    mergeVariantAttributes({
+      for (final row in rows)
+        if (row.name.isNotEmpty && row.value.isNotEmpty) row.name: row.value,
+    });
+
+/// Seed rows for a NEW variant from the shop's configured descriptor fields, so
+/// the common case still opens pre-filled with Size / Colour.
+List<_AttrRow> _seedRowsFromFields(List<AttributeModel> fields) =>
+    fields.map((a) => _AttrRow(attribute: a)).toList();
+
+/// Seed rows for an EXISTING variant from its stored map.
+///
+/// A key matching a catalogue attribute by name becomes a real attribute row
+/// (with its value picker); anything else stays a one-off pair. Without the
+/// match, editing a variant would demote every Size/Colour it already had into
+/// free text.
+List<_AttrRow> _seedRowsFromAttributes(Map<String, String>? stored) {
+  final rows = <_AttrRow>[];
+  stored?.forEach((key, value) {
+    final attribute = attributeStore.getAttributeByName(key);
+    rows.add(
+      attribute != null
+          ? _AttrRow(attribute: attribute, value: value)
+          : _AttrRow(name: key, value: value),
+    );
+  });
+  return rows;
+}
+
+/// The variant's descriptors — Size, Colour, Material — as one clearly labelled
+/// section, shared by the Add and Edit dialogs.
+///
+/// Replaces a split that made attributes hard to find: configured fields were
+/// rendered unlabelled at the very top (and vanished entirely whenever the shop
+/// had no Simple Product Fields configured), while a generic "One-off details"
+/// box sat at the very bottom under More options. Neither said "attributes",
+/// and neither offered the catalogue.
+class _AttributesSection extends StatelessWidget {
+  final List<_AttrRow> rows;
+  final VoidCallback onChanged;
+
+  const _AttributesSection({required this.rows, required this.onChanged});
+
+  /// Catalogue attributes not already on this variant — adding one twice would
+  /// write a single key and silently lose the other value.
+  List<AttributeModel> _unused() {
+    final used = rows
+        .map((r) => r.name.toLowerCase())
+        .where((n) => n.isNotEmpty)
+        .toSet();
+    return attributeStore.attributes
+        .where((a) => !used.contains(a.name.toLowerCase()))
+        .toList();
+  }
+
+  /// The "+ Add" control: a dropdown anchored to the button itself.
+  ///
+  /// Deliberately NOT a bottom sheet. This section lives inside a dialog, so a
+  /// sheet rising from the bottom of the screen while the dialog sits centred
+  /// reads as an unrelated surface. A menu opens at the control you pressed,
+  /// and matches the value picker on the rows below it.
+  Widget _addButton(BuildContext context) {
+    final available = _unused();
+
+    return PopupMenuButton<Object>(
+      tooltip: 'Add attribute',
+      color: AppColors.white,
+      position: PopupMenuPosition.under,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      // A shop with a long catalogue gets a scrolling menu rather than one that
+      // runs off the dialog.
+      constraints: const BoxConstraints(maxHeight: 320, minWidth: 200),
+      onSelected: (picked) {
+        rows.add(
+          picked is AttributeModel ? _AttrRow(attribute: picked) : _AttrRow(),
+        );
+        onChanged();
+      },
+      itemBuilder: (_) => [
+        for (final attribute in available)
+          PopupMenuItem<Object>(
+            value: attribute,
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.label_outline_rounded,
+                  size: 18,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  attribute.name,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        // Only a separator when there is something above to separate from.
+        if (available.isNotEmpty) const PopupMenuDivider(),
+        PopupMenuItem<Object>(
+          value: 'custom',
+          child: Row(
+            children: [
+              const Icon(
+                Icons.add_circle_outline_rounded,
+                size: 18,
+                color: AppColors.textSecondary,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Custom detail',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.add, size: 16, color: AppColors.primary),
+            const SizedBox(width: 4),
+            Text(
+              'Add',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(child: _sectionLabel(context, 'Attributes')),
+            _addButton(context),
+          ],
+        ),
+        if (rows.isEmpty)
+          Text(
+            'Add Size, Colour or a custom detail for this variant.',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.captionFontSize(context),
+              color: AppColors.textSecondary,
+            ),
+          ),
+        for (final row in rows) ...[
+          const SizedBox(height: 8),
+          _buildRow(context, row),
+        ],
+        const SizedBox(height: 12),
+        const Divider(color: AppColors.divider),
+        const SizedBox(height: 4),
+      ],
+    );
+  }
+
+  Widget _buildRow(BuildContext context, _AttrRow row) {
+    final remove = IconButton(
+      tooltip: 'Remove',
+      icon: const Icon(Icons.close_rounded, size: 18),
+      color: AppColors.textSecondary,
+      onPressed: () {
+        rows.remove(row);
+        row.dispose();
+        onChanged();
+      },
+    );
+
+    if (row.isCustom) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: AppTextField(
+              controller: row.nameController,
+              label: 'Detail',
+              hint: 'e.g. Material',
+              icon: Icons.label_outline_rounded,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: AppTextField(
+              controller: row.valueController,
+              label: 'Value',
+              hint: 'e.g. Cotton',
+            ),
+          ),
+          remove,
+        ],
+      );
+    }
+
+    final values = attributeStore.getValues(row.attribute!.attributeId);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: AppTextField(
+            controller: row.valueController,
+            label: row.attribute!.name,
+            hint: values.isEmpty ? null : 'e.g. ${values.first.value}',
+            icon: Icons.label_outline_rounded,
+            // Pick from the attribute's own values instead of retyping them —
+            // the same PopupMenuButton the Add Product form has always had.
+            // Typing stays allowed: a value the shop has not defined yet must
+            // not be blocked mid-flow.
+            suffixIcon: values.isEmpty
+                ? null
+                : PopupMenuButton<String>(
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 22,
+                      color: AppColors.textSecondary,
+                    ),
+                    tooltip: 'Choose ${row.attribute!.name}',
+                    color: AppColors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    onSelected: (value) {
+                      row.valueController.text = value;
+                      onChanged();
+                    },
+                    itemBuilder: (_) => values
+                        .map(
+                          (v) => PopupMenuItem<String>(
+                            value: v.value,
+                            child: Text(
+                              v.value,
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.bodyFontSize(context),
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+          ),
+        ),
+        remove,
+      ],
+    );
   }
 }

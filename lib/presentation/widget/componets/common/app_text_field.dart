@@ -36,6 +36,14 @@ class AppTextField extends StatefulWidget {
   /// Placeholder text inside the field.
   final String? hint;
 
+  /// Always-visible note under the field.
+  ///
+  /// Use this, not [hint], for anything the user must know BEFORE they touch
+  /// the field — "auto-generated if left blank" is worthless once they have
+  /// already typed something, and Material hides the hint behind the resting
+  /// label until the field is focused.
+  final String? helperText;
+
   /// Leading icon inside the field.
   final IconData? icon;
 
@@ -106,6 +114,7 @@ class AppTextField extends StatefulWidget {
     this.initialValue,
     this.label,
     this.hint,
+    this.helperText,
     this.icon,
     this.suffixIcon,
     this.required = false,
@@ -227,6 +236,11 @@ class _AppTextFieldState extends State<AppTextField> {
           color: AppColors.textSecondary,
         ),
         hintText: widget.hint,
+        helperText: widget.helperText,
+        helperStyle: GoogleFonts.poppins(
+          fontSize: 11,
+          color: AppColors.textSecondary,
+        ),
         hintStyle: GoogleFonts.poppins(
           fontSize: 14,
           color: AppColors.textSecondary,

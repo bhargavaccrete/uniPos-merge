@@ -12,6 +12,7 @@ import 'package:billberrylite/core/constants/retail_store_types.dart';
 import 'package:billberrylite/core/init/hive_init.dart';
 import 'package:billberrylite/core/di/service_locator.dart' as sl;
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
+import 'package:billberrylite/domain/services/retail/store_type_attribute_defaults_service.dart';
 import 'package:billberrylite/domain/services/common/device_id_service.dart';
 
 part 'setup_wizard_store.g.dart';
@@ -561,6 +562,7 @@ abstract class _SetupWizardStore with Store {
         retailStoreType: selectedRetailStoreType,
       );
       await _businessDetailsRepo.save(details);
+      await _seedStoreTypeAttributeDefaults();
 
       // Also save to StoreSettingsService for use in receipts
       final storeSettings = StoreSettingsService();
@@ -579,6 +581,27 @@ abstract class _SetupWizardStore with Store {
       errorMessage = 'Failed to save business details: $e';
     } finally {
       isLoading = false;
+    }
+  }
+
+  /// Create the chosen store type's default product attributes, silently.
+  ///
+  /// Runs the moment the store type is persisted, so the merchant finds the
+  /// defaults already waiting in Settings → Product Attributes. It adds NO step,
+  /// dialog or prompt to the wizard — this is the only action the selection
+  /// performs beyond saving the type itself.
+  ///
+  /// Safe here: `selectBusinessType('retail')` has already run
+  /// `HiveInit.initializeForMode` and `registerBusinessDependencies`, so the
+  /// attribute boxes are open and `attributeStore` is registered. Failure is
+  /// non-fatal and self-healing — the attributes screen and every product form
+  /// call the same idempotent seed on open.
+  Future<void> _seedStoreTypeAttributeDefaults() async {
+    if (selectedBusinessTypeId != 'retail') return;
+    try {
+      await StoreTypeAttributeDefaultsService().ensureStoreTypeDefaults();
+    } catch (e) {
+      debugPrint('Setup wizard: store-type attribute defaults not seeded — $e');
     }
   }
 
@@ -654,6 +677,7 @@ abstract class _SetupWizardStore with Store {
         retailStoreType: selectedRetailStoreType,
       );
       await _businessDetailsRepo.save(details);
+      await _seedStoreTypeAttributeDefaults();
 
       // 7. Save to StoreSettingsService for use in receipts
       final storeSettings = StoreSettingsService();
