@@ -25,6 +25,10 @@ import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
+import 'package:billberrylite/presentation/screens/retail/change_password_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/login_screen.dart';
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Settings/licensing_screen.dart';
 
 /// Display name and version shown in the About dialog.
 ///
@@ -148,6 +152,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   context,
                   MaterialPageRoute(
                     builder: (context) => const StoreInfoSettingsScreen(),
+                  ),
+                );
+              },
+            ),
+            _buildSettingsCard(
+              context,
+              icon: Icons.verified_rounded,
+              title: 'License & Subscription',
+              subtitle: 'Manage license key, plan, and device registration',
+              iconColor: Colors.purple,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const LicensingScreen(),
                   ),
                 );
               },
@@ -343,6 +362,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _sectionHeader(context, 'BILLING PREFERENCES'),
             _buildRoundOffCard(context),
             _buildVisualKeyboardCard(context),
+            _buildRefundsCard(context),
 
             const SizedBox(height: 16),
 
@@ -407,6 +427,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // is where someone looks for a report. Settings stays config only.
               const SizedBox(height: 16),
             ],
+
+            // Security & Account Section
+            _sectionHeader(context, 'SECURITY & ACCOUNT'),
+            _buildAutoLogoutTimeoutCard(context),
+            _buildMaxSessionDurationCard(context),
+            _buildSettingsCard(
+              context,
+              icon: Icons.lock_outline_rounded,
+              title: 'Change Admin PIN',
+              subtitle: 'Update your security PIN for admin access',
+              iconColor: AppColors.primary,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ChangePasswordScreen(),
+                  ),
+                );
+              },
+            ),
+            _buildSettingsCard(
+              context,
+              icon: Icons.logout_rounded,
+              title: 'Logout',
+              subtitle: 'End your current session',
+              iconColor: AppColors.danger,
+              onTap: () async {
+                final confirmed = await showAppConfirmDialog(
+                  context: context,
+                  title: 'Logout',
+                  message: 'Are you sure you want to logout?',
+                  confirmLabel: 'Logout',
+                  accent: AppColors.danger,
+                  icon: Icons.logout_rounded,
+                );
+                if (confirmed && context.mounted) {
+                  await authService.logout();
+                  if (!context.mounted) return;
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (context) => const LoginScreen(),
+                    ),
+                    (route) => false,
+                  );
+                }
+              },
+            ),
+            const SizedBox(height: 16),
 
             // App Information Section
             _sectionHeader(context, 'ABOUT'),
@@ -551,7 +619,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             trailing: Switch(
               value: value,
               onChanged: onChanged,
-              activeColor: iconColor,
+              activeThumbColor: iconColor,
             ),
           ),
           if (child != null) ...[
@@ -653,6 +721,283 @@ class _SettingsScreenState extends State<SettingsScreen> {
         iconColor: AppColors.primary,
         value: AppSettings.visualKeyboard,
         onChanged: (v) => AppSettings.updateSetting('Visual Keyboard', v),
+      ),
+    );
+  }
+
+  /// Refunds — master toggle switch & window duration for sales returns.
+  Widget _buildRefundsCard(BuildContext context) {
+    return ListenableBuilder(
+      listenable: AppSettings.settingsNotifier,
+      builder: (context, _) {
+        final refundsOn =
+            AppSettings.settingsNotifier.value["Allow Refunds"] ?? true;
+        return _buildToggleCard(
+          context,
+          icon: Icons.undo_rounded,
+          title: 'Allow Refunds',
+          subtitle: refundsOn
+              ? 'Refunds allowed within the configured window'
+              : 'Refunds disabled — no refund option on sales',
+          iconColor: Colors.deepPurple,
+          value: refundsOn,
+          onChanged: (val) => AppSettings.updateSetting("Allow Refunds", val),
+          child: refundsOn ? _buildRefundWindowPicker(context) : null,
+        );
+      },
+    );
+  }
+
+  Widget _buildRefundWindowPicker(BuildContext context) {
+    const options = <(int, String)>[
+      (30, '30 min'),
+      (60, '1 hr'),
+      (120, '2 hr'),
+      (240, '4 hr'),
+      (480, '8 hr'),
+      (1440, '24 hr'),
+      (0, 'No Limit'),
+    ];
+    return ValueListenableBuilder<int>(
+      valueListenable: AppSettings.refundWindowNotifier,
+      builder: (context, currentMinutes, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Refund Window (time limit for returns)',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.captionFontSize(context),
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: options.map((opt) {
+              final selected = currentMinutes == opt.$1;
+              return GestureDetector(
+                onTap: () => AppSettings.updateRefundWindow(opt.$1),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color:
+                        selected ? Colors.deepPurple : AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: selected ? Colors.deepPurple : AppColors.divider,
+                      width: selected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Text(
+                    opt.$2,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: selected
+                          ? AppColors.white
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Auto Logout Timeout — lock session after period of inactivity.
+  Widget _buildAutoLogoutTimeoutCard(BuildContext context) {
+    const options = <(int, String)>[
+      (5, '5 min'),
+      (10, '10 min'),
+      (15, '15 min'),
+      (30, '30 min'),
+      (60, '1 hr'),
+    ];
+    return ValueListenableBuilder<int>(
+      valueListenable: RestaurantSession.timeoutMinutesNotifier,
+      builder: (context, current, _) => Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.divider),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.lock_clock_rounded,
+                    color: Colors.orange,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Auto Logout Timeout',
+                        style: TextStyle(
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Lock session after period of inactivity',
+                        style: TextStyle(
+                          fontSize: AppResponsive.captionFontSize(context),
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Divider(height: 1, color: AppColors.divider),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: options.map((opt) {
+                final selected = current == opt.$1;
+                return GestureDetector(
+                  onTap: () => RestaurantSession.setTimeoutMinutes(opt.$1),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color:
+                          selected ? Colors.orange : AppColors.surfaceLight,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: selected ? Colors.orange : AppColors.divider,
+                        width: selected ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Text(
+                      opt.$2,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: selected
+                            ? AppColors.white
+                            : AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Maximum Session Duration & Stale Shift Auto Close.
+  Widget _buildMaxSessionDurationCard(BuildContext context) {
+    return ListenableBuilder(
+      listenable: AppSettings.settingsNotifier,
+      builder: (context, _) {
+        final autoCloseOn =
+            AppSettings.settingsNotifier.value["Auto Close Stale Shift"] ??
+                true;
+        return _buildToggleCard(
+          context,
+          icon: Icons.history_toggle_off_rounded,
+          title: 'Auto Close Stale Shift',
+          subtitle:
+              'Automatically close open shift when session duration limit is reached',
+          iconColor: Colors.blue,
+          value: autoCloseOn,
+          onChanged: (val) =>
+              AppSettings.updateSetting("Auto Close Stale Shift", val),
+          child: autoCloseOn ? _buildMaxSessionDurationPicker(context) : null,
+        );
+      },
+    );
+  }
+
+  Widget _buildMaxSessionDurationPicker(BuildContext context) {
+    const options = <(int, String)>[
+      (12, '12 Hours'),
+      (18, '18 Hours'),
+      (24, '24 Hours'),
+      (36, '36 Hours'),
+      (48, '48 Hours'),
+    ];
+    return ValueListenableBuilder<int>(
+      valueListenable: AppSettings.maxSessionDurationHoursNotifier,
+      builder: (context, currentHours, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Maximum Session Duration',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.captionFontSize(context),
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: options.map((opt) {
+              final selected = currentHours == opt.$1;
+              return GestureDetector(
+                onTap: () => AppSettings.updateMaxSessionDurationHours(opt.$1),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: selected ? Colors.blue : AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: selected ? Colors.blue : AppColors.divider,
+                      width: selected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Text(
+                    opt.$2,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: selected
+                          ? AppColors.white
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }

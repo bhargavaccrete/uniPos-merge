@@ -2,6 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../util/restaurant/restaurant_auth_helper.dart';
+import '../../../util/restaurant/restaurant_session.dart';
 
 /// Authentication result
 class AuthResult {
@@ -57,6 +58,7 @@ class AuthService {
     if (hasSession) {
       _currentUsername = prefs.getString(_usernameKey);
       if (_currentUsername != null) {
+        await RestaurantSession.saveAdminSession();
         return true;
       }
     }
@@ -102,6 +104,7 @@ class AuthService {
         RestaurantAuthHelper.verifyPassword(trimmedPin, storedHash)) {
       await _saveSession('Admin');
       _currentUsername = 'Admin';
+      await RestaurantSession.saveAdminSession();
       return AuthResult.success('Admin');
     }
 
@@ -117,6 +120,7 @@ class AuthService {
       final name = '${match.firstName} ${match.lastName}'.trim();
       await _saveSession(name);
       _currentUsername = name;
+      await RestaurantSession.saveStaffSession(match);
       return AuthResult.success(name);
     }
 
@@ -128,6 +132,7 @@ class AuthService {
   Future<void> logout() async {
     await _clearSession();
     _currentUsername = null;
+    await RestaurantSession.clearSession();
   }
 
   /// Change the admin PIN (requires proving the current one first).

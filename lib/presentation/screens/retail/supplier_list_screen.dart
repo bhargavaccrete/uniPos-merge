@@ -326,20 +326,6 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Suppliers',
-        actions: [
-          // Populated → add lives here; empty → the centred empty-state button
-          // is the only prompt.
-          Observer(
-            builder: (context) => supplierStore.suppliers.isEmpty
-                ? const SizedBox.shrink()
-                : IconButton(
-                    icon: const Icon(Icons.add_business_rounded),
-                    tooltip: 'Add supplier',
-                    onPressed: () => _showSupplierForm(),
-                  ),
-          ),
-          const SizedBox(width: 4),
-        ],
       ),
       body: MoneyScope(
         child: Column(
@@ -377,15 +363,11 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
 
                   if (suppliers.isEmpty) {
                     return _searchController.text.isEmpty
-                        ? AppEmptyState(
+                        ? const AppEmptyState(
                             icon: Icons.storefront_outlined,
                             title: 'No suppliers yet',
                             message:
                                 'Add your first supplier to track purchases and balances.',
-                            action: appEmptyStateAction(
-                              label: 'Add Supplier',
-                              onPressed: () => _showSupplierForm(),
-                            ),
                           )
                         : AppEmptyState(
                             icon: Icons.search_off_rounded,
@@ -398,7 +380,7 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                   return _capped(
                     context,
                     ListView.builder(
-                      padding: AppResponsive.padding(context),
+                      padding: AppResponsive.padding(context).copyWith(bottom: 88),
                       itemCount: suppliers.length,
                       itemBuilder: (context, index) =>
                           _buildSupplierCard(context, suppliers[index]),
@@ -409,6 +391,12 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
             ),
           ],
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showSupplierForm(),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.add),
       ),
     );
   }

@@ -60,17 +60,6 @@ class _AttributesScreenState extends State<AttributesScreen> {
       appBar: buildPrimaryAppBar(
         title: 'Product Attributes',
         titleFontSize: 18,
-        actions: [
-          Observer(
-            builder: (_) => _attributeStore.attributes.isEmpty
-                ? const SizedBox.shrink()
-                : IconButton(
-                    icon: const Icon(Icons.add),
-                    tooltip: 'Add Attribute',
-                    onPressed: () => showAddAttributeDialog(context),
-                  ),
-          ),
-        ],
       ),
       body: SafeArea(
         child: AppResponsive.constrainedContent(
@@ -84,21 +73,17 @@ class _AttributesScreenState extends State<AttributesScreen> {
               }
 
               if (_attributeStore.attributes.isEmpty) {
-                return AppEmptyState(
+                return const AppEmptyState(
                   icon: Icons.category_outlined,
                   title: 'No attributes yet',
                   message:
                       'Create attributes like Color, Size or Material to '
                       'build variable products and describe simple ones.',
-                  action: appEmptyStateAction(
-                    label: 'Add First Attribute',
-                    onPressed: () => showAddAttributeDialog(context),
-                  ),
                 );
               }
 
               return ListView(
-                padding: AppResponsive.screenPadding(context),
+                padding: AppResponsive.screenPadding(context).copyWith(bottom: 88),
                 children: [
                   _buildExplainer(),
                   SizedBox(height: AppResponsive.mediumSpacing(context)),
@@ -119,6 +104,12 @@ class _AttributesScreenState extends State<AttributesScreen> {
             },
           ),
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => showAddAttributeDialog(context),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.add),
       ),
     );
   }

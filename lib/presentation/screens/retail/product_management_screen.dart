@@ -46,7 +46,6 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
   int _lastTabIndex = 0;
 
   static const _titles = ['Products', 'Categories'];
-  static const _addLabels = ['Add Product', 'Add Category'];
 
   @override
   void initState() {
@@ -160,24 +159,6 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
               );
             },
           ),
-          // Both the icon's action and its visibility depend on the active tab,
-          // so it tracks the tab animation as well as the stores.
-          AnimatedBuilder(
-            animation: _tabController.animation!,
-            builder: (_, child) => Observer(
-              builder: (_) {
-                final index = _tabController.animation!.value.round();
-                // Empty tabs put the call-to-action in their empty state
-                // instead, matching the rest of the app.
-                if (_countFor(index) == 0) return const SizedBox.shrink();
-                return IconButton(
-                  icon: const Icon(Icons.add),
-                  tooltip: _addLabels[index],
-                  onPressed: _addForCurrentTab,
-                );
-              },
-            ),
-          ),
           const SizedBox(width: 4),
         ],
       ),
@@ -197,6 +178,12 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
             ),
           ],
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _addForCurrentTab,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.add),
       ),
     );
   }

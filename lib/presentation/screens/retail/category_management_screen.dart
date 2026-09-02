@@ -122,7 +122,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
         // Phones read better as a list; wider screens fit a card grid.
         if (AppResponsive.isMobile(context)) {
           return ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
             itemCount: categories.length,
             itemBuilder: (context, index) =>
                 _buildCategoryCard(categories[index]),
@@ -144,9 +144,9 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
         return GridView.builder(
           padding: AppResponsive.getValue(
             context,
-            mobile: const EdgeInsets.all(20),
-            tablet: const EdgeInsets.all(20),
-            desktop: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+            mobile: const EdgeInsets.fromLTRB(20, 20, 20, 88),
+            tablet: const EdgeInsets.fromLTRB(20, 20, 20, 88),
+            desktop: const EdgeInsets.fromLTRB(32, 20, 32, 88),
           ),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
@@ -240,7 +240,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
+                  color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(

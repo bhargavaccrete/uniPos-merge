@@ -383,7 +383,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                     vertical: 5,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -438,9 +438,9 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
     final padding = AppResponsive.getValue(
       context,
-      mobile: const EdgeInsets.all(20),
-      tablet: const EdgeInsets.all(20),
-      desktop: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
+      mobile: const EdgeInsets.fromLTRB(20, 20, 20, 88),
+      tablet: const EdgeInsets.fromLTRB(20, 20, 20, 88),
+      desktop: const EdgeInsets.fromLTRB(32, 8, 32, 88),
     );
 
     return Observer(
@@ -516,7 +516,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
+                  color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
@@ -717,7 +717,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: AppColors.info.withOpacity(0.1),
+        color: AppColors.info.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(3),
       ),
       child: Text(

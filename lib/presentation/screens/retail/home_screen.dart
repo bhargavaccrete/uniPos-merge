@@ -10,7 +10,6 @@ import 'package:billberrylite/presentation/screens/retail/ex/posscreen.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
-import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/dashboard_menu_card.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 
@@ -24,8 +23,6 @@ import 'package:billberrylite/presentation/screens/retail/damaged_goods_hub_scre
 import 'package:billberrylite/presentation/screens/retail/sales_history_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/cash_drawer_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/settings_screen.dart';
-import 'package:billberrylite/presentation/screens/retail/login_screen.dart';
-import 'package:billberrylite/presentation/screens/retail/change_password_screen.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
@@ -222,14 +219,12 @@ class _HomeScreenState extends State<HomeScreen> {
   // ==================== HEADERS ====================
   /// Action widgets shown on the right of the dashboard AppBar (mobile/tablet).
   List<Widget> _buildDashboardAppBarActions(BuildContext context) {
-    // Notification bell, then the account menu (change PIN, logout). White
-    // tint to read on the primary AppBar.
+    // Notification bell. White tint to read on the primary AppBar.
     return [
       NotificationBell(
         iconSize: AppResponsive.isMobile(context) ? 22 : 24,
       ),
-      _buildUserMenuButton(context, Colors.white),
-      const SizedBox(width: 4),
+      const SizedBox(width: 8),
     ];
   }
 
@@ -280,7 +275,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // the bell has to be placed here too — same control, primary tint
           // against the light header.
           const NotificationBell(tint: AppColors.primary, iconSize: 24),
-          _buildUserMenuButton(context, AppColors.primary),
+          const SizedBox(width: 8),
         ],
       ),
     );
@@ -496,89 +491,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ==================== USER MENU ====================
-  Widget _buildUserMenuButton(BuildContext context, Color iconColor) {
-    return PopupMenuButton<String>(
-      icon: Icon(Icons.account_circle_rounded, color: iconColor, size: 28),
-      offset: const Offset(0, 50),
-      // M3 tints menu surfaces by default; keep them plain white.
-      color: AppColors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      onSelected: (value) async {
-        switch (value) {
-          case 'change_password':
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const ChangePasswordScreen(),
-              ),
-            );
-            break;
-          case 'logout':
-            final confirmed = await showAppConfirmDialog(
-              context: context,
-              title: 'Logout',
-              message: 'Are you sure you want to logout?',
-              confirmLabel: 'Logout',
-              accent: AppColors.danger,
-              icon: Icons.logout_rounded,
-            );
-            if (confirmed && context.mounted) {
-              await authService.logout();
-              if (!context.mounted) return;
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-                (route) => false,
-              );
-            }
-            break;
-        }
-      },
-      itemBuilder: (context) => [
-        PopupMenuItem<String>(
-          value: 'change_password',
-          child: Row(
-            children: [
-              const Icon(
-                Icons.lock_outline_rounded,
-                size: 20,
-                color: AppColors.textSecondary,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Change PIN',
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.bodyFontSize(context),
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const PopupMenuDivider(),
-        PopupMenuItem<String>(
-          value: 'logout',
-          child: Row(
-            children: [
-              const Icon(
-                Icons.logout_rounded,
-                size: 20,
-                color: AppColors.danger,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Logout',
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.bodyFontSize(context),
-                  color: AppColors.danger,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+
 
   // ==================== MENU CARDS ====================
   /// Wrap a card's tap in its plan gate. DashboardMenuCard is deliberately

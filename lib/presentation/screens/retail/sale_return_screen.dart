@@ -17,6 +17,7 @@ import '../../../core/plan/plan_enforcement.dart';
 import '../../../core/plan/retail_entitlement_keys.dart';
 import '../../../domain/services/retail/return_math.dart';
 import '../../../domain/services/retail/return_service.dart';
+import 'package:billberrylite/util/restaurant/staticswitch.dart';
 
 class SaleReturnScreen extends StatefulWidget {
   final String saleId;
@@ -167,6 +168,23 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
             : 'Select at least one item to return.',
       );
       return;
+    }
+
+    if (!AppSettings.refundsEnabled) {
+      NotificationService.instance.showError('Refunds are disabled in Settings');
+      return;
+    }
+
+    final windowMinutes = AppSettings.refundWindowMinutes;
+    if (_sale != null && windowMinutes > 0) {
+      final saleDate = DateTime.tryParse(_sale!.date);
+      if (saleDate != null) {
+        final elapsed = DateTime.now().difference(saleDate).inMinutes;
+        if (elapsed > windowMinutes) {
+          NotificationService.instance.showError('Refund window has passed for this sale');
+          return;
+        }
+      }
     }
 
     final split = _split;

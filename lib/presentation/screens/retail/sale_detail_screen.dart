@@ -19,6 +19,7 @@ import 'package:billberrylite/presentation/screens/retail/exchange_screen.dart';
 import 'package:billberrylite/domain/services/retail/print_service.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/restaurant/staticswitch.dart';
 
 class SaleDetailScreen extends StatefulWidget {
   final String saleId;
@@ -218,10 +219,20 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
           _sale != null &&
               !(_sale!.isReturn ?? false) &&
               !_isFullyReturned &&
-              !_isLoading
+              !_isLoading &&
+              (AppSettings.refundsEnabled || _exchangeService.canExchange)
           ? _buildActionBar()
           : null,
     );
+  }
+
+  bool get _isRefundWindowExpired {
+    if (_sale == null) return false;
+    final windowMinutes = AppSettings.refundWindowMinutes;
+    if (windowMinutes == 0) return false; // 0 = No Limit
+    final saleDate = DateTime.tryParse(_sale!.date);
+    if (saleDate == null) return false;
+    return DateTime.now().difference(saleDate).inMinutes > windowMinutes;
   }
 
   /// Return, plus Exchange when the user is allowed to run one.
@@ -229,7 +240,26 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
   /// Exchange is HIDDEN rather than shown-and-refused for a non-admin — the
   /// pattern every money-sensitive retail action follows.
   Widget _buildActionBar() {
-    if (!_exchangeService.canExchange) return _buildReturnButton();
+    final canReturn = AppSettings.refundsEnabled;
+    final canExchange = _exchangeService.canExchange;
+
+    if (!canExchange && canReturn) return _buildReturnButton();
+    if (!canReturn && canExchange) {
+      return Container(
+        padding: AppResponsive.padding(context),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: _capped(context, _exchangeButton()),
+      );
+    }
 
     return Container(
       padding: AppResponsive.padding(context),
@@ -309,45 +339,68 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
   /// The Return action itself. [compact] shortens the label and drops the
   /// full-width minimum so it can sit beside Exchange in a Row.
   Widget _returnAction({bool compact = false}) {
-    return ElevatedButton.icon(
-      onPressed: () async {
-        final result = await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => SaleReturnScreen(saleId: widget.saleId),
-          ),
-        );
+    final windowExpired = _isRefundWindowExpired;
+    final isEnabled = AppSettings.refundsEnabled && !windowExpired;
 
-        if (result == true && mounted) {
-          Navigator.pop(context, true); // Go back to sales history
-        }
-      },
-      icon: Icon(
-        Icons.keyboard_return,
-        size: AppResponsive.iconSize(context),
-      ),
-      label: Text(
-        compact ? 'Return' : 'Process Return/Refund',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontSize: compact
-              ? AppResponsive.bodyFontSize(context)
-              : AppResponsive.subheadingFontSize(context),
+    final windowMinutes = AppSettings.refundWindowMinutes;
+    final windowLabel = windowMinutes < 60
+        ? '$windowMinutes min'
+        : '${windowMinutes ~/ 60} hr';
+
+    final tooltipMsg = !AppSettings.refundsEnabled
+        ? 'Refunds are disabled in Settings'
+        : windowExpired
+            ? 'Refund window has passed ($windowLabel limit)'
+            : '';
+
+    return Tooltip(
+      message: tooltipMsg,
+      child: ElevatedButton.icon(
+        onPressed: isEnabled
+            ? () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SaleReturnScreen(saleId: widget.saleId),
+                  ),
+                );
+
+                if (result == true && mounted) {
+                  Navigator.pop(context, true); // Go back to sales history
+                }
+              }
+            : null,
+        icon: Icon(
+          Icons.keyboard_return,
+          size: AppResponsive.iconSize(context),
         ),
-      ),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.red,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+        label: Text(
+          !AppSettings.refundsEnabled
+              ? 'Refunds Disabled'
+              : windowExpired
+                  ? (compact ? 'Window Expired' : 'Refund Window Expired')
+                  : (compact ? 'Return' : 'Process Return/Refund'),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: compact
+                ? AppResponsive.bodyFontSize(context)
+                : AppResponsive.subheadingFontSize(context),
+          ),
         ),
-        padding: EdgeInsets.symmetric(
-          vertical: AppResponsive.largeSpacing(context),
-        ),
-        minimumSize: Size(
-          compact ? 0 : double.infinity,
-          AppResponsive.buttonHeight(context) + 2,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isEnabled ? Colors.red : Colors.grey,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          padding: EdgeInsets.symmetric(
+            vertical: AppResponsive.largeSpacing(context),
+          ),
+          minimumSize: Size(
+            compact ? 0 : double.infinity,
+            AppResponsive.buttonHeight(context) + 2,
+          ),
         ),
       ),
     );

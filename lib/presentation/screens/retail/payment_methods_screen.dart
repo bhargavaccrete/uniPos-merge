@@ -389,14 +389,6 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Payment Methods',
-        actions: [
-          IconButton(
-            onPressed: _showAddDialog,
-            icon: const Icon(Icons.add_circle_outline, color: Colors.white),
-            tooltip: 'Add Payment Method',
-          ),
-          const SizedBox(width: 8),
-        ],
       ),
       body: AppResponsive.constrainedContent(
         context: context,
@@ -410,31 +402,15 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
             }
 
             if (_paymentStore.paymentMethods.isEmpty) {
-              return AppEmptyState(
+              return const AppEmptyState(
                 icon: Icons.payment_outlined,
                 title: 'No payment methods',
                 message: 'Add the ways your customers can pay.',
-                action: ElevatedButton.icon(
-                  onPressed: _showAddDialog,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add Payment Method'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
               );
             }
 
             return ListView.builder(
-              padding: AppResponsive.padding(context),
+              padding: AppResponsive.padding(context).copyWith(bottom: 88),
               itemCount: _paymentStore.paymentMethods.length,
               itemBuilder: (context, index) => _buildMethodCard(
                 context,
@@ -443,6 +419,12 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
             );
           },
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddDialog,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.add),
       ),
     );
   }

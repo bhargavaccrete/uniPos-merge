@@ -25,6 +25,7 @@ import 'domain/services/restaurant/auto_backup_service.dart';
 import 'domain/services/common/local_notification_service.dart';
 import 'domain/services/common/firebase_messaging_service.dart';
 import 'domain/services/common/notification_sync.dart';
+import 'package:billberrylite/presentation/screens/retail/login_screen.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 final appStore = AppStore();
 
@@ -436,10 +437,17 @@ class _SessionActivityWrapperState extends State<_SessionActivityWrapper> {
       return;
     }
     RestaurantSession.clearSession(); // clears session + resets the flag
-    navigatorKey.currentState?.pushNamedAndRemoveUntil(
-      RouteNames.restaurantLogin,
-      (route) => false,
-    );
+    if (AppConfig.isRetail) {
+      navigatorKey.currentState?.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
+      );
+    } else {
+      navigatorKey.currentState?.pushNamedAndRemoveUntil(
+        RouteNames.restaurantLogin,
+        (route) => false,
+      );
+    }
   }
 
   @override

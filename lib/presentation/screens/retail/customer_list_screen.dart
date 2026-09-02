@@ -314,21 +314,6 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Customers',
-        actions: [
-          // Once the book has customers, adding lives here. While it's still
-          // empty the centred empty-state button is the only prompt, so this
-          // stays hidden rather than offering the same action twice.
-          Observer(
-            builder: (context) => customerStore.customers.isEmpty
-                ? const SizedBox.shrink()
-                : IconButton(
-                    icon: const Icon(Icons.person_add_alt_1_rounded),
-                    tooltip: 'Add customer',
-                    onPressed: _showAddCustomerDialog,
-                  ),
-          ),
-          const SizedBox(width: 4),
-        ],
       ),
       body: MoneyScope(
         child: Column(
@@ -376,15 +361,11 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
 
                   if (customers.isEmpty) {
                     return _searchController.text.isEmpty
-                        ? AppEmptyState(
+                        ? const AppEmptyState(
                             icon: Icons.people_outline_rounded,
                             title: 'No customers yet',
                             message:
                                 'Add your first customer to start tracking purchases, points and dues.',
-                            action: appEmptyStateAction(
-                              label: 'Add Customer',
-                              onPressed: _showAddCustomerDialog,
-                            ),
                           )
                         : AppEmptyState(
                             icon: Icons.search_off_rounded,
@@ -397,7 +378,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                   return _capped(
                     context,
                     ListView.builder(
-                      padding: AppResponsive.padding(context),
+                      padding: AppResponsive.padding(context).copyWith(bottom: 88),
                       itemCount: customers.length,
                       itemBuilder: (context, index) =>
                           _buildCustomerCard(context, customers[index]),
@@ -408,6 +389,12 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
             ),
           ],
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddCustomerDialog,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.add),
       ),
     );
   }
