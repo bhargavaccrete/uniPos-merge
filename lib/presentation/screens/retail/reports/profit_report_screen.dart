@@ -3,6 +3,8 @@ import 'package:billberrylite/util/common/short_ref.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_notice.dart';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
@@ -200,6 +202,82 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
     );
   }
 
+  /// Lines in [rows] with no cost price on record, and the revenue they carry.
+  ///
+  /// Revenue from an un-costed line is still counted — the sale happened — so
+  /// its profit is really "revenue minus the cost we know about", and the
+  /// margin is overstated by exactly the missing cost. Every tab says so, in
+  /// the same words, off the same two keys.
+  (int, double) _unknownCostOf(List<Map<String, dynamic>> rows) {
+    var lines = 0;
+    var revenue = 0.0;
+    for (final row in rows) {
+      lines += (row['unknownCostLines'] as num?)?.toInt() ?? 0;
+      revenue += (row['unknownCostRevenue'] as num?)?.toDouble() ?? 0.0;
+    }
+    return (lines, revenue);
+  }
+
+  /// The tab-level banner. Returns an empty box when everything is costed, so
+  /// it can sit unconditionally in a `children:` list.
+  Widget _unknownCostBanner(int lines, double revenue) {
+    if (lines <= 0) return const SizedBox.shrink();
+    final plural = lines == 1 ? '' : 's';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: ReportNotice(
+        message: '$lines sale line$plural have no cost price on record. Their '
+            '${formatMoney(revenue)} revenue is included, but the cost is not '
+            '— so profit and margin here are overstated.',
+      ),
+    );
+  }
+
+  /// The row-level marker, for one day / variant / sale.
+  Widget _unknownCostChip(int lines, double revenue) {
+    final plural = lines == 1 ? '' : 's';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.amber.shade50,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.warning_amber_rounded,
+            size: AppResponsive.captionFontSize(context) + 4,
+            color: Colors.amber.shade800,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'No cost on $lines line$plural (${formatMoney(revenue)} revenue) '
+              '— margin overstated',
+              style: TextStyle(
+                fontSize: AppResponsive.captionFontSize(context),
+                color: Colors.amber.shade900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// [_unknownCostChip] for a row, or nothing when the row is fully costed.
+  Widget _rowUnknownCost(Map<String, dynamic> row) {
+    final lines = (row['unknownCostLines'] as num?)?.toInt() ?? 0;
+    if (lines <= 0) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: _unknownCostChip(
+        lines,
+        (row['unknownCostRevenue'] as num?)?.toDouble() ?? 0.0,
+      ),
+    );
+  }
+
   Widget _buildOverviewTab() {
     if (_overallReport == null) return const Center(child: Text('No data'));
 
@@ -269,6 +347,10 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
           ),
         ),
         const SizedBox(height: 16),
+        _unknownCostBanner(
+          (_overallReport!['unknownCostLines'] as num?)?.toInt() ?? 0,
+          (_overallReport!['unknownCostRevenue'] as num?)?.toDouble() ?? 0.0,
+        ),
         _buildCard(
           'Total Revenue',
           formatMoney((_overallReport!['totalRevenue'] as double)),
@@ -296,9 +378,12 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
       return const Center(child: Text('No daily profit data available'));
     }
 
+    final (unknownLines, unknownRevenue) = _unknownCostOf(_profitPerDay);
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        _unknownCostBanner(unknownLines, unknownRevenue),
         Container(
           height: 250,
           padding: const EdgeInsets.all(16),
@@ -485,6 +570,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
               ),
             ],
           ),
+          _rowUnknownCost(day),
         ],
       ),
     );
@@ -495,9 +581,13 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
       return const Center(child: Text('No item profit data available'));
     }
 
+    final (itemUnknownLines, itemUnknownRevenue) =
+        _unknownCostOf(_profitPerItem);
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        _unknownCostBanner(itemUnknownLines, itemUnknownRevenue),
         Text(
           'Profit by Product Variant',
           style: TextStyle(
@@ -593,12 +683,15 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
               Expanded(
                 child: _buildSmallStat(
                   'Qty Sold',
-                  '${item['totalQuantitySold']}',
+                  // Quantities are `double` so loose goods can be sold by
+                  // weight; a piece product must still read "3", not "3.0".
+                  formatQty((item['totalQuantitySold'] as num).toDouble()),
                   Colors.orange,
                 ),
               ),
             ],
           ),
+          _rowUnknownCost(item),
         ],
       ),
     );
@@ -609,9 +702,14 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
       return const Center(child: Text('No sale profit data available'));
     }
 
+    // Over the whole period, not just the 50 rows listed below.
+    final (saleUnknownLines, saleUnknownRevenue) =
+        _unknownCostOf(_profitPerSale);
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        _unknownCostBanner(saleUnknownLines, saleUnknownRevenue),
         Text(
           'Profit by Individual Sale',
           style: TextStyle(
@@ -705,12 +803,15 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
               Expanded(
                 child: _buildSmallStat(
                   'Items',
-                  '${sale['totalItems']}',
+                  // `signedItemCount` returns a double (it negates a return),
+                  // so this rendered "3.0" without the format call.
+                  formatQty((sale['totalItems'] as num).toDouble()),
                   Colors.orange,
                 ),
               ),
             ],
           ),
+          _rowUnknownCost(sale),
         ],
       ),
     );
@@ -807,7 +908,9 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: margin >= 0 ? Colors.green.shade50 : Colors.red.shade50,
+                  color: margin >= 0
+                      ? Colors.green.shade50
+                      : Colors.red.shade50,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(

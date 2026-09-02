@@ -118,11 +118,20 @@ class SaleRepository {
   // ==================== CREDIT SALE METHODS ====================
 
   /// Get all credit sales (pay later)
+  /// Newest first, then the sale id.
+  ///
+  /// A date is not a total order — two sales in the same second reordered
+  /// between loads, because `List.sort` is not stable.
+  static int _newestSaleFirst(SaleModel a, SaleModel b) {
+    final byDate = b.date.compareTo(a.date);
+    return byDate != 0 ? byDate : a.saleId.compareTo(b.saleId);
+  }
+
   Future<List<SaleModel>> getCreditSales() async {
     return _saleBox.values
         .where((sale) => sale.paymentType == 'credit')
         .toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
+      ..sort(_newestSaleFirst);
   }
 
   /// Get all sales with due amount
@@ -171,7 +180,11 @@ class SaleRepository {
     DateTime endDate,
   ) async {
     final sales = await getSalesByDateRange(startDate, endDate);
-    return sales.where((sale) => sale.paymentType == 'credit').toList();
+    // Sorted like the unfiltered list above — this used to come back in Hive
+    // key order, so applying a date filter changed the ORDER of the Credit
+    // Sales tab as well as its contents.
+    return sales.where((sale) => sale.paymentType == 'credit').toList()
+      ..sort(_newestSaleFirst);
   }
 
   /// Get sales by status

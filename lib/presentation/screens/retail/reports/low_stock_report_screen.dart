@@ -3,6 +3,7 @@ import 'package:billberrylite/util/common/quantity_format.dart';
 
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
 import 'package:billberrylite/domain/services/retail/report_service.dart';
+import 'package:billberrylite/domain/services/retail/stock_alert_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_app_bar.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_body.dart';
@@ -37,20 +38,30 @@ class LowStockReportScreen extends StatefulWidget {
 class _LowStockReportScreenState extends State<LowStockReportScreen> {
   static const int _rowsPerPage = 50;
 
-  /// Below this, a row reads as critical rather than merely low.
-  static const int _criticalAt = 3;
-
   final ReportService _reportService = ReportService();
+  final StockAlertService _alertService = StockAlertService();
 
   List<Map<String, dynamic>> _reportData = [];
   bool _isLoading = true;
-  int _threshold = 10;
+
+  /// Seeded from the STORED Stock Alert threshold — the same value Settings and
+  /// the Stock Alerts screen write. This screen used to hard-code 10 and offer
+  /// its own `[5, 10, 20]`, so a store configured at 25 opened the report at 10
+  /// and could not even select 25. `StockAlertService` centralises both.
+  int _threshold = StockAlertService.defaultThreshold;
   int _currentPage = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadReport();
+    _init();
+  }
+
+  Future<void> _init() async {
+    final stored = await _alertService.getThreshold();
+    if (!mounted) return;
+    setState(() => _threshold = stored);
+    await _loadReport();
   }
 
   Future<void> _loadReport() async {
@@ -70,8 +81,16 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
   }
 
   /// Red once a variant is nearly gone, amber while it is merely low.
-  Color _severityColor(double stock) =>
-      stock <= _criticalAt ? AppColors.danger : AppColors.warning;
+  ///
+  /// The rule is [StockAlertService.isCritical], NOT a constant of this
+  /// screen's own — a third of the row's reorder point, floored at 1. The old
+  /// `stock <= 3` marked a variant that reorders at 2 as critical forever and
+  /// left one that reorders at 30 amber at 8, so this report and the Stock
+  /// Alerts card disagreed about the very same rows.
+  Color _severityColor(Map<String, dynamic> row) =>
+      StockAlertService.isCritical(row)
+          ? AppColors.danger
+          : AppColors.warning;
 
   @override
   Widget build(BuildContext context) {
@@ -88,22 +107,16 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
             ReportFilterBar<int>(
               selected: _threshold,
               onSelected: _onThresholdChanged,
-              options: const [
-                ReportFilterOption(
-                  value: 5,
-                  label: '≤ 5',
-                  icon: Icons.priority_high_rounded,
-                ),
-                ReportFilterOption(
-                  value: 10,
-                  label: '≤ 10',
-                  icon: Icons.tune_rounded,
-                ),
-                ReportFilterOption(
-                  value: 20,
-                  label: '≤ 20',
-                  icon: Icons.inventory_2_outlined,
-                ),
+              // The ONE list. Settings and the Stock Alerts screen already
+              // share it; this screen offering a third had reintroduced the
+              // exact drift that centralising it was meant to end.
+              options: [
+                for (final value in StockAlertService.thresholdOptions)
+                  ReportFilterOption(
+                    value: value,
+                    label: '≤ $value',
+                    icon: Icons.tune_rounded,
+                  ),
               ],
             ),
             AppResponsive.verticalSpace(context, size: SpacingSize.small),
@@ -127,12 +140,10 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
 
     // `num`, not `int` — a loose-goods variant carries a fractional stock and
     // a hard int cast threw as soon as one was flagged.
-    final outOfStock = _reportData
-        .where((r) => _stockOf(r) <= 0)
-        .length;
-    final critical = _reportData
-        .where((r) => _stockOf(r) > 0 && _stockOf(r) <= _criticalAt)
-        .length;
+    final outOfStock = _reportData.where((r) => _stockOf(r) <= 0).length;
+    // Same predicate the Stock Alerts card counts with, so the two tiles can
+    // never report different numbers over the same rows.
+    final critical = _reportData.where(StockAlertService.isCritical).length;
 
     final pageRows = ReportPagination.pageSlice(
       _reportData,
@@ -165,7 +176,7 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
               ReportSummaryCard(
                 title: 'Critical',
                 value: '$critical',
-                subtitle: '≤ $_criticalAt left',
+                subtitle: 'at a third of reorder point',
                 icon: Icons.priority_high_rounded,
                 color: critical > 0
                     ? AppColors.danger
@@ -208,7 +219,7 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
     final stock = _stockOf(item);
     final costPrice = (item['costPrice'] as num?)?.toDouble();
     final isBundle = item['isBundle'] == true;
-    final color = _severityColor(stock);
+    final color = _severityColor(item);
 
     return DataRow(
       cells: [
@@ -222,10 +233,7 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (isBundle) ...[
-                const SizedBox(width: 6),
-                _bundleBadge(),
-              ],
+              if (isBundle) ...[const SizedBox(width: 6), _bundleBadge()],
             ],
           ),
         ),
@@ -247,7 +255,11 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
             ),
           ),
         ),
-        DataCell(Text('${item['reorderPoint']}')),
+        // `formatQty`, not the raw value: a variant-level reorder point is a
+        // double and used to render "5.0" beside a global fallback's "10".
+        DataCell(
+          Text(formatQty((item['reorderPoint'] as num).toDouble())),
+        ),
         DataCell(Text(costPrice == null ? '—' : formatMoney(costPrice))),
       ],
     );
@@ -294,8 +306,10 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
               r['productName'],
               r['variantLabel'] ?? '',
               r['barcode'] ?? '',
-              r['currentStock'],
-              r['reorderPoint'],
+              // `exportQty`, so Excel keeps a numeric cell while the PDF —
+              // which calls toString() — stops printing "3.0".
+              exportQty((r['currentStock'] as num).toDouble()),
+              exportQty((r['reorderPoint'] as num).toDouble()),
               r['costPrice'] == null
                   ? ''
                   : ReportExportService.formatCurrency(

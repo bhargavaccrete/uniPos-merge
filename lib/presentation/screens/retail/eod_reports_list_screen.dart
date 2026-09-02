@@ -1,3 +1,5 @@
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
+import 'package:billberrylite/util/common/short_ref.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -5,9 +7,14 @@ import 'package:billberrylite/presentation/widget/componets/common/primary_app_b
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
+import 'package:billberrylite/domain/services/common/report_export_service.dart';
+import 'package:billberrylite/domain/services/retail/eod_history_export.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_export_button.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_filter_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_period.dart';
 import 'package:billberrylite/domain/services/restaurant/eod_service.dart';
 import 'package:billberrylite/presentation/screens/retail/eod_report_detail_screen.dart';
-import 'package:billberrylite/util/common/currency_helper.dart';
 
 /// EOD Reports List Screen - Shows all saved EOD reports
 class EODReportsListScreen extends StatefulWidget {
@@ -18,8 +25,18 @@ class EODReportsListScreen extends StatefulWidget {
 }
 
 class _EODReportsListScreenState extends State<EODReportsListScreen> {
-  List<EndOfDayReport> _reports = [];
+  /// Every retail close, loaded once. The period filter narrows this in memory
+  /// rather than re-querying — a close list is small and already sorted.
+  List<EndOfDayReport> _allReports = [];
   bool _isLoading = true;
+
+  /// Set when the load itself failed. Kept apart from "no reports" because an
+  /// empty list used to render the SUCCESS state ("No EOD Reports Yet") behind
+  /// a red toast — a failure was indistinguishable from a quiet shop.
+  String? _error;
+
+  /// `null` = all time, which is what this screen has always shown.
+  ReportPeriod? _period;
 
   @override
   void initState() {
@@ -27,28 +44,63 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
     _loadReports();
   }
 
+  /// The closes the period covers. Bounds come from the shared report kit, so
+  /// "This Month" means here exactly what it means on every other report —
+  /// inclusive start, EXCLUSIVE end.
+  List<EndOfDayReport> get _visibleReports {
+    final period = _period;
+    if (period == null) return _allReports;
+    final now = DateTime.now();
+    final start = reportPeriodStartBound(period, now);
+    final end = reportPeriodEndBound(period, now);
+    return _allReports
+        .where((r) => !r.date.isBefore(start) && r.date.isBefore(end))
+        .toList();
+  }
+
+  String get _periodLabel => _period?.label ?? 'All time';
+
   Future<void> _loadReports() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
     try {
       final allReports = await EODService.getAllEODReports();
-      // Filter for retail reports only (mode == 'retail' or null for old reports)
+      // Retail closes only: `mode` is null on legacy records, and null means
+      // RESTAURANT (`EndOfDayReport.mode`, "nullable for backward
+      // compatibility"). So an exact match on 'retail' is correct — do not
+      // widen this to include nulls, or restaurant closes appear here.
       final retailReports = allReports.where((report) {
         return report.mode == 'retail';
       }).toList();
 
+      if (!mounted) return;
       setState(() {
-        _reports = retailReports;
+        _allReports = retailReports;
         _isLoading = false;
       });
     } catch (e) {
-      setState(() => _isLoading = false);
-      _showError('Error loading reports: $e');
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _error = '$e';
+      });
     }
   }
 
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
+  Future<void> _export() async {
+    final export = EodHistoryExport.list(
+      reports: _visibleReports,
+      period: _periodLabel,
+    );
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'eod_history',
+      reportTitle: 'End of Day History',
+      headers: export.headers,
+      data: export.rows,
+      summary: export.summary,
     );
   }
 
@@ -66,55 +118,156 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
           ),
         ],
       ),
-      body: AppResponsive.constrainedContent(
-        context: context,
-        alignment: Alignment.topCenter,
-        maxWidth: AppResponsive.maxContentWidth(context),
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _reports.isEmpty
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.receipt_long, size: 80, color: Colors.grey[300]),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No EOD Reports Yet',
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.subheadingFontSize(context),
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey[600],
-                      ),
+      // Every amount here goes through formatMoney; MoneyScope is the single
+      // subscription that re-renders them when the store's currency or decimal
+      // precision changes. These two screens were the last holdouts still
+      // hard-coding the symbol and two decimals.
+      body: MoneyScope(
+        child: AppResponsive.constrainedContent(
+          context: context,
+          alignment: Alignment.topCenter,
+          maxWidth: AppResponsive.maxContentWidth(context),
+          child: Column(
+            children: [
+              // The shared period bar, so "This Month" means here what it means
+              // on every other retail report. `null` is All time, which is what
+              // this screen has always shown.
+              ReportFilterBar<ReportPeriod?>(
+                selected: _period,
+                onSelected: (value) => setState(() => _period = value),
+                options: [
+                  const ReportFilterOption<ReportPeriod?>(
+                    value: null,
+                    label: 'All',
+                    icon: Icons.all_inclusive,
+                  ),
+                  for (final period in const [
+                    ReportPeriod.today,
+                    ReportPeriod.thisWeek,
+                    ReportPeriod.thisMonth,
+                    ReportPeriod.thisYear,
+                  ])
+                    ReportFilterOption<ReportPeriod?>(
+                      value: period,
+                      label: period.label,
+                      icon: period.icon,
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Complete your first End of Day to see reports here',
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.bodyFontSize(context),
-                        color: Colors.grey[500],
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            : RefreshIndicator(
-                onRefresh: _loadReports,
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _reports.length,
-                  itemBuilder: (context, index) {
-                    final report = _reports[index];
-                    return _buildReportCard(report);
-                  },
-                ),
+                ],
               ),
+              Expanded(child: _buildContent()),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    if (_isLoading) return const ReportLoading();
+
+    // A FAILED load is not an empty shop. This used to fall through to the
+    // success state below, so the screen cheerfully announced "No EOD Reports
+    // Yet" over a load that had thrown.
+    if (_error != null) {
+      return _buildMessage(
+        icon: Icons.error_outline,
+        iconColor: AppColors.danger,
+        title: 'Could not load reports',
+        message: _error!,
+        action: TextButton.icon(
+          onPressed: _loadReports,
+          icon: const Icon(Icons.refresh),
+          label: const Text('Try again'),
+        ),
+      );
+    }
+
+    final reports = _visibleReports;
+    if (reports.isEmpty) {
+      // Two different empty states: nothing has ever been closed, versus
+      // nothing was closed in the period the user picked.
+      return _period == null
+          ? _buildMessage(
+              icon: Icons.receipt_long,
+              iconColor: Colors.grey[300]!,
+              title: 'No EOD Reports Yet',
+              message: 'Complete your first End of Day to see reports here',
+            )
+          : _buildMessage(
+              icon: Icons.event_busy,
+              iconColor: Colors.grey[300]!,
+              title: 'No closes in this period',
+              message: 'Nothing was closed during $_periodLabel.',
+            );
+    }
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: ReportExportButton(onPressed: _export),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _loadReports,
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: reports.length,
+              itemBuilder: (context, index) {
+                return _buildReportCard(reports[index]);
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMessage({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String message,
+    Widget? action,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 80, color: iconColor),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.subheadingFontSize(context),
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                color: Colors.grey[500],
+              ),
+            ),
+            if (action != null) ...[const SizedBox(height: 12), action],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildReportCard(EndOfDayReport report) {
+    // Date AND time: two closes on one day used to render as identical cards.
     final dateFormat = DateFormat('dd MMM yyyy, EEEE');
+    final timeFormat = DateFormat('hh:mm a');
+    final sessionId = report.sessionId;
     final isBalanced =
         report.cashReconciliation.reconciliationStatus == 'Balanced';
     final isOverage =
@@ -151,12 +304,31 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                         color: Colors.grey[600],
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        dateFormat.format(report.date),
-                        style: GoogleFonts.poppins(
-                          fontSize: AppResponsive.bodyFontSize(context),
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            dateFormat.format(report.date),
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.bodyFontSize(context),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            // Retail carries no sessionId (the model documents
+                            // null = retail/legacy), so the TIME is what tells
+                            // two closes on one date apart. The session is
+                            // shown as well whenever a record has one.
+                            sessionId == null || sessionId.isEmpty
+                                ? timeFormat.format(report.date)
+                                : '${timeFormat.format(report.date)} · '
+                                      'Session ${shortRef(sessionId)}',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.captionFontSize(context),
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -199,7 +371,7 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                 children: [
                   _buildStatColumn(
                     'Total Sales',
-                    '${CurrencyHelper.currentSymbol}${report.totalSales.toStringAsFixed(2)}',
+                    formatMoney(report.totalSales),
                     Colors.green,
                   ),
                   _buildStatColumn(
@@ -218,18 +390,22 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                 children: [
                   _buildStatColumn(
                     'Expected Cash',
-                    '${CurrencyHelper.currentSymbol}${report.cashReconciliation.systemExpectedCash.toStringAsFixed(2)}',
+                    formatMoney(report.cashReconciliation.systemExpectedCash),
                     Colors.orange,
                   ),
                   _buildStatColumn(
                     'Actual Cash',
-                    '${CurrencyHelper.currentSymbol}${report.cashReconciliation.actualCash.toStringAsFixed(2)}',
+                    formatMoney(report.cashReconciliation.actualCash),
                     Colors.teal,
                   ),
                 ],
               ),
 
-              if (report.cashReconciliation.difference != 0) ...[
+              // The SAME tolerance that decided the status. `!= 0` drew an
+              // amber banner reading "Difference: ₹0.00" over a residual of
+              // 1e-13.
+              if (report.cashReconciliation.difference.abs() >=
+                  kCashReconciliationTolerance) ...[
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(8),
@@ -253,7 +429,7 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        'Difference: ${CurrencyHelper.currentSymbol}${report.cashReconciliation.difference.abs().toStringAsFixed(2)}',
+                        'Difference: ${formatMoney(report.cashReconciliation.difference.abs())}',
                         style: GoogleFonts.poppins(
                           fontSize: AppResponsive.captionFontSize(context),
                           fontWeight: FontWeight.w600,

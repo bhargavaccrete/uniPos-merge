@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/core/config/tax_feature.dart';
+import 'package:billberrylite/core/config/tax_label_rule.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 
+import 'package:billberrylite/domain/services/retail/gst_service.dart';
 import 'package:billberrylite/domain/services/retail/report_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_notice.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 
 class GstReportScreen extends StatefulWidget {
@@ -26,17 +30,36 @@ class _GstReportScreenState extends State<GstReportScreen>
 
   final ReportService _reportService = ReportService();
 
+  // Resolved once. The country cannot change while this screen is open, and
+  // these would otherwise hit the repository once per row of every list.
+  //
+  // PRESENTATION ONLY — the figures below are identical in every country; this
+  // decides what they are called and whether the CGST/SGST halves, which are an
+  // Indian intra-state concept, may be shown at all.
+  late final String _taxName = TaxLabelRule.name;
+  late final bool _splitsTax = TaxLabelRule.splitsIntoComponents;
+  late final ({String first, String second})? _taxComponents =
+      TaxLabelRule.components;
+
   // Report data — all aggregation now happens in ReportService; this screen
   // only renders what it is handed.
   int _saleCount = 0;
-  int _lineCount = 0;
+
+  /// Signed UNITS sold, not rows. `lineCount` counted a credit note's lines as
+  /// +1 while every money figure beside it was netted, so a fully-credited
+  /// period read "Total Items Sold: 20" against zero tax.
+  double _totalQuantity = 0;
+
+  /// Sales dropped because their date could not be read — and therefore missing
+  /// from the tax totals above. Computed all along; never shown until now.
+  int _skippedRows = 0;
   double _totalTaxableAmount = 0;
   double _totalGstAmount = 0;
   double _totalCgstAmount = 0;
   double _totalSgstAmount = 0;
   Map<double, _GstRateSummary> _gstByRate = {};
   Map<String, _ProductGstSummary> _gstByProduct = {};
-  Map<String, _CategoryGstSummary> _gstByCategory = {};
+  Map<double, _CategoryGstSummary> _gstByCategory = {};
 
   @override
   void initState() {
@@ -74,7 +97,8 @@ class _GstReportScreenState extends State<GstReportScreen>
       if (!mounted) return;
 
       _saleCount = data['saleCount'] as int;
-      _lineCount = data['lineCount'] as int;
+      _totalQuantity = (data['totalQuantity'] as num).toDouble();
+      _skippedRows = (data['skippedRows'] as num?)?.toInt() ?? 0;
       _totalTaxableAmount = data['totalTaxableAmount'] as double;
       _totalGstAmount = data['totalGstAmount'] as double;
       _totalCgstAmount = data['totalCgstAmount'] as double;
@@ -89,10 +113,12 @@ class _GstReportScreenState extends State<GstReportScreen>
             in (data['byProduct'] as List).cast<Map<String, dynamic>>())
           row['productId'] as String: _ProductGstSummary.fromMap(row),
       };
+      // Keyed on the RATE. Keyed on `categoryName`, two bands whose names
+      // format alike would collide here and one would be silently dropped.
       _gstByCategory = {
         for (final row
             in (data['byCategory'] as List).cast<Map<String, dynamic>>())
-          row['categoryName'] as String: _CategoryGstSummary.fromMap(row),
+          (row['gstRate'] as num).toDouble(): _CategoryGstSummary.fromMap(row),
       };
     } catch (e) {
       debugPrint('Error loading GST report: $e');
@@ -130,7 +156,7 @@ class _GstReportScreenState extends State<GstReportScreen>
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
-        title: 'GST Reports',
+        title: TaxLabelRule.reportTitle,
         // Tabs read on the primary fill, matching every other AppBar.
         bottom: TabBar(
           controller: _tabController,
@@ -223,6 +249,15 @@ class _GstReportScreenState extends State<GstReportScreen>
                 ],
               ),
             ),
+            if (_skippedRows > 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: ReportNotice(
+                  message: '$_skippedRows sale${_skippedRows == 1 ? '' : 's'} '
+                      'could not be dated and ${_skippedRows == 1 ? 'is' : 'are'} '
+                      'excluded from every figure below.',
+                ),
+              ),
             const Divider(height: 1),
 
             // Tab Content
@@ -262,25 +297,29 @@ class _GstReportScreenState extends State<GstReportScreen>
               children: [
                 _buildSummaryRow('Total Sales', '$_saleCount'),
                 const SizedBox(height: 12),
-                _buildSummaryRow('Total Items Sold', '$_lineCount'),
+                _buildSummaryRow('Total Units Sold', formatQty(_totalQuantity)),
                 const Divider(height: 24),
                 _buildSummaryRow(
                   'Total Taxable Amount',
                   '${CurrencyHelper.currentSymbol}${_totalTaxableAmount.toStringAsFixed(2)}',
                 ),
-                const SizedBox(height: 12),
-                _buildSummaryRow(
-                  'Total CGST',
-                  '${CurrencyHelper.currentSymbol}${_totalCgstAmount.toStringAsFixed(2)}',
-                ),
-                const SizedBox(height: 8),
-                _buildSummaryRow(
-                  'Total SGST',
-                  '${CurrencyHelper.currentSymbol}${_totalSgstAmount.toStringAsFixed(2)}',
-                ),
+                // Outside India there are no components — VAT and US sales tax
+                // are one figure, and the stored halves mean nothing.
+                if (_splitsTax && _taxComponents != null) ...[
+                  const SizedBox(height: 12),
+                  _buildSummaryRow(
+                    'Total ${_taxComponents.first}',
+                    '${CurrencyHelper.currentSymbol}${_totalCgstAmount.toStringAsFixed(2)}',
+                  ),
+                  const SizedBox(height: 8),
+                  _buildSummaryRow(
+                    'Total ${_taxComponents.second}',
+                    '${CurrencyHelper.currentSymbol}${_totalSgstAmount.toStringAsFixed(2)}',
+                  ),
+                ],
                 const Divider(height: 24),
                 _buildSummaryRow(
-                  'Total GST Collected',
+                  'Total $_taxName Collected',
                   '${CurrencyHelper.currentSymbol}${_totalGstAmount.toStringAsFixed(2)}',
                   isBold: true,
                   fontSize: AppResponsive.subheadingFontSize(context),
@@ -292,7 +331,7 @@ class _GstReportScreenState extends State<GstReportScreen>
 
           // GST Rate Distribution
           Text(
-            'GST Distribution by Rate',
+            '$_taxName Distribution by Rate',
             style: TextStyle(
               fontSize: AppResponsive.subheadingFontSize(context),
               fontWeight: FontWeight.w600,
@@ -321,7 +360,7 @@ class _GstReportScreenState extends State<GstReportScreen>
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          '${entry.key.toInt()}%',
+                          GstService.formatGstRate(entry.key),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: AppResponsive.smallFontSize(context),
@@ -342,7 +381,7 @@ class _GstReportScreenState extends State<GstReportScreen>
                               ),
                             ),
                             Text(
-                              '${summary.itemCount} items',
+                              '${summary.itemCount} lines',
                               style: TextStyle(
                                 fontSize: AppResponsive.captionFontSize(
                                   context,
@@ -365,8 +404,9 @@ class _GstReportScreenState extends State<GstReportScreen>
   }
 
   Widget _buildByRateTab() {
-    final sortedRates = _gstByRate.entries.toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
+    // No sort: `ReportService` returns the rates ascending and the map above
+    // preserves that order. One decision, one place.
+    final sortedRates = _gstByRate.entries.toList();
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
@@ -397,7 +437,7 @@ class _GstReportScreenState extends State<GstReportScreen>
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      'GST ${entry.key.toInt()}%',
+                      '$_taxName ${GstService.formatGstRate(entry.key)}',
                       style: TextStyle(
                         fontSize: AppResponsive.subheadingFontSize(context),
                         fontWeight: FontWeight.w600,
@@ -407,7 +447,8 @@ class _GstReportScreenState extends State<GstReportScreen>
                   ),
                   const Spacer(),
                   Text(
-                    '${summary.itemCount} items',
+                    // LINES, not units: this counts sale rows, netted by sign.
+                    '${summary.itemCount} lines',
                     style: TextStyle(color: Colors.grey[600]),
                   ),
                 ],
@@ -417,19 +458,21 @@ class _GstReportScreenState extends State<GstReportScreen>
                 'Taxable Amount',
                 '${CurrencyHelper.currentSymbol}${summary.taxableAmount.toStringAsFixed(2)}',
               ),
-              const SizedBox(height: 8),
-              _buildDetailRow(
-                'CGST (${(entry.key / 2).toStringAsFixed(1)}%)',
-                '${CurrencyHelper.currentSymbol}${summary.cgst.toStringAsFixed(2)}',
-              ),
-              const SizedBox(height: 8),
-              _buildDetailRow(
-                'SGST (${(entry.key / 2).toStringAsFixed(1)}%)',
-                '${CurrencyHelper.currentSymbol}${summary.sgst.toStringAsFixed(2)}',
-              ),
+              if (_splitsTax && _taxComponents != null) ...[
+                const SizedBox(height: 8),
+                _buildDetailRow(
+                  '${_taxComponents.first} (${(entry.key / 2).toStringAsFixed(1)}%)',
+                  '${CurrencyHelper.currentSymbol}${summary.cgst.toStringAsFixed(2)}',
+                ),
+                const SizedBox(height: 8),
+                _buildDetailRow(
+                  '${_taxComponents.second} (${(entry.key / 2).toStringAsFixed(1)}%)',
+                  '${CurrencyHelper.currentSymbol}${summary.sgst.toStringAsFixed(2)}',
+                ),
+              ],
               const Divider(height: 16),
               _buildDetailRow(
-                'Total GST',
+                'Total $_taxName',
                 '${CurrencyHelper.currentSymbol}${summary.totalGst.toStringAsFixed(2)}',
                 isBold: true,
               ),
@@ -441,8 +484,8 @@ class _GstReportScreenState extends State<GstReportScreen>
   }
 
   Widget _buildByProductTab() {
-    final sortedProducts = _gstByProduct.values.toList()
-      ..sort((a, b) => b.totalGst.compareTo(a.totalGst));
+    // Ordered by the service: most tax first, product id as the tie-break.
+    final sortedProducts = _gstByProduct.values.toList();
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
@@ -472,7 +515,10 @@ class _GstReportScreenState extends State<GstReportScreen>
                     ),
                   ),
                   Text(
-                    'Qty: ${summary.quantity}',
+                    // `formatQty`, not the raw double: 2.5 kg used to be
+                    // truncated to "2", and a product sold only in half-kilos
+                    // read "Qty: 0".
+                    'Qty: ${formatQty(summary.quantity)}',
                     style: TextStyle(color: Colors.grey[600]),
                   ),
                 ],
@@ -493,7 +539,7 @@ class _GstReportScreenState extends State<GstReportScreen>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'GST Rate: ${summary.avgGstRate.toStringAsFixed(1)}%',
+                        '$_taxName Rate: ${summary.avgGstRate.toStringAsFixed(1)}%',
                         style: TextStyle(
                           fontSize: AppResponsive.smallFontSize(context),
                           color: Colors.grey[600],
@@ -511,7 +557,7 @@ class _GstReportScreenState extends State<GstReportScreen>
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      'GST: ${CurrencyHelper.currentSymbol}${summary.totalGst.toStringAsFixed(2)}',
+                      '$_taxName: ${CurrencyHelper.currentSymbol}${summary.totalGst.toStringAsFixed(2)}',
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF4CAF50),
@@ -528,8 +574,8 @@ class _GstReportScreenState extends State<GstReportScreen>
   }
 
   Widget _buildByCategoryTab() {
-    final sortedCategories = _gstByCategory.values.toList()
-      ..sort((a, b) => b.totalGst.compareTo(a.totalGst));
+    // Ordered by the service: most tax first, rate as the tie-break.
+    final sortedCategories = _gstByCategory.values.toList();
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
@@ -568,7 +614,7 @@ class _GstReportScreenState extends State<GstReportScreen>
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      '${summary.gstRate.toInt()}%',
+                      GstService.formatGstRate(summary.gstRate),
                       style: TextStyle(
                         fontSize: AppResponsive.captionFontSize(context),
                         fontWeight: FontWeight.w600,
@@ -579,19 +625,23 @@ class _GstReportScreenState extends State<GstReportScreen>
                 ],
               ),
               const Divider(height: 20),
-              _buildDetailRow('Items Sold', '${summary.itemCount}'),
+              _buildDetailRow('Sale Lines', '${summary.itemCount}'),
               const SizedBox(height: 8),
               _buildDetailRow(
                 'Taxable Amount',
                 '${CurrencyHelper.currentSymbol}${summary.taxableAmount.toStringAsFixed(2)}',
               ),
-              const SizedBox(height: 8),
-              _buildDetailRow('CGST', '${CurrencyHelper.currentSymbol}${summary.cgst.toStringAsFixed(2)}'),
-              const SizedBox(height: 8),
-              _buildDetailRow('SGST', '${CurrencyHelper.currentSymbol}${summary.sgst.toStringAsFixed(2)}'),
+              if (_splitsTax && _taxComponents != null) ...[
+                const SizedBox(height: 8),
+                _buildDetailRow(_taxComponents.first,
+                    '${CurrencyHelper.currentSymbol}${summary.cgst.toStringAsFixed(2)}'),
+                const SizedBox(height: 8),
+                _buildDetailRow(_taxComponents.second,
+                    '${CurrencyHelper.currentSymbol}${summary.sgst.toStringAsFixed(2)}'),
+              ],
               const Divider(height: 16),
               _buildDetailRow(
-                'Total GST',
+                'Total $_taxName',
                 '${CurrencyHelper.currentSymbol}${summary.totalGst.toStringAsFixed(2)}',
                 isBold: true,
               ),
@@ -690,7 +740,10 @@ class _GstRateSummary {
 class _ProductGstSummary {
   final String productId;
   final String productName;
-  final int quantity;
+
+  /// A `double` — retail sells by weight. Read back `as int` this truncated
+  /// 2.5 to 2 and 0.5 to 0.
+  final double quantity;
   final double taxableAmount;
   final double totalGst;
   final double avgGstRate;
@@ -708,7 +761,7 @@ class _ProductGstSummary {
       _ProductGstSummary(
         productId: map['productId'] as String,
         productName: map['productName'] as String,
-        quantity: (map['quantity'] as num).toInt(),
+        quantity: (map['quantity'] as num).toDouble(),
         taxableAmount: (map['taxableAmount'] as num).toDouble(),
         totalGst: (map['totalGst'] as num).toDouble(),
         avgGstRate: (map['avgGstRate'] as num).toDouble(),

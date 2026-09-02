@@ -396,25 +396,61 @@ abstract class _PurchaseOrderStore with Store {
     }
   }
 
-  /// Update PO status based on receiving progress
+  /// Tolerance for comparing received against ordered.
+  ///
+  /// Quantities are `double` so goods can be received by weight, and binary
+  /// floating point does not add them exactly: three receipts of 3.5 against an
+  /// order of 10.5 sum to 10.499999999999998, which a bare `>=` reads as short.
+  static const double _qtyEpsilon = 1e-6;
+
+  /// Update PO status based on receiving progress.
+  ///
+  /// **Completion is decided PER ITEM, never on the PO's totals.** Comparing
+  /// summed quantities let a surplus on one line cover a shortage on another —
+  /// an order for A 10 / B 10 receiving A 15 / B 5 summed to 20 of 20 and was
+  /// marked Completed with five units of B never delivered. That is not just a
+  /// wrong label: `canReceive` is `sent || partiallyCompleted`, so the PO left
+  /// the receiving flow and the outstanding goods had nowhere to land.
+  ///
+  /// Over-receipt still satisfies its OWN line — `>=` is deliberate, and a
+  /// trade surplus should not hold an order open.
+  ///
+  /// Reads `getTotalReceivedQtyForPOItem`, which the receiving screen already
+  /// uses to compute each line's remaining quantity, so the status and the
+  /// receiving UI agree by construction. It counts CONFIRMED GRNs only.
+  ///
+  /// Nothing here recomputes historical rows: a PO already stored as
+  /// `fullyCompleted` under the old total-based rule keeps that status until
+  /// something calls this again. Repairing those is a separate decision.
   Future<void> _updatePOStatusAfterGRN(String poId) async {
     final po = _poRepository.getPurchaseOrderById(poId);
     if (po == null) return;
 
-    // Get all PO items
     final poItems = await _poItemRepository.getItemsByPOId(poId);
-    final totalOrdered = poItems.fold<double>(0.0, (sum, item) => sum + item.orderedQty);
+    // Legacy/restore protection. An order with no lines, or nothing actually
+    // ordered, must never auto-complete — `0 >= 0` would have done exactly
+    // that. The PO screen already refuses a zero quantity at entry.
+    if (poItems.isEmpty) return;
+    final totalOrdered =
+        poItems.fold<double>(0.0, (sum, item) => sum + item.orderedQty);
+    if (totalOrdered <= 0) return;
 
-    // Get total received from all confirmed GRNs
-    final totalReceived = await _grnRepository.getTotalReceivedQtyForPO(poId);
+    var allSatisfied = true;
+    var anyReceived = false;
+    for (final item in poItems) {
+      final received =
+          await _grnItemRepository.getTotalReceivedQtyForPOItem(item.poItemId);
+      if (received > 0) anyReceived = true;
+      if (received < item.orderedQty - _qtyEpsilon) allSatisfied = false;
+    }
 
     POStatus newStatus;
-    if (totalReceived >= totalOrdered) {
+    if (allSatisfied) {
       newStatus = POStatus.fullyCompleted;
-    } else if (totalReceived > 0) {
+    } else if (anyReceived) {
       newStatus = POStatus.partiallyCompleted;
     } else {
-      return; // No change needed
+      return; // Nothing received yet — the order stays as it was sent.
     }
 
     await updatePOStatus(poId, newStatus);

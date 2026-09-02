@@ -11,11 +11,16 @@ import 'package:billberrylite/presentation/widget/componets/common/money_scope.d
 import 'package:billberrylite/presentation/widget/componets/common/report_summary_card.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_table.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 
 /// Goods sent back to suppliers, and where each credit note stands.
 ///
-/// Values here never touched the supplier balance — damaged units were never
-/// billed — so this tracks paperwork owed, not money owed.
+/// **This is money owed, not paperwork.** The GRN billed the full received
+/// quantity, damaged units included (`purchase_return_model_174.dart:22-27`),
+/// so a return is the claim to recover that value. The supplier balance moves
+/// when the CREDIT NOTE is recorded, not when the return is raised — which is
+/// why a return can sit here pending, be credited later, or be cancelled
+/// without ever being recovered. Value returned is not value recovered.
 class PurchaseReturnReportScreen extends StatelessWidget {
   const PurchaseReturnReportScreen({super.key});
 
@@ -46,7 +51,15 @@ class PurchaseReturnReportScreen extends StatelessWidget {
       loader: (start, end) =>
           service.getPurchaseReturnReport(startDate: start, endDate: end),
       summaryCards: (rows) {
-        final value = rows.fold<double>(
+        // A cancelled return means the goods never went back —
+        // `cancelPurchaseReturn` moves no supplier balance for exactly that
+        // reason, and `_damagedRecoveryByGRN` treats it as absorbed cost. So
+        // neither its value NOR its units were ever returned. The rows stay
+        // visible as history; only the totals exclude them.
+        final returned = rows
+            .where((r) => r['status'] != PurchaseReturnStatus.cancelled.name)
+            .toList();
+        final value = returned.fold<double>(
           0,
           (s, r) => s + (r['totalAmount'] as double),
         );
@@ -63,7 +76,7 @@ class PurchaseReturnReportScreen extends StatelessWidget {
             title: 'Returns',
             value: '${rows.length}',
             subtitle:
-                '${rows.fold<int>(0, (s, r) => s + (r['totalQty'] as int))} units',
+                '${formatQty(returned.fold<double>(0, (s, r) => s + (r['totalQty'] as num).toDouble()))} units',
             icon: Icons.assignment_return_rounded,
             color: AppColors.primary,
           ),
@@ -99,7 +112,7 @@ class PurchaseReturnReportScreen extends StatelessWidget {
           DataCell(Text(row['supplierName'] as String)),
           DataCell(Text(row['grnNumber'] as String)),
           DataCell(Text(_date(row['returnDate'] as String))),
-          DataCell(Text('${row['totalQty']}')),
+          DataCell(Text(formatQty((row['totalQty'] as num).toDouble()))),
           DataCell(Text(formatMoney(row['totalAmount'] as double))),
           DataCell(Text(row['creditNoteNumber'] as String? ?? '—')),
           DataCell(
@@ -134,7 +147,7 @@ class PurchaseReturnReportScreen extends StatelessWidget {
                 r['grnNumber'],
                 r['poNumber'],
                 _date(r['returnDate'] as String),
-                r['totalQty'],
+                exportQty((r['totalQty'] as num).toDouble()),
                 ReportExportService.formatCurrency(r['totalAmount'] as double),
                 r['statusDisplay'],
                 r['creditNoteNumber'] ?? '',
@@ -148,8 +161,14 @@ class PurchaseReturnReportScreen extends StatelessWidget {
             .toList(),
         summary: {
           'Returns': rows.length,
+          // Cancelled returns are listed above but never went back, so they are
+          // out of the value total — see the summary card.
           'Total Value': ReportExportService.formatCurrency(
-            rows.fold<double>(0, (s, r) => s + (r['totalAmount'] as double)),
+            rows
+                .where(
+                  (r) => r['status'] != PurchaseReturnStatus.cancelled.name,
+                )
+                .fold<double>(0, (s, r) => s + (r['totalAmount'] as double)),
           ),
         },
       ),

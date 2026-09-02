@@ -182,7 +182,14 @@ class StockAdjustmentService {
   /// Every adjustment ever recorded, newest first — the history screen's feed.
   static List<StockMovementModel> allAdjustments() {
     final list = _movements.allMovements();
-    list.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    // Newest first, then the movement id. A stock take applies many
+    // adjustments in one loop, so several routinely share a millisecond — and
+    // `List.sort` is not stable, so tied rows could reorder between loads.
+    list.sort((a, b) {
+      final byTime = b.timestamp.compareTo(a.timestamp);
+      if (byTime != 0) return byTime;
+      return a.id.compareTo(b.id);
+    });
     return list;
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:billberrylite/util/common/short_ref.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:billberrylite/core/config/tax_label_rule.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/config/tax_feature.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
@@ -41,6 +42,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final TextEditingController _discountController = TextEditingController(
     text: '0',
   );
+
+  // PRESENTATION ONLY. The bill's tax figures — including the cgst/sgst halves
+  // on every line — are computed and stored exactly as before in every country.
+  // These decide what the tax is CALLED here, and whether the two halves may be
+  // shown: they are an Indian intra-state concept and mean nothing under VAT or
+  // US sales tax.
+  late final String _taxName = TaxLabelRule.name;
+  late final bool _splitsTax = TaxLabelRule.splitsIntoComponents;
+  late final ({String first, String second})? _taxComponents =
+      TaxLabelRule.components;
   bool _isProcessing = false;
 
   // Split payment state
@@ -1284,7 +1295,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'GST Breakdown',
+            '$_taxName Breakdown',
             style: TextStyle(
               fontSize: AppResponsive.bodyFontSize(context),
               color: Color(0xFF1A1A1A),
@@ -1311,7 +1322,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                'GST ${GstService.formatGstRate(rate)}',
+                                '$_taxName ${GstService.formatGstRate(rate)}',
                                 style: TextStyle(
                                   color: Color(0xFF6B6B6B),
                                   fontSize: AppResponsive.smallFontSize(
@@ -1330,53 +1341,57 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 4),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                '  CGST ${GstService.formatGstRate(rate / 2)}',
-                                style: TextStyle(
-                                  color: Color(0xFF9E9E9E),
-                                  fontSize: AppResponsive.smallFontSize(
-                                    context,
+                          if (_splitsTax && _taxComponents != null) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '  ${_taxComponents.first} ${GstService.formatGstRate(rate / 2)}',
+                                  style: TextStyle(
+                                    color: Color(0xFF9E9E9E),
+                                    fontSize: AppResponsive.smallFontSize(
+                                      context,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              Text(
-                                '$symbol${data.cgstAmount.toStringAsFixed(precision)}',
-                                style: TextStyle(
-                                  color: Color(0xFF9E9E9E),
-                                  fontSize: AppResponsive.smallFontSize(
-                                    context,
+                                Text(
+                                  '$symbol${data.cgstAmount.toStringAsFixed(precision)}',
+                                  style: TextStyle(
+                                    color: Color(0xFF9E9E9E),
+                                    fontSize: AppResponsive.smallFontSize(
+                                      context,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                '  SGST ${GstService.formatGstRate(rate / 2)}',
-                                style: TextStyle(
-                                  color: Color(0xFF9E9E9E),
-                                  fontSize: AppResponsive.smallFontSize(
-                                    context,
+                              ],
+                            ),
+                            Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '  ${_taxComponents.second} ${GstService.formatGstRate(rate / 2)}',
+                                  style: TextStyle(
+                                    color: Color(0xFF9E9E9E),
+                                    fontSize: AppResponsive.smallFontSize(
+                                      context,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              Text(
-                                '$symbol${data.sgstAmount.toStringAsFixed(precision)}',
-                                style: TextStyle(
-                                  color: Color(0xFF9E9E9E),
-                                  fontSize: AppResponsive.smallFontSize(
-                                    context,
+                                Text(
+                                  '$symbol${data.sgstAmount.toStringAsFixed(precision)}',
+                                  style: TextStyle(
+                                    color: Color(0xFF9E9E9E),
+                                    fontSize: AppResponsive.smallFontSize(
+                                      context,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     );
@@ -1454,22 +1469,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     const SizedBox(height: 8),
                   ],
                   if (_totalGstAmount > 0) ...[
+                    if (_splitsTax && _taxComponents != null) ...[
+                      _buildSummaryRow(
+                        _taxComponents.first,
+                        '+ $symbol${_totalCgstAmount.toStringAsFixed(precision)}',
+                        isBold: false,
+                        color: const Color(0xFF4CAF50),
+                      ),
+                      const SizedBox(height: 4),
+                      _buildSummaryRow(
+                        _taxComponents.second,
+                        '+ $symbol${_totalSgstAmount.toStringAsFixed(precision)}',
+                        isBold: false,
+                        color: const Color(0xFF4CAF50),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     _buildSummaryRow(
-                      'CGST',
-                      '+ $symbol${_totalCgstAmount.toStringAsFixed(precision)}',
-                      isBold: false,
-                      color: const Color(0xFF4CAF50),
-                    ),
-                    const SizedBox(height: 4),
-                    _buildSummaryRow(
-                      'SGST',
-                      '+ $symbol${_totalSgstAmount.toStringAsFixed(precision)}',
-                      isBold: false,
-                      color: const Color(0xFF4CAF50),
-                    ),
-                    const SizedBox(height: 8),
-                    _buildSummaryRow(
-                      'Total GST',
+                      'Total $_taxName',
                       '+ $symbol${_totalGstAmount.toStringAsFixed(precision)}',
                       isBold: false,
                       color: const Color(0xFF4CAF50),

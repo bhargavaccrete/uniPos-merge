@@ -6,6 +6,7 @@ import 'package:billberrylite/presentation/screens/retail/reports/report_page_sc
 import 'package:billberrylite/presentation/widget/componets/common/report_summary_card.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_table.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 
 /// Every manual stock correction, with who made it and why.
 ///
@@ -38,12 +39,13 @@ class StockAdjustmentReportScreen extends StatelessWidget {
       loader: (start, end) =>
           service.getStockAdjustmentReport(startDate: start, endDate: end),
       summaryCards: (rows) {
-        final added = rows
-            .where((r) => r['isIn'] as bool)
-            .fold<int>(0, (s, r) => s + (r['quantity'] as int));
-        final removed = rows
-            .where((r) => !(r['isIn'] as bool))
-            .fold<int>(0, (s, r) => s + (r['quantity'] as int));
+        // COUNTS, not summed quantities. Adding 2.5 kg to 3 pieces and
+        // showing "5.5 units" is a figure with no meaning — the rows carry
+        // whatever unit their variant uses. Counting the corrections answers
+        // what this report is for: how often stock was changed by hand, and in
+        // which direction.
+        final added = rows.where((r) => r['isIn'] as bool).length;
+        final removed = rows.where((r) => !(r['isIn'] as bool)).length;
 
         return [
           ReportSummaryCard(
@@ -54,14 +56,14 @@ class StockAdjustmentReportScreen extends StatelessWidget {
             color: AppColors.primary,
           ),
           ReportSummaryCard(
-            title: 'Units Added',
+            title: 'Adjustments Added',
             value: '$added',
             subtitle: 'stock increased',
             icon: Icons.trending_up_rounded,
             color: added > 0 ? AppColors.success : AppColors.textSecondary,
           ),
           ReportSummaryCard(
-            title: 'Units Removed',
+            title: 'Adjustments Removed',
             value: '$removed',
             subtitle: 'stock decreased',
             icon: Icons.trending_down_rounded,
@@ -80,7 +82,9 @@ class StockAdjustmentReportScreen extends StatelessWidget {
       ],
       rowBuilder: (context, row) {
         final isIn = row['isIn'] as bool;
-        final signed = row['signedQuantity'] as int;
+        // A double: a loose-goods variant is corrected by weight.
+        final signed = (row['signedQuantity'] as num).toDouble();
+        final unit = row['unit'] as String? ?? '';
         final note = row['note'] as String;
 
         return DataRow(
@@ -96,17 +100,34 @@ class StockAdjustmentReportScreen extends StatelessWidget {
             ),
             DataCell(Text(row['reason'] as String)),
             DataCell(Text(row['staffName'] as String)),
-            DataCell(Text('${row['balanceBefore']}')),
             DataCell(
               Text(
-                isIn ? '+$signed' : '$signed',
+                formatQtyWithUnit(
+                  (row['balanceBefore'] as num).toDouble(),
+                  unit,
+                ),
+              ),
+            ),
+            DataCell(
+              Text(
+                // formatQty already carries the minus on a decrease.
+                isIn
+                    ? '+${formatQtyWithUnit(signed, unit)}'
+                    : formatQtyWithUnit(signed, unit),
                 style: TextStyle(
                   color: isIn ? AppColors.success : AppColors.danger,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ),
-            DataCell(Text('${row['balanceAfter']}')),
+            DataCell(
+              Text(
+                formatQtyWithUnit(
+                  (row['balanceAfter'] as num).toDouble(),
+                  unit,
+                ),
+              ),
+            ),
           ],
         );
       },
@@ -119,6 +140,7 @@ class StockAdjustmentReportScreen extends StatelessWidget {
           'Stock Before',
           'Change',
           'Stock After',
+          'Unit',
           'Note',
         ],
         rows: rows
@@ -128,21 +150,20 @@ class StockAdjustmentReportScreen extends StatelessWidget {
                 r['itemName'],
                 r['reason'],
                 r['staffName'],
-                r['balanceBefore'],
-                r['signedQuantity'],
-                r['balanceAfter'],
+                exportQty((r['balanceBefore'] as num).toDouble()),
+                exportQty((r['signedQuantity'] as num).toDouble()),
+                exportQty((r['balanceAfter'] as num).toDouble()),
+                r['unit'] ?? '',
                 r['note'],
               ],
             )
             .toList(),
         summary: {
           'Adjustments': rows.length,
-          'Units Added': rows
-              .where((r) => r['isIn'] as bool)
-              .fold<int>(0, (s, r) => s + (r['quantity'] as int)),
-          'Units Removed': rows
-              .where((r) => !(r['isIn'] as bool))
-              .fold<int>(0, (s, r) => s + (r['quantity'] as int)),
+          // Counts, matching the cards — quantities across mixed units are not
+          // summable into one figure.
+          'Adjustments Added': rows.where((r) => r['isIn'] as bool).length,
+          'Adjustments Removed': rows.where((r) => !(r['isIn'] as bool)).length,
         },
       ),
     );

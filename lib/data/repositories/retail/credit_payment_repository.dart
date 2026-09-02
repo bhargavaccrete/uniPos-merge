@@ -16,10 +16,18 @@ class CreditPaymentRepository {
     _paymentBox = Hive.box<CreditPaymentModel>('credit_payments');
   }
 
+  /// Newest first, then the payment id.
+  ///
+  /// A date is not a total order — two collections recorded in the same second
+  /// reordered between loads, because `List.sort` is not stable.
+  static int _newestFirst(CreditPaymentModel a, CreditPaymentModel b) {
+    final byDate = b.date.compareTo(a.date);
+    return byDate != 0 ? byDate : a.paymentId.compareTo(b.paymentId);
+  }
+
   /// Get all credit payments
   Future<List<CreditPaymentModel>> getAllPayments() async {
-    return _paymentBox.values.toList()
-      ..sort((a, b) => b.date.compareTo(a.date)); // Sort by date descending
+    return _paymentBox.values.toList()..sort(_newestFirst);
   }
 
   /// Add a new credit payment
@@ -64,7 +72,7 @@ class CreditPaymentRepository {
       if (paymentDate == null) return false;
       return !paymentDate.isBefore(startDate) && paymentDate.isBefore(endDate);
     }).toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
+      ..sort(_newestFirst);
   }
 
   /// Get today's payments
@@ -105,35 +113,58 @@ class CreditPaymentRepository {
     return result;
   }
 
+  /// Bucket key for a collection whose mode is none of cash / card / upi.
+  ///
+  /// Without it an unknown mode was dropped from the per-mode buckets while
+  /// still being added to `total`, so the figures on screen did not add up to
+  /// the total printed beside them.
+  static const String otherMode = 'other';
+
+  /// The mode buckets, plus `total`. Every displayed bucket is included, so
+  /// `cash + card + upi + other == total`, always.
+  ///
+  /// [payments] is filtered by [CreditPaymentModel.isCollection], which excludes
+  /// write-offs AND return adjustments. A return offsetting an unpaid invoice
+  /// writes a payment row (`ReturnService`, mode `return_adjustment`) purely so
+  /// the customer ledger shows it — no money changed hands, so counting it as
+  /// collected overstates the day's takings.
+  ///
+  /// ONE implementation for the whole report: the all-time summary used to be
+  /// computed inline on the screen with the pre-fix rule, so clearing the date
+  /// filter silently reverted both behaviours.
+  static Map<String, double> bucketCollections(
+    Iterable<CreditPaymentModel> payments,
+  ) {
+    final result = <String, double>{
+      'cash': 0.0,
+      'card': 0.0,
+      'upi': 0.0,
+      otherMode: 0.0,
+      'total': 0.0,
+    };
+
+    for (final payment in payments) {
+      if (!payment.isCollection) continue;
+      final mode = payment.paymentMode.toLowerCase().trim();
+      // `total` is a key of this map, not a mode — a payment recorded under
+      // that literal must not clobber the sum.
+      final key =
+          (mode != 'total' && result.containsKey(mode)) ? mode : otherMode;
+      result[key] = result[key]! + payment.amount;
+      result['total'] = result['total']! + payment.amount;
+    }
+
+    return result;
+  }
+
   /// Get collection by date range grouped by mode
   Future<Map<String, double>> getCollectionByModeInRange(
     DateTime startDate,
     DateTime endDate,
   ) async {
-    final payments = await getPaymentsByDateRange(startDate, endDate);
-    final result = <String, double>{
-      'cash': 0.0,
-      'card': 0.0,
-      'upi': 0.0,
-      'total': 0.0,
-    };
-
-    for (var payment in payments) {
-      // `isCollection` excludes write-offs AND return adjustments. The per-mode
-      // buckets were already safe (a credit note's mode is not one of them),
-      // but `total` summed every non-write-off row — so a return offsetting an
-      // unpaid invoice was reported as money collected.
-      if (payment.isCollection) {
-        final mode = payment.paymentMode.toLowerCase();
-        if (result.containsKey(mode)) {
-          result[mode] = result[mode]! + payment.amount;
-        }
-        result['total'] = result['total']! + payment.amount;
-      }
-    }
-
-    return result;
+    return bucketCollections(await getPaymentsByDateRange(startDate, endDate));
   }
+
 
   /// Get total amount collected for a customer
   Future<double> getTotalCollectedFromCustomer(String customerId) async {

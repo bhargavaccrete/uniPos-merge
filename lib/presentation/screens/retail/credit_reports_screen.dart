@@ -7,6 +7,11 @@ import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:intl/intl.dart';
 import '../../../core/di/service_locator.dart';
 import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model_218.dart';
+import 'package:billberrylite/data/repositories/retail/credit_payment_repository.dart';
+import 'package:billberrylite/domain/services/common/report_export_service.dart';
+import 'package:billberrylite/domain/services/retail/credit_report_export.dart';
+import 'package:billberrylite/domain/services/retail/report_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_export_button.dart';
 import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 
@@ -38,19 +43,49 @@ class CreditReportsScreen extends StatefulWidget {
   return (start, end);
 }
 
+/// The period an export covers, in the words the filter chip uses.
+///
+/// "All time" rather than a blank: an export handed to an accountant has to say
+/// what it covers, and an unfiltered credit report legitimately covers
+/// everything the plan lets it see.
+String _periodLabel(DateTimeRange? range) {
+  if (range == null) return 'All time';
+  final f = DateFormat('dd MMM yyyy');
+  return '${f.format(range.start)} - ${f.format(range.end)}';
+}
+
 class _CreditReportsScreenState extends State<CreditReportsScreen>
     with SingleTickerProviderStateMixin {
+  /// Tab index of Outstanding — a CURRENT balance, with no date dimension.
+  static const int _outstandingTab = 2;
+
   late TabController _tabController;
   DateTimeRange? _dateFilter;
+  int _tabIndex = 0;
+
+  /// Outstanding is what customers owe RIGHT NOW; a date range means nothing to
+  /// it, and it never read one. The control used to stay lit above it anyway,
+  /// with a blue banner announcing a period the tab was quietly ignoring.
+  ///
+  /// The selection itself is KEPT, not cleared — switching back to Credit Sales
+  /// restores the range the user picked.
+  bool get _filterApplies => _tabIndex != _outstandingTab;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(_onTabChanged);
+  }
+
+  void _onTabChanged() {
+    if (!mounted || _tabController.index == _tabIndex) return;
+    setState(() => _tabIndex = _tabController.index);
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -83,22 +118,24 @@ class _CreditReportsScreenState extends State<CreditReportsScreen>
       appBar: buildPrimaryAppBar(
         title: 'Credit Reports',
         actions: [
-          IconButton(
-            // White on the primary fill; the amber marks an active filter,
-            // which used to be green-on-white and is now invisible otherwise.
-            icon: Icon(
-              Icons.filter_alt_outlined,
-              color: _dateFilter != null ? AppColors.warning : Colors.white,
-            ),
-            tooltip: 'Filter by date',
-            onPressed: _selectDateRange,
-          ),
-          if (_dateFilter != null)
+          if (_filterApplies) ...[
             IconButton(
-              icon: const Icon(Icons.clear, color: Colors.white),
-              tooltip: 'Clear filter',
-              onPressed: () => setState(() => _dateFilter = null),
+              // White on the primary fill; the amber marks an active filter,
+              // which used to be green-on-white and is now invisible otherwise.
+              icon: Icon(
+                Icons.filter_alt_outlined,
+                color: _dateFilter != null ? AppColors.warning : Colors.white,
+              ),
+              tooltip: 'Filter by date',
+              onPressed: _selectDateRange,
             ),
+            if (_dateFilter != null)
+              IconButton(
+                icon: const Icon(Icons.clear, color: Colors.white),
+                tooltip: 'Clear filter',
+                onPressed: () => setState(() => _dateFilter = null),
+              ),
+          ],
         ],
         bottom: TabBar(
           controller: _tabController,
@@ -122,8 +159,8 @@ class _CreditReportsScreenState extends State<CreditReportsScreen>
           maxWidth: AppResponsive.maxContentWidth(context),
           child: Column(
             children: [
-              // Date Filter Info
-              if (_dateFilter != null)
+              // Date Filter Info — not over Outstanding, which ignores it.
+              if (_dateFilter != null && _filterApplies)
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(
@@ -157,7 +194,9 @@ class _CreditReportsScreenState extends State<CreditReportsScreen>
                   children: [
                     _CreditSalesTab(dateFilter: _dateFilter),
                     _CollectionsTab(dateFilter: _dateFilter),
-                    _OutstandingTab(dateFilter: _dateFilter),
+                    // No `dateFilter`: it never used one, and passing it in
+                    // implied otherwise.
+                    const _OutstandingTab(),
                   ],
                 ),
               ),
@@ -201,13 +240,15 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      List<SaleModel> sales;
-      if (widget.dateFilter != null) {
-        final (start, end) = _queryBounds(widget.dateFilter!);
-        sales = await saleStore.getCreditSalesByDateRange(start, end);
-      } else {
-        sales = await saleStore.getCreditSales();
-      }
+      // Through ReportService, so the plan's report-history cutoff applies the
+      // same way it does on every other retail report. Reading SaleRepository
+      // directly skipped it: a plan limited to 30 days still listed every
+      // credit sale ever made.
+      final (start, end) = widget.dateFilter == null
+          ? (null, null)
+          : _queryBounds(widget.dateFilter!);
+      final sales = await ReportService()
+          .getCreditSalesReport(startDate: start, endDate: end);
 
       final total = sales.fold<double>(0, (sum, s) => sum + s.totalAmount);
 
@@ -250,6 +291,11 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
             ],
           ),
         ),
+        if (_creditSales.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: ReportExportButton(onPressed: _export),
+          ),
         const Divider(height: 1),
 
         // List
@@ -298,6 +344,25 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
           ),
         ),
       ],
+    );
+  }
+
+  /// Exports the rows the tab is showing — not a re-query, so the file can
+  /// never cover a different period than the screen above it. The summary
+  /// reads the same two figures the cards do.
+  Future<void> _export() async {
+    final export = CreditReportExport.creditSales(
+      sales: _creditSales,
+      totalCreditSales: _totalCreditSales,
+      period: _periodLabel(widget.dateFilter),
+    );
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'credit_sales',
+      reportTitle: 'Credit Sales',
+      headers: export.headers,
+      data: export.rows,
+      summary: export.summary,
     );
   }
 
@@ -449,30 +514,19 @@ class _CollectionsTabState extends State<_CollectionsTab> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      List<CreditPaymentModel> payments;
-      Map<String, double> collections;
+      // One list, one window rule — bounds AND the plan's history cutoff, via
+      // ReportService like every other retail report.
+      final (start, end) = widget.dateFilter == null
+          ? (null, null)
+          : _queryBounds(widget.dateFilter!);
+      final payments = await ReportService()
+          .getCreditCollectionsReport(startDate: start, endDate: end);
 
-      if (widget.dateFilter != null) {
-        final (start, end) = _queryBounds(widget.dateFilter!);
-        payments = await creditPaymentRepository.getPaymentsByDateRange(
-          start,
-          end,
-        );
-        collections = await creditPaymentRepository.getCollectionByModeInRange(
-          start,
-          end,
-        );
-      } else {
-        payments = await creditPaymentRepository.getAllPayments();
-        collections = {'cash': 0, 'card': 0, 'upi': 0, 'total': 0};
-        for (var p in payments) {
-          if (!(p.isWriteOff ?? false)) {
-            final mode = p.paymentMode.toLowerCase();
-            collections[mode] = (collections[mode] ?? 0) + p.amount;
-            collections['total'] = (collections['total'] ?? 0) + p.amount;
-          }
-        }
-      }
+      // The summary is bucketed from THAT list, so the cards can never describe
+      // a different set of rows than the one below them. `bucketCollections` is
+      // the single place deciding what counts as collected: write-offs and
+      // return adjustments are listed but not counted.
+      final collections = CreditPaymentRepository.bucketCollections(payments);
 
       setState(() {
         _payments = payments;
@@ -522,6 +576,22 @@ class _CollectionsTabState extends State<_CollectionsTab> {
                       const Color(0xFF2196F3),
                     ),
                   ),
+                  // Anything collected under a mode that is not one of the
+                  // three above. Without it those cards silently failed to add
+                  // up to the Total printed below them. Hidden when empty, so
+                  // the ordinary bill shows the same three cards as before.
+                  if ((_collectionByMode[CreditPaymentRepository.otherMode] ??
+                          0) >
+                      0) ...[
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildModeCard(
+                        'Other',
+                        _collectionByMode[CreditPaymentRepository.otherMode]!,
+                        AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ],
               ),
               const SizedBox(height: 12),
@@ -555,6 +625,11 @@ class _CollectionsTabState extends State<_CollectionsTab> {
             ],
           ),
         ),
+        if (_payments.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: ReportExportButton(onPressed: _export),
+          ),
         const Divider(height: 1),
 
         // List
@@ -574,6 +649,24 @@ class _CollectionsTabState extends State<_CollectionsTab> {
                 ),
         ),
       ],
+    );
+  }
+
+  /// Exports the rows on screen, with the summary bucketed from the very map
+  /// the cards render — so the file cannot disagree with them.
+  Future<void> _export() async {
+    final export = CreditReportExport.collections(
+      payments: _payments,
+      buckets: _collectionByMode,
+      period: _periodLabel(widget.dateFilter),
+    );
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'credit_collections',
+      reportTitle: 'Credit Collections',
+      headers: export.headers,
+      data: export.rows,
+      summary: export.summary,
     );
   }
 
@@ -683,9 +776,7 @@ class _CollectionsTabState extends State<_CollectionsTab> {
 
 /// Outstanding Tab
 class _OutstandingTab extends StatefulWidget {
-  final DateTimeRange? dateFilter;
-
-  const _OutstandingTab({this.dateFilter});
+  const _OutstandingTab();
 
   @override
   State<_OutstandingTab> createState() => _OutstandingTabState();
@@ -705,14 +796,14 @@ class _OutstandingTabState extends State<_OutstandingTab> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
+      // Already ordered by the repository: largest debt first, customer id as
+      // the tie-break. The screen used to re-sort with the same comparator and
+      // no tie-break, which just re-introduced the instability.
       final customers = await customerStore.getCustomersWithCredit();
       final total = customers.fold<double>(
         0,
         (sum, c) => sum + c.creditBalance,
       );
-
-      // Sort by credit balance descending
-      customers.sort((a, b) => b.creditBalance.compareTo(a.creditBalance));
 
       setState(() {
         _customersWithDue = customers;
@@ -789,6 +880,12 @@ class _OutstandingTabState extends State<_OutstandingTab> {
           ),
         ),
 
+        if (_customersWithDue.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: ReportExportButton(onPressed: _export),
+          ),
+
         // List
         Expanded(
           child: _customersWithDue.isEmpty
@@ -825,6 +922,22 @@ class _OutstandingTabState extends State<_OutstandingTab> {
                 ),
         ),
       ],
+    );
+  }
+
+  Future<void> _export() async {
+    final export = CreditReportExport.outstanding(
+      customers: _customersWithDue,
+      totalOutstanding: _totalOutstanding,
+      asAt: DateTime.now(),
+    );
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'credit_outstanding',
+      reportTitle: 'Outstanding Credit',
+      headers: export.headers,
+      data: export.rows,
+      summary: export.summary,
     );
   }
 

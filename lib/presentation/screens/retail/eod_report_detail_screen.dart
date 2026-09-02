@@ -1,3 +1,4 @@
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -5,7 +6,10 @@ import 'package:billberrylite/presentation/widget/componets/common/primary_app_b
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
-import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/domain/services/common/notification_service.dart';
+import 'package:billberrylite/domain/services/common/report_export_service.dart';
+import 'package:billberrylite/domain/services/retail/eod_history_export.dart';
+import 'package:billberrylite/domain/services/retail/eod_settlement_print.dart';
 
 /// EOD Report Detail Screen - Shows detailed view of a single EOD report
 class EODReportDetailScreen extends StatelessWidget {
@@ -19,296 +23,359 @@ class EODReportDetailScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: buildPrimaryAppBar(title: 'EOD Report Details'),
-      body: AppResponsive.constrainedContent(
-        context: context,
-        alignment: Alignment.topCenter,
-        maxWidth: AppResponsive.maxCardWidth(context),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Date Header
-              Container(
-                padding: const EdgeInsets.all(16),
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF4CAF50), Color(0xFF66BB6A)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+      appBar: buildPrimaryAppBar(
+        title: 'EOD Report Details',
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.print_outlined, color: Colors.white),
+            tooltip: 'Reprint settlement',
+            onPressed: _reprint,
+          ),
+          IconButton(
+            icon: const Icon(Icons.file_download_outlined, color: Colors.white),
+            tooltip: 'Export',
+            onPressed: () => _export(context),
+          ),
+        ],
+      ),
+      // Every amount here goes through formatMoney; MoneyScope is the single
+      // subscription that re-renders them when the store's currency or decimal
+      // precision changes. These two screens were the last holdouts still
+      // hard-coding the symbol and two decimals.
+      body: MoneyScope(
+        child: AppResponsive.constrainedContent(
+          context: context,
+          alignment: Alignment.topCenter,
+          maxWidth: AppResponsive.maxCardWidth(context),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Date Header
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF4CAF50), Color(0xFF66BB6A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'EOD Report',
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.bodyFontSize(context),
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white70,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'EOD Report',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white70,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      dateFormat.format(report.date),
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.headingFontSize(context),
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                      const SizedBox(height: 4),
+                      Text(
+                        dateFormat.format(report.date),
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.headingFontSize(context),
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
 
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-              // Opening/Closing Balance
-              _buildSection(
-                context,
-                'Balance Summary',
-                Icons.account_balance_wallet,
-                Colors.teal,
-                [
-                  _buildRow(
-                    context,
-                    'Opening Balance',
-                    '${CurrencyHelper.currentSymbol}${report.openingBalance.toStringAsFixed(2)}',
-                  ),
-                  _buildRow(
-                    context,
-                    'Closing Balance',
-                    '${CurrencyHelper.currentSymbol}${report.closingBalance.toStringAsFixed(2)}',
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-
-              // Sales Summary
-              _buildSection(
-                context,
-                'Sales Summary',
-                Icons.shopping_cart,
-                Colors.green,
-                [
-                  _buildRow(
-                    context,
-                    'Total Sales',
-                    '${CurrencyHelper.currentSymbol}${report.totalSales.toStringAsFixed(2)}',
-                    isBold: true,
-                  ),
-                  _buildRow(
-                    context,
-                    'Total Transactions',
-                    '${report.totalOrderCount}',
-                  ),
-                  if (report.totalDiscount > 0)
-                    _buildRow(
-                      context,
-                      'Discount',
-                      '${CurrencyHelper.currentSymbol}${report.totalDiscount.toStringAsFixed(2)}',
-                      color: Colors.red,
-                    ),
-                  if (report.totalRefunds > 0)
-                    _buildRow(
-                      context,
-                      'Refunds',
-                      '${CurrencyHelper.currentSymbol}${report.totalRefunds.toStringAsFixed(2)}',
-                      color: Colors.orange,
-                    ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-
-              // Payment Breakdown
-              if (report.paymentSummaries.isNotEmpty) ...[
+                // Opening/Closing Balance
                 _buildSection(
                   context,
-                  'Payment Breakdown',
-                  Icons.payment,
-                  Colors.blue,
-                  report.paymentSummaries.map((payment) {
-                    return _buildRow(
-                      context,
-                      '${payment.paymentType} (${payment.transactionCount} txns)',
-                      '${CurrencyHelper.currentSymbol}${payment.totalAmount.toStringAsFixed(2)}',
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // Tax Summary
-              if (report.taxSummaries.isNotEmpty) ...[
-                _buildSection(
-                  context,
-                  'Tax Summary',
-                  Icons.receipt_long,
-                  Colors.purple,
-                  [
-                    ...report.taxSummaries.map((tax) {
-                      return _buildRow(
-                        context,
-                        tax.taxName,
-                        '${CurrencyHelper.currentSymbol}${tax.taxAmount.toStringAsFixed(2)}',
-                      );
-                    }),
-                    const Divider(),
-                    _buildRow(
-                      context,
-                      'Total Tax',
-                      '${CurrencyHelper.currentSymbol}${report.totalTax.toStringAsFixed(2)}',
-                      isBold: true,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // Expenses
-              if (report.totalExpenses > 0) ...[
-                _buildSection(context, 'Expenses', Icons.money_off, Colors.red, [
-                  _buildRow(
-                    context,
-                    'Total Expenses',
-                    '${CurrencyHelper.currentSymbol}${report.totalExpenses.toStringAsFixed(2)}',
-                  ),
-                  _buildRow(
-                    context,
-                    'Cash Expenses',
-                    '${CurrencyHelper.currentSymbol}${report.cashExpenses.toStringAsFixed(2)}',
-                    color: Colors.red[700]!,
-                  ),
-                  if (report.totalExpenses > report.cashExpenses)
-                    _buildRow(
-                      context,
-                      'Non-Cash Expenses',
-                      '${CurrencyHelper.currentSymbol}${(report.totalExpenses - report.cashExpenses).toStringAsFixed(2)}',
-                      color: Colors.grey,
-                    ),
-                ]),
-                const SizedBox(height: 16),
-              ],
-
-              // Credit Collections — repayments against credit sold on EARLIER
-              // days. Deliberately separate from Sales: this money is not revenue
-              // for today, but the cash leg still lands in today's drawer.
-              if (report.totalCollections > 0) ...[
-                _buildSection(
-                  context,
-                  'Credit Collections',
+                  'Balance Summary',
                   Icons.account_balance_wallet,
                   Colors.teal,
                   [
-                    if (report.cashCollections > 0)
-                      _buildRow(
-                        context,
-                        'Cash',
-                        '${CurrencyHelper.currentSymbol}${report.cashCollections.toStringAsFixed(2)}',
-                      ),
-                    if (report.cardCollections > 0)
-                      _buildRow(
-                        context,
-                        'Card',
-                        '${CurrencyHelper.currentSymbol}${report.cardCollections.toStringAsFixed(2)}',
-                      ),
-                    if (report.upiCollections > 0)
-                      _buildRow(
-                        context,
-                        'UPI',
-                        '${CurrencyHelper.currentSymbol}${report.upiCollections.toStringAsFixed(2)}',
-                      ),
-                    const Divider(),
                     _buildRow(
                       context,
-                      'Total Collected',
-                      '${CurrencyHelper.currentSymbol}${report.totalCollections.toStringAsFixed(2)}',
-                      isBold: true,
+                      'Opening Balance',
+                      formatMoney(report.openingBalance),
+                    ),
+                    _buildRow(
+                      context,
+                      'Closing Balance',
+                      formatMoney(report.closingBalance),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-              ],
 
-              // Profit — revenue here is EX-TAX, so the margin is real margin and
-              // not inflated by the GST that has to be handed over.
-              if (report.totalCost != 0 || report.grossProfit != 0) ...[
+                const SizedBox(height: 16),
+
+                // Sales Summary
                 _buildSection(
                   context,
-                  'Profit',
-                  Icons.trending_up,
-                  report.grossProfit >= 0 ? Colors.green : Colors.red,
+                  'Sales Summary',
+                  Icons.shopping_cart,
+                  Colors.green,
                   [
                     _buildRow(
                       context,
-                      'Revenue (excl. tax)',
-                      '${CurrencyHelper.currentSymbol}${(report.totalSales - report.totalTax).toStringAsFixed(2)}',
-                    ),
-                    _buildRow(
-                      context,
-                      'Cost of Goods',
-                      '${CurrencyHelper.currentSymbol}${report.totalCost.toStringAsFixed(2)}',
-                    ),
-                    const Divider(),
-                    _buildRow(
-                      context,
-                      'Gross Profit',
-                      '${CurrencyHelper.currentSymbol}${report.grossProfit.toStringAsFixed(2)}',
+                      'Total Sales',
+                      formatMoney(report.totalSales),
                       isBold: true,
-                      color: report.grossProfit >= 0
-                          ? Colors.green[700]!
-                          : Colors.red[700]!,
                     ),
                     _buildRow(
                       context,
-                      'Margin',
-                      '${report.profitMargin.toStringAsFixed(1)}%',
+                      'Total Transactions',
+                      '${report.totalOrderCount}',
                     ),
+                    if (report.totalDiscount > 0)
+                      _buildRow(
+                        context,
+                        'Discount',
+                        formatMoney(report.totalDiscount),
+                        color: Colors.red,
+                      ),
+                    if (report.totalRefunds > 0)
+                      _buildRow(
+                        context,
+                        'Refunds',
+                        formatMoney(report.totalRefunds),
+                        color: Colors.orange,
+                      ),
                   ],
                 ),
+
                 const SizedBox(height: 16),
+
+                // Payment Breakdown
+                if (report.paymentSummaries.isNotEmpty) ...[
+                  _buildSection(
+                    context,
+                    'Payment Breakdown',
+                    Icons.payment,
+                    Colors.blue,
+                    report.paymentSummaries.map((payment) {
+                      return _buildRow(
+                        context,
+                        '${payment.paymentType} (${payment.transactionCount} txns)',
+                        formatMoney(payment.totalAmount),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Tax Summary
+                if (_taxRows(report).isNotEmpty) ...[
+                  _buildSection(
+                    context,
+                    'Tax Summary',
+                    Icons.receipt_long,
+                    Colors.purple,
+                    [
+                      ..._taxRows(report).map((tax) {
+                        return _buildRow(
+                          context,
+                          tax.label,
+                          formatMoney(tax.amount),
+                        );
+                      }),
+                      const Divider(),
+                      _buildRow(
+                        context,
+                        'Total Tax',
+                        formatMoney(report.totalTax),
+                        isBold: true,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Expenses
+                if (report.totalExpenses > 0) ...[
+                  _buildSection(
+                    context,
+                    'Expenses',
+                    Icons.money_off,
+                    Colors.red,
+                    [
+                      _buildRow(
+                        context,
+                        'Total Expenses',
+                        formatMoney(report.totalExpenses),
+                      ),
+                      _buildRow(
+                        context,
+                        'Cash Expenses',
+                        formatMoney(report.cashExpenses),
+                        color: Colors.red[700]!,
+                      ),
+                      if (report.totalExpenses > report.cashExpenses)
+                        _buildRow(
+                          context,
+                          'Non-Cash Expenses',
+                          formatMoney(
+                            (report.totalExpenses - report.cashExpenses),
+                          ),
+                          color: Colors.grey,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Credit Collections — repayments against credit sold on EARLIER
+                // days. Deliberately separate from Sales: this money is not revenue
+                // for today, but the cash leg still lands in today's drawer.
+                if (report.totalCollections > 0) ...[
+                  _buildSection(
+                    context,
+                    'Credit Collections',
+                    Icons.account_balance_wallet,
+                    Colors.teal,
+                    [
+                      if (report.cashCollections > 0)
+                        _buildRow(
+                          context,
+                          'Cash',
+                          formatMoney(report.cashCollections),
+                        ),
+                      if (report.cardCollections > 0)
+                        _buildRow(
+                          context,
+                          'Card',
+                          formatMoney(report.cardCollections),
+                        ),
+                      if (report.upiCollections > 0)
+                        _buildRow(
+                          context,
+                          'UPI',
+                          formatMoney(report.upiCollections),
+                        ),
+                      const Divider(),
+                      _buildRow(
+                        context,
+                        'Total Collected',
+                        formatMoney(report.totalCollections),
+                        isBold: true,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Profit — revenue here is EX-TAX, so the margin is real margin and
+                // not inflated by the GST that has to be handed over.
+                if (report.totalCost != 0 || report.grossProfit != 0) ...[
+                  _buildSection(
+                    context,
+                    'Profit',
+                    Icons.trending_up,
+                    report.grossProfit >= 0 ? Colors.green : Colors.red,
+                    [
+                      _buildRow(
+                        context,
+                        'Revenue (excl. tax)',
+                        formatMoney((report.totalSales - report.totalTax)),
+                      ),
+                      _buildRow(
+                        context,
+                        'Cost of Goods',
+                        formatMoney(report.totalCost),
+                      ),
+                      const Divider(),
+                      _buildRow(
+                        context,
+                        'Gross Profit',
+                        formatMoney(report.grossProfit),
+                        isBold: true,
+                        color: report.grossProfit >= 0
+                            ? Colors.green[700]!
+                            : Colors.red[700]!,
+                      ),
+                      _buildRow(
+                        context,
+                        'Margin',
+                        '${report.profitMargin.toStringAsFixed(1)}%',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Customer Outstanding — a position at close, not a movement during
+                // the day, so it is not part of any total above.
+                if (report.totalOutstanding > 0) ...[
+                  _buildSection(
+                    context,
+                    'Customer Outstanding',
+                    Icons.people_alt,
+                    Colors.brown,
+                    [
+                      _buildRow(
+                        context,
+                        'Customers with Due',
+                        '${report.customersWithDue}',
+                      ),
+                      _buildRow(
+                        context,
+                        'Total Outstanding',
+                        formatMoney(report.totalOutstanding),
+                        isBold: true,
+                        color: Colors.brown[700]!,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Cash Reconciliation
+                _buildCashReconciliation(context),
+
+                const SizedBox(height: 32),
               ],
-
-              // Customer Outstanding — a position at close, not a movement during
-              // the day, so it is not part of any total above.
-              if (report.totalOutstanding > 0) ...[
-                _buildSection(
-                  context,
-                  'Customer Outstanding',
-                  Icons.people_alt,
-                  Colors.brown,
-                  [
-                    _buildRow(
-                      context,
-                      'Customers with Due',
-                      '${report.customersWithDue}',
-                    ),
-                    _buildRow(
-                      context,
-                      'Total Outstanding',
-                      '${CurrencyHelper.currentSymbol}${report.totalOutstanding.toStringAsFixed(2)}',
-                      isBold: true,
-                      color: Colors.brown[700]!,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // Cash Reconciliation
-              _buildCashReconciliation(context),
-
-              const SizedBox(height: 32),
-            ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  /// The tax rows to print, by country — see
+  /// [EodHistoryExport.taxRowsFor], which owns the rule so this screen and the
+  /// file exported from it can never name the tax differently.
+  List<({String label, double amount})> _taxRows(EndOfDayReport report) =>
+      EodHistoryExport.taxRowsFor(report);
+
+  /// Reprints the settlement slip for THIS stored close.
+  ///
+  /// The close flow prints one and it is gone; this is the second copy.
+  Future<void> _reprint() async {
+    final outcome = await EodSettlementPrint.reprint(report);
+    switch (outcome) {
+      case EodReprintOutcome.printed:
+        NotificationService.instance.showSuccess('Settlement printed');
+      case EodReprintOutcome.noPrinter:
+        NotificationService.instance
+            .showError('No printer paired. Add one in Printer Settings.');
+      case EodReprintOutcome.sendFailed:
+        NotificationService.instance
+            .showError('Could not reach the printer. Check it and try again.');
+    }
+  }
+
+  Future<void> _export(BuildContext context) async {
+    final export = EodHistoryExport.detail(report);
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'eod_close',
+      reportTitle: 'End of Day Report',
+      headers: export.headers,
+      data: export.rows,
+      summary: export.summary,
     );
   }
 
@@ -483,18 +550,18 @@ class EODReportDetailScreen extends StatelessWidget {
                 _buildRow(
                   context,
                   'Expected Cash',
-                  '${CurrencyHelper.currentSymbol}${reconciliation.systemExpectedCash.toStringAsFixed(2)}',
+                  formatMoney(reconciliation.systemExpectedCash),
                 ),
                 _buildRow(
                   context,
                   'Actual Cash',
-                  '${CurrencyHelper.currentSymbol}${reconciliation.actualCash.toStringAsFixed(2)}',
+                  formatMoney(reconciliation.actualCash),
                 ),
                 const Divider(),
                 _buildRow(
                   context,
                   'Difference',
-                  '${reconciliation.difference >= 0 ? '+' : ''}${CurrencyHelper.currentSymbol}${reconciliation.difference.toStringAsFixed(2)}',
+                  '${reconciliation.difference >= 0 ? '+' : ''}${formatMoney(reconciliation.difference)}',
                   isBold: true,
                   color: reconciliation.difference == 0
                       ? Colors.green

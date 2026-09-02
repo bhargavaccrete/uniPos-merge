@@ -2,14 +2,20 @@
 
 
 
+import 'package:billberrylite/core/config/tax_label_rule.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model_218.dart';
 import 'package:billberrylite/data/models/retail/hive_model/grn_model_213.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_return_model_174.dart';
 import 'package:billberrylite/data/models/retail/hive_model/supplier_claim_model_176.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model_211.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
+import 'package:billberrylite/data/models/retail/hive_model/grn_item_model_214.dart';
+import 'package:billberrylite/data/repositories/retail/credit_payment_repository.dart';
 import 'package:billberrylite/data/repositories/retail/grn_item_repository.dart';
+import 'package:billberrylite/domain/services/retail/gst_service.dart';
+import 'package:billberrylite/domain/store/retail/product_store.dart' show kInactiveVariantStatus;
 import 'package:billberrylite/domain/services/retail/inventory_service.dart';
 import 'package:billberrylite/domain/services/retail/sales_totals.dart';
 import 'package:billberrylite/domain/services/retail/stock_adjustment_service.dart';
@@ -111,6 +117,29 @@ class ReportService {
   /// 2dp from the billing engine, so this only strips float noise — the reason
   /// a quantity could surface as `0.30000000000000004`.
   static double _r2(double v) => double.parse(v.toStringAsFixed(2));
+
+  /// The CGST/SGST components of an authoritative [totalGst], reconciled so the
+  /// two ALWAYS add back to it exactly at two decimals.
+  ///
+  /// Every write path stores the halves as two INDEPENDENTLY rounded copies of
+  /// `gst / 2` (`SaleItemModel:260`, `GstService:60`,
+  /// `RetailBillingService:209`). On an odd paisa those two roundings do not
+  /// close: ₹18.05 stores 9.03 and 9.03, which display as ₹18.06 beside a Total
+  /// GST of ₹18.05. Summed over a month of lines the gap reaches rupees, and it
+  /// is visible on the one report that gets filed.
+  ///
+  /// Total GST is the authoritative figure — it is what the customer was
+  /// charged and what `sale.taxAmount` and the receipt carry. The components
+  /// are a presentation split of it, so they are DERIVED here rather than
+  /// summed: the first is the ordinary half, the second is whatever is left.
+  /// The adjustment is at most ₹0.01 and lands on SGST, deterministically.
+  ///
+  /// Sign is preserved — a credit note's negative GST yields two negative
+  /// components that still sum to it.
+  static ({double cgst, double sgst}) _splitGst(double totalGst) {
+    final cgst = _r2(totalGst / 2);
+    return (cgst: cgst, sgst: _r2(totalGst - cgst));
+  }
   static double _r3(double v) => double.parse(v.toStringAsFixed(3));
 
   /// Deterministic order for a line-level report row: revenue desc, then
@@ -385,6 +414,14 @@ class ReportService {
   }
 
   /// Emit-time rounding for a line-level row. Leaves every other key alone.
+  /// A breakdown row with its `cgst`/`sgst` replaced by the reconciled split of
+  /// its own `totalGst`. Each By Rate and By Category card prints its two
+  /// components above its own total, so each row has to close on its own.
+  static Map<String, dynamic> _reconciledSplit(Map<String, dynamic> row) {
+    final parts = _splitGst(row['totalGst'] as double);
+    return {...row, 'cgst': parts.cgst, 'sgst': parts.sgst};
+  }
+
   static Map<String, dynamic> _rounded(Map<String, dynamic> row) => {
         ...row,
         'totalQuantity': _r3(row['totalQuantity'] as double),
@@ -517,7 +554,7 @@ class ReportService {
       {DateTime? startDate, DateTime? endDate}) async {
     final receipts = _confirmedGRNs(startDate: startDate, endDate: endDate);
     final suppliers = supplierStore.suppliers;
-    final damagedByGRN = _damagedRecoveryByGRN();
+    final recovery = _damagedRecoveryInWindow(startDate, endDate);
 
     final stats = <String, Map<String, dynamic>>{};
 
@@ -526,46 +563,100 @@ class ReportService {
           .where((s) => s.supplierId == grn.supplierId)
           .firstOrNull;
 
+      // Historical identity: the receipt's OWN snapshot wins, so renaming a
+      // supplier today cannot rename last year's purchases. `supplierName` is
+      // denormalized onto the GRN for exactly this reason. Falls back to the
+      // live record (a GRN restored without the field), then to a placeholder.
+      //
+      // Blank counts as absent: `??` alone passes an empty or whitespace-only
+      // name straight through and renders an empty cell.
+      final snapshot = (grn.supplierName ?? '').trim();
+      final current = (supplier?.name ?? '').trim();
+      final resolvedName = snapshot.isNotEmpty
+          ? snapshot
+          : (current.isNotEmpty ? current : 'Unknown Supplier');
+
       final entry = stats.putIfAbsent(
+        // Grouping stays on the ID: two suppliers sharing a name must never
+        // merge, and one supplier's receipts must never split on a rename.
         grn.supplierId,
         () => {
           'supplierId': grn.supplierId,
-          'supplierName':
-              supplier?.name ?? grn.supplierName ?? 'Unknown Supplier',
+          'supplierName': resolvedName,
           'receiptCount': 0,
           'totalItems': 0.0,
           'totalAmount': 0.0,
           'damagedAmount': 0.0,
-          'damagedRecoverable': 0.0,
+          'damagedExpected': 0.0,
+          'damagedRecovered': 0.0,
           'damagedAbsorbed': 0.0,
         },
       );
-
-      final damaged = damagedByGRN[grn.grnId];
 
       entry['receiptCount'] = (entry['receiptCount'] as int) + 1;
       entry['totalItems'] =
           (entry['totalItems'] as num).toDouble() + grn.totalReceivedQty;
       entry['totalAmount'] =
           (entry['totalAmount'] as double) + (grn.totalAmount ?? 0);
-      entry['damagedRecoverable'] =
-          (entry['damagedRecoverable'] as double) + (damaged?.recoverable ?? 0);
-      entry['damagedAbsorbed'] =
-          (entry['damagedAbsorbed'] as double) + (damaged?.absorbed ?? 0);
-      // Kept as the combined figure for any reader that only wants one number.
-      entry['damagedAmount'] =
-          (entry['damagedAmount'] as double) + (damaged?.total ?? 0);
     }
 
+    // Recovery is merged by SUPPLIER on its own event date, not by receipt. A
+    // supplier can therefore appear in this window purely because a return was
+    // raised or a credit landed, with no goods received — which is the point:
+    // a January receipt credited in March belongs to March.
+    for (final e in recovery.entries) {
+      final row = stats.putIfAbsent(
+        e.key,
+        () => {
+          'supplierId': e.key,
+          'supplierName': e.value.supplierName ?? 'Unknown Supplier',
+          'receiptCount': 0,
+          'totalItems': 0.0,
+          'totalAmount': 0.0,
+          'damagedAmount': 0.0,
+          'damagedExpected': 0.0,
+          'damagedRecovered': 0.0,
+          'damagedAbsorbed': 0.0,
+        },
+      );
+      row['damagedExpected'] =
+          (row['damagedExpected'] as double) + e.value.expected;
+      row['damagedRecovered'] =
+          (row['damagedRecovered'] as double) + e.value.recovered;
+      row['damagedAbsorbed'] =
+          (row['damagedAbsorbed'] as double) + e.value.absorbed;
+      row['damagedAmount'] = (row['damagedAmount'] as double) + e.value.total;
+    }
+
+    // Amount alone is not a total order: `List.sort` is not stable in Dart, so
+    // two suppliers on the same spend fell in whatever order the GRN box
+    // happened to yield, and the screen and its export could disagree between
+    // loads. Units, then the supplier id, break the tie on values that do not
+    // move.
     return stats.values.toList()
-      ..sort((a, b) =>
-          (b['totalAmount'] as double).compareTo(a['totalAmount'] as double));
+      ..sort((a, b) {
+        final byAmount =
+            (b['totalAmount'] as num).compareTo(a['totalAmount'] as num);
+        if (byAmount != 0) return byAmount;
+        final byUnits =
+            (b['totalItems'] as num).compareTo(a['totalItems'] as num);
+        if (byUnits != 0) return byUnits;
+        return (a['supplierId'] as String).compareTo(b['supplierId'] as String);
+      });
   }
 
   // ==================== Low Stock Report ====================
 
   /// Get low stock report
   Future<List<Map<String, dynamic>>> getLowStockReport({int threshold = 10}) async {
+    // The catalogue hydrates asynchronously from ProductStore's constructor,
+    // and `products` below is the OBSERVABLE while the variants are read from
+    // the repository. Without this await a cold open could see every variant
+    // and zero products, produce no rows, and render the success state — "All
+    // products are well stocked" — over a catalogue that had simply not loaded.
+    // Same guard, same reason, as `RetailNotificationSyncService`.
+    await productStore.ensureLoaded();
+
     final allProducts = productStore.products;
     final lowStockItems = <Map<String, dynamic>>[];
 
@@ -580,10 +671,27 @@ class ReportService {
       final variants =
           variantsByProduct[product.productId] ?? const <VarianteModel>[];
       for (var variant in variants) {
+        // A DEACTIVATED variant is not actionable: it has been withdrawn, so it
+        // will sit at zero forever and can never be reordered. It used to be
+        // flagged here and — because `StockAlertService` reads these same rows —
+        // raised as a low-stock NOTIFICATION for the life of the store, with no
+        // way to clear it short of deleting the variant.
+        //
+        // Excluding rather than filtering to `isSellable`, deliberately:
+        // `isSellable` is `status == 'active'`, and `VarianteModel` documents
+        // `out_of_stock` as a third value. Keeping only 'active' would drop the
+        // out-of-stock rows, which are the most urgent ones this report exists
+        // to show. Only an explicit 'inactive' is withdrawn.
+        if (variant.status == kInactiveVariantStatus) continue;
+
         // A variant's own minStock wins over the global threshold, matching
         // productStore.reorderPointFor — otherwise the Stock Alerts card and
         // the inventory colouring would disagree about the same variant.
-        final reorderPoint = variant.minStock ?? threshold;
+        // Always a `double`. `minStock` is a double and `threshold` an int, so
+        // this used to emit a double for a variant-level reorder point and an
+        // int for the global fallback — two runtime types in one column, which
+        // rendered as "5.0" beside "10" and would throw on any `as int`.
+        final reorderPoint = variant.minStock ?? threshold.toDouble();
         // Bundle-type variants have no stock of their own — `variant.stockQty`
         // is meaningless for them. "How many can actually be sold" (bounded by
         // component stock) is what the reorder threshold should compare
@@ -610,9 +718,16 @@ class ReportService {
       }
     }
 
-    // Sort by stock quantity (lowest first)
-    lowStockItems.sort((a, b) => (a['currentStock'] as num)
-        .compareTo(b['currentStock'] as num));
+    // Lowest stock first, then the variant id. Stock alone is not a total
+    // order and `List.sort` is not stable, so a catalogue with many
+    // zero-stock variants reordered between loads — and between the screen and
+    // its own export, which reads this same list.
+    lowStockItems.sort((a, b) {
+      final byStock =
+          (a['currentStock'] as num).compareTo(b['currentStock'] as num);
+      if (byStock != 0) return byStock;
+      return (a['variantId'] as String).compareTo(b['variantId'] as String);
+    });
 
     return lowStockItems;
   }
@@ -641,6 +756,9 @@ class ReportService {
       final refund = CashDrawerLedger.cashRefundOf(sale);
       if (refund > 0) {
         rows.add({
+          // Source-prefixed unique key, for the tie-break below. `reference`
+          // cannot serve: it holds a staff NAME on a manual movement.
+          'id': 'sale:${sale.saleId}',
           'at': at,
           'type': 'Refund',
           'description': 'Cash Refund',
@@ -653,6 +771,7 @@ class ReportService {
       final cash = CashDrawerLedger.cashComponentOf(sale);
       if (cash <= 0) continue;
       rows.add({
+        'id': 'sale:${sale.saleId}',
         'at': at,
         'type': 'Sale',
         'description':
@@ -668,6 +787,7 @@ class ReportService {
       if (!_inWindow(m.timestamp, startDate, endDate)) continue;
       final isIn = m.type == 'in';
       rows.add({
+        'id': 'movement:${m.id}',
         'at': m.timestamp,
         'type': isIn ? 'Cash In' : 'Cash Out',
         'description': m.note == null || m.note!.isEmpty
@@ -684,6 +804,7 @@ class ReportService {
       if ((e.paymentType ?? '').toLowerCase().trim() != 'cash') continue;
       if (!_inWindow(e.dateandTime, startDate, endDate)) continue;
       rows.add({
+        'id': 'expense:${e.id}',
         'at': e.dateandTime,
         'type': 'Expense',
         'description':
@@ -693,8 +814,55 @@ class ReportService {
       });
     }
 
-    rows.sort((a, b) => (b['at'] as DateTime).compareTo(a['at'] as DateTime));
+    // Newest first, then the row's own id. A timestamp is not a total order —
+    // two cash sales in the same second, or a sale and a movement sharing one,
+    // reordered between loads because `List.sort` is not stable. The screen and
+    // the export read this same list, so both are pinned by one decision.
+    rows.sort((a, b) {
+      final byTime = (b['at'] as DateTime).compareTo(a['at'] as DateTime);
+      if (byTime != 0) return byTime;
+      return (a['id'] as String).compareTo(b['id'] as String);
+    });
     return rows;
+  }
+
+  // ==================== Credit Reports ====================
+
+  /// Credit sales for a period — the Credit Sales tab.
+  ///
+  /// Exists so the credit tabs go through the SAME window rule as every other
+  /// retail report: [_withinRange] applies the caller's bounds AND the plan's
+  /// `reports.history_limit_days` cutoff. Reading `SaleRepository` directly, as
+  /// the screen used to, skipped the cutoff entirely — a plan limited to 30
+  /// days of history still showed every credit sale ever made.
+  ///
+  /// Filtered on `createdAt`, the basis every other report uses. The repository
+  /// still owns the ORDER (newest first, sale id as the tie-break).
+  Future<List<SaleModel>> getCreditSalesReport({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final all = await saleStore.getCreditSales();
+    return all
+        .where((sale) => _withinRange(sale.createdAt, startDate, endDate))
+        .toList();
+  }
+
+  /// Credit collections for a period — the Collections tab.
+  ///
+  /// Same window rule as [getCreditSalesReport]. Payments carry a single date,
+  /// so that is what is judged. Write-off and return-adjustment rows are kept
+  /// here — the tab LISTS them — and excluded from the money totals by
+  /// `CreditPaymentRepository.bucketCollections`, which is the one place that
+  /// decides what counts as collected.
+  Future<List<CreditPaymentModel>> getCreditCollectionsReport({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final all = await CreditPaymentRepository().getAllPayments();
+    return all
+        .where((payment) => _withinRange(payment.date, startDate, endDate))
+        .toList();
   }
 
   // ==================== GST Summary Report ====================
@@ -722,21 +890,27 @@ class ReportService {
 
     final byRate = <double, Map<String, dynamic>>{};
     final byProduct = <String, Map<String, dynamic>>{};
-    final byCategory = <String, Map<String, dynamic>>{};
+    // Keyed on the RATE, not on a formatted label. Keying on `rate.toInt()`
+    // merged 12% and 12.5% into one "12%" band whose badge then showed
+    // whichever rate arrived first, while `byRate` kept them apart — the same
+    // screen gave two different answers.
+    final byCategory = <double, Map<String, dynamic>>{};
 
-    double totalTaxable = 0, totalGst = 0, totalCgst = 0, totalSgst = 0;
+    // No cgst/sgst accumulators: the components are derived from the totals
+    // below, not summed from the per-line halves. See `_splitGst`.
+    double totalTaxable = 0, totalGst = 0;
+    // B-4: signed UNITS, so a credit note subtracts. `lineCount` below counts
+    // rows and cannot do that.
+    double totalQuantity = 0;
 
     for (final (:item, :sign) in lines) {
       final rate = item.gstRate ?? 0;
       final taxable = (item.taxableAmount ?? 0) * sign;
       final gst = (item.gstAmount ?? 0) * sign;
-      final cgst = (item.cgstAmount ?? 0) * sign;
-      final sgst = (item.sgstAmount ?? 0) * sign;
 
       totalTaxable += taxable;
       totalGst += gst;
-      totalCgst += cgst;
-      totalSgst += sgst;
+      totalQuantity += item.qty * sign;
 
       final rateRow = byRate.putIfAbsent(
           rate,
@@ -744,14 +918,14 @@ class ReportService {
                 'rate': rate,
                 'itemCount': 0,
                 'taxableAmount': 0.0,
+                // Placeholders. Filled by `_reconciledSplit` at emit time from
+                // this row's own `totalGst`, never accumulated.
                 'cgst': 0.0,
                 'sgst': 0.0,
                 'totalGst': 0.0,
               });
       rateRow['itemCount'] += sign;
       rateRow['taxableAmount'] += taxable;
-      rateRow['cgst'] += cgst;
-      rateRow['sgst'] += sgst;
       rateRow['totalGst'] += gst;
 
       final productRow = byProduct.putIfAbsent(
@@ -759,7 +933,10 @@ class ReportService {
           () => {
                 'productId': item.productId,
                 'productName': item.productName ?? 'Unknown',
-                'quantity': 0,
+                // A `double`: retail sells by weight, and seeding an `int`
+                // made the field's runtime type depend on whether any line had
+                // been added yet.
+                'quantity': 0.0,
                 'taxableAmount': 0.0,
                 'totalGst': 0.0,
               });
@@ -768,22 +945,24 @@ class ReportService {
       productRow['totalGst'] += gst;
 
       // Rate band standing in for a category, as the screen already did.
-      final bandKey = '${rate.toInt()}%';
       final categoryRow = byCategory.putIfAbsent(
-          bandKey,
+          rate,
           () => {
-                'categoryName': 'GST $bandKey Items',
+                // Country-aware NAME only — the grouping, the rate and every
+                // amount below are identical everywhere. The rate is formatted,
+                // not floored, so 12.5% reads "12.5%" and stays its own band.
+                'categoryName':
+                    '${TaxLabelRule.name} ${GstService.formatGstRate(rate)} Items',
                 'gstRate': rate,
                 'itemCount': 0,
                 'taxableAmount': 0.0,
+                // Placeholders — see the byRate seed above.
                 'cgst': 0.0,
                 'sgst': 0.0,
                 'totalGst': 0.0,
               });
       categoryRow['itemCount'] += sign;
       categoryRow['taxableAmount'] += taxable;
-      categoryRow['cgst'] += cgst;
-      categoryRow['sgst'] += sgst;
       categoryRow['totalGst'] += gst;
     }
 
@@ -793,10 +972,20 @@ class ReportService {
       'lineCount': lines.length,
       'totalTaxableAmount': totalTaxable,
       'totalGstAmount': totalGst,
-      'totalCgstAmount': totalCgst,
-      'totalSgstAmount': totalSgst,
-      'byRate': byRate.values.toList(),
-      'byProduct': byProduct.values.map((row) {
+      // Derived from the total, so the three figures the Summary card prints
+      // under one divider actually add up.
+      'totalCgstAmount': _splitGst(totalGst).cgst,
+      'totalSgstAmount': _splitGst(totalGst).sgst,
+      'totalQuantity': totalQuantity,
+      // Ascending, decided HERE. Returned in map-insertion order, the Summary
+      // tab listed rates in whatever order their first line happened to appear
+      // in the box while the By Rate tab sorted them — two orders for one list,
+      // and the Summary one shifted as new sales arrived.
+      'byRate': (byRate.values.map(_reconciledSplit).toList()
+        ..sort((a, b) => (a['rate'] as double).compareTo(b['rate'] as double))),
+      // ORDER IS DECIDED HERE, for all three breakdowns, so the screen just
+      // renders what it is handed and no two surfaces can disagree.
+      'byProduct': (byProduct.values.map((row) {
         final taxable = row['taxableAmount'] as double;
         final gst = row['totalGst'] as double;
         return {
@@ -806,8 +995,25 @@ class ReportService {
           // line count negative.
           'avgGstRate': taxable != 0 ? (gst / taxable) * 100 : 0.0,
         };
-      }).toList(),
-      'byCategory': byCategory.values.toList(),
+      }).toList()
+        // Most tax first, then the product id. Tax alone is not a total order
+        // and `List.sort` is not stable, so tied products reordered between
+        // loads.
+        ..sort((a, b) {
+          final byTax =
+              (b['totalGst'] as double).compareTo(a['totalGst'] as double);
+          if (byTax != 0) return byTax;
+          return (a['productId'] as String).compareTo(b['productId'] as String);
+        })),
+      // Same rule as byProduct; the rate is the tie-break because a band's
+      // name is derived from it.
+      'byCategory': (byCategory.values.map(_reconciledSplit).toList()
+        ..sort((a, b) {
+          final byTax =
+              (b['totalGst'] as double).compareTo(a['totalGst'] as double);
+          if (byTax != 0) return byTax;
+          return (a['gstRate'] as double).compareTo(b['gstRate'] as double);
+        })),
       'skippedRows': window.skippedRows,
     };
   }
@@ -912,6 +1118,7 @@ class ReportService {
           // different facts and the screen needs to be able to tell them apart.
           'costPrice': unitCost,
           'unknownCostLines': 0,
+          'unknownCostRevenue': 0.0,
         };
       }
 
@@ -921,30 +1128,44 @@ class ReportService {
       stat['totalQuantitySold'] += item.qty * sign;
       stat['totalRevenue'] += revenue;
 
+      // Cost only when it is known; profit is derived at the end from the two
+      // totals. Accumulating profit HERE, inside the else, meant revenue
+      // counted every line while profit counted only the costed ones — so a
+      // variant with a mix failed its own `profit == revenue - cost`, and its
+      // margin was understated by the whole un-costed amount.
       if (unitCost == null) {
         stat['unknownCostLines'] += 1;
+        stat['unknownCostRevenue'] += revenue;
       } else {
-        final cost = unitCost * item.qty * sign;
-        stat['totalCost'] += cost;
-        stat['totalProfit'] += revenue - cost;
+        stat['totalCost'] += unitCost * item.qty * sign;
       }
     }
 
     // Calculate profit margin and average selling price
     final statsList = itemProfits.values.map((stat) {
       final revenue = stat['totalRevenue'] as double;
-      final profit = stat['totalProfit'] as double;
       final qty = (stat['totalQuantitySold'] as num).toDouble();
+      // Derived from the two totals, never accumulated alongside them.
+      final profit = revenue - (stat['totalCost'] as double);
 
       return {
         ...stat,
+        // Derived, so the row always satisfies profit == revenue - cost.
+        'totalProfit': profit,
         // `!= 0`, not `> 0`: a variant returned more than it sold has negative
         // revenue, and `> 0` rendered that loss as a flat 0% break-even.
         'profitMargin': revenue != 0 ? (profit / revenue) * 100 : 0.0,
         'avgSellingPrice': qty != 0 ? revenue / qty : 0.0,
       };
     }).toList()
-      ..sort((a, b) => (b['totalProfit'] as double).compareTo(a['totalProfit'] as double));
+      // Highest profit first, then the variant id — profit alone is not a
+      // total order and `List.sort` is not stable.
+      ..sort((a, b) {
+        final byProfit =
+            (b['totalProfit'] as double).compareTo(a['totalProfit'] as double);
+        if (byProfit != 0) return byProfit;
+        return (a['variantId'] as String).compareTo(b['variantId'] as String);
+      });
 
     return statsList;
   }
@@ -1012,18 +1233,32 @@ class ReportService {
       final sign = RetailSaleFilter.revenueSign(sale);
       final saleItems = itemsBySaleId[sale.saleId] ?? const <SaleItemModel>[];
 
-      // Header amounts are already negated on a return, so this is signed.
-      final totalRevenue = sale.totalAmount - sale.taxAmount;
-
+      // LINE basis, matching every other profit tab. This used to read
+      // `sale.totalAmount - sale.taxAmount`, which is `taxable + roundOff` —
+      // so this tab and the Daily one carried the sale's round-off into profit
+      // while Overview and By-Item did not, and the same period showed a
+      // different profit depending on which tab you were looking at.
+      //
+      // Round-off is an adjustment to the customer's payable, attributable to
+      // no line and no product's margin, so it stays out of profit. Cost is a
+      // pure line figure; revenue has to be on the same footing.
+      double totalRevenue = 0.0;
       double totalCost = 0.0;
       var unknownCostLines = 0;
+      double unknownCostRevenue = 0.0;
       for (final item in saleItems) {
+        // Lines are stored positive even on a return — hence the sign.
+        final revenue = _netRevenueOf(item) * sign;
+        totalRevenue += revenue;
+
         final unitCost = _unitCostOf(item, liveCost);
         if (unitCost == null) {
+          // Revenue is kept; only the cost is unknown. Surfaced below so a
+          // margin built on it can't be mistaken for fully-costed profit.
           unknownCostLines++;
+          unknownCostRevenue += revenue;
           continue;
         }
-        // Lines are stored positive even on a return — hence the sign.
         totalCost += unitCost * item.qty * sign;
       }
 
@@ -1046,11 +1281,18 @@ class ReportService {
         'taxAmount': sale.taxAmount,
         'isReturn': RetailSaleFilter.isReturn(sale),
         'unknownCostLines': unknownCostLines,
+        'unknownCostRevenue': unknownCostRevenue,
       });
     }
 
-    // Sort by profit (highest first)
-    saleProfits.sort((a, b) => (b['profit'] as double).compareTo(a['profit'] as double));
+    // Highest profit first, then the sale id. Profit alone is not a total
+    // order and `List.sort` is not stable, so tied rows could reorder between
+    // loads.
+    saleProfits.sort((a, b) {
+      final byProfit = (b['profit'] as double).compareTo(a['profit'] as double);
+      if (byProfit != 0) return byProfit;
+      return (a['saleId'] as String).compareTo(b['saleId'] as String);
+    });
 
     return saleProfits;
   }
@@ -1082,21 +1324,34 @@ class ReportService {
           'totalProfit': 0.0,
           'profitMargin': 0.0,
           'totalItems': 0.0,
+          // A day of un-costed sales used to read as 100% margin with nothing
+          // said about it — the exact failure `_unitCostOf` exists to prevent.
+          'unknownCostLines': 0,
+          'unknownCostRevenue': 0.0,
         };
       }
 
       final saleItems = itemsBySaleId[sale.saleId] ?? const <SaleItemModel>[];
 
+      // LINE basis, matching every other profit tab — see the note in
+      // `getProfitPerSaleReport`. The header figure this replaces carried the
+      // sale's round-off into the day's profit.
+      double saleRevenue = 0.0;
       double saleCost = 0.0;
+      var unknownLines = 0;
+      double unknownRevenue = 0.0;
       for (final item in saleItems) {
+        final revenue = _netRevenueOf(item) * sign;
+        saleRevenue += revenue;
+
         final unitCost = _unitCostOf(item, liveCost);
-        if (unitCost == null) continue;
+        if (unitCost == null) {
+          unknownLines++;
+          unknownRevenue += revenue;
+          continue;
+        }
         saleCost += unitCost * item.qty * sign;
       }
-
-      // Header amounts are already negated on a return; ex-tax so the day's
-      // profit doesn't count collected GST as margin.
-      final saleRevenue = sale.totalAmount - sale.taxAmount;
 
       final day = dailyProfits[dayKey]!;
       day['totalSales'] += sign;
@@ -1104,6 +1359,8 @@ class ReportService {
       day['totalCost'] += saleCost;
       day['totalProfit'] += saleRevenue - saleCost;
       day['totalItems'] += RetailSaleFilter.signedItemCount(sale);
+      day['unknownCostLines'] += unknownLines;
+      day['unknownCostRevenue'] += unknownRevenue;
     }
 
     // Calculate profit margin for each day
@@ -1125,8 +1382,19 @@ class ReportService {
 
   /// [_inWindow] for records that store their timestamp as an ISO string.
   /// An unparseable value is treated as outside any explicit window.
+  /// The date rule for every PURCHASE report — POs, GRNs and returns.
+  ///
+  /// Parse FIRST, always. This used to open with
+  /// `if (start == null && end == null) return true;`, which skipped
+  /// [_inWindow] entirely — so an all-time query ignored the plan's history
+  /// cutoff, and admitted rows whose date could not be read while a bounded
+  /// query rejected the very same rows. [_inWindow] already null-guards both
+  /// bounds, so it is the whole rule in both cases.
+  ///
+  /// The sales side had the same defect and it is documented there
+  /// (`_salesInWindow`, "it used to sit inside `if (start != null || end !=
+  /// null)`"). This is the purchase counterpart.
   bool _withinRange(String? iso, DateTime? start, DateTime? end) {
-    if (start == null && end == null) return true;
     final at = DateTime.tryParse(iso ?? '');
     if (at == null) return false;
     return _inWindow(at, start, end);
@@ -1140,7 +1408,18 @@ class ReportService {
             g.statusEnum == GRNStatus.confirmed &&
             _withinRange(g.receivedDate, startDate, endDate))
         .toList()
-      ..sort((a, b) => b.receivedDate.compareTo(a.receivedDate));
+      // Newest first, then the GRN id. `receivedDate` alone is not a total
+      // order and `List.sort` is not stable in Dart, so two receipts confirmed
+      // in the same instant could swap between loads.
+      //
+      // Only the GRN Report inherits this order: Supplier-wise re-aggregates
+      // and sorts on its own, Purchase Summary only folds, and Damaged Items
+      // builds a map from it and sorts its own rows.
+      ..sort((a, b) {
+        final byDate = b.receivedDate.compareTo(a.receivedDate);
+        if (byDate != 0) return byDate;
+        return a.grnId.compareTo(b.grnId);
+      });
   }
 
   /// Damaged value per GRN. GRN headers only carry accepted value, so the
@@ -1155,37 +1434,141 @@ class ReportService {
   ///
   /// A rejected claim that has already been written off is counted through its
   /// loss records instead, so the same value never lands in `absorbed` twice.
-  Map<String, _DamagedRecovery> _damagedRecoveryByGRN() {
-    final byGRN = <String, _DamagedRecovery>{};
-    _DamagedRecovery entry(String grnId) =>
-        byGRN.putIfAbsent(grnId, () => _DamagedRecovery());
+  /// A received line with no usable cost price.
+  ///
+  /// **Zero is the live case, not null.** `ReceivingItemData.costPrice` is a
+  /// non-nullable double seeded `estimatedPrice ?? variant.costPrice ?? 0`
+  /// (`material_receiving_screen.dart:88`) and the price field parses
+  /// `tryParse(text) ?? 0` (`:150`), so a blank price becomes 0 — which then
+  /// values the line, the receipt, the supplier accrual and any return raised
+  /// from it at nothing. Null only reaches here from legacy or restored rows.
+  ///
+  /// Both mean the same thing — the cost was never captured — so both are
+  /// flagged. Nothing is reconstructed: substituting the variant's current cost
+  /// would price a receipt at a figure no invoice supports, and the supplier
+  /// ledger has already accrued the zero.
+  ///
+  /// Lines that received nothing are ignored; an unpriced line only matters
+  /// once goods have actually arrived against it.
+  static bool _lineUnpriced(GRNItemModel i) =>
+      i.receivedQty > 0 && (i.costPrice == null || i.costPrice! <= 0);
+
+  /// GRN ids with at least one unpriced received line.
+  ///
+  /// Derived once from the item list so every report that surfaces this reads
+  /// the same answer — a receipt cannot be flagged on one screen and clean on
+  /// another.
+  static Set<String> _grnIdsWithUnpricedLines(List<GRNItemModel> items) => {
+        for (final i in items)
+          if (_lineUnpriced(i)) i.grnId,
+      };
+
+  /// A confirmed receipt whose invoice value was never recorded.
+  ///
+  /// **Null is not zero.** `GRNModel.totalAmount` and the supplier's `purchase`
+  /// ledger movement are written from ONE value in ONE block
+  /// (`material_receiving_screen.dart:547` and `:753`), so a GRN with no amount
+  /// also has no payable — the two absences are the same event. Every report
+  /// reads it as `?? 0`, which is honest against the ledger but silently
+  /// understates spend, so the condition is surfaced rather than patched.
+  ///
+  /// Deliberately NOT reconstructed. `Σ item.totalAmount` uses `acceptedQty`
+  /// (`grn_item_model_214.dart:135`) while the header bills `receivedQty`, so
+  /// it drops the damaged value; and recomputing from `costPrice` would invent
+  /// a payable the supplier balance has never seen.
+  ///
+  /// A stored `0.0` is a legitimate value — a free or sample receipt — and is
+  /// never flagged.
+  static bool _grnAmountMissing(GRNModel g) => g.totalAmount == null;
+
+  /// Damage recovery for a window, grouped by SUPPLIER, with every document
+  /// judged on ITS OWN event date.
+  ///
+  /// This replaces a per-GRN lookup that attributed every return, claim and
+  /// write-off to the date its GRN was RECEIVED, and applied no date filter at
+  /// all. Two things were wrong with that: recovery appeared in a period before
+  /// it had happened, and a closed period changed retroactively every time a
+  /// later credit note arrived.
+  ///
+  /// The app already dates these events correctly in the supplier ledger —
+  /// `recordCreditNote` posts with `creditNoteDate` and `updateClaimStatus`
+  /// posts with `resolvedAt` (`damaged_goods_store.dart:313, :45`). This makes
+  /// the reports agree with the ledger.
+  ///
+  /// **Expected is not Recovered.** A raised return or claim is value the
+  /// supplier owes; only a credit note or a settled claim is value actually
+  /// received — and a credit note may be for LESS than the return's face value,
+  /// so `creditNoteAmount` is what counts as recovered, never `totalAmount`.
+  ///
+  /// Iterates the DOCUMENTS, not the window's GRNs: February's recovery belongs
+  /// to a January receipt that is not in February's window at all.
+  ///
+  /// Cancelled returns are excluded from all three buckets. The goods never went
+  /// back, nothing was credited, and there is no reliable cancellation date to
+  /// post against — `updatedAt` moves on any edit, so using it would invent an
+  /// accounting event.
+  Map<String, _DamagedRecovery> _damagedRecoveryInWindow(
+      DateTime? start, DateTime? end) {
+    final bySupplier = <String, _DamagedRecovery>{};
+    _DamagedRecovery entry(String supplierId, String? name) {
+      final e = bySupplier.putIfAbsent(supplierId, () => _DamagedRecovery());
+      final trimmed = (name ?? '').trim();
+      if (e.supplierName == null && trimmed.isNotEmpty) {
+        e.supplierName = trimmed;
+      }
+      return e;
+    }
 
     for (final r in damagedGoodsStore.purchaseReturns) {
-      // A cancelled return means the goods never went back, so the value the
-      // receipt billed stays with the business.
-      if (r.statusEnum == PurchaseReturnStatus.cancelled) {
-        entry(r.grnId).absorbed += r.totalAmount;
-      } else {
-        entry(r.grnId).recoverable += r.totalAmount;
+      switch (r.statusEnum) {
+        case PurchaseReturnStatus.cancelled:
+          break; // never returned, never credited, no dependable date
+        case PurchaseReturnStatus.pending:
+          if (_withinRange(r.returnDate, start, end)) {
+            entry(r.supplierId, r.supplierName).expected += r.totalAmount;
+          }
+        case PurchaseReturnStatus.creditReceived:
+          // The note's face value, which may be less than the return total.
+          // A legacy row with no credit date cannot be placed in a period.
+          if (_withinRange(r.creditNoteDate, start, end)) {
+            entry(r.supplierId, r.supplierName).recovered +=
+                r.creditNoteAmount ?? 0;
+          }
       }
     }
 
     for (final c in damagedGoodsStore.supplierClaims) {
-      if (c.statusEnum != SupplierClaimStatus.rejected) {
-        entry(c.grnId).recoverable += c.totalAmount;
-      } else if (!c.isLossRecorded) {
-        // Written-off rejections are counted via their loss rows below.
-        entry(c.grnId).absorbed += c.totalAmount;
+      switch (c.statusEnum) {
+        case SupplierClaimStatus.pending:
+        case SupplierClaimStatus.approved:
+          // Approved means the supplier agreed, not that they paid.
+          if (_withinRange(c.claimDate, start, end)) {
+            entry(c.supplierId, c.supplierName).expected += c.totalAmount;
+          }
+        case SupplierClaimStatus.settled:
+          if (_withinRange(c.resolvedAt, start, end)) {
+            entry(c.supplierId, c.supplierName).recovered += c.totalAmount;
+          }
+        case SupplierClaimStatus.rejected:
+          // A written-off rejection is counted through its loss row instead, so
+          // the same value never lands in `absorbed` twice.
+          if (!c.isLossRecorded && _withinRange(c.resolvedAt, start, end)) {
+            entry(c.supplierId, c.supplierName).absorbed += c.totalAmount;
+          }
       }
     }
 
     for (final l in damagedGoodsStore.inventoryLosses) {
-      final grnId = l.grnId;
-      if (grnId == null) continue;
-      entry(grnId).absorbed += l.lossValue;
+      // Only losses raised from a receipt are purchase damage; a stock
+      // adjustment loss has no GRN and belongs to inventory, not purchasing.
+      if (l.grnId == null) continue;
+      final supplierId = l.supplierId;
+      if (supplierId == null) continue;
+      if (!_withinRange(l.recordedAt, start, end)) continue;
+      entry(supplierId, l.supplierName).absorbed += l.lossValue;
     }
 
-    return byGRN;
+    return bySupplier;
   }
 
   /// Units received against a PO across its confirmed GRNs.
@@ -1214,7 +1597,13 @@ class ReportService {
         .toList();
 
     final receipts = _confirmedGRNs(startDate: startDate, endDate: endDate);
-    final damagedByGRN = _damagedRecoveryByGRN();
+    final recovery = _damagedRecoveryInWindow(startDate, endDate);
+    // One item read so this figure is line-accurate. A receipt with SOME
+    // unpriced lines still has a non-zero header total, so a header-only check
+    // would miss it — and would then disagree with the GRN Report, which is
+    // line-aware.
+    final unpricedGRNs =
+        _grnIdsWithUnpricedLines(await GRNItemRepository().getAllGRNItems());
 
     // Every status, including draft and cancelled — this breakdown is meant to
     // account for all of them.
@@ -1233,10 +1622,16 @@ class ReportService {
             po.statusEnum != POStatus.cancelled)
         .toList();
 
-    final damagedRecoverable = receipts.fold<double>(
-        0, (sum, g) => sum + (damagedByGRN[g.grnId]?.recoverable ?? 0));
-    final damagedAbsorbed = receipts.fold<double>(
-        0, (sum, g) => sum + (damagedByGRN[g.grnId]?.absorbed ?? 0));
+    // Recovery is judged on each document's OWN event date, so these cover
+    // recovery that HAPPENED in this period — not recovery attached to this
+    // period's receipts. A January receipt credited in March contributes to
+    // March, and January never changes afterwards.
+    final damagedExpected =
+        recovery.values.fold<double>(0, (sum, r) => sum + r.expected);
+    final damagedRecovered =
+        recovery.values.fold<double>(0, (sum, r) => sum + r.recovered);
+    final damagedAbsorbed =
+        recovery.values.fold<double>(0, (sum, r) => sum + r.absorbed);
 
     // Value still expected on orders that are placed but not fully received.
     final outstandingValue = orders
@@ -1262,11 +1657,20 @@ class ReportService {
           placedOrders.fold<double>(0, (sum, po) => sum + po.estimatedTotal),
       'receivedValue':
           receipts.fold<double>(0, (sum, g) => sum + (g.totalAmount ?? 0)),
-      'damagedValue': damagedRecoverable + damagedAbsorbed,
-      'damagedRecoverable': damagedRecoverable,
+      'damagedValue': damagedExpected + damagedRecovered + damagedAbsorbed,
+      // Expected is owed, not received — never present them as one number.
+      'damagedExpected': damagedExpected,
+      'damagedRecovered': damagedRecovered,
       'damagedAbsorbed': damagedAbsorbed,
       'outstandingValue': outstandingValue,
       'supplierCount': receipts.map((g) => g.supplierId).toSet().length,
+      // Same window and same confirmed-only rule as every figure above it —
+      // it counts the very list they were folded from.
+      'grnsMissingAmount': receipts.where(_grnAmountMissing).length,
+      // Receipts in this window carrying at least one line with no cost price.
+      // Their value — and any recovery raised from them — is understated.
+      'grnsWithUnpricedLines':
+          receipts.where((g) => unpricedGRNs.contains(g.grnId)).length,
     };
   }
 
@@ -1286,19 +1690,37 @@ class ReportService {
             po.statusEnum == status &&
             _withinRange(po.createdAt, startDate, endDate))
         .toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      // Newest first, then the PO id. `createdAt` alone is not a total order,
+      // and `List.sort` is not stable in Dart, so two orders stamped the same
+      // instant fell in whatever order the box yielded and could swap between
+      // loads — on screen and in the export.
+      ..sort((a, b) {
+        final byDate = b.createdAt.compareTo(a.createdAt);
+        if (byDate != 0) return byDate;
+        return a.poId.compareTo(b.poId);
+      });
 
     return orders.map((po) {
       final received = _receivedQtyForPO(po.poId);
+      // The PO's own snapshot is the source of truth for the name — a renamed
+      // supplier must not relabel historical orders. Blank counts as absent:
+      // `??` alone passes a whitespace-only name through and renders an empty
+      // cell.
+      final snapshot = (po.supplierName ?? '').trim();
       return {
         'poId': po.poId,
         'poNumber': po.poNumber,
-        'supplierName': po.supplierName ?? 'Unknown Supplier',
+        'supplierName': snapshot.isNotEmpty ? snapshot : 'Unknown Supplier',
         'createdAt': po.createdAt,
         'expectedDeliveryDate': po.expectedDeliveryDate,
         'orderedQty': po.totalItems,
         'receivedQty': received,
-        'remainingQty': (po.totalItems - received).clamp(0, po.totalItems),
+        // `.toDouble()` is load-bearing: `num.clamp` returns whichever operand
+        // it picked, so on an over-receipt this handed back the int literal `0`
+        // while every other row was a double. The column carried two runtime
+        // types and the screen's `as int` threw on the double ones.
+        'remainingQty':
+            (po.totalItems - received).clamp(0, po.totalItems).toDouble(),
         'estimatedTotal': po.estimatedTotal,
         'receivedValue': _receivedValueForPO(po.poId),
         'status': po.status,
@@ -1313,6 +1735,8 @@ class ReportService {
       {DateTime? startDate, DateTime? endDate}) async {
     final receipts = _confirmedGRNs(startDate: startDate, endDate: endDate);
     final items = await GRNItemRepository().getAllGRNItems();
+
+    final unpricedGRNs = _grnIdsWithUnpricedLines(items);
 
     final acceptedByGRN = <String, double>{};
     final damagedByGRN = <String, double>{};
@@ -1333,9 +1757,19 @@ class ReportService {
               'invoiceNumber': grn.invoiceNumber,
               'orderedQty': grn.totalOrderedQty,
               'receivedQty': grn.totalReceivedQty,
-              'acceptedQty': acceptedByGRN[grn.grnId] ?? 0,
-              'damagedQty': damagedByGRN[grn.grnId] ?? 0,
+              // `?? 0` handed back the int literal for a GRN with no items
+              // while every other row was a double, so the column carried two
+              // runtime types and the screen's `as int` threw on the doubles.
+              'acceptedQty': acceptedByGRN[grn.grnId] ?? 0.0,
+              'damagedQty': damagedByGRN[grn.grnId] ?? 0.0,
               'totalAmount': grn.totalAmount ?? 0.0,
+              // At least one received line has no cost price, so this receipt's
+              // Value is understated by whatever those units were worth.
+              'hasUnpricedLine': unpricedGRNs.contains(grn.grnId),
+              // The `?? 0` above is lossy: it makes "never recorded" and
+              // "genuinely free" look identical. This keeps them apart so the
+              // row report can name the receipt rather than just count it.
+              'amountMissing': _grnAmountMissing(grn),
             })
         .toList();
   }
@@ -1364,20 +1798,41 @@ class ReportService {
         'grnItemId': item.grnItemId,
         'grnNumber': grn.grnNumber,
         'poNumber': grn.poNumber,
-        'supplierName': grn.supplierName ?? 'Unknown Supplier',
+        // The GRN's own snapshot names the supplier — a rename must not
+        // relabel historical receipts. Blank counts as absent: `??` alone
+        // passes a whitespace-only name through and renders an empty cell.
+        'supplierName': (grn.supplierName ?? '').trim().isEmpty
+            ? 'Unknown Supplier'
+            : grn.supplierName!.trim(),
         'receivedDate': grn.receivedDate,
         'productName': item.productName ?? 'Unknown Product',
         'variantInfo': item.variantInfo,
-        'damagedQty': item.damagedQty ?? 0,
+        // Always a double. Rows are filtered to `damagedQty > 0`, so this is
+        // never the `?? 0` int literal in practice — but the fallback matches
+        // the type anyway, so the column can never carry two runtime types.
+        'damagedQty': (item.damagedQty ?? 0).toDouble(),
         'costPrice': item.costPrice,
+        // No usable cost, so `damagedAmount` below is 0 and any return or claim
+        // raised from this line was created at zero value too.
+        'costMissing': _lineUnpriced(item),
         'damagedAmount': item.damagedAmount ?? 0.0,
         'handling': item.damagedHandlingEnum?.name,
         'handlingDisplay': item.damagedHandlingDisplay,
       });
     }
 
-    rows.sort((a, b) =>
-        (b['receivedDate'] as String).compareTo(a['receivedDate'] as String));
+    // Newest first, then the line id. Several damaged lines from ONE receipt
+    // share an identical `receivedDate`, so ties are the norm here rather than
+    // the exception — and `List.sort` is not stable in Dart.
+    //
+    // This is the report's OWN sort: `_confirmedGRNs` is consumed as a map
+    // above, so its ordering never reaches these rows.
+    rows.sort((a, b) {
+      final byDate =
+          (b['receivedDate'] as String).compareTo(a['receivedDate'] as String);
+      if (byDate != 0) return byDate;
+      return (a['grnItemId'] as String).compareTo(b['grnItemId'] as String);
+    });
     return rows;
   }
 
@@ -1389,7 +1844,15 @@ class ReportService {
     final returns = damagedGoodsStore.purchaseReturns
         .where((r) => _withinRange(r.returnDate, startDate, endDate))
         .toList()
-      ..sort((a, b) => b.returnDate.compareTo(a.returnDate));
+      // Newest first, then the return id. `returnDate` alone is not a total
+      // order — one receipt can raise several returns in the same instant — and
+      // `List.sort` is not stable in Dart, so tied rows could swap between
+      // loads, on screen and in the export.
+      ..sort((a, b) {
+        final byDate = b.returnDate.compareTo(a.returnDate);
+        if (byDate != 0) return byDate;
+        return a.returnId.compareTo(b.returnId);
+      });
 
     return returns
         .map((r) => {
@@ -1397,9 +1860,16 @@ class ReportService {
               'returnNumber': r.returnNumber,
               'grnNumber': r.grnNumber,
               'poNumber': r.poNumber,
-              'supplierName': r.supplierName ?? 'Unknown Supplier',
+              // The return document's own snapshot names the supplier — a
+              // rename must not relabel history. Blank counts as absent: `??`
+              // alone passes a whitespace-only name through as an empty cell.
+              'supplierName': (r.supplierName ?? '').trim().isEmpty
+                  ? 'Unknown Supplier'
+                  : r.supplierName!.trim(),
               'returnDate': r.returnDate,
-              'totalQty': r.totalQty,
+              // Explicitly a double, matching every other quantity the reports
+              // emit — goods go back by weight as readily as by the piece.
+              'totalQty': r.totalQty.toDouble(),
               'totalAmount': r.totalAmount,
               'status': r.status,
               'statusDisplay': r.statusDisplay,
@@ -1439,10 +1909,22 @@ class ReportService {
               'variantId': m.variantId,
               'type': m.type,
               'isIn': m.isIn,
-              'quantity': m.quantity.toInt(),
-              'signedQuantity': m.signedQuantity.toInt(),
-              'balanceAfter': m.balanceAfter.toInt(),
-              'balanceBefore': (m.balanceAfter - m.signedQuantity).toInt(),
+              // Doubles, deliberately. `StockMovementModel.quantity` and
+              // `balanceAfter` are `double` and the adjustment dialog lets a
+              // loose-goods variant type a fractional amount
+              // (`stock_adjustment_dialog.dart:159`), so `.toInt()` here turned
+              // a 2.5 kg correction into 2 — silently, with no error to notice.
+              //
+              // It also broke the row's own arithmetic: `balanceBefore` is
+              // derived from the two doubles, so truncating all three
+              // separately let Before + Change disagree with After.
+              'quantity': m.quantity,
+              'signedQuantity': m.signedQuantity,
+              'balanceAfter': m.balanceAfter,
+              'balanceBefore': m.balanceAfter - m.signedQuantity,
+              // Carried from the movement so a weighed correction can read
+              // "2.5 kg" rather than a bare number that looks like pieces.
+              'unit': m.unit,
               'reason': m.reason,
               'note': m.note ?? '',
               'staffName': m.staffName,
@@ -1456,12 +1938,23 @@ class ReportService {
 ///
 /// Mutable on purpose — it is accumulated in a single pass over three document
 /// lists and never escapes [ReportService].
+/// Damage recovery for one supplier in one window, split by what actually
+/// happened rather than by what might.
 class _DamagedRecovery {
-  /// Open or credited returns, plus claims not yet refused.
-  double recoverable = 0;
+  /// Snapshot name from whichever document was seen first, so a supplier that
+  /// appears only through a recovery event can still be labelled.
+  String? supplierName;
 
-  /// Write-offs, refused claims and cancelled returns — cost the business keeps.
+  /// Raised and owed: an open return, or a claim not yet settled or refused.
+  /// **Not money received.**
+  double expected = 0;
+
+  /// Actually credited or settled — a credit note's face value, or a settled
+  /// claim's total.
+  double recovered = 0;
+
+  /// Write-offs and refused claims: cost the business keeps.
   double absorbed = 0;
 
-  double get total => recoverable + absorbed;
+  double get total => expected + recovered + absorbed;
 }

@@ -118,8 +118,14 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
           // method down automatically — including card/UPI refunds, which
           // belong in the summary even though they never touch the drawer.
           _addToMethod(s.paymentType, s.totalAmount);
-          if (s.paymentType.toLowerCase().trim() != 'cash') continue;
-          final refunded = s.totalAmount.abs();
+          // The SHARED rule, not a local one. This used to read
+          // `s.paymentType == 'cash' ? s.totalAmount.abs() : 0`, which ignored
+          // the stored payment legs: an exchange return booked the whole value
+          // of the goods handed back as cash out, when only the difference
+          // left the till, and a split refund headed 'card' with a cash leg
+          // was skipped entirely. The Cash Drawer History report already used
+          // `cashRefundOf`, so the two screens disagreed on real money.
+          final refunded = CashDrawerLedger.cashRefundOf(s);
           if (refunded <= 0) continue;
           cashRefunds += refunded;
           refundEntries.add(

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/init/hive_init.dart';
@@ -331,12 +333,14 @@ class BillBerryApp extends StatelessWidget {
       title: 'Bill Berry Lite',
       debugShowCheckedModeBanner: false,
 
-      // Wrap all routes with NotificationOverlay + app-wide inactivity handling.
+      // Wrap all routes with NotificationOverlay + app-wide inactivity handling + global back exit protection.
       builder: (context, child) {
         return NotificationOverlay(
           service: NotificationService.instance,
           child: _SessionActivityWrapper(
-            child: child ?? const SizedBox.shrink(),
+            child: _GlobalBackProtection(
+              child: child ?? const SizedBox.shrink(),
+            ),
           ),
         );
       },
@@ -446,6 +450,76 @@ class _SessionActivityWrapperState extends State<_SessionActivityWrapper> {
         if (RestaurantSession.isLoggedIn) {
           RestaurantSession.resetInactivityTimer();
         }
+      },
+      child: widget.child,
+    );
+  }
+}
+
+/// App-wide back-button protection:
+///   • If popping navigates back inside the app (`Navigator.canPop()` is true),
+///     it pops the top screen immediately without showing any message.
+///   • If popping would exit/close the app (`Navigator.canPop()` is false), it
+///     intercepts the back press, shows a floating SnackBar ("Press back again
+///     to exit"), and requires a second back press within 2 seconds to exit.
+class _GlobalBackProtection extends StatefulWidget {
+  final Widget child;
+  const _GlobalBackProtection({required this.child});
+
+  @override
+  State<_GlobalBackProtection> createState() => _GlobalBackProtectionState();
+}
+
+class _GlobalBackProtectionState extends State<_GlobalBackProtection> {
+  DateTime? _lastBackPress;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+
+        // If popping navigates back to a previous screen inside the app, pop normally.
+        final nav = navigatorKey.currentState;
+        if (nav != null && nav.canPop()) {
+          nav.pop();
+          return;
+        }
+
+        // Navigator cannot pop further — popping would exit/close the app.
+        // Prompt for double-press before exiting.
+        final now = DateTime.now();
+        if (_lastBackPress != null &&
+            now.difference(_lastBackPress!) < const Duration(seconds: 2)) {
+          SystemNavigator.pop();
+          return;
+        }
+        _lastBackPress = now;
+
+        rootScaffoldMessengerKey.currentState?.clearSnackBars();
+        rootScaffoldMessengerKey.currentState?.showSnackBar(
+          SnackBar(
+            content: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.exit_to_app_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Text(
+                  'Press back again to exit',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.primary,
+            margin: const EdgeInsets.only(bottom: 24, left: 24, right: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
       },
       child: widget.child,
     );

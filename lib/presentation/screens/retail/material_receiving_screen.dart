@@ -115,7 +115,8 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
   void _showEditItemDialog(int index) {
     final item = _receivingItems[index];
     // The PO line's own variant decides whether fractions may be received.
-    final allowDecimal = productStore.variants
+    final allowDecimal =
+        productStore.variants
             .where((v) => v.varianteId == item.variantId)
             .firstOrNull
             ?.isDecimalQuantity ??
@@ -138,11 +139,13 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
         child: MoneyScope(
           child: StatefulBuilder(
             builder: (context, setDialogState) {
-              final received = (allowDecimal
+              final received =
+                  (allowDecimal
                       ? double.tryParse(receivedController.text)
                       : int.tryParse(receivedController.text)?.toDouble()) ??
                   0;
-              final damaged = (allowDecimal
+              final damaged =
+                  (allowDecimal
                       ? double.tryParse(damagedController.text)
                       : int.tryParse(damagedController.text)?.toDouble()) ??
                   0;
@@ -171,7 +174,9 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                           : TextInputType.number,
                       inputFormatters: [
                         if (allowDecimal)
-                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d{0,2}'),
+                          )
                         else
                           FilteringTextInputFormatter.digitsOnly,
                       ],
@@ -188,7 +193,9 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                           : TextInputType.number,
                       inputFormatters: [
                         if (allowDecimal)
-                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d{0,2}'),
+                          )
                         else
                           FilteringTextInputFormatter.digitsOnly,
                       ],
@@ -486,6 +493,28 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
       return;
     }
 
+    // A cost price is required on anything actually received.
+    //
+    // `costPrice` seeds from `estimatedPrice ?? variant.costPrice ?? 0` and the
+    // price field parses `tryParse(text) ?? 0`, so a blank silently became ₹0 —
+    // and ₹0 then valued the line, this receipt, the supplier accrual and any
+    // return or claim raised from it at nothing, indistinguishably from goods
+    // that really were free. Blocking here is the only point at which the
+    // figure can still be asked for; afterwards no report can recover it.
+    final itemsWithoutCost = _receivingItems
+        .where((item) => item.receivedQty > 0 && item.costPrice <= 0)
+        .toList();
+
+    if (itemsWithoutCost.isNotEmpty) {
+      final names = itemsWithoutCost.map((i) => i.productName).join(', ');
+      NotificationService.instance.showError(
+        itemsWithoutCost.length == 1
+            ? 'Enter a cost price for $names before receiving it'
+            : 'Enter a cost price for these items before receiving: $names',
+      );
+      return;
+    }
+
     // Calculate totals
     final totalOrdered = _receivingItems.fold<double>(
       0,
@@ -608,7 +637,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                   grnItems.length == _receivingItems.length
                       ? '${grnItems.length} line${grnItems.length == 1 ? '' : 's'}'
                       : '${grnItems.length} of ${_receivingItems.length} lines '
-                          '• ${_receivingItems.length - grnItems.length} not received at all',
+                            '• ${_receivingItems.length - grnItems.length} not received at all',
                 ),
                 if (_notesController.text.trim().isNotEmpty)
                   _metaLine('Notes', _notesController.text.trim()),

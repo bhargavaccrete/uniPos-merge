@@ -6,9 +6,11 @@ import 'package:billberrylite/domain/services/retail/report_service.dart';
 import 'package:billberrylite/presentation/screens/retail/reports/report_page_scaffold.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_notice.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_summary_card.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 
 /// Headline purchasing numbers: ordered vs actually received, and what it cost.
 ///
@@ -44,8 +46,14 @@ class PurchaseSummaryReportScreen extends StatelessWidget {
           startDate: start,
           endDate: end,
         );
-        if ((data['orderCount'] as int) == 0 &&
-            (data['receiptCount'] as int) == 0) {
+        // `orderCount` deliberately excludes draft and cancelled orders, so
+        // testing it alone declared "no purchase activity" for a period that
+        // held nothing but drafts — and hid the very status breakdown that
+        // exists to account for them. `countByStatus` covers all five statuses,
+        // so it subsumes `orderCount`.
+        final counts = data['countByStatus'] as Map<String, int>;
+        final hasOrders = counts.values.any((c) => c > 0);
+        if (!hasOrders && (data['receiptCount'] as int) == 0) {
           return [];
         }
         return [data];
@@ -56,7 +64,10 @@ class PurchaseSummaryReportScreen extends StatelessWidget {
           ReportSummaryCard(
             title: 'Received',
             value: formatMoney(d['receivedValue'] as double),
-            subtitle: '${d['receivedQty']} units in',
+            // A double: goods can be received by weight. Raw interpolation
+            // printed 12 units as "12.0".
+            subtitle:
+                '${formatQty((d['receivedQty'] as num).toDouble())} units in',
             icon: Icons.inventory_2_rounded,
             color: AppColors.success,
           ),
@@ -70,13 +81,15 @@ class PurchaseSummaryReportScreen extends StatelessWidget {
           ReportSummaryCard(
             title: 'Outstanding',
             value: formatMoney(d['outstandingValue'] as double),
-            subtitle: 'still expected',
+            // Not recovery: this is PO value not yet delivered. "Still
+            // expected" collided with the Expected recovery row below.
+            subtitle: 'undelivered on open POs',
             icon: Icons.hourglass_top_rounded,
             color: AppColors.warning,
           ),
         ];
       },
-      detail: (context, rows) => _buildBreakdown(context, rows.first),
+      detail: (context, rows) => _buildDetail(context, rows.first),
       exportData: (rows) {
         final d = rows.first;
         final counts = d['countByStatus'] as Map<String, int>;
@@ -86,8 +99,8 @@ class PurchaseSummaryReportScreen extends StatelessWidget {
             ['Purchase Orders', d['orderCount']],
             ['Goods Receipts', d['receiptCount']],
             ['Suppliers', d['supplierCount']],
-            ['Units Ordered', d['orderedQty']],
-            ['Units Received', d['receivedQty']],
+            ['Units Ordered', exportQty((d['orderedQty'] as num).toDouble())],
+            ['Units Received', exportQty((d['receivedQty'] as num).toDouble())],
             [
               'Ordered Value',
               ReportExportService.formatCurrency(d['orderedValue'] as double),
@@ -97,9 +110,15 @@ class PurchaseSummaryReportScreen extends StatelessWidget {
               ReportExportService.formatCurrency(d['receivedValue'] as double),
             ],
             [
-              'Damaged Recoverable',
+              'Expected Recovery',
               ReportExportService.formatCurrency(
-                d['damagedRecoverable'] as double,
+                d['damagedExpected'] as double,
+              ),
+            ],
+            [
+              'Recovered',
+              ReportExportService.formatCurrency(
+                d['damagedRecovered'] as double,
               ),
             ],
             [
@@ -119,6 +138,43 @@ class PurchaseSummaryReportScreen extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+
+  /// The breakdown, preceded by a data-quality notice when any receipt in the
+  /// period has no recorded invoice value.
+  Widget _buildDetail(BuildContext context, Map<String, dynamic> d) {
+    final missing = d['grnsMissingAmount'] as int? ?? 0;
+    final unpriced = d['grnsWithUnpricedLines'] as int? ?? 0;
+    if (missing == 0 && unpriced == 0) return _buildBreakdown(context, d);
+
+    return Column(
+      children: [
+        if (missing > 0) ...[
+          ReportNotice(
+            message: missing == 1
+                ? '1 goods receipt in this period has no invoice value '
+                      'recorded. It is counted at ₹0 here — its quantities are '
+                      'still included.'
+                : '$missing goods receipts in this period have no invoice '
+                      'value recorded. They are counted at ₹0 here — their '
+                      'quantities are still included.',
+          ),
+          AppResponsive.verticalSpace(context),
+        ],
+        if (unpriced > 0) ...[
+          ReportNotice(
+            message: unpriced == 1
+                ? '1 goods receipt has an item with no cost price. Its value, '
+                      'and any return or claim raised from it, is understated.'
+                : '$unpriced goods receipts have items with no cost price. '
+                      'Their value, and any returns or claims raised from them, '
+                      'is understated.',
+          ),
+          AppResponsive.verticalSpace(context),
+        ],
+        _buildBreakdown(context, d),
+      ],
     );
   }
 
@@ -148,16 +204,23 @@ class PurchaseSummaryReportScreen extends StatelessWidget {
           const Divider(height: 24),
           _statLine(context, 'Goods receipts', '${d['receiptCount']}'),
           _statLine(context, 'Suppliers', '${d['supplierCount']}'),
-          // Split by outcome: a live return or claim can still be credited
-          // back, a write-off or refused claim cannot.
+          // Three outcomes, never one number: value the supplier still owes,
+          // value actually credited, and value the business keeps. Each is
+          // dated by its own event, so a receipt from an earlier period can be
+          // recovered in this one.
           _statLine(
             context,
-            'Damaged — recoverable',
-            formatMoney(d['damagedRecoverable'] as double),
+            'Expected recovery',
+            formatMoney(d['damagedExpected'] as double),
           ),
           _statLine(
             context,
-            'Damaged — absorbed',
+            'Recovered',
+            formatMoney(d['damagedRecovered'] as double),
+          ),
+          _statLine(
+            context,
+            'Absorbed (written off)',
             formatMoney(d['damagedAbsorbed'] as double),
             color: (d['damagedAbsorbed'] as double) > 0
                 ? AppColors.danger

@@ -202,7 +202,14 @@ class CustomerRepository {
     return _customerBox.values
         .where((customer) => customer.creditBalance > 0)
         .toList()
-      ..sort((a, b) => b.creditBalance.compareTo(a.creditBalance));
+      // Largest debt first, then the customer id. A balance is not a total
+      // order and `List.sort` is not stable, so customers owing the same
+      // amount reordered between loads.
+      ..sort((a, b) {
+        final byBalance = b.creditBalance.compareTo(a.creditBalance);
+        if (byBalance != 0) return byBalance;
+        return a.customerId.compareTo(b.customerId);
+      });
   }
 
   /// Update GST number

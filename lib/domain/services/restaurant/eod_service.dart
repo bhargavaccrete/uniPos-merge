@@ -1,4 +1,5 @@
 
+import 'package:billberrylite/core/config/tax_label_rule.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/di/service_locator.dart';
@@ -15,6 +16,13 @@ import 'package:billberrylite/util/retail/retail_cash_expectation.dart';
 import 'package:billberrylite/domain/services/retail/eod_report_service.dart';
 import 'package:billberrylite/domain/services/retail/report_service.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
+
+/// Below this, a cash difference is float noise rather than a real shortage or
+/// overage — half a paisa, under anything a drawer can be counted to.
+///
+/// Shared so the EOD History card judges a stored difference by exactly the
+/// rule that decided its status.
+const double kCashReconciliationTolerance = 0.005;
 
 class EODService {
   static const _uuid = Uuid();
@@ -545,7 +553,14 @@ class EODService {
     final cashDifference = actualCash - closingBalance;
 
     String reconciliationStatus;
-    if (cashDifference == 0) {
+    // Tolerance, not `== 0`. `closingBalance` accumulates opening + cash sales
+    // + cash in - cash out - expenses - refunds, so a perfectly counted drawer
+    // routinely lands a residual like 1e-13 away from it. The exact comparison
+    // branded such a day 'Shortage', and the status is STORED — so it stayed
+    // wrong forever. Half a paisa is below anything a drawer can be counted to.
+    //
+    // Only the STATUS decision changes; `difference` keeps the real number.
+    if (cashDifference.abs() < kCashReconciliationTolerance) {
       reconciliationStatus = 'Balanced';
     } else if (cashDifference > 0) {
       reconciliationStatus = 'Overage';
@@ -643,6 +658,25 @@ class EODService {
     }
 
     List<TaxSummary> summaries = [];
+
+    // CGST/SGST is an INDIAN intra-state concept. Storing those names for a UK
+    // or US shop put Indian tax rows into its permanent close records — and
+    // unlike a screen label, a stored name cannot be re-rendered later.
+    // `TaxLabelRule` is the same rule the GST report and Checkout already use.
+    if (!TaxLabelRule.splitsIntoComponents) {
+      final totalTax = totalCgst + totalSgst;
+      if (totalTax > 0) {
+        summaries.add(TaxSummary(
+          // "VAT" / "Sales Tax" / "Tax" — whatever this country calls it.
+          taxName: TaxLabelRule.name,
+          taxRate: 0.0, // Rate varies by product, so we'll show 0 for overall
+          taxAmount: totalTax,
+          // The WHOLE base, not a half: there is nothing to halve it between.
+          taxableAmount: totalTaxableAmount,
+        ));
+      }
+      return summaries;
+    }
 
     // Add CGST summary if present
     if (totalCgst > 0) {

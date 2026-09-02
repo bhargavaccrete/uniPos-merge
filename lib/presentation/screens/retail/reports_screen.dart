@@ -22,6 +22,7 @@ import 'package:billberrylite/presentation/screens/retail/reports/purchase_retur
 import 'package:billberrylite/presentation/screens/retail/reports/cash_drawer_history_report_screen.dart';
 // Financial reports that already existed but were only reachable from Settings,
 // or (in Credit's case) not reachable at all.
+import 'package:billberrylite/core/config/tax_label_rule.dart';
 import 'package:billberrylite/presentation/screens/retail/gst_report_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/credit_reports_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/eod_reports_list_screen.dart';
@@ -295,7 +296,9 @@ class ReportsScreen extends StatelessWidget {
             ),
             _buildReportCard(
               context,
-              title: 'GST Report',
+              // "GST Report" only where the tax is called GST. The
+              // subtitle already says "Output tax", which is true everywhere.
+              title: TaxLabelRule.reportTitle,
               subtitle: 'Output tax by rate, product and category',
               icon: Icons.receipt,
               color: const Color(0xFF00796B),

@@ -3,14 +3,16 @@ import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/images.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
-
-import 'home_screen.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 
-/// PIN-only login — same mechanism as restaurant's login (see
-/// `restaurant_login.dart`): the entered PIN identifies whoever it is,
-/// admin first, then staff (see `AuthService.login`).
+import 'home_screen.dart';
+
+/// PIN-only login — same UI structure and layout as restaurant's login (see
+/// `restaurant_login.dart`): entered PIN identifies whoever it is, admin first,
+/// then staff (see `AuthService.login`).
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -80,224 +82,215 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final height = MediaQuery.of(context).size.height;
+    final width = MediaQuery.of(context).size.width;
+
     return Scaffold(
-      backgroundColor: AppColors.surfaceLight,
+      backgroundColor: AppColors.white,
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              // Login card stays narrow on every device — maxFormWidth is
-              // unbounded on mobile, which would stretch it edge to edge.
-              constraints: BoxConstraints(
-                maxWidth: AppResponsive.getValue(
-                  context,
-                  mobile: 400.0,
-                  tablet: 480.0,
-                  desktop: 560.0,
-                ),
-              ),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Logo / App Icon
+        child: SingleChildScrollView(
+          child: Container(
+            width: width,
+            height: height * 0.95,
+            padding: EdgeInsets.symmetric(
+              horizontal: AppResponsive.width(context, 0.05),
+              vertical: AppResponsive.height(context, 0.02),
+            ),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Logo
+                  Container(
+                    alignment: Alignment.center,
+                    width: AppResponsive.width(context, 0.5),
+                    height: AppResponsive.height(context, 0.20),
+                    child: Image.asset(AppImages.logo),
+                  ),
+
+                  SizedBox(height: AppResponsive.height(context, 0.02)),
+
+                  // Title
+                  Text(
+                    'Bill Berry Lite',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.getValue(
+                        context,
+                        mobile: 24.0,
+                        tablet: 26.4,
+                        desktop: 28.8,
+                      ),
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
+                  ),
+
+                  SizedBox(height: AppResponsive.height(context, 0.01)),
+
+                  Text(
+                    'Login to Continue',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.getValue(
+                        context,
+                        mobile: 16.0,
+                        tablet: 17.6,
+                        desktop: 19.2,
+                      ),
+                      fontWeight: FontWeight.w400,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+
+                  SizedBox(height: AppResponsive.height(context, 0.05)),
+
+                  // Error Message
+                  if (_errorMessage != null) ...[
                     Container(
-                      width: 100,
-                      height: 100,
+                      width: width,
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withOpacity(0.3),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            color: Colors.red.shade700,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _errorMessage!,
+                              style: GoogleFonts.poppins(
+                                color: Colors.red.shade700,
+                                fontSize: AppResponsive.getValue(
+                                  context,
+                                  mobile: 14.0,
+                                  tablet: 15.4,
+                                  desktop: 16.8,
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.point_of_sale,
-                        size: 50,
-                        color: Colors.white,
-                      ),
                     ),
-                    const SizedBox(height: 32),
+                    SizedBox(height: AppResponsive.height(context, 0.02)),
+                  ],
 
-                    // Title
-                    Text(
-                      'Bill Berry Lite',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.getValue(
-                          context,
-                          mobile: 28.0,
-                          tablet: 32.0,
-                          desktop: 36.0,
-                        ),
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Login to Continue',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.subheadingFontSize(context),
+                  // PIN Field — the only credential needed
+                  AppTextField(
+                    controller: _pinController,
+                    autofocus: true,
+                    enabled: !_isLoading,
+                    label: 'PIN',
+                    hint: 'Enter your PIN',
+                    icon: Icons.lock_outline_rounded,
+                    required: true,
+                    obscureText: _obscurePin,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    maxLength: 6,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) {
+                      if (!_isLoading) _handleLogin();
+                    },
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePin
+                            ? Icons.visibility_off_rounded
+                            : Icons.visibility_rounded,
+                        size: 20,
                         color: AppColors.textSecondary,
                       ),
+                      onPressed: () =>
+                          setState(() => _obscurePin = !_obscurePin),
                     ),
-                    const SizedBox(height: 48),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'PIN is required';
+                      }
+                      if (!RegExp(r'^\d{4,6}$').hasMatch(value.trim())) {
+                        return 'PIN must be 4–6 digits';
+                      }
+                      return null;
+                    },
+                  ),
 
-                    // Error Message
-                    if (_errorMessage != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.danger.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: AppColors.danger.withOpacity(0.3),
+                  SizedBox(height: AppResponsive.height(context, 0.04)),
+
+                  // Login Button
+                  CommonButton(
+                    width: width,
+                    height: AppResponsive.height(context, 0.065),
+                    onTap: _isLoading ? () {} : _handleLogin,
+                    bgcolor: _isLoading ? Colors.grey : AppColors.primary,
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Center(
+                            child: Text(
+                              'Login',
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: AppResponsive.getValue(
+                                  context,
+                                  mobile: 18.0,
+                                  tablet: 19.8,
+                                  desktop: 21.6,
+                                ),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.error_outline,
-                              color: AppColors.danger,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _errorMessage!,
-                                style: GoogleFonts.poppins(
-                                  color: AppColors.danger,
-                                  fontSize: AppResponsive.bodyFontSize(context),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
+                  ),
 
-                    // PIN Field — the only credential needed
-                    AppTextField(
-                      controller: _pinController,
-                      autofocus: true,
-                      enabled: !_isLoading,
-                      label: 'PIN',
-                      hint: 'Enter your PIN',
-                      icon: Icons.lock_outline_rounded,
-                      required: true,
-                      obscureText: _obscurePin,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      maxLength: 6,
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) {
-                        if (!_isLoading) _handleLogin();
-                      },
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePin
-                              ? Icons.visibility_off_rounded
-                              : Icons.visibility_rounded,
-                          size: 20,
-                          color: AppColors.textSecondary,
-                        ),
-                        onPressed: () =>
-                            setState(() => _obscurePin = !_obscurePin),
+                  // Help Text — default PIN hint
+                  if (_showDefaultPinHint) ...[
+                    SizedBox(height: AppResponsive.height(context, 0.03)),
+                    Container(
+                      width: width,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.info.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'PIN is required';
-                        }
-                        if (!RegExp(r'^\d{4,6}$').hasMatch(value.trim())) {
-                          return 'PIN must be 4–6 digits';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Login Button
-                    SizedBox(
-                      height: 54,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _handleLogin,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.info_outline,
+                            color: AppColors.info,
+                            size: 18,
                           ),
-                          elevation: 0,
-                          disabledBackgroundColor: AppColors.divider,
-                        ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text(
-                                'Login',
-                                style: GoogleFonts.poppins(
-                                  fontSize: AppResponsive.subheadingFontSize(
-                                    context,
-                                  ),
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Default PIN: 123456',
+                              style: GoogleFonts.poppins(
+                                color: AppColors.info,
+                                fontSize: AppResponsive.smallFontSize(
+                                  context,
                                 ),
                               ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    // Help Text — only while the PIN is still the un-changed
-                    // default (see AuthService.isUsingDefaultCredentials).
-                    // Disappears the moment the PIN is actually changed,
-                    // instead of disclosing it permanently.
-                    if (_showDefaultPinHint) ...[
-                      const SizedBox(height: 24),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.info.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.info_outline,
-                              color: AppColors.info,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Default PIN: 123456',
-                                style: GoogleFonts.poppins(
-                                  color: AppColors.info,
-                                  fontSize: AppResponsive.smallFontSize(
-                                    context,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
                   ],
-                ),
+
+                  SizedBox(height: AppResponsive.height(context, 0.03)),
+                ],
               ),
             ),
           ),

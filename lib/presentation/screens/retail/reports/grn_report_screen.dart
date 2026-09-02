@@ -5,9 +5,12 @@ import 'package:billberrylite/domain/services/common/report_export_service.dart'
 import 'package:billberrylite/domain/services/retail/report_service.dart';
 import 'package:billberrylite/presentation/screens/retail/reports/report_page_scaffold.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_notice.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_summary_card.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_table.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 
 /// Every confirmed goods receipt, with ordered / received / accepted / damaged
 /// side by side.
@@ -41,38 +44,81 @@ class GRNReportScreen extends StatelessWidget {
           0,
           (s, r) => s + (r['totalAmount'] as double),
         );
-        final accepted = rows.fold<int>(
+        // Doubles — goods are received by weight. Reading them back `as int`
+        // threw on every GRN that had items, i.e. every real receipt.
+        final accepted = rows.fold<double>(
           0,
-          (s, r) => s + (r['acceptedQty'] as int),
+          (s, r) => s + (r['acceptedQty'] as num).toDouble(),
         );
-        final damaged = rows.fold<int>(
+        final damaged = rows.fold<double>(
           0,
-          (s, r) => s + (r['damagedQty'] as int),
+          (s, r) => s + (r['damagedQty'] as num).toDouble(),
         );
 
         return [
           ReportSummaryCard(
             title: 'Receipts',
             value: '${rows.length}',
-            subtitle: '$accepted units accepted',
+            subtitle: '${formatQty(accepted)} units accepted',
             icon: Icons.local_shipping_rounded,
             color: AppColors.primary,
           ),
           ReportSummaryCard(
             title: 'Value',
             value: formatMoney(value),
-            subtitle: 'accepted goods',
+            // `totalAmount` is `receivedQty * costPrice` — damaged units are
+            // billed too, so this is NOT an accepted-goods figure.
+            subtitle: 'invoiced, damage included',
             icon: Icons.payments_rounded,
             color: AppColors.success,
           ),
           ReportSummaryCard(
             title: 'Damaged',
-            value: '$damaged',
+            value: formatQty(damaged),
             subtitle: 'units rejected',
             icon: Icons.report_gmailerrorred_rounded,
             color: damaged > 0 ? AppColors.danger : AppColors.textSecondary,
           ),
         ];
+      },
+      // Counted from the rows' own flag rather than a separate figure, so the
+      // notice can never disagree with the table it sits above.
+      detail: (context, rows) {
+        final missing = rows.where((r) => r['amountMissing'] == true).toList();
+        final unpriced = rows
+            .where((r) => r['hasUnpricedLine'] == true)
+            .toList();
+        if (missing.isEmpty && unpriced.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        String names(List<Map<String, dynamic>> rs) =>
+            rs.map((r) => r['grnNumber']).join(', ');
+
+        return Column(
+          children: [
+            if (missing.isNotEmpty)
+              ReportNotice(
+                message: missing.length == 1
+                    ? 'Receipt ${names(missing)} has no invoice value recorded.'
+                          ' Its Value shows ₹0 — the quantities are still correct.'
+                    : '${missing.length} receipts have no invoice value '
+                          'recorded (${names(missing)}). Their Value shows ₹0 — '
+                          'the quantities are still correct.',
+              ),
+            if (missing.isNotEmpty && unpriced.isNotEmpty)
+              AppResponsive.verticalSpace(context),
+            if (unpriced.isNotEmpty)
+              ReportNotice(
+                message: unpriced.length == 1
+                    ? 'Receipt ${names(unpriced)} has an item with no cost '
+                          'price, so its Value is understated.'
+                    : '${unpriced.length} receipts have items with no cost '
+                          'price (${names(unpriced)}), so their Value is '
+                          'understated.',
+              ),
+          ],
+        );
       },
       columns: (context) => [
         ReportTable.column(context, 'GRN'),
@@ -86,19 +132,19 @@ class GRNReportScreen extends StatelessWidget {
         ReportTable.column(context, 'Value', numeric: true),
       ],
       rowBuilder: (context, row) {
-        final damaged = row['damagedQty'] as int;
+        final damaged = (row['damagedQty'] as num).toDouble();
         return DataRow(
           cells: [
             DataCell(Text(row['grnNumber'] as String)),
             DataCell(Text(row['poNumber'] as String)),
             DataCell(Text(row['supplierName'] as String)),
             DataCell(Text(_date(row['receivedDate'] as String))),
-            DataCell(Text('${row['orderedQty']}')),
-            DataCell(Text('${row['receivedQty']}')),
-            DataCell(Text('${row['acceptedQty']}')),
+            DataCell(Text(formatQty((row['orderedQty'] as num).toDouble()))),
+            DataCell(Text(formatQty((row['receivedQty'] as num).toDouble()))),
+            DataCell(Text(formatQty((row['acceptedQty'] as num).toDouble()))),
             DataCell(
               Text(
-                '$damaged',
+                formatQty(damaged),
                 style: TextStyle(
                   color: damaged > 0 ? AppColors.danger : null,
                   fontWeight: damaged > 0 ? FontWeight.w600 : null,
@@ -130,17 +176,17 @@ class GRNReportScreen extends StatelessWidget {
                 r['supplierName'],
                 _date(r['receivedDate'] as String),
                 r['invoiceNumber'] ?? '',
-                r['orderedQty'],
-                r['receivedQty'],
-                r['acceptedQty'],
-                r['damagedQty'],
+                exportQty((r['orderedQty'] as num).toDouble()),
+                exportQty((r['receivedQty'] as num).toDouble()),
+                exportQty((r['acceptedQty'] as num).toDouble()),
+                exportQty((r['damagedQty'] as num).toDouble()),
                 ReportExportService.formatCurrency(r['totalAmount'] as double),
               ],
             )
             .toList(),
         summary: {
           'Receipts': rows.length,
-          'Accepted Value': ReportExportService.formatCurrency(
+          'Received Value': ReportExportService.formatCurrency(
             rows.fold<double>(0, (s, r) => s + (r['totalAmount'] as double)),
           ),
         },

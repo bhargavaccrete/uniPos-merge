@@ -6,14 +6,21 @@ import 'package:billberrylite/domain/services/retail/report_service.dart';
 import 'package:billberrylite/presentation/screens/retail/reports/report_page_scaffold.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_status_pill.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_notice.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_summary_card.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_table.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 
 /// Goods that arrived damaged, and what was decided about each.
 ///
-/// Damaged units never entered stock and were never billed — this report is
-/// about supplier quality and what is owed back, not about inventory movement.
+/// Damaged units never entered stock, but they WERE billed: the receipt accrues
+/// the full received value and `damagedHandling` does not change what is owed
+/// (`grn_item_model_214.dart:24-27`). Handling only decides which document is
+/// raised afterwards — a return or a settled claim carries its own credit, a
+/// write-off carries none and stays a real cost. So this report measures
+/// supplier quality and the value at stake, not inventory movement, and not
+/// every line here is recoverable.
 class DamagedItemsReportScreen extends StatelessWidget {
   const DamagedItemsReportScreen({super.key});
 
@@ -44,20 +51,25 @@ class DamagedItemsReportScreen extends StatelessWidget {
       loader: (start, end) =>
           service.getDamagedItemsReport(startDate: start, endDate: end),
       summaryCards: (rows) {
-        final qty = rows.fold<int>(0, (s, r) => s + (r['damagedQty'] as int));
+        // A double — goods are received by weight, and rows are filtered to
+        // `damagedQty > 0`, so `as int` threw on every non-empty period.
+        final qty = rows.fold<double>(
+          0,
+          (s, r) => s + (r['damagedQty'] as num).toDouble(),
+        );
         final value = rows.fold<double>(
           0,
           (s, r) => s + (r['damagedAmount'] as double),
         );
 
-        int qtyFor(String handling) => rows
+        double qtyFor(String handling) => rows
             .where((r) => r['handling'] == handling)
-            .fold<int>(0, (s, r) => s + (r['damagedQty'] as int));
+            .fold<double>(0, (s, r) => s + (r['damagedQty'] as num).toDouble());
 
         return [
           ReportSummaryCard(
             title: 'Damaged',
-            value: '$qty',
+            value: formatQty(qty),
             subtitle: '${rows.length} lines',
             icon: Icons.report_gmailerrorred_rounded,
             color: AppColors.danger,
@@ -65,18 +77,32 @@ class DamagedItemsReportScreen extends StatelessWidget {
           ReportSummaryCard(
             title: 'Value',
             value: formatMoney(value),
-            subtitle: 'not billed',
+            subtitle: 'billed, damage included',
             icon: Icons.payments_rounded,
             color: AppColors.warning,
           ),
           ReportSummaryCard(
             title: 'Written Off',
-            value: '${qtyFor('writeOff')}',
+            value: formatQty(qtyFor('writeOff')),
             subtitle: 'a real loss',
             icon: Icons.delete_outline_rounded,
             color: AppColors.textSecondary,
           ),
         ];
+      },
+      // Damage on an unpriced line is valued at ₹0, so the Value card and any
+      // return or claim raised from it understate the real exposure.
+      detail: (context, rows) {
+        final unpriced = rows.where((r) => r['costMissing'] == true).toList();
+        if (unpriced.isEmpty) return const SizedBox.shrink();
+        final names = unpriced.map((r) => r['productName']).toSet().join(', ');
+        return ReportNotice(
+          message: unpriced.length == 1
+              ? 'One damaged line has no cost price ($names), so its value '
+                    'shows ₹0.'
+              : '${unpriced.length} damaged lines have no cost price ($names), '
+                    'so their value shows ₹0.',
+        );
       },
       columns: (context) => [
         ReportTable.column(context, 'Product'),
@@ -103,7 +129,7 @@ class DamagedItemsReportScreen extends StatelessWidget {
             DataCell(Text(row['supplierName'] as String)),
             DataCell(Text(row['grnNumber'] as String)),
             DataCell(Text(_date(row['receivedDate'] as String))),
-            DataCell(Text('${row['damagedQty']}')),
+            DataCell(Text(formatQty((row['damagedQty'] as num).toDouble()))),
             DataCell(Text(formatMoney(row['damagedAmount'] as double))),
             DataCell(
               AppStatusPill(
@@ -137,7 +163,7 @@ class DamagedItemsReportScreen extends StatelessWidget {
                 r['grnNumber'],
                 r['poNumber'],
                 _date(r['receivedDate'] as String),
-                r['damagedQty'],
+                exportQty((r['damagedQty'] as num).toDouble()),
                 r['costPrice'] == null
                     ? ''
                     : ReportExportService.formatCurrency(
@@ -151,9 +177,11 @@ class DamagedItemsReportScreen extends StatelessWidget {
             )
             .toList(),
         summary: {
-          'Damaged Units': rows.fold<int>(
-            0,
-            (s, r) => s + (r['damagedQty'] as int),
+          'Damaged Units': formatQty(
+            rows.fold<double>(
+              0,
+              (s, r) => s + (r['damagedQty'] as num).toDouble(),
+            ),
           ),
           'Damaged Value': ReportExportService.formatCurrency(
             rows.fold<double>(0, (s, r) => s + (r['damagedAmount'] as double)),

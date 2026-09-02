@@ -200,15 +200,6 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
         titleFontSize: AppResponsive.subheadingFontSize(context),
         actions: [
           IconButton(
-            icon: const Icon(Icons.share_outlined),
-            onPressed: () {
-              // TODO: Implement share functionality
-              NotificationService.instance.showSuccess(
-                'Share feature coming soon',
-              );
-            },
-          ),
-          IconButton(
             icon: const Icon(Icons.print_outlined),
             onPressed: _isLoading || _sale == null ? null : _printBill,
           ),
