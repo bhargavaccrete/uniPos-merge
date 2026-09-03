@@ -1,3 +1,4 @@
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:hive/hive.dart';
 
 import '../../../core/constants/hive_box_names.dart';
@@ -95,14 +96,14 @@ class BarcodeGeneratorService {
 /// Who may create barcodes and print labels.
 ///
 /// A label is a physical artifact that goes onto stock, and generating a barcode
-/// writes to the catalogue, so it gets the same narrow gate as
-/// `PriceOverrideService.canOverride` and `StockAdjustmentService.canAdjust` --
-/// see `AuthService.login`, which names the admin session 'Admin'.
+/// WRITES to the catalogue — so it rides `catalogEdit`, the same key that gates
+/// every other catalogue modification. Admin and Manager pass; a Cashier does
+/// not.
 ///
 /// Callers must HIDE the action when this is false rather than showing it and
 /// refusing.
 class BarcodeLabelPermission {
   BarcodeLabelPermission._();
 
-  static bool get canPrint => authService.currentUsername == 'Admin';
+  static bool get canPrint => RestaurantSession.canAccess('catalogEdit');
 }

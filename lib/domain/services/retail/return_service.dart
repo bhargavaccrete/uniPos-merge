@@ -1,3 +1,4 @@
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model_218.dart';
@@ -383,6 +384,9 @@ class ReturnService {
       paidAmount: -figures.totalAmount,
       dueAmount: 0,
       status: SaleStatus.paid,
+      // The refund belongs to the shift that processed it, not the one that
+      // made the original sale.
+      shiftId: RestaurantSession.currentShiftId,
     );
   }
 

@@ -78,13 +78,13 @@ import 'package:billberrylite/data/models/restaurant/db/expensemodel_315.dart';
 import 'package:billberrylite/data/models/restaurant/db/expensel_316.dart';
 import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:billberrylite/data/models/restaurant/db/testbillmodel_318.dart';
-import 'package:billberrylite/data/models/restaurant/db/shift_model.dart';
+import 'package:billberrylite/data/models/common/shift_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/cash_movement_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/stock_movement_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/cash_handover_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/saved_printer_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/session_model.dart';
-import 'package:billberrylite/data/models/restaurant/db/attendance_model.dart';
+import 'package:billberrylite/data/models/common/attendance_model.dart';
 import 'package:billberrylite/data/models/common/app_notification_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/item_cancellation_model_134.dart';
 
@@ -142,6 +142,15 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.appNotification)) {
       Hive.registerAdapter(AppNotificationModelAdapter());
     }
+    // ShiftModel - 127 and AttendanceModel - 132. Both sit in the restaurant
+    // typeId range for historical reasons, but staff shifts and clock-in/out
+    // are COMMON to both modes, so they register regardless of business mode.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.shift)) {
+      Hive.registerAdapter(ShiftModelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(HiveTypeIds.attendance)) {
+      Hive.registerAdapter(AttendanceModelAdapter());
+    }
   }
 
   /// Open common boxes (needed regardless of business mode)
@@ -166,6 +175,13 @@ class HiveInit {
     // NotificationRepository does a synchronous Hive.box() lookup, so this
     // must be open before the service locator builds the store.
     await Hive.openBox<AppNotificationModel>(HiveBoxNames.appNotifications);
+
+    // Staff shifts + attendance — one physical box each for both modes.
+    // ShiftRepository / AttendanceRepository do synchronous Hive.box() lookups
+    // in their constructors, so these must be open before the service locator
+    // builds them.
+    await Hive.openBox<ShiftModel>(HiveBoxNames.shift);
+    await Hive.openBox<AttendanceModel>(HiveBoxNames.attendance);
 
     // Open and initialize payment methods box with defaults
     final paymentBox = await Hive.openBox<pm.PaymentMethod>(HiveBoxNames.paymentMethods);
@@ -242,6 +258,11 @@ class HiveInit {
 
   /// Register all retail adapters (typeIds: 150-223)
   static Future<void> registerRetailAdapters() async {
+    // Self-sufficient: a mode's adapters are meaningless without the common
+    // ones (ShiftModel, AttendanceModel, SavedPrinterModel, AppNotification…).
+    // `init()` normally runs this first and every registration is individually
+    // guarded by isAdapterRegistered, so calling it again is a no-op.
+    await _registerCommonAdapters();
     // Product - 150
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailProduct)) {
       Hive.registerAdapter(ProductModelAdapter());
@@ -539,6 +560,11 @@ class HiveInit {
 
   /// Register all restaurant adapters (typeIds: 100-149)
   static Future<void> registerRestaurantAdapters() async {
+    // Self-sufficient: a mode's adapters are meaningless without the common
+    // ones (ShiftModel, AttendanceModel, SavedPrinterModel, AppNotification…).
+    // `init()` normally runs this first and every registration is individually
+    // guarded by isAdapterRegistered, so calling it again is a no-op.
+    await _registerCommonAdapters();
     // Category - 100
     if (!Hive.isAdapterRegistered(HiveTypeIds.category)) {
       Hive.registerAdapter(CategoryAdapter());
@@ -635,10 +661,7 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.customer)) {
       Hive.registerAdapter(CustomerAdapter());
     }
-    // ShiftModel - 127
-    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantShift)) {
-      Hive.registerAdapter(ShiftModelAdapter());
-    }
+    // ShiftModel (127) moved to _registerCommonAdapters — shared with retail.
     // CashMovementModel - 128: records every Cash In / Cash Out during the day
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantCashMovement)) {
       Hive.registerAdapter(CashMovementModelAdapter());
@@ -657,10 +680,7 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantSession)) {
       Hive.registerAdapter(RestaurantSessionModelAdapter());
     }
-    // AttendanceModel - 132: Staff clock-in/clock-out records
-    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantAttendance)) {
-      Hive.registerAdapter(AttendanceModelAdapter());
-    }
+    // AttendanceModel (132) moved to _registerCommonAdapters — shared with retail.
     // ItemCancellationModel - 134: item-level cancellation audit
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantItemCancellation)) {
       Hive.registerAdapter(ItemCancellationModelAdapter());
@@ -777,8 +797,7 @@ class HiveInit {
     // Restaurant Customer (shared Customer model, own box)
     await Hive.openBox<Customer>(HiveBoxNames.customer);
 
-    // Restaurant Shifts
-    await Hive.openBox<ShiftModel>(HiveBoxNames.restaurantShift);
+    // Shifts box moved to openCommonBoxes — shared with retail.
 
     // Cash Management — movements (Cash In/Out) and handovers (shift transfers)
     await Hive.openBox<CashMovementModel>(HiveBoxNames.restaurantCashMovements);
@@ -790,8 +809,7 @@ class HiveInit {
     // Restaurant POS Sessions
     await Hive.openBox<RestaurantSessionModel>(HiveBoxNames.restaurantSessions);
 
-    // Staff attendance
-    await Hive.openBox<AttendanceModel>(HiveBoxNames.restaurantAttendance);
+    // Staff attendance box moved to openCommonBoxes — shared with retail.
     // Item-level cancellation audit
     await Hive.openBox<ItemCancellationModel>(HiveBoxNames.restaurantItemCancellations);
 

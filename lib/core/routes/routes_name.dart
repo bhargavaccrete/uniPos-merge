@@ -163,6 +163,14 @@ class RouteNames {
   static const storeInfo = '/store-info';
   static const gstSettings = '/gst-settings';
   static const paymentSetup = '/payment-setup';
+  // Kept as '/staff-setup' so existing links keep working; it now opens the
+  // real Manage Staff CRUD screen rather than the in-memory stub it used to.
   static const staffSetup = '/staff-setup';
   static const backup = '/backup';
+
+  // Retail – Staff
+  static const retailAttendance = '/attendance';
+  static const retailAttendanceReport = '/attendance-report';
+  static const retailShiftReport = '/shift-report';
+  static const retailStaffPerformance = '/staff-performance';
 }

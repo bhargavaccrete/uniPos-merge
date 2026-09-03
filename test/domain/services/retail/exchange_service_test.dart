@@ -581,10 +581,13 @@ void main() {
 
   // ==========================================================================
   group('permission', () {
-    test('a non-admin cannot process an exchange', () async {
+    test('a signed-out user cannot process an exchange', () async {
       await seedStandard();
       await authService.logout();
 
+      // Exchange moved from an admin-name check to the role matrix, so a
+      // MANAGER may now exchange too. A cleared session still cannot: canAccess
+      // fails closed on isLoggedIn.
       expect(service.canExchange, isFalse);
 
       final r = await service.processExchange(
@@ -596,7 +599,7 @@ void main() {
       );
 
       expect(r.success, isFalse);
-      expect(r.error, contains('admin'));
+      expect(r.error, contains('manager'));
       expect(allSales().length, 1);
     });
   });

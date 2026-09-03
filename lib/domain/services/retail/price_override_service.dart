@@ -1,3 +1,4 @@
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/retail/hive_model/variante_model_201.dart';
 import 'price_override_reason.dart';
@@ -52,14 +53,15 @@ class PriceOverrideValidation {
 class PriceOverrideService {
   PriceOverrideService._();
 
-  /// Only the admin identity may override a price. An override moves money off
-  /// the books on a settled sale, so it gets the same narrow gate as
-  /// `StockAdjustmentService.canAdjust` — see `AuthService.login`, which names
-  /// the admin session 'Admin'.
+  /// Admin and Manager may override a price; a Cashier may not. An override
+  /// moves money off the books, so it gets the same manager-level gate as
+  /// `StockAdjustmentService.canAdjust`.
+  ///
+  /// Resolved from the signed-in staff member's ROLE, not their display name.
   ///
   /// Callers must HIDE the action when this is false rather than showing it and
   /// refusing (see the retail stock-adjustment precedent).
-  static bool get canOverride => authService.currentUsername == 'Admin';
+  static bool get canOverride => RestaurantSession.canAccess('billingOverride');
 
   /// Validate [newPrice] against the variant's own MRP and cost.
   ///

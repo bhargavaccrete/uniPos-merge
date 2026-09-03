@@ -1,3 +1,4 @@
+import 'package:billberrylite/domain/services/retail/catalog_permission.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -86,7 +87,8 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
               title: 'Categories',
               actions: [
                 Observer(
-                  builder: (_) => categoryStore.categories.isEmpty
+                  builder: (_) => categoryStore.categories.isEmpty ||
+                          !CatalogPermission.canEdit
                       ? const SizedBox.shrink()
                       : IconButton(
                           icon: const Icon(Icons.add),
@@ -176,10 +178,12 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
       icon: Icons.category_outlined,
       title: 'No categories yet',
       message: 'Group your products so billing stays fast.',
-      action: appEmptyStateAction(
-        label: 'Add Category',
-        onPressed: () => showAddCategoryDialog(context),
-      ),
+      action: CatalogPermission.canEdit
+          ? appEmptyStateAction(
+              label: 'Add Category',
+              onPressed: () => showAddCategoryDialog(context),
+            )
+          : null,
     );
   }
 
@@ -230,7 +234,9 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
         ],
       ),
       child: InkWell(
-        onTap: () => _showEditCategoryDialog(category),
+        onTap: CatalogPermission.canEdit
+            ? () => _showEditCategoryDialog(category)
+            : null,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -278,19 +284,21 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
               ),
               // Edit/delete sit on the card, matching the product form's
               // category picker — the two are the same job in two places.
-              RowActionButton(
-                icon: Icons.edit_outlined,
-                color: AppColors.primary,
-                tooltip: 'Rename',
-                onTap: () => _showEditCategoryDialog(category),
-              ),
-              const SizedBox(width: 8),
-              RowActionButton(
-                icon: Icons.delete_outline_rounded,
-                color: AppColors.danger,
-                tooltip: 'Delete',
-                onTap: () => _confirmDelete(category),
-              ),
+              if (CatalogPermission.canEdit) ...[
+                RowActionButton(
+                  icon: Icons.edit_outlined,
+                  color: AppColors.primary,
+                  tooltip: 'Rename',
+                  onTap: () => _showEditCategoryDialog(category),
+                ),
+                const SizedBox(width: 8),
+                RowActionButton(
+                  icon: Icons.delete_outline_rounded,
+                  color: AppColors.danger,
+                  tooltip: 'Delete',
+                  onTap: () => _confirmDelete(category),
+                ),
+              ],
             ],
           ),
         ),

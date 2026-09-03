@@ -8,7 +8,6 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
-import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -18,15 +17,17 @@ import '../../../../data/models/common/staffModel_310.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../util/restaurant/restaurant_auth_helper.dart';
 import '../../../../util/common/app_responsive.dart';
+import '../../../../util/common/staff_roles.dart';
+import '../../../../core/plan/mode_keys.dart';
 
-class manageStaff extends StatefulWidget {
-  const manageStaff({super.key});
+class ManageStaffScreen extends StatefulWidget {
+  const ManageStaffScreen({super.key});
 
   @override
-  State<manageStaff> createState() => _manageStaffState();
+  State<ManageStaffScreen> createState() => _ManageStaffScreenState();
 }
 
-class _manageStaffState extends State<manageStaff> {
+class _ManageStaffScreenState extends State<ManageStaffScreen> {
   TextEditingController userNameController = TextEditingController();
   TextEditingController firstNameController = TextEditingController();
 
@@ -62,7 +63,7 @@ class _manageStaffState extends State<manageStaff> {
   final _addMailFocus = FocusNode();
   final _addPinFocus = FocusNode();
 
-  String selectedrole = 'Select Role';
+  String selectedrole = StaffRoles.unselected;
   String searchQuery = '';
 
   @override
@@ -82,18 +83,11 @@ class _manageStaffState extends State<manageStaff> {
     super.dispose();
   }
 
-  // ── Role chip metadata ───────────────────────────────────────────────────
-  static const _roleLabels = ['Manager', 'Cashier', 'Waiter'];
-  static const _roleIcons = {
-    'Manager': Icons.manage_accounts_rounded,
-    'Cashier': Icons.point_of_sale_rounded,
-    'Waiter': Icons.restaurant_rounded,
-  };
-  static const _roleColors = {
-    'Manager': Color(0xFF7C3AED),
-    'Cashier': Color(0xFF059669),
-    'Waiter': Color(0xFFDB2777),
-  };
+  // ── Role chips ───────────────────────────────────────────────────────────
+  // Vocabulary comes from StaffRoles so this screen, the onboarding step and
+  // the permission matrix can never drift apart. Retail gets Manager/Cashier;
+  // restaurant additionally gets Waiter.
+  List<String> get _roleLabels => StaffRoles.forCurrentMode;
 
   Widget _buildRoleSelector(String current, void Function(String) onSelect) {
     return Column(
@@ -103,7 +97,7 @@ class _manageStaffState extends State<manageStaff> {
         Row(
           children: _roleLabels.map((role) {
             final isSelected = current == role;
-            final color = _roleColors[role]!;
+            final color = StaffRoles.colorFor(role);
             return Expanded(
               child: Padding(
                 padding: EdgeInsets.only(right: role != _roleLabels.last ? 8 : 0),
@@ -123,7 +117,7 @@ class _manageStaffState extends State<manageStaff> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(_roleIcons[role]!, size: 20,
+                        Icon(StaffRoles.iconFor(role), size: 20,
                             color: isSelected ? color : AppColors.textSecondary),
                         const SizedBox(height: 4),
                         Text(role,
@@ -145,8 +139,8 @@ class _manageStaffState extends State<manageStaff> {
   }
 
   Future<void> _addStaff() async {
-    if (!PlanGuard.allowedOr(context, EntKeys.users, featureName: 'Staff')) return;
-    if (!PlanGuard.withinLimitOr(context, EntKeys.usersMax, staffStore.staff.length, unit: 'users')) return;
+    if (!PlanGuard.allowedOr(context, ModeKeys.users, featureName: 'Staff')) return;
+    if (!PlanGuard.withinLimitOr(context, ModeKeys.usersMax, staffStore.staff.length, unit: 'users')) return;
     final newstaff = StaffModel(
       id: Uuid().v4().toString(),
       userName: userNameController.text.trim(),
@@ -175,7 +169,7 @@ class _manageStaffState extends State<manageStaff> {
     // the login default ('123456') — so compare against that, otherwise a staff
     // could take the default admin PIN and shadow the admin at login.
     final prefs = await SharedPreferences.getInstance();
-    final adminPass = prefs.getString('restaurant_admin_password');
+    final adminPass = prefs.getString(RestaurantAuthHelper.adminPinKey);
     final adminCollision = adminPass != null
         ? RestaurantAuthHelper.verifyPassword(pin, adminPass)
         : pin == '123456';
@@ -212,7 +206,7 @@ class _manageStaffState extends State<manageStaff> {
     mobileController.clear();
     mailController.clear();
     pinNoController.clear();
-    selectedrole = 'Select Role';
+    selectedrole = StaffRoles.unselected;
   }
 
   Future<void> _updateStaff(StaffModel staff) async {
@@ -254,7 +248,7 @@ class _manageStaffState extends State<manageStaff> {
                   height: isTablet ? 50 : 46,
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      selectedrole = 'Select Role';
+                      selectedrole = StaffRoles.unselected;
                       _clear();
                       _showAddStaffDialog(context, isTablet);
                     },
@@ -514,7 +508,7 @@ class _manageStaffState extends State<manageStaff> {
           // pressing enter commits the form exactly like tapping the button.
           Future<void> submitAdd() async {
             if (!formKey.currentState!.validate()) return;
-            if (selectedrole == 'Select Role') {
+            if (selectedrole == StaffRoles.unselected) {
               NotificationService.instance.showInfo('Please select a role');
               return;
             }

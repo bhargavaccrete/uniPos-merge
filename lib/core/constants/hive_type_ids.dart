@@ -81,7 +81,9 @@ class HiveTypeIds {
   static const int TaxSummary = 124;
   static const int customer = 125;
   static const int restaurantStockLog = 126;
-  static const int restaurantShift = 127;
+  /// ShiftModel — staff shift (start/end + orderCount/totalSales).
+  /// SHARED restaurant+retail (a device only ever runs one mode).
+  static const int shift = 127;
 
   // Cash Management (128-129)
   static const int restaurantCashMovement = 128; // CashMovementModel — Cash In/Out events
@@ -91,7 +93,9 @@ class HiveTypeIds {
   static const int savedPrinter = 130; // SavedPrinterModel — BT/WiFi printer config
 
   static const int restaurantSession = 131; // RestaurantSessionModel — Session-based day management
-  static const int restaurantAttendance = 132; // AttendanceModel — Staff clock-in/clock-out
+  /// AttendanceModel — staff clock-in/clock-out.
+  /// SHARED restaurant+retail (a device only ever runs one mode).
+  static const int attendance = 132;
   // SHARED (restaurant + retail) — id and box name are historical, do not change.
   static const int appNotification = 133; // AppNotificationModel — persisted notifications
   static const int restaurantItemCancellation = 134; // ItemCancellationModel — item-level cancel audit
@@ -276,12 +280,12 @@ class HiveTypeIds {
     TaxSummary,
     customer,
     restaurantStockLog,
-    restaurantShift,
+    shift,
     restaurantCashMovement,
     restaurantCashHandover,
     savedPrinter,
     restaurantSession,
-    restaurantAttendance,
+    attendance,
     appNotification,
     restaurantItemCancellation,
     restaurantRecipe,

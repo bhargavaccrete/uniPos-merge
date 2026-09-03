@@ -1,3 +1,4 @@
+import 'package:billberrylite/domain/services/retail/catalog_permission.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -97,6 +98,7 @@ class _AttributesScreenState extends State<AttributesScreen> {
                       onEditValue: (value) =>
                           _showEditValueDialog(attribute, value),
                       onDeleteValue: _confirmDeleteValue,
+                      canEdit: CatalogPermission.canEdit,
                     ),
                   ),
                 ],
@@ -105,12 +107,14 @@ class _AttributesScreenState extends State<AttributesScreen> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => showAddAttributeDialog(context),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: CatalogPermission.canEdit
+          ? FloatingActionButton(
+              onPressed: () => showAddAttributeDialog(context),
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 
@@ -416,6 +420,10 @@ class _AttributeCard extends StatelessWidget {
   final ValueChanged<AttributeValueModel> onEditValue;
   final ValueChanged<AttributeValueModel> onDeleteValue;
 
+  /// False for a cashier: every callback above mutates the catalogue, so the
+  /// card renders read-only rather than offering controls that would refuse.
+  final bool canEdit;
+
   const _AttributeCard({
     required this.attribute,
     required this.values,
@@ -424,6 +432,7 @@ class _AttributeCard extends StatelessWidget {
     required this.onAddValue,
     required this.onEditValue,
     required this.onDeleteValue,
+    required this.canEdit,
   });
 
   @override
@@ -479,19 +488,21 @@ class _AttributeCard extends StatelessWidget {
               // Rename/Delete act on the ATTRIBUTE. The value chips below carry
               // their own long-press menu — that stays, chips are too dense for
               // per-chip buttons.
-              RowActionButton(
-                icon: Icons.edit_outlined,
-                color: AppColors.primary,
-                tooltip: 'Rename Attribute',
-                onTap: onEdit,
-              ),
-              const SizedBox(width: 6),
-              RowActionButton(
-                icon: Icons.delete_outline_rounded,
-                color: AppColors.danger,
-                tooltip: 'Delete Attribute',
-                onTap: onDelete,
-              ),
+              if (canEdit) ...[
+                RowActionButton(
+                  icon: Icons.edit_outlined,
+                  color: AppColors.primary,
+                  tooltip: 'Rename Attribute',
+                  onTap: onEdit,
+                ),
+                const SizedBox(width: 6),
+                RowActionButton(
+                  icon: Icons.delete_outline_rounded,
+                  color: AppColors.danger,
+                  tooltip: 'Delete Attribute',
+                  onTap: onDelete,
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 4),
@@ -519,6 +530,7 @@ class _AttributeCard extends StatelessWidget {
                             isColor: isColor,
                             onEdit: () => onEditValue(value),
                             onDelete: () => onDeleteValue(value),
+                            canEdit: canEdit,
                           ),
                         )
                         .toList(),
@@ -526,6 +538,7 @@ class _AttributeCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
+          if (canEdit)
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: OutlinedButton.icon(
@@ -571,11 +584,15 @@ class _ValueChip extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
+  /// False for a cashier — the chip renders as a plain read-only label.
+  final bool canEdit;
+
   const _ValueChip({
     required this.value,
     required this.isColor,
     required this.onEdit,
     required this.onDelete,
+    required this.canEdit,
   });
 
   Color? get _swatch {
@@ -657,14 +674,16 @@ class _ValueChip extends StatelessWidget {
     final swatch = _swatch;
 
     return Tooltip(
-      message: 'Tap to edit · Long-press for more',
+      // A cashier sees the value but gets no edit affordance and no tooltip
+      // promising one.
+      message: canEdit ? 'Tap to edit · Long-press for more' : '',
       child: Material(
         color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(20),
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: onEdit,
-          onLongPress: () => _showMenu(context),
+          onTap: canEdit ? onEdit : null,
+          onLongPress: canEdit ? () => _showMenu(context) : null,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(

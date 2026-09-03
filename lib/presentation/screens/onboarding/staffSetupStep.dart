@@ -1,3 +1,4 @@
+import 'package:billberrylite/util/common/staff_roles.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:flutter_mobx/flutter_mobx.dart';
@@ -53,22 +54,6 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
   final _pinFocus = FocusNode();
 
   String _selectedRole = 'Cashier';
-  final List<String> _retailRoles = ['Manager', 'Cashier'];
-  final List<String> _restaurantRoles = ['Manager', 'Cashier', 'Waiter'];
-
-  static const _roleIcons = {
-    'Manager':   Icons.manage_accounts_rounded,
-    'Cashier':   Icons.point_of_sale_rounded,
-    'Waiter':    Icons.restaurant_rounded,
-    'Chef':      Icons.soup_kitchen_rounded,
-  };
-
-  static const _roleColors = {
-    'Manager':   Color(0xFF7C3AED),
-    'Cashier':   Color(0xFF059669),
-    'Waiter':    Color(0xFFDB2777),
-    'Chef':      Color(0xFFDC2626),
-  };
 
   // UI state
   bool _isPinVisible = false;
@@ -279,7 +264,7 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
   @override
   Widget build(BuildContext context) {
     final isRetail = AppConfig.isRetail;
-    final roles = isRetail ? _retailRoles : _restaurantRoles;
+    final roles = StaffRoles.forCurrentMode;
 
     final hPad = AppResponsive.getValue<double>(
         context, mobile: 20, tablet: 32, desktop: 40);
@@ -767,8 +752,8 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
         Row(
           children: roles.map((role) {
             final isSelected = _selectedRole == role;
-            final color = _roleColors[role] ?? AppColors.primary;
-            final icon = _roleIcons[role] ?? Icons.person_rounded;
+            final color = StaffRoles.colorFor(role);
+            final icon = StaffRoles.iconFor(role);
             return Expanded(
               child: Padding(
                 padding: EdgeInsets.only(right: role != roles.last ? 8 : 0),

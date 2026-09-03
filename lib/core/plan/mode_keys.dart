@@ -46,6 +46,15 @@ class ModeKeys {
   static String get usersMax =>
       AppConfig.isRetail ? RetailEntKeys.usersMax : EntKeys.usersMax;
 
+  // ── Shift lifecycle ───────────────────────────────────────────────────────
+  // Read by the auto-start/auto-close logic, which is the same code on both
+  // dashboards. The attendance and staff-report keys deliberately have NO
+  // getter here: those surfaces are gated at their route and call sites, which
+  // are mode-specific and name RetailEntKeys/EntKeys directly. Add one only
+  // when genuinely shared code needs to ask.
+  static String get shifts =>
+      AppConfig.isRetail ? RetailEntKeys.shifts : EntKeys.shifts;
+
   // ── Inventory (shared notification screen's tap guard) ────────────────────
   // A low-stock or expiry notification can fire for a module the plan doesn't
   // include; the shared notifications screen checks this before navigating.

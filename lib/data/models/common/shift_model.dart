@@ -3,7 +3,7 @@ import 'package:billberrylite/core/constants/hive_type_ids.dart';
 
 part 'shift_model.g.dart';
 
-@HiveType(typeId: HiveTypeIds.restaurantShift)
+@HiveType(typeId: HiveTypeIds.shift)
 class ShiftModel extends HiveObject {
   @HiveField(0)
   final String id;

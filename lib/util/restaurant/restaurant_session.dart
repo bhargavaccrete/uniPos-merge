@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/config/app_config.dart';
 import '../../data/models/common/staffModel_310.dart';
 
 /// Tracks who is currently logged in to the restaurant POS.
@@ -203,26 +204,83 @@ class RestaurantSession {
   }
 
   // ── Permission check ─────────────────────────────────────────────────────
+
+  /// What a RESTAURANT Cashier may NOT do.
+  ///
+  /// 'settings' covers the whole store/admin config cluster — Settings and its
+  /// sub-screens, Licensing, Payment Methods, admin password, Order Settings,
+  /// Data Generator — so one rule locks them all.
+  static const Set<String> _restaurantCashierBlocked = {
+    'reports',
+    'manageStaff',
+    'cashDrawer',
+    'settings',
+    'taxSettings',
+  };
+
+  /// What a RETAIL Cashier may NOT do.
+  ///
+  /// Deliberately NOT the restaurant set:
+  /// * `cashDrawer` is absent — a retail cashier records their own cash in/out.
+  /// * The catalogue, procurement and backup keys have no restaurant analogue.
+  ///
+  /// Note the view/modify split: `catalog` and `inventory` stay OPEN so a
+  /// cashier can look up a price or check stock at the counter; `catalogEdit`
+  /// and `inventoryAdjust` are the gates that stop them changing anything.
+  ///
+  /// `settings` is blocked, but retail's Settings *hub* is deliberately not
+  /// gated on it — Start Day, End of Day and Logout live inside that hub, so
+  /// locking the door would leave a cashier unable to close the day or log out.
+  /// The sensitive tiles inside carry the gate instead.
+  static const Set<String> _retailCashierBlocked = {
+    'reports',
+    'manageStaff',
+    'settings',
+    'taxSettings',
+    'catalogEdit',
+    'inventoryAdjust',
+    'suppliers',
+    'purchase',
+    'dataBackup',
+    // Money-sensitive POS actions. Each is read through a named service getter
+    // (PriceOverrideService.canOverride and friends) whose callers HIDE the
+    // control rather than showing it and refusing.
+    'billingOverride',
+    'billingDiscount',
+    'billingExchange',
+  };
+
   /// Returns true if the current session can access the given feature key.
-  /// Feature keys: 'startOrder', 'manageMenu', 'manageStaff', 'customers',
-  ///               'reports', 'taxSettings', 'expenses', 'inventory', 'settings'
+  ///
+  /// **Admin and Manager get everything, in both business modes.** Only the
+  /// Cashier rule differs, and it is a DENYLIST: anything not named is allowed.
+  /// That means a feature key added later is Cashier-accessible until someone
+  /// adds it to the relevant set — check this when adding a sensitive screen.
+  ///
+  /// Restaurant keys: 'startOrder', 'manageMenu', 'manageStaff', 'customers',
+  ///   'reports', 'taxSettings', 'expenses', 'inventory', 'settings',
+  ///   'cashDrawer', 'endDay'.
+  /// Retail keys: 'billing', 'customers', 'catalog', 'catalogEdit',
+  ///   'inventory', 'inventoryAdjust', 'suppliers', 'purchase', 'reports',
+  ///   'manageStaff', 'settings', 'taxSettings', 'dataBackup', 'cashDrawer',
+  ///   'endDay', 'attendance', 'billingOverride', 'billingDiscount',
+  ///   'billingExchange'.
   static bool canAccess(String feature) {
+    // Fail CLOSED when nobody is signed in. `clearSession` resets loginType to
+    // 'admin' (its default), so `isAdmin` reads TRUE after a logout — without
+    // this line every permission would be granted to a logged-out session.
+    // RestaurantGuard checks isLoggedIn before calling here, but the service
+    // getters (PriceOverrideService.canOverride and friends) do not, and
+    // RetailGuard has no login check at all.
+    if (!isLoggedIn) return false;
     if (isAdmin || staffRole == 'Manager') return true;
     if (staffRole == 'Cashier') {
-      // Cashier may take orders, manage customers, and view/adjust inventory —
-      // but NOT reports, staff, cash drawer, or store/admin configuration
-      // (Settings, its sub-screens, Licensing, Payment Methods, admin password,
-      // Order Settings, Data Generator — all gated by 'settings' — and Tax).
-      const blocked = {
-        'reports',
-        'manageStaff',
-        'cashDrawer',
-        'settings',
-        'taxSettings',
-      };
+      final blocked =
+          AppConfig.isRetail ? _retailCashierBlocked : _restaurantCashierBlocked;
       return !blocked.contains(feature);
     }
-    // Other staff roles: orders only
+    // Other staff roles (restaurant's Waiter): orders only. Retail has no third
+    // role — StaffRoles.retail stops at Manager/Cashier.
     return feature == 'startOrder';
   }
 }

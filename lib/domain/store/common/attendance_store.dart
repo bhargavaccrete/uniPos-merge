@@ -1,8 +1,9 @@
 import 'package:mobx/mobx.dart';
 import 'package:uuid/uuid.dart';
-import '../../../data/models/restaurant/db/attendance_model.dart';
-import '../../../data/repositories/restaurant/attendance_repository.dart';
+import '../../../data/models/common/attendance_model.dart';
+import '../../../data/repositories/common/attendance_repository.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'shift_store.dart';
 
 part 'attendance_store.g.dart';
 
@@ -165,7 +166,9 @@ abstract class _AttendanceStore with Store {
     await _repository.deleteRecord(recordId);
     todayRecords.removeWhere((r) => r.id == recordId);
     // Reflect the deletion in the Shift Report (never wipes a shift's sales).
-    if (record != null) {
+    // Guarded: shifts are a separate module, so a mode that omits ShiftStore
+    // must still be able to correct an attendance record.
+    if (record != null && locator.isRegistered<ShiftStore>()) {
       await shiftStore.reconcileShiftOnAttendanceDelete(record);
     }
   }
@@ -192,8 +195,11 @@ abstract class _AttendanceStore with Store {
     
     await _repository.updateRecord(record);
 
-    // Keep the Shift Report / Staff Performance aligned with the corrected times.
-    await shiftStore.syncShiftTimesFromAttendance(record);
+    // Keep the Shift Report / Staff Performance aligned with the corrected
+    // times. Guarded for the same reason as deleteRecord.
+    if (locator.isRegistered<ShiftStore>()) {
+      await shiftStore.syncShiftTimesFromAttendance(record);
+    }
 
     // Refresh list if it's today's record
     final idx = todayRecords.indexWhere((r) => r.id == recordId);

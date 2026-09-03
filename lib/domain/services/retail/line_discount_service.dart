@@ -1,3 +1,4 @@
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/retail/hive_model/variante_model_201.dart';
 import '../restaurant/cart_calculation_service.dart' show DiscountType;
@@ -59,14 +60,15 @@ class LineDiscountValidation {
 class LineDiscountService {
   LineDiscountService._();
 
-  /// Only the admin identity may discount a line. It moves money off a settled
-  /// sale, so it gets the same narrow gate as `PriceOverrideService.canOverride`
-  /// and `StockAdjustmentService.canAdjust` — see `AuthService.login`, which names
-  /// the admin session 'Admin'.
+  /// Admin and Manager may discount a line; a Cashier may not. It moves money
+  /// off a sale, so it gets the same manager-level gate as
+  /// `PriceOverrideService.canOverride` and `StockAdjustmentService.canAdjust`.
+  ///
+  /// Resolved from the signed-in staff member's ROLE, not their display name.
   ///
   /// Callers must HIDE the action when this is false rather than showing it and
   /// refusing.
-  static bool get canDiscount => authService.currentUsername == 'Admin';
+  static bool get canDiscount => RestaurantSession.canAccess('billingDiscount');
 
   /// Resolve an entered discount to a currency amount for the whole line.
   ///

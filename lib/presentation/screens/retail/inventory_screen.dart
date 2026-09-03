@@ -25,6 +25,7 @@ import 'package:billberrylite/presentation/screens/retail/product_detail_screen.
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 import 'package:billberrylite/domain/services/retail/stock_adjustment_service.dart';
+import 'package:billberrylite/domain/services/retail/catalog_permission.dart';
 import 'package:billberrylite/presentation/screens/retail/stock_take_list_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/assemble_kit_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/bundles_screen.dart';
@@ -180,6 +181,9 @@ class _InventoryScreenState extends State<InventoryScreen>
   /// Edit / Delete for a product, as visible buttons on the row — matching the
   /// Categories tab and the product form's category picker.
   Widget _buildProductMenu(ProductModel product) {
+    // A cashier gets the row without its actions rather than actions that
+    // refuse them — the retail house pattern.
+    if (!CatalogPermission.canEdit) return const SizedBox.shrink();
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -302,21 +306,26 @@ class _InventoryScreenState extends State<InventoryScreen>
                     onPressed: _openStockTakes,
                     tooltip: 'Stock Takes',
                   ),
-                IconButton(
-                  icon: const Icon(Icons.inventory_rounded),
-                  onPressed: _openAssembleKit,
-                  tooltip: 'Assemble Kit',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.widgets_outlined),
-                  onPressed: _openBundles,
-                  tooltip: 'Bundles',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.add),
-                  onPressed: () => openAddProductScreen(context),
-                  tooltip: 'Add New Item',
-                ),
+                // Assembling a kit and building a bundle both WRITE stock, so
+                // they ride the stock-adjustment gate rather than catalogEdit.
+                if (StockAdjustmentService.canAdjust)
+                  IconButton(
+                    icon: const Icon(Icons.inventory_rounded),
+                    onPressed: _openAssembleKit,
+                    tooltip: 'Assemble Kit',
+                  ),
+                if (StockAdjustmentService.canAdjust)
+                  IconButton(
+                    icon: const Icon(Icons.widgets_outlined),
+                    onPressed: _openBundles,
+                    tooltip: 'Bundles',
+                  ),
+                if (CatalogPermission.canEdit)
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    onPressed: () => openAddProductScreen(context),
+                    tooltip: 'Add New Item',
+                  ),
               ],
             ),
       body: SafeArea(
@@ -802,10 +811,12 @@ class _InventoryScreenState extends State<InventoryScreen>
       icon: Icons.inventory_2_outlined,
       title: 'No products yet',
       message: 'Add your first product to start billing.',
-      action: appEmptyStateAction(
-        label: 'Add Product',
-        onPressed: () => openAddProductScreen(context),
-      ),
+      action: CatalogPermission.canEdit
+          ? appEmptyStateAction(
+              label: 'Add Product',
+              onPressed: () => openAddProductScreen(context),
+            )
+          : null,
     );
   }
 

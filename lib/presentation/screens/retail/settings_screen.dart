@@ -15,6 +15,7 @@ import 'package:billberrylite/presentation/screens/retail/tax_settings_screen.da
 import 'package:billberrylite/presentation/screens/retail/attributes_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/simple_product_fields_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/store_info_settings_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/need_help_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/settings/printer_settings_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/settings/printer_connection_screen.dart';
 import 'package:billberrylite/presentation/widget/restaurant/opening_balance_dialog.dart';
@@ -26,7 +27,6 @@ import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 import 'package:billberrylite/presentation/screens/retail/change_password_screen.dart';
-import 'package:billberrylite/presentation/screens/retail/login_screen.dart';
 import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:billberrylite/presentation/screens/restaurant/Settings/licensing_screen.dart';
 
@@ -34,8 +34,6 @@ import 'package:billberrylite/presentation/screens/restaurant/Settings/licensing
 ///
 /// Kept together so the two can't drift apart the way the name did — this
 /// screen still said 'rPOS' after the rename. Version tracks `pubspec.yaml`.
-const String _appName = 'Bill Berry Lite';
-const String _appVersion = '1.0.0';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -133,69 +131,74 @@ class _SettingsScreenState extends State<SettingsScreen> {
           padding: AppResponsive.padding(context),
           children: [
             // Store Information Section
-            _sectionHeader(context, 'BUSINESS INFORMATION'),
-            _buildSettingsCard(
-              context,
-              icon: Icons.store,
-              title: 'Store Information',
-              subtitle: 'Configure store name, address, and contact details',
-              iconColor: AppColors.success,
-              onTap: () {
-                if (!PlanGuard.allowedOr(
-                  context,
-                  RetailEntKeys.settings,
-                  featureName: 'Store Information',
-                )) {
-                  return;
-                }
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const StoreInfoSettingsScreen(),
-                  ),
-                );
-              },
-            ),
-            _buildSettingsCard(
-              context,
-              icon: Icons.verified_rounded,
-              title: 'License & Subscription',
-              subtitle: 'Manage license key, plan, and device registration',
-              iconColor: Colors.purple,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const LicensingScreen(),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
+            if (RestaurantSession.canAccess('settings')) ...[
+              _sectionHeader(context, 'BUSINESS INFORMATION'),
+              _buildSettingsCard(
+                context,
+                icon: Icons.store,
+                title: 'Store Information',
+                subtitle: 'Configure store name, address, and contact details',
+                iconColor: AppColors.success,
+                onTap: () {
+                  if (!PlanGuard.allowedOr(
+                    context,
+                    RetailEntKeys.settings,
+                    featureName: 'Store Information',
+                  )) {
+                    return;
+                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const StoreInfoSettingsScreen(),
+                    ),
+                  );
+                },
+              ),
+              _buildSettingsCard(
+                context,
+                icon: Icons.verified_rounded,
+                title: 'License & Subscription',
+                subtitle: 'Manage license key, plan, and device registration',
+                iconColor: Colors.purple,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const LicensingScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
 
             // Data Management Section
-            _sectionHeader(context, 'DATA MANAGEMENT'),
-            _buildSettingsCard(
-              context,
-              icon: Icons.backup,
-              title: 'Backup & Restore',
-              subtitle: 'Manage your data backups',
-              iconColor: Colors.blue,
-              onTap: () {
-                if (!PlanGuard.allowedOr(
-                  context,
-                  RetailEntKeys.dataBackup,
-                  featureName: 'Backup & Restore',
-                )) {
-                  return;
-                }
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const BackupScreen()),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
+            // Restoring a backup can overwrite the whole database.
+            if (RestaurantSession.canAccess('dataBackup')) ...[
+              _sectionHeader(context, 'DATA MANAGEMENT'),
+              _buildSettingsCard(
+                context,
+                icon: Icons.backup,
+                title: 'Backup & Restore',
+                subtitle: 'Manage your data backups',
+                iconColor: Colors.blue,
+                onTap: () {
+                  if (!PlanGuard.allowedOr(
+                    context,
+                    RetailEntKeys.dataBackup,
+                    featureName: 'Backup & Restore',
+                  )) {
+                    return;
+                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const BackupScreen()),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
 
             // Day Management Section
             _sectionHeader(context, 'DAY MANAGEMENT'),
@@ -259,139 +262,153 @@ class _SettingsScreenState extends State<SettingsScreen> {
             // Printing Section — device connection first, then what goes on the
             // paper. Both use the same shared printer stack the restaurant side
             // uses (PrinterStore / ThermalPrinterService).
-            _sectionHeader(context, 'PRINTING'),
-            _buildSettingsCard(
-              context,
-              icon: Icons.print_outlined,
-              title: 'Connect Printer',
-              subtitle: 'Pair a thermal printer — Bluetooth · WiFi · USB',
-              iconColor: AppColors.info,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const RetailPrinterConnectionScreen(),
-                  ),
-                );
-              },
-            ),
-            _buildSettingsCard(
-              context,
-              icon: Icons.print,
-              title: 'Printer Settings',
-              subtitle:
-                  'Configure invoice layout, paper size, and print options',
-              iconColor: const Color(0xFF673AB7),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const PrinterSettingsScreen(),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
+            if (RestaurantSession.canAccess('settings')) ...[
+              _sectionHeader(context, 'PRINTING'),
+              _buildSettingsCard(
+                context,
+                icon: Icons.print_outlined,
+                title: 'Connect Printer',
+                subtitle: 'Pair a thermal printer — Bluetooth · WiFi · USB',
+                iconColor: AppColors.info,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const RetailPrinterConnectionScreen(),
+                    ),
+                  );
+                },
+              ),
+              _buildSettingsCard(
+                context,
+                icon: Icons.print,
+                title: 'Printer Settings',
+                subtitle:
+                    'Configure invoice layout, paper size, and print options',
+                iconColor: const Color(0xFF673AB7),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const PrinterSettingsScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
 
             // Product Settings Section
-            _sectionHeader(context, 'PRODUCT SETTINGS'),
-            _buildSettingsCard(
-              context,
-              icon: Icons.tune,
-              title: 'Product Attributes',
-              subtitle: 'Manage global attributes (Color, Size, etc.)',
-              iconColor: const Color(0xFF9C27B0),
-              onTap: () {
-                if (!PlanGuard.allowedOr(
-                  context,
-                  RetailEntKeys.catalog,
-                  featureName: 'Product Attributes',
-                )) {
-                  return;
-                }
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AttributesScreen(),
-                  ),
-                );
-              },
-            ),
-            _buildSettingsCard(
-              context,
-              icon: Icons.checklist_rtl,
-              title: 'Simple Product Fields',
-              subtitle: 'Choose the fields shown on simple products',
-              iconColor: const Color(0xFF3F51B5),
-              onTap: () {
-                if (!PlanGuard.allowedOr(
-                  context,
-                  RetailEntKeys.catalog,
-                  featureName: 'Simple Product Fields',
-                )) {
-                  return;
-                }
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const SimpleProductFieldsScreen(),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
+            // Attributes and field config change the catalogue, so they ride
+            // catalogEdit rather than the generic settings key.
+            if (RestaurantSession.canAccess('catalogEdit')) ...[
+              _sectionHeader(context, 'PRODUCT SETTINGS'),
+              _buildSettingsCard(
+                context,
+                icon: Icons.tune,
+                title: 'Product Attributes',
+                subtitle: 'Manage global attributes (Color, Size, etc.)',
+                iconColor: const Color(0xFF9C27B0),
+                onTap: () {
+                  if (!PlanGuard.allowedOr(
+                    context,
+                    RetailEntKeys.catalog,
+                    featureName: 'Product Attributes',
+                  )) {
+                    return;
+                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AttributesScreen(),
+                    ),
+                  );
+                },
+              ),
+              _buildSettingsCard(
+                context,
+                icon: Icons.checklist_rtl,
+                title: 'Simple Product Fields',
+                subtitle: 'Choose the fields shown on simple products',
+                iconColor: const Color(0xFF3F51B5),
+                onTap: () {
+                  if (!PlanGuard.allowedOr(
+                    context,
+                    RetailEntKeys.catalog,
+                    featureName: 'Simple Product Fields',
+                  )) {
+                    return;
+                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SimpleProductFieldsScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
 
             // Stock Alerts Section
-            _sectionHeader(context, 'NOTIFICATIONS'),
-            _buildStockAlertThresholdCard(context),
+            if (RestaurantSession.canAccess('settings')) ...[
+              _sectionHeader(context, 'NOTIFICATIONS'),
+              _buildStockAlertThresholdCard(context),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
+            ],
 
             // Display & Format Section
-            _sectionHeader(context, 'DISPLAY & FORMAT'),
-            _buildCurrencyCard(context),
-            _buildDecimalPrecisionCard(context),
+            if (RestaurantSession.canAccess('settings')) ...[
+              _sectionHeader(context, 'DISPLAY & FORMAT'),
+              _buildCurrencyCard(context),
+              _buildDecimalPrecisionCard(context),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
+            ],
 
             // Billing Preferences — settings that already governed retail bills
             // but were only reachable from the RESTAURANT Personalization screen
             // (`customization_drawer.dart`), which a retail user never sees.
             // These write the same AppSettings keys, so it is one setting shown
             // in two places, not a retail copy that could drift.
-            _sectionHeader(context, 'BILLING PREFERENCES'),
-            _buildRoundOffCard(context),
-            _buildVisualKeyboardCard(context),
-            _buildRefundsCard(context),
+            if (RestaurantSession.canAccess('settings')) ...[
+              _sectionHeader(context, 'BILLING PREFERENCES'),
+              _buildRoundOffCard(context),
+              _buildVisualKeyboardCard(context),
+              _buildRefundsCard(context),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
+            ],
 
             // Payment Settings Section
-            _sectionHeader(context, 'PAYMENT SETTINGS'),
-            _buildSettingsCard(
-              context,
-              icon: Icons.payment,
-              title: 'Payment Methods',
-              subtitle: 'Configure available payment options',
-              iconColor: AppColors.success,
-              onTap: () {
-                if (!PlanGuard.allowedOr(
-                  context,
-                  RetailEntKeys.settings,
-                  featureName: 'Payment Methods',
-                )) {
-                  return;
-                }
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const PaymentMethodsScreen(),
-                  ),
-                );
-              },
-            ),
+            if (RestaurantSession.canAccess('settings')) ...[
+              _sectionHeader(context, 'PAYMENT SETTINGS'),
+              _buildSettingsCard(
+                context,
+                icon: Icons.payment,
+                title: 'Payment Methods',
+                subtitle: 'Configure available payment options',
+                iconColor: AppColors.success,
+                onTap: () {
+                  if (!PlanGuard.allowedOr(
+                    context,
+                    RetailEntKeys.settings,
+                    featureName: 'Payment Methods',
+                  )) {
+                    return;
+                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const PaymentMethodsScreen(),
+                    ),
+                  );
+                },
+              ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
+            ],
 
             // Tax Section — hidden entirely for a business that answered
             // "Not Registered" on Store Details. Same `taxEnabled` flag the setup
@@ -399,104 +416,82 @@ class _SettingsScreenState extends State<SettingsScreen> {
             // (`setupWizardScreen.dart`), so a shop that never registered is not
             // offered tax configuration in either place.
             if (TaxFeature.enabled) ...[
-              _sectionHeader(context, 'TAX SETTINGS'),
+              // Tax rates are Manager-only, matching restaurant's 'taxSettings'.
+              if (RestaurantSession.canAccess('taxSettings')) ...[
+                _sectionHeader(context, 'TAX SETTINGS'),
+                _buildSettingsCard(
+                  context,
+                  icon: Icons.receipt_long,
+                  title: 'Tax Settings',
+                  subtitle: 'Tax rates, defaults and inclusive pricing',
+                  iconColor: AppColors.success,
+                  onTap: () {
+                    if (!PlanGuard.allowedOr(
+                      context,
+                      RetailEntKeys.settings,
+                      featureName: 'Tax Settings',
+                    )) {
+                      return;
+                    }
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const TaxSettingsScreen(),
+                      ),
+                    );
+                  },
+                ),
+                // GST Reports and EOD Reports used to live here — a reports section
+                // filed under TAX SETTINGS. Both now sit in the Reports hub, which
+                // is where someone looks for a report. Settings stays config only.
+                const SizedBox(height: 16),
+              ],
+            ],
+
+            // Security & Account Section
+            //
+            // Everything here is store configuration, so the header sits inside
+            // the gate — a cashier would otherwise see an empty heading. Logout
+            // used to live here too; it is now a dashboard card so it is
+            // reachable in one tap regardless of role.
+            if (RestaurantSession.canAccess('settings')) ...[
+              _sectionHeader(context, 'SECURITY & ACCOUNT'),
+              _buildAutoLogoutTimeoutCard(context),
+              _buildMaxSessionDurationCard(context),
               _buildSettingsCard(
                 context,
-                icon: Icons.receipt_long,
-                title: 'Tax Settings',
-                subtitle: 'Tax rates, defaults and inclusive pricing',
-                iconColor: AppColors.success,
+                icon: Icons.lock_outline_rounded,
+                title: 'Change Admin PIN',
+                subtitle: 'Update your security PIN for admin access',
+                iconColor: AppColors.primary,
                 onTap: () {
-                  if (!PlanGuard.allowedOr(
-                    context,
-                    RetailEntKeys.settings,
-                    featureName: 'Tax Settings',
-                  )) {
-                    return;
-                  }
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const TaxSettingsScreen(),
+                      builder: (context) => const ChangePasswordScreen(),
                     ),
                   );
                 },
               ),
-              // GST Reports and EOD Reports used to live here — a reports section
-              // filed under TAX SETTINGS. Both now sit in the Reports hub, which
-              // is where someone looks for a report. Settings stays config only.
               const SizedBox(height: 16),
             ],
 
-            // Security & Account Section
-            _sectionHeader(context, 'SECURITY & ACCOUNT'),
-            _buildAutoLogoutTimeoutCard(context),
-            _buildMaxSessionDurationCard(context),
+            // Help & Support — deliberately outside the 'settings' gate.
+            // A cashier sees almost none of the sections above; support
+            // contact must still be one tap away for them.
+            _sectionHeader(context, 'HELP & SUPPORT'),
             _buildSettingsCard(
               context,
-              icon: Icons.lock_outline_rounded,
-              title: 'Change Admin PIN',
-              subtitle: 'Update your security PIN for admin access',
-              iconColor: AppColors.primary,
+              icon: Icons.support_agent_rounded,
+              title: 'Need Help?',
+              subtitle: 'Call or email support, and browse common questions',
+              iconColor: AppColors.info,
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const ChangePasswordScreen(),
+                    builder: (context) => const RetailNeedHelpScreen(),
                   ),
-                );
-              },
-            ),
-            _buildSettingsCard(
-              context,
-              icon: Icons.logout_rounded,
-              title: 'Logout',
-              subtitle: 'End your current session',
-              iconColor: AppColors.danger,
-              onTap: () async {
-                final confirmed = await showAppConfirmDialog(
-                  context: context,
-                  title: 'Logout',
-                  message: 'Are you sure you want to logout?',
-                  confirmLabel: 'Logout',
-                  accent: AppColors.danger,
-                  icon: Icons.logout_rounded,
-                );
-                if (confirmed && context.mounted) {
-                  await authService.logout();
-                  if (!context.mounted) return;
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(
-                      builder: (context) => const LoginScreen(),
-                    ),
-                    (route) => false,
-                  );
-                }
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // App Information Section
-            _sectionHeader(context, 'ABOUT'),
-            _buildSettingsCard(
-              context,
-              icon: Icons.info_outline,
-              title: 'App Information',
-              subtitle: 'Version $_appVersion',
-              iconColor: AppColors.textSecondary,
-              onTap: () {
-                showAboutDialog(
-                  context: context,
-                  // Was 'rPOS' — the app is Bill Berry Lite, and this dialog was
-                  // the one place still showing the pre-rename name to users.
-                  applicationName: _appName,
-                  applicationVersion: _appVersion,
-                  applicationIcon: const Icon(Icons.point_of_sale, size: 48),
-                  children: [
-                    const Text(
-                      'A modern Point of Sale system built with Flutter',
-                    ),
-                  ],
                 );
               },
             ),

@@ -1,3 +1,4 @@
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'dart:io';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/domain/services/common/auto_backup_service.dart';
@@ -361,6 +362,11 @@ class _BackupScreenState extends State<BackupScreen> {
   }
 
   Future<void> _deleteBackup(File file) async {
+    // Defence in depth. The entrance is gated three ways already (dashboard
+    // has no backup card, the Settings tile and the route both check
+    // 'dataBackup'), but this operation can overwrite the entire database,
+    // so it verifies for itself rather than trusting how it was reached.
+    if (!RestaurantSession.canAccess('dataBackup')) return;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -402,6 +408,11 @@ class _BackupScreenState extends State<BackupScreen> {
   }
 
   Future<void> _importBackup() async {
+    // Defence in depth. The entrance is gated three ways already (dashboard
+    // has no backup card, the Settings tile and the route both check
+    // 'dataBackup'), but this operation can overwrite the entire database,
+    // so it verifies for itself rather than trusting how it was reached.
+    if (!RestaurantSession.canAccess('dataBackup')) return;
     try {
       // Open file picker to select backup file (ZIP or JSON)
       const XTypeGroup typeGroup = XTypeGroup(
@@ -506,6 +517,11 @@ class _BackupScreenState extends State<BackupScreen> {
   }
 
   Future<void> _restoreBackup(File file) async {
+    // Defence in depth. The entrance is gated three ways already (dashboard
+    // has no backup card, the Settings tile and the route both check
+    // 'dataBackup'), but this operation can overwrite the entire database,
+    // so it verifies for itself rather than trusting how it was reached.
+    if (!RestaurantSession.canAccess('dataBackup')) return;
     // Show confirmation dialog
     final confirm = await showDialog<bool>(
       context: context,

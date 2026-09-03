@@ -5,16 +5,27 @@ import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 import 'package:billberrylite/presentation/screens/restaurant/auth/license_lock_screen.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
+import 'package:billberrylite/presentation/widget/componets/common/access_denied_screen.dart';
 
-/// Route wrapper enforcing plan **entitlements** for retail, mirroring
-/// `RestaurantGuard` — but entitlement + licence only: retail has no role or
-/// staff session of its own (`AuthService` is admin-only).
+/// Route wrapper enforcing licence, **role** and plan entitlements for retail,
+/// mirroring `RestaurantGuard`.
 ///
-/// Reactive by design: the body sits in an [Observer], so a mid-session revoke,
-/// expiry or plan downgrade re-renders an already-open screen. Evaluating once
-/// at route-build time would let a revoked device keep whatever it had open.
+/// Retail DOES have a staff session: `AuthService.login` resolves a staff PIN
+/// and calls `RestaurantSession.saveStaffSession`, so `staffRole` is populated
+/// and `canAccess` answers for retail keys.
+///
+/// Reactive by design for licence and plan: the body sits in an [Observer], so
+/// a mid-session revoke, expiry or downgrade re-renders an already-open screen.
+/// The ROLE check is not reactive — it can't change without a re-login, and
+/// `RestaurantGuard` evaluates it the same way.
 class RetailGuard extends StatelessWidget {
   final Widget child;
+
+  /// A `RestaurantSession.canAccess` feature key, or null for a route open to
+  /// every role. Checked BEFORE the plan: "you may not" outranks "you could buy
+  /// this".
+  final String? permissionKey;
 
   /// A `RetailEntKeys.*` string, or null for an always-open route.
   final String? entitlementKey;
@@ -26,6 +37,7 @@ class RetailGuard extends StatelessWidget {
   const RetailGuard({
     super.key,
     required this.child,
+    this.permissionKey,
     this.entitlementKey,
     this.entitlementAnyOf,
   });
@@ -46,6 +58,14 @@ class RetailGuard extends StatelessWidget {
           // Recovery comes from this Observer re-rendering once the store
           // updates, so the callback has nothing to do — same as RestaurantGuard.
           return LicenseLockScreen(onActivated: () {});
+        }
+
+        // Role gate. Ahead of the plan check so a cashier is told "ask a
+        // manager" rather than "upgrade your plan" for something no upgrade
+        // would give them.
+        final perm = permissionKey;
+        if (perm != null && !RestaurantSession.canAccess(perm)) {
+          return const AccessDeniedScreen();
         }
 
         // Entitlements go through PlanEnforce rather than Entitlements directly,

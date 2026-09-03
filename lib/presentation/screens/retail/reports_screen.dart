@@ -28,6 +28,9 @@ import 'package:billberrylite/presentation/screens/retail/credit_reports_screen.
 import 'package:billberrylite/presentation/screens/retail/eod_reports_list_screen.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
+import 'package:billberrylite/presentation/screens/common/attendance/attendance_report_screen.dart';
+import 'package:billberrylite/presentation/screens/common/shift/shift_report_screen.dart';
+import 'package:billberrylite/presentation/screens/common/shift/staff_performance_screen.dart';
 
 class ReportsScreen extends StatelessWidget {
   const ReportsScreen({super.key});
@@ -351,6 +354,49 @@ class ReportsScreen extends StatelessWidget {
                 ),
               ),
               entitlementKey: RetailEntKeys.reportsEodHistory,
+            ),
+            _buildSectionHeader(context, 'Staff Reports'),
+            _buildReportCard(
+              context,
+              title: 'Attendance',
+              subtitle: 'Clock-in hours per staff member',
+              icon: Icons.how_to_reg,
+              color: const Color(0xFFEC407A),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AttendanceReportScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsAttendance,
+            ),
+            _buildReportCard(
+              context,
+              title: 'Shift Report',
+              subtitle: 'Shifts with sales and expenses',
+              icon: Icons.schedule,
+              color: const Color(0xFF5C6BC0),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ShiftReportScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsShift,
+            ),
+            _buildReportCard(
+              context,
+              title: 'Staff Performance',
+              subtitle: 'Sales and hours per staff member',
+              icon: Icons.leaderboard,
+              color: const Color(0xFF26A69A),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const StaffPerformanceScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsStaffPerformance,
             ),
           ],
         ),

@@ -11,6 +11,7 @@ import 'package:billberrylite/presentation/widget/componets/common/primary_app_b
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 import 'package:billberrylite/domain/services/retail/stock_adjustment_service.dart';
+import 'package:billberrylite/domain/services/retail/catalog_permission.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 
@@ -149,7 +150,8 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
           AnimatedBuilder(
             animation: _tabController.animation!,
             builder: (_, child) {
-              if (_tabController.animation!.value.round() != 0) {
+              if (_tabController.animation!.value.round() != 0 ||
+                  !CatalogPermission.canEdit) {
                 return const SizedBox.shrink();
               }
               return IconButton(
@@ -179,12 +181,14 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addForCurrentTab,
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: CatalogPermission.canEdit
+          ? FloatingActionButton(
+              onPressed: _addForCurrentTab,
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 

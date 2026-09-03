@@ -33,6 +33,7 @@ import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 import 'package:billberrylite/presentation/screens/retail/attributes_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/scanner_screen.dart';
 import 'package:billberrylite/domain/services/retail/barcode_generator_service.dart';
+import 'package:billberrylite/domain/services/retail/catalog_permission.dart';
 import 'package:billberrylite/presentation/widget/componets/retail/print_labels_sheet.dart';
 
 /// Money input — digits with at most two decimals, the same rule the checkout,
@@ -311,14 +312,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               }
             },
             itemBuilder: (context) => [
-              _menuItem('add', Icons.add, 'Add Variant'),
-              _menuItem(
-                'bulk',
-                Icons.library_add_outlined,
-                'Bulk Add Variants',
-              ),
-              const PopupMenuDivider(),
-              _menuItem('edit', Icons.edit_outlined, 'Edit Details'),
+              // Catalogue mutations drop out for a cashier; Stock History is
+              // read-only and stays for every role.
+              if (CatalogPermission.canEdit) ...[
+                _menuItem('add', Icons.add, 'Add Variant'),
+                _menuItem(
+                  'bulk',
+                  Icons.library_add_outlined,
+                  'Bulk Add Variants',
+                ),
+                const PopupMenuDivider(),
+                _menuItem('edit', Icons.edit_outlined, 'Edit Details'),
+              ],
               _menuItem('history', Icons.history_rounded, 'Stock History'),
               if (BarcodeLabelPermission.canPrint)
                 _menuItem('labels', Icons.qr_code_2_rounded, 'Print Labels'),
@@ -440,10 +445,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       icon: Icons.layers_outlined,
       title: 'No variants yet',
       message: 'Add a variant for each option you stock.',
-      action: appEmptyStateAction(
-        label: 'Add First Variant',
-        onPressed: _openAddVariant,
-      ),
+      action: CatalogPermission.canEdit
+          ? appEmptyStateAction(
+              label: 'Add First Variant',
+              onPressed: _openAddVariant,
+            )
+          : null,
     );
   }
 
@@ -791,19 +798,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             // Edit and Delete are visible buttons on the row, matching the
             // product and category rows. The two permission-gated extras stay
             // behind an overflow that hides itself when neither is allowed.
-            RowActionButton(
-              icon: Icons.edit_outlined,
-              color: AppColors.primary,
-              tooltip: 'Edit Variant',
-              onTap: () => _openEditVariant(variant),
-            ),
-            const SizedBox(width: 6),
-            RowActionButton(
-              icon: Icons.delete_outline_rounded,
-              color: AppColors.danger,
-              tooltip: 'Delete Variant',
-              onTap: () => _deleteVariant(variant),
-            ),
+            if (CatalogPermission.canEdit) ...[
+              RowActionButton(
+                icon: Icons.edit_outlined,
+                color: AppColors.primary,
+                tooltip: 'Edit Variant',
+                onTap: () => _openEditVariant(variant),
+              ),
+              const SizedBox(width: 6),
+              RowActionButton(
+                icon: Icons.delete_outline_rounded,
+                color: AppColors.danger,
+                tooltip: 'Delete Variant',
+                onTap: () => _deleteVariant(variant),
+              ),
+            ],
             _buildVariantExtrasMenu(variant),
           ],
         ),

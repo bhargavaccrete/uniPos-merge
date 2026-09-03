@@ -546,7 +546,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
             ),
             Switch(
               value: enabled,
-              activeColor: AppColors.success,
+              activeThumbColor: AppColors.success,
               onChanged: (value) async {
                 await _paymentStore.togglePaymentMethod(method.id);
                 if (mounted) {

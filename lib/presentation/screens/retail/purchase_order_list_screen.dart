@@ -1,3 +1,4 @@
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import '../../../core/di/service_locator.dart';
@@ -709,8 +710,11 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
                     ),
                   ),
                   // Cancel/Delete are draft-only, so the buttons only exist
-                  // then — same guard the menu had.
-                  if (po.statusEnum == POStatus.draft) ...[
+                  // then — same guard the menu had. Also Manager-only: the
+                  // whole screen is behind 'purchase', so this is defence in
+                  // depth for anything that reaches the list another way.
+                  if (po.statusEnum == POStatus.draft &&
+                      RestaurantSession.canAccess('purchase')) ...[
                     const SizedBox(width: 6),
                     RowActionButton(
                       icon: Icons.block,

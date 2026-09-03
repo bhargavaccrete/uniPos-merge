@@ -39,6 +39,11 @@ class AuthService {
   static const String _sessionTimestampKey = 'admin_session_timestamp';
   // Display name shown after login — "Admin" or a staff member's name.
   static const String _usernameKey = 'admin_username';
+  // WHICH identity the session belongs to. Absent = the admin; set = that
+  // staff member's `StaffModel.id`. A display name alone can't tell the two
+  // apart (and staff names are editable and can collide), which is exactly
+  // how restore used to elevate every staff member to admin.
+  static const String _staffIdKey = 'admin_staff_id';
 
   static const String _defaultPin = '123456';
 
@@ -50,20 +55,56 @@ class AuthService {
 
   bool get isLoggedIn => _currentUsername != null;
 
-  /// Initialize auth service - check for existing session
+  /// Restore a saved session, re-establishing the SAME identity that logged
+  /// in — admin as admin, staff as staff.
+  ///
+  /// This used to call `saveAdminSession()` unconditionally, so after any app
+  /// restart a cashier came back as the admin: `RestaurantSession.staffName`
+  /// went null, Attendance stopped excluding the logged-in user, the
+  /// attendance detail screen's admin-only edit/delete opened up, and their
+  /// shift was attributed to 'admin'.
+  ///
+  /// Every path that cannot positively identify a staff member clears the
+  /// session and returns false (→ LoginScreen) rather than falling back to
+  /// admin. Failing closed is the only safe direction for a privilege check.
   Future<bool> initialize() async {
     final prefs = await SharedPreferences.getInstance();
     final hasSession = prefs.getBool(_sessionKey) ?? false;
+    if (!hasSession) return false;
 
-    if (hasSession) {
-      _currentUsername = prefs.getString(_usernameKey);
-      if (_currentUsername != null) {
-        await RestaurantSession.saveAdminSession();
-        return true;
+    final username = prefs.getString(_usernameKey);
+    if (username == null) return false;
+
+    final staffId = prefs.getString(_staffIdKey);
+
+    if (staffId == null) {
+      // No staff id recorded. Either a genuine admin session, or one saved
+      // before this field existed — and a legacy session under a non-admin
+      // name is precisely the case that used to be silently elevated, so it
+      // must re-authenticate instead.
+      if (username != 'Admin') {
+        await _clearSession();
+        return false;
       }
+      _currentUsername = username;
+      await RestaurantSession.saveAdminSession();
+      return true;
     }
 
-    return false;
+    // Staff session — re-resolve the record so the restored session carries
+    // the live role and name, not a stale copy of them.
+    await staffStore.loadStaff();
+    final match =
+        staffStore.staff.where((s) => s.id == staffId && s.isActive).firstOrNull;
+    if (match == null) {
+      // Deleted or deactivated since login: the session identifies nobody.
+      await _clearSession();
+      return false;
+    }
+
+    _currentUsername = '${match.firstName} ${match.lastName}'.trim();
+    await RestaurantSession.saveStaffSession(match);
+    return true;
   }
 
   /// Ensure a default admin PIN exists (first run only — never overwrites an
@@ -102,7 +143,7 @@ class AuthService {
     // 1. Admin (PIN = stored admin PIN)
     if (storedHash != null &&
         RestaurantAuthHelper.verifyPassword(trimmedPin, storedHash)) {
-      await _saveSession('Admin');
+      await _saveSession('Admin', staffId: null);
       _currentUsername = 'Admin';
       await RestaurantSession.saveAdminSession();
       return AuthResult.success('Admin');
@@ -118,7 +159,7 @@ class AuthService {
 
     if (match != null) {
       final name = '${match.firstName} ${match.lastName}'.trim();
-      await _saveSession(name);
+      await _saveSession(name, staffId: match.id);
       _currentUsername = name;
       await RestaurantSession.saveStaffSession(match);
       return AuthResult.success(name);
@@ -190,10 +231,18 @@ class AuthService {
   }
 
   /// Save session to SharedPreferences
-  Future<void> _saveSession(String username) async {
+  Future<void> _saveSession(String username, {required String? staffId}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_sessionKey, true);
     await prefs.setString(_usernameKey, username);
+    // Explicitly removed on an admin login — otherwise a previous staff
+    // session's id would linger and the next restore would resolve the admin
+    // as that staff member.
+    if (staffId == null) {
+      await prefs.remove(_staffIdKey);
+    } else {
+      await prefs.setString(_staffIdKey, staffId);
+    }
     await prefs.setString(
       _sessionTimestampKey,
       DateTime.now().toIso8601String(),
@@ -205,6 +254,7 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_sessionKey);
     await prefs.remove(_usernameKey);
+    await prefs.remove(_staffIdKey);
     await prefs.remove(_sessionTimestampKey);
   }
 

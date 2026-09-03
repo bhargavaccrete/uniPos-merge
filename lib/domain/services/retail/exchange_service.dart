@@ -1,3 +1,4 @@
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -212,11 +213,16 @@ class ExchangeService {
   /// Guards against a double-tap producing two exchange groups.
   bool _inFlight = false;
 
-  /// Exchange is money-sensitive, so it follows the same admin gate the other
-  /// money-sensitive retail services use (price override, line discount, stock
-  /// adjustment). Callers must HIDE the action when this is false rather than
-  /// showing it and refusing.
-  bool get canExchange => authService.currentUsername == 'Admin';
+  /// Admin and Manager may process an exchange; a Cashier may not.
+  ///
+  /// Note the deliberate asymmetry: a Cashier CAN process a plain return
+  /// (`sale_return_screen`), but not an exchange — an exchange writes a new
+  /// sale at a possibly different price, so it carries the same manager-level
+  /// gate as price override and line discount.
+  ///
+  /// Callers must HIDE the action when this is false rather than showing it and
+  /// refusing.
+  bool get canExchange => RestaurantSession.canAccess('billingExchange');
 
   // ==========================================================================
   // Validation + pricing — NOTHING is written here
@@ -389,7 +395,8 @@ class ExchangeService {
       return ExchangeResult.failure('An exchange is already being processed');
     }
     if (!canExchange) {
-      return ExchangeResult.failure('Only the admin can process an exchange');
+      return ExchangeResult.failure(
+          'Only an admin or manager can process an exchange');
     }
 
     _inFlight = true;
@@ -563,6 +570,9 @@ class ExchangeService {
       isTaxInclusive: bill.isTaxInclusive,
       lineDiscountTotal: bill.lineDiscountTotal,
       exchangeGroupId: groupId,
+      // Both legs of an exchange belong to the shift that processed it —
+      // return_service stamps the return leg with the same value.
+      shiftId: RestaurantSession.currentShiftId,
     );
 
     final item = SaleItemModel.fromCalculated(

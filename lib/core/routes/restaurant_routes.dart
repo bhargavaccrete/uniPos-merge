@@ -10,8 +10,8 @@ import 'package:billberrylite/presentation/screens/restaurant/Reports/salesbyCat
 import 'package:billberrylite/presentation/screens/restaurant/Reports/salesbyItem/salesbyitem.dart';
 import 'package:billberrylite/presentation/screens/restaurant/Reports/totalsales/totalsales.dart';
 import 'package:billberrylite/presentation/screens/restaurant/Settings/data_generator_screen.dart';
-import 'package:billberrylite/presentation/screens/restaurant/attendance/staff_attendance_screen.dart';
-import 'package:billberrylite/presentation/screens/restaurant/attendance/attendance_report_screen.dart';
+import 'package:billberrylite/presentation/screens/common/attendance/staff_attendance_screen.dart';
+import 'package:billberrylite/presentation/screens/common/attendance/attendance_report_screen.dart';
 import 'package:billberrylite/presentation/screens/restaurant/import/bulk_import_screen.dart';
 import 'package:billberrylite/presentation/screens/restaurant/tabbar/order.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/componets/import/test_data_screen.dart';
@@ -67,7 +67,7 @@ import 'package:billberrylite/presentation/screens/restaurant/online%20Order/mis
 import 'package:billberrylite/presentation/screens/restaurant/inventory/manage_Inventory.dart';
 
 // Restaurant - Staff
-import 'package:billberrylite/presentation/screens/restaurant/ManageStaff/manageStaff.dart';
+import 'package:billberrylite/presentation/screens/common/staff/manage_staff_screen.dart';
 
 // Restaurant - Expenses
 import 'package:billberrylite/presentation/screens/restaurant/Expense/Expense.dart';
@@ -109,8 +109,8 @@ import '../../presentation/screens/restaurant/Reports/paymentMode/payment_mode_r
 import '../../presentation/screens/restaurant/Reports/void Order Report/voidOrderReport.dart';
 import '../../presentation/screens/restaurant/Reports/item Cancellation Report/itemCancellationReport.dart';
 import '../../presentation/screens/common/printer/addprinter/addprinter.dart';
-import '../../presentation/screens/restaurant/shift/shift_report_screen.dart';
-import '../../presentation/screens/restaurant/shift/staff_performance_screen.dart';
+import '../../presentation/screens/common/shift/shift_report_screen.dart';
+import '../../presentation/screens/common/shift/staff_performance_screen.dart';
 import '../../presentation/screens/restaurant/cash_drawer/cash_drawer_screen.dart';
 import '../../presentation/screens/restaurant/cash_drawer/cash_drawer_history_screen.dart';
 
@@ -178,7 +178,7 @@ class RestaurantRoutes {
     RouteNames.restaurantInventory: _guard(const ManageInventory(), 'inventory', EntKeys.inventory),
 
     // Restaurant - Staff
-    RouteNames.restaurantStaff: _guard(const manageStaff(), 'manageStaff', EntKeys.users),
+    RouteNames.restaurantStaff: _guard(const ManageStaffScreen(), 'manageStaff', EntKeys.users),
 
     // Restaurant - Expenses
     RouteNames.restaurantExpenses: _guard(const ExpenseScreen(), 'expenses', EntKeys.expenses),

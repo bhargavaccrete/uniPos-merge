@@ -147,6 +147,16 @@ class SaleModel extends HiveObject {
   @HiveField(32)
   final String? exchangeGroupId;
 
+  /// The staff shift this sale was rung up on, or null.
+  ///
+  /// Retail's Shift Report and Staff Performance attribute a sale to a shift by
+  /// this link first, falling back to the shift's time window for rows written
+  /// before shifts existed — the same two-step `PastOrderModel.shiftId` gives
+  /// the restaurant side. Nullable, so every pre-existing sale reads back as
+  /// null and simply takes the time-window path.
+  @HiveField(33)
+  final String? shiftId;
+
   SaleModel({
     required this.saleId,
     this.customerId,
@@ -181,6 +191,7 @@ class SaleModel extends HiveObject {
     this.isTaxInclusive,
     this.lineDiscountTotal,
     this.exchangeGroupId,
+    this.shiftId,
   })  : isReturn = isReturn ?? false,
         paidAmount = paidAmount ?? totalAmount,
         dueAmount = dueAmount ?? 0.0,
@@ -202,6 +213,7 @@ class SaleModel extends HiveObject {
     double? totalCgstAmount,
     double? totalSgstAmount,
     double? grandTotal,
+    String? shiftId,
   }) {
     final now = DateTime.now().toIso8601String();
 
@@ -224,6 +236,7 @@ class SaleModel extends HiveObject {
       totalCgstAmount: totalCgstAmount,
       totalSgstAmount: totalSgstAmount,
       grandTotal: grandTotal,
+      shiftId: shiftId,
     );
   }
 
@@ -240,6 +253,7 @@ class SaleModel extends HiveObject {
     required String paymentType,
     bool isReturn = false,
     String? originalSaleId,
+    String? shiftId,
   }) {
     final now = DateTime.now().toIso8601String();
     final cgst = double.parse((totalGstAmount / 2).toStringAsFixed(2));
@@ -264,6 +278,7 @@ class SaleModel extends HiveObject {
       totalCgstAmount: cgst,
       totalSgstAmount: sgst,
       grandTotal: grandTotal,
+      shiftId: shiftId,
     );
   }
 
@@ -291,6 +306,7 @@ class SaleModel extends HiveObject {
     double? lineDiscountTotal,
     /// Set when this sale is the replacement half of an exchange.
     String? exchangeGroupId,
+    String? shiftId,
     /// When the customer tenders less than [grandTotal], pass what was actually
     /// collected. The remainder is recorded as due and the sale is marked
     /// partially paid rather than paid.
@@ -345,6 +361,7 @@ class SaleModel extends HiveObject {
       isTaxInclusive: isTaxInclusive,
       lineDiscountTotal: lineDiscountTotal,
       exchangeGroupId: exchangeGroupId,
+      shiftId: shiftId,
       paidAmount: collected,
       dueAmount: isShort ? due : 0.0,
       status: isShort ? SaleStatus.partiallyPaid : SaleStatus.paid,
@@ -389,6 +406,7 @@ class SaleModel extends HiveObject {
     bool? isTaxInclusive,
     double? lineDiscountTotal,
     String? exchangeGroupId,
+    String? shiftId,
   }) {
     final now = DateTime.now().toIso8601String();
     final cgst = double.parse((totalGstAmount / 2).toStringAsFixed(2));
@@ -428,6 +446,7 @@ class SaleModel extends HiveObject {
       isTaxInclusive: isTaxInclusive,
       lineDiscountTotal: lineDiscountTotal,
       exchangeGroupId: exchangeGroupId,
+      shiftId: shiftId,
     );
   }
 
@@ -486,6 +505,7 @@ class SaleModel extends HiveObject {
     bool? isTaxInclusive,
     double? lineDiscountTotal,
     String? exchangeGroupId,
+    String? shiftId,
   }) {
     return SaleModel(
       saleId: saleId ?? this.saleId,
@@ -526,6 +546,7 @@ class SaleModel extends HiveObject {
       isTaxInclusive: isTaxInclusive ?? this.isTaxInclusive,
       lineDiscountTotal: lineDiscountTotal ?? this.lineDiscountTotal,
       exchangeGroupId: exchangeGroupId ?? this.exchangeGroupId,
+      shiftId: shiftId ?? this.shiftId,
     );
   }
 
@@ -571,6 +592,7 @@ class SaleModel extends HiveObject {
       'isTaxInclusive': isTaxInclusive,
       'lineDiscountTotal': lineDiscountTotal,
       'exchangeGroupId': exchangeGroupId,
+      'shiftId': shiftId,
     };
   }
 
@@ -622,6 +644,7 @@ class SaleModel extends HiveObject {
       lineDiscountTotal:
           (map['lineDiscountTotal'] as num?)?.toDouble(),
       exchangeGroupId: map['exchangeGroupId'] as String?,
+      shiftId: map['shiftId'] as String?,
     );
   }
 }

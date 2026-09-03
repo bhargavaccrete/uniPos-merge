@@ -1,3 +1,4 @@
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/di/service_locator.dart';
@@ -61,10 +62,14 @@ class StockAdjustmentService {
   /// A decimal variant logs its own unit (kg, liter, …) instead.
   static const String _unit = 'pcs';
 
-  /// Only the admin identity may adjust stock. An adjustment can make missing
-  /// goods vanish from the books, so it is deliberately the narrowest gate in
-  /// retail — see `AuthService.login`, which names the admin session 'Admin'.
-  static bool get canAdjust => authService.currentUsername == 'Admin';
+  /// Admin and Manager may adjust stock; a Cashier may not. An adjustment can
+  /// make missing goods vanish from the books, so it stays a manager-level
+  /// action.
+  ///
+  /// Resolved from the signed-in staff member's ROLE. This used to compare
+  /// `authService.currentUsername == 'Admin'` — a display name — which denied
+  /// Managers too, and decided a privilege question on a label.
+  static bool get canAdjust => RestaurantSession.canAccess('inventoryAdjust');
 
   /// Apply a manual adjustment to [variant]'s stock.
   ///

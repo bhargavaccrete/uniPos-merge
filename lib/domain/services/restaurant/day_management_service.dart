@@ -6,7 +6,7 @@ import 'package:billberrylite/core/constants/hive_box_names.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/restaurant/db/cash_movement_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/session_model.dart';
-import 'package:billberrylite/data/models/restaurant/db/shift_model.dart';
+import 'package:billberrylite/data/models/common/shift_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:billberrylite/data/models/restaurant/db/ordermodel_309.dart';
 import 'package:billberrylite/data/models/restaurant/db/expensel_316.dart';

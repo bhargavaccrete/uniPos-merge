@@ -12,6 +12,8 @@ import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
 import 'package:billberrylite/domain/services/restaurant/eod_service.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:billberrylite/core/routes/routes_name.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 
@@ -214,6 +216,15 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
         setState(() => _isCompleted = true);
       }
 
+      // 4b. Close staff hours before the session ends.
+      //
+      // Mirrors restaurant's endday.dart: a stale session freezes shifts and
+      // attendance at the last real business activity FIRST, so completing EOD
+      // late can never stretch a shift to DateTime.now(). Anything still open
+      // after the freeze is closed explicitly. Wrapped so a staff-hours failure
+      // can never block the day from closing.
+      await _closeStaffHours();
+
       // 5. Close the session, carrying the counted cash forward.
       //
       // This was `resetDay()`, which calls `endSession()` with no argument —
@@ -309,6 +320,50 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
       accent: AppColors.primary,
       icon: Icons.nights_stay_rounded,
     );
+  }
+
+  /// Close every open shift and clock out every open attendance record.
+  ///
+  /// Non-fatal by design: EOD must complete even if staff-hours cleanup fails,
+  /// exactly as `endday.dart` treats it.
+  Future<void> _closeStaffHours() async {
+    try {
+      final stale = await DayManagementService.isEodStrictlyPending() ||
+          await DayManagementService.hasPendingEOD();
+      if (stale) {
+        await shiftStore.freezeStaleShiftsAndAttendance();
+      }
+      // Staff with no matching shift survive the freeze — when the session is
+      // stale they must still close at its last activity, never at now().
+      final DateTime? staleClockOut = stale
+          ? await DayManagementService.calculateSessionLastActivity()
+          : null;
+
+      await attendanceStore.loadTodayRecords();
+      final open = attendanceStore.todayRecords.where((r) => r.isOpen).toList();
+      for (final r in open) {
+        DateTime? outAt = staleClockOut;
+        if (outAt != null && outAt.isBefore(r.clockIn)) outAt = r.clockIn;
+        await attendanceStore.clockOut(r.id, clockOutTime: outAt);
+      }
+
+      await shiftStore.loadShifts();
+      for (final sh in shiftStore.shifts.where((s) => s.isOpen)) {
+        final now = DateTime.now();
+        final isStaleShift = stale ||
+            sh.startTime.day != now.day ||
+            sh.startTime.month != now.month ||
+            sh.startTime.year != now.year;
+        if (isStaleShift) {
+          await shiftStore.closeStaleShiftWithLatestActivity(sh.id);
+        } else {
+          await shiftStore.closeShift(sh.id);
+        }
+      }
+      await RestaurantSession.clearShiftSession();
+    } catch (e) {
+      debugPrint('EOD: staff hours cleanup failed (non-fatal): $e');
+    }
   }
 
   Future<void> _markDayCompleted() async {

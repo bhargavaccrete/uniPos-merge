@@ -3,7 +3,7 @@ import 'package:billberrylite/core/constants/hive_type_ids.dart';
 
 part 'attendance_model.g.dart';
 
-@HiveType(typeId: HiveTypeIds.restaurantAttendance)
+@HiveType(typeId: HiveTypeIds.attendance)
 class AttendanceModel extends HiveObject {
   @HiveField(0)
   final String id;

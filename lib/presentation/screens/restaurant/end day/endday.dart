@@ -17,7 +17,7 @@ import 'package:billberrylite/presentation/widget/componets/common/app_dialog.da
 import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/constants/hive_box_names.dart';
-import 'package:billberrylite/data/models/restaurant/db/attendance_model.dart';
+import 'package:billberrylite/data/models/common/attendance_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:billberrylite/data/models/restaurant/db/cartmodel_308.dart';
@@ -667,7 +667,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
 
     // --- AUTO CLOCK-OUT CHECK --- (only genuinely current staff remain here)
     try {
-      final attendanceBox = Hive.box<AttendanceModel>(HiveBoxNames.restaurantAttendance);
+      final attendanceBox = Hive.box<AttendanceModel>(HiveBoxNames.attendance);
       final openAttendance = attendanceBox.values.where((r) => r.isOpen).toList();
       
       if (openAttendance.isNotEmpty) {

@@ -14,7 +14,7 @@ import 'package:billberrylite/data/models/common/staffModel_310.dart';
 import 'package:billberrylite/data/models/restaurant/db/table_Model_311.dart';
 import 'package:billberrylite/data/models/common/taxmodel_314.dart';
 import 'package:billberrylite/data/models/common/customer_model_125.dart';
-import 'package:billberrylite/data/models/restaurant/db/shift_model.dart';
+import 'package:billberrylite/data/models/common/shift_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/cash_movement_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/cash_handover_model.dart';
 import 'package:billberrylite/data/models/common/categorymodel_300.dart';

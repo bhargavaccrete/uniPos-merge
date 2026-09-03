@@ -61,7 +61,7 @@ import 'package:billberrylite/data/repositories/restaurant/cart_repository.dart'
 import 'package:billberrylite/data/repositories/restaurant/table_repository.dart';
 import 'package:billberrylite/data/repositories/common/customer_repository.dart';
 import 'package:billberrylite/data/repositories/common/staff_repository.dart';
-import 'package:billberrylite/data/repositories/restaurant/shift_repository.dart';
+import 'package:billberrylite/data/repositories/common/shift_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/cash_movement_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/cash_handover_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/expense_repository.dart';
@@ -85,7 +85,7 @@ import 'package:billberrylite/domain/store/restaurant/past_order_store.dart';
 import 'package:billberrylite/domain/store/restaurant/cart_store.dart' as restaurant;
 import 'package:billberrylite/domain/store/restaurant/table_store.dart';
 import 'package:billberrylite/domain/store/common/staff_store.dart';
-import 'package:billberrylite/domain/store/restaurant/shift_store.dart';
+import 'package:billberrylite/domain/store/common/shift_store.dart';
 import 'package:billberrylite/domain/store/restaurant/cash_movement_store.dart';
 import 'package:billberrylite/domain/store/restaurant/cash_handover_store.dart';
 import 'package:billberrylite/util/restaurant/restaurant_session.dart';
@@ -95,13 +95,13 @@ import 'package:billberrylite/domain/store/common/tax_store.dart';
 import 'package:billberrylite/domain/store/restaurant/eod_store.dart';
 import 'package:billberrylite/domain/store/restaurant/appStore.dart';
 import 'package:billberrylite/domain/store/restaurant/printer_store.dart';
-import 'package:billberrylite/domain/store/restaurant/attendance_store.dart';
+import 'package:billberrylite/domain/store/common/attendance_store.dart';
 import 'package:billberrylite/domain/store/common/notification_store.dart';
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 import 'package:billberrylite/domain/services/common/license_api_service.dart';
 import 'package:billberrylite/domain/services/restaurant/thermal_printer_service.dart';
 
-import 'package:billberrylite/data/repositories/restaurant/attendance_repository.dart';
+import 'package:billberrylite/data/repositories/common/attendance_repository.dart';
 import 'package:billberrylite/data/repositories/common/notification_repository.dart';
 import '../../domain/services/retail/barcode_generator_service.dart';
 
@@ -289,11 +289,28 @@ Future<void> _registerRetailDependencies() async {
 
   // Staff CRUD — shared store+repository with restaurant. Same `StaffModel`
   // (restaurant's shape only — retail's onboarding no longer collects the
-  // extra permission/employment fields), retail's own box.
+  // extra permission/employment fields) in the one shared `staffBox`.
   _regBusiness<StaffRepository>(() => StaffRepository());
   _regBusiness<StaffStore>(
     () => StaffStore(locator<StaffRepository>()),
   );
+
+  // Attendance + Shifts — shared with restaurant, same boxes and typeIds. The
+  // only vertical-specific part is which rows count as a shift's revenue, and
+  // ShiftRepository.getAllTxns() contains that fork.
+  _regBusiness<AttendanceRepository>(() => AttendanceRepository());
+  _regBusiness<ShiftRepository>(() => ShiftRepository());
+  _regBusiness<AttendanceStore>(
+    () => AttendanceStore(locator<AttendanceRepository>()),
+  );
+  _regBusiness<ShiftStore>(
+    () => ShiftStore(locator<ShiftRepository>()),
+  );
+  // Auto-close the open shift / clock out on any logout path that calls
+  // RestaurantSession.clearSession() — retail's AuthService.logout() does.
+  RestaurantSession.onShiftAutoClose = (id) => shiftStore.closeShift(id);
+  RestaurantSession.onAttendanceAutoClockOut =
+      (name) => attendanceStore.autoClockOutIfOpen(name);
 
   _regBusiness<SupplierStore>(() => SupplierStore());
   _regBusiness<PurchaseOrderStore>(() => PurchaseOrderStore());
@@ -629,6 +646,9 @@ CartRepository get cartRepository => locator<CartRepository>();
 TableRepository get tableRepository => locator<TableRepository>();
 CustomerRepository get customerRepository => locator<CustomerRepository>();
 StaffRepository get staffRepository => locator<StaffRepository>();
+ShiftRepository get shiftRepository => locator<ShiftRepository>();
+AttendanceRepository get attendanceRepository =>
+    locator<AttendanceRepository>();
 ExpenseRepository get expenseRepository => locator<ExpenseRepository>();
 ExpenseCategoryRepository get expenseCategoryRepository => locator<ExpenseCategoryRepository>();
 TaxRepository get taxRepository => locator<TaxRepository>();

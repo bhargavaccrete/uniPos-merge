@@ -3,9 +3,9 @@ import 'package:uuid/uuid.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 import 'package:billberrylite/core/constants/hive_box_names.dart';
-import '../../../data/models/restaurant/db/shift_model.dart';
-import '../../../data/models/restaurant/db/attendance_model.dart';
-import '../../../data/repositories/restaurant/shift_repository.dart';
+import '../../../data/models/common/shift_model.dart';
+import '../../../data/models/common/attendance_model.dart';
+import '../../../data/repositories/common/shift_repository.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
 
@@ -113,17 +113,10 @@ abstract class _ShiftStore with Store {
       final enriched = <ShiftModel>[];
       for (final s in loaded) {
         if (s.isOpen) {
-          final orders = await _repository.getOrdersForShift(s);
-          final validOrders = orders.where((o) {
-            final status = (o.orderStatus ?? '').toUpperCase();
-            return status != 'VOID' &&
-                status != 'VOIDED' &&
-                status != 'FULLY_REFUNDED';
-          }).toList();
+          final txns = await _repository.getTxnsForShift(s);
           enriched.add(s.copyWith(
-            orderCount: validOrders.length,
-            totalSales: validOrders.fold<double>(
-                0.0, (sum, o) => sum + (o.totalPrice - (o.refundAmount ?? 0.0))),
+            orderCount: txns.length,
+            totalSales: txns.fold<double>(0.0, (sum, t) => sum + t.amount),
           ));
         } else {
           enriched.add(s);
@@ -187,16 +180,9 @@ abstract class _ShiftStore with Store {
         return null;
       }
 
-      final orders = await _repository.getOrdersForShift(shift);
-      final validOrders = orders.where((o) {
-        final status = (o.orderStatus ?? '').toUpperCase();
-        return status != 'VOID' &&
-            status != 'VOIDED' &&
-            status != 'FULLY_REFUNDED';
-      }).toList();
-      final orderCount = validOrders.length;
-      final totalSales = validOrders.fold<double>(
-          0.0, (sum, o) => sum + (o.totalPrice - (o.refundAmount ?? 0.0)));
+      final txns = await _repository.getTxnsForShift(shift);
+      final orderCount = txns.length;
+      final totalSales = txns.fold<double>(0.0, (sum, t) => sum + t.amount);
 
       final closed = shift.copyWith(
         endTime: DateTime.now(),
@@ -238,16 +224,9 @@ abstract class _ShiftStore with Store {
       // Calculate latest business activity timestamp using service layer
       final endTime = await DayManagementService.calculateLatestBusinessActivity(shift);
       
-      final orders = await _repository.getOrdersForShift(shift);
-      final validOrders = orders.where((o) {
-        final status = (o.orderStatus ?? '').toUpperCase();
-        return status != 'VOID' &&
-            status != 'VOIDED' &&
-            status != 'FULLY_REFUNDED';
-      }).toList();
-      final orderCount = validOrders.length;
-      final totalSales = validOrders.fold<double>(
-          0.0, (sum, o) => sum + (o.totalPrice - (o.refundAmount ?? 0.0)));
+      final txns = await _repository.getTxnsForShift(shift);
+      final orderCount = txns.length;
+      final totalSales = txns.fold<double>(0.0, (sum, t) => sum + t.amount);
 
       final closed = shift.copyWith(
         endTime: endTime,
@@ -267,7 +246,7 @@ abstract class _ShiftStore with Store {
       // EOD auto-clock-out later closes it at DateTime.now(), inflating the shift
       // to ~24h+. clockOut is idempotent (skips already-closed).
       try {
-        final box = Hive.box<AttendanceModel>(HiveBoxNames.restaurantAttendance);
+        final box = Hive.box<AttendanceModel>(HiveBoxNames.attendance);
         final open = box.values.firstWhere(
           (r) =>
               r.isOpen &&
@@ -305,7 +284,7 @@ abstract class _ShiftStore with Store {
       // Clock out ANY remaining open attendance (orphans: the shift was already
       // closed but attendance was left open — e.g. legacy records from the old
       // today-only lookup) at the session's last activity, NEVER DateTime.now().
-      final box = Hive.box<AttendanceModel>(HiveBoxNames.restaurantAttendance);
+      final box = Hive.box<AttendanceModel>(HiveBoxNames.attendance);
       final orphans = box.values.where((r) => r.isOpen).toList();
       if (orphans.isEmpty) return;
       final sessionEnd =

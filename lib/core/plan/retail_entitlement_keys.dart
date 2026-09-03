@@ -16,6 +16,8 @@ class RetailEntKeys {
   static const catalog = 'retail.catalog'; // product catalog (retail's "menu")
   static const customers = 'retail.customers';
   static const users = 'retail.users'; // staff
+  static const attendance = 'retail.attendance'; // clock-in/out
+  static const shifts = 'retail.shifts'; // staff shift lifecycle
   static const inventory = 'retail.inventory';
   static const inventoryStockTake = 'retail.inventory.stock_take';
   static const suppliers = 'retail.suppliers';
@@ -64,6 +66,13 @@ class RetailEntKeys {
   // Cash / day close
   static const reportsCashDrawerHistory = 'retail.reports.cash_drawer_history';
   static const reportsEodHistory = 'retail.reports.eod_history';
+
+  // Staff reports — mirror restaurant's `reports.attendance`,
+  // `reports.shift` and `reports.staff_performance`.
+  static const reportsAttendance = 'retail.reports.attendance';
+  static const reportsShift = 'retail.reports.shift';
+  static const reportsStaffPerformance =
+      'retail.reports.staff_performance';
   // NOTE: the Credit Reports tile deliberately has no key of its own — it reads
   // [billingCredit], the same key its route guard uses. One responsibility, one key.
 

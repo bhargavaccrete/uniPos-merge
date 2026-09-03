@@ -41,13 +41,13 @@ import 'package:billberrylite/data/models/restaurant/db/variantmodel_305.dart';
 
 import 'package:billberrylite/data/models/restaurant/db/cartmodel_308.dart';
 import 'package:billberrylite/data/models/restaurant/db/testbillmodel_318.dart';
-import 'package:billberrylite/data/models/restaurant/db/shift_model.dart';
+import 'package:billberrylite/data/models/common/shift_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/cash_movement_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/cash_handover_model.dart';
 import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/restaurant/db/saved_printer_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/session_model.dart';
-import 'package:billberrylite/data/models/restaurant/db/attendance_model.dart';
+import 'package:billberrylite/data/models/common/attendance_model.dart';
 
 // Shared models
 import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
@@ -163,6 +163,7 @@ class UnifiedBackupService {
     'restaurant_is_logged_in', 'restaurant_login_type', 'restaurant_staff_role',
     'restaurant_staff_name', 'restaurant_current_shift_id',
     'admin_session', 'admin_username', 'admin_session_timestamp',
+    'admin_staff_id',
     // Transient / regenerated
     'last_backup_date', 'auto_backup_enabled', 'first_time_pos',
     'first_time_pos_v2', 'last_eod_date', 'retail_last_eod_date',
@@ -808,7 +809,7 @@ class UnifiedBackupService {
 
       // ✅ Shifts
       try {
-        exportMap["shifts"] = Hive.box<ShiftModel>(HiveBoxNames.restaurantShift)
+        exportMap["shifts"] = Hive.box<ShiftModel>(HiveBoxNames.shift)
             .values
             .map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>)
             .toList();
@@ -901,7 +902,7 @@ class UnifiedBackupService {
 
       // Restaurant Attendance
       try {
-        exportMap["restaurantAttendance"] = Hive.box<AttendanceModel>(HiveBoxNames.restaurantAttendance)
+        exportMap["restaurantAttendance"] = Hive.box<AttendanceModel>(HiveBoxNames.attendance)
             .values
             .map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>)
             .toList();
@@ -1365,6 +1366,36 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Staff box error: $e");
         exportMap["staffBox"] = [];
+      }
+
+      // Shifts — shared box (restaurant + retail), same reasoning as Staff
+      // above: export is mode-gated, so dropping this branch would mean a
+      // retail backup silently carried zero shifts. Same key as restaurant's.
+      try {
+        exportMap["shifts"] = Hive.box<ShiftModel>(HiveBoxNames.shift)
+            .values
+            .map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>)
+            .toList();
+        debugPrint("📦 Shifts exported: ${exportMap["shifts"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Shifts box error: $e");
+        exportMap["shifts"] = [];
+      }
+
+      // Attendance — shared box, same reasoning. The key stays
+      // "restaurantAttendance" so a restore never has to guess which of two
+      // names a backup used based on its origin mode.
+      try {
+        exportMap["restaurantAttendance"] =
+            Hive.box<AttendanceModel>(HiveBoxNames.attendance)
+                .values
+                .map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>)
+                .toList();
+        debugPrint(
+            "📦 Attendance exported: ${exportMap["restaurantAttendance"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Attendance box error: $e");
+        exportMap["restaurantAttendance"] = [];
       }
 
       // Tax — shared box (restaurant + retail), same reasoning as Staff above.
@@ -2227,7 +2258,7 @@ class UnifiedBackupService {
     try {
       await restoreBoxWithId(
         "shifts",
-        Hive.box<ShiftModel>(HiveBoxNames.restaurantShift),
+        Hive.box<ShiftModel>(HiveBoxNames.shift),
         (m) => ShiftModel.fromMap(m),
         (s) => s.id,
       );
@@ -2301,7 +2332,7 @@ class UnifiedBackupService {
     try {
       await restoreBoxWithId(
         "restaurantAttendance",
-        Hive.box<AttendanceModel>(HiveBoxNames.restaurantAttendance),
+        Hive.box<AttendanceModel>(HiveBoxNames.attendance),
         (m) => AttendanceModel.fromMap(m),
         (a) => a.id,
       );
@@ -2843,6 +2874,22 @@ class UnifiedBackupService {
       await restoreBoxTypedWithId("staffBox", Hive.box<StaffModel>(HiveBoxNames.staff), (m) => StaffModel.fromMap(m), (s) => s.id);
     } catch (e) {
       debugPrint("⚠️ Error restoring staff: $e");
+    }
+
+    // Shifts + Attendance — shared boxes (restaurant + retail). Restaurant's
+    // restore of the same keys lives in `_restoreRestaurantData`; this function
+    // needs its own copy for the same reason Staff does. ID-keyed, never the
+    // auto-increment `restoreBoxTyped` — that duplicates rows on re-import.
+    try {
+      await restoreBoxTypedWithId("shifts", Hive.box<ShiftModel>(HiveBoxNames.shift), (m) => ShiftModel.fromMap(m), (s) => s.id);
+    } catch (e) {
+      debugPrint("⚠️ Error restoring shifts: $e");
+    }
+
+    try {
+      await restoreBoxTypedWithId("restaurantAttendance", Hive.box<AttendanceModel>(HiveBoxNames.attendance), (m) => AttendanceModel.fromMap(m), (a) => a.id);
+    } catch (e) {
+      debugPrint("⚠️ Error restoring attendance: $e");
     }
 
     // Tax — shared box (restaurant + retail). Restaurant's restore of this

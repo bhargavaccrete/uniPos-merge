@@ -7,6 +7,7 @@ import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 import 'package:billberrylite/core/plan/entitlements.dart';
 import 'package:billberrylite/presentation/screens/restaurant/auth/license_lock_screen.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/access_denied_screen.dart';
 import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:billberrylite/util/color.dart';
 
@@ -97,51 +98,13 @@ class _RestaurantGuardState extends State<RestaurantGuard> {
           if (!hasAny) return const _UpgradeRequiredScreen();
         }
 
-        if (_state == 'denied') return const _AccessDeniedScreen();
+        if (_state == 'denied') return const AccessDeniedScreen();
         if (_state != true) {
           return const Scaffold(
               body: Center(child: CircularProgressIndicator()));
         }
         return widget.child;
       },
-    );
-  }
-}
-
-class _AccessDeniedScreen extends StatelessWidget {
-  const _AccessDeniedScreen();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: buildPrimaryAppBar(
-        leading: BackButton(onPressed: () => Navigator.pop(context)),
-      ),
-      backgroundColor: Colors.grey.shade50,
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.lock_outline, size: 64, color: Colors.red.shade300),
-            const SizedBox(height: 16),
-            Text('Access Denied',
-                style: GoogleFonts.poppins(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87)),
-            const SizedBox(height: 8),
-            Text("You don't have permission to view this page.",
-                style: GoogleFonts.poppins(
-                    fontSize: 14, color: Colors.grey.shade600)),
-            const SizedBox(height: 24),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Go Back',
-                  style: GoogleFonts.poppins(color: Colors.blue)),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
-import 'package:billberrylite/data/models/restaurant/db/shift_model.dart';
+import 'package:billberrylite/data/models/common/shift_model.dart';
+import 'package:billberrylite/data/models/common/shift_txn.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
@@ -89,16 +90,20 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
     }
     setState(() => _isLoading = true);
     await shiftStore.loadShifts();
-    await pastOrderStore.loadPastOrders();
+    // Mode-agnostic: the repository flattens restaurant orders or retail sales
+    // into ShiftTxn and has already dropped anything that isn't revenue.
+    _allTxns = await shiftRepository.getAllTxns();
     await staffStore.loadStaff();
     await expenseStore.loadExpenses();
     _isDataLoaded = true;
     _compute();
   }
 
+  List<ShiftTxn> _allTxns = const [];
+
   void _compute() {
     final allShifts = shiftStore.shifts;
-    final allOrders = pastOrderStore.pastOrders;
+    final allTxns = _allTxns;
 
     // 1. Filter shifts by date period
     final now = DateTime.now();
@@ -153,8 +158,8 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
     //      • shiftId == null → the staff whose shift time-window contains orderAt
     //        (legacy / missed assignment fallback)
     //      • shiftId set but not in this period → skip (belongs elsewhere)
-    final Map<String, List<dynamic>> ordersByStaff = {};
-    for (final o in allOrders) {
+    final Map<String, List<ShiftTxn>> ordersByStaff = {};
+    for (final o in allTxns) {
       final sid = o.shiftId;
 
       if (sid != null) {
@@ -165,9 +170,9 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
         continue; // non-null shiftId not in this period → skip
       }
 
-      // Null shiftId — attribute by time window (same rule as getOrdersForShift).
-      final at = o.orderAt;
-      if (at == null) continue;
+      // Null shiftId — attribute by time window (same rule as
+      // ShiftRepository.txnBelongsToShift).
+      final at = o.at;
       outer:
       for (final entry in byStaff.entries) {
         for (final s in entry.value) {
@@ -218,13 +223,16 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
       final Map<String, int> orderTypes = {};
 
       for (final o in orders) {
-        // FIX 4: Skip fully cancelled orders — they inflate discounts/refunds/type counts.
-        final status = (o.orderStatus as String?) ?? '';
-        if (status == 'VOIDED' || status == 'VOID' || status == 'FULLY_REFUNDED') continue;
-        totalDiscounts += (o.Discount as double?) ?? 0.0;
-        totalRefunds += (o.refundAmount as double?) ?? 0.0;
-        final type = (o.orderType as String?) ?? 'Unknown';
-        orderTypes[type] = (orderTypes[type] ?? 0) + 1;
+        // Non-revenue rows (VOID / VOIDED / FULLY_REFUNDED on restaurant) were
+        // already dropped by the repository, so nothing to skip here.
+        totalDiscounts += o.discount;
+        totalRefunds += o.refund;
+        // Null in retail, which has no dine-in/takeaway split — the breakdown
+        // section hides itself when the map ends up empty.
+        final type = o.typeLabel;
+        if (type != null) {
+          orderTypes[type] = (orderTypes[type] ?? 0) + 1;
+        }
       }
 
       // Resolve role from staffStore; Admin is a special case (no StaffModel entry)

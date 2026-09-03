@@ -1,4 +1,6 @@
+import 'package:billberrylite/domain/services/retail/line_discount_service.dart';
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:billberrylite/util/common/short_ref.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
@@ -344,6 +346,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         loyaltyPointsUsed: _pointsRedeemed,
         roundOff: bill.roundOff,
         isTaxInclusive: bill.isTaxInclusive,
+        // Stamp the open shift so the Shift Report and Staff Performance can
+        // attribute this sale directly instead of inferring from its timestamp.
+        shiftId: RestaurantSession.currentShiftId,
       );
 
       // Update customer credit balance
@@ -547,6 +552,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         // In partial mode record what was actually collected; the factory
         // derives dueAmount and flips the status to partially_paid.
         amountCollected: _allowPartialPayment ? _totalPaid : null,
+        // Stamp the open shift so the Shift Report and Staff Performance can
+        // attribute this sale directly instead of inferring from its timestamp.
+        shiftId: RestaurantSession.currentShiftId,
       );
 
       // Update customer purchase data if customer is selected
@@ -854,6 +862,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       ),
       child: Column(
         children: [
+          // Bill-level discount — Manager only, same gate as a line discount.
+          // Hidden rather than disabled, per the retail house pattern. The
+          // checkout route itself stays open to every role: it is mid-sale, and
+          // the billing entrance is the gate.
+          if (LineDiscountService.canDiscount) ...[
           // Discount type — flat amount or percentage of the item total
           Row(
             children: [
@@ -972,6 +985,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 onChanged: (_) => setState(() {}),
               ),
             ],
+          ],
           ],
         ],
       ),

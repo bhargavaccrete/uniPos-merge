@@ -18,6 +18,15 @@ import 'package:billberrylite/presentation/screens/retail/customer_list_screen.d
 import 'package:billberrylite/presentation/screens/retail/reports_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/stock_alerts_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/supplier_list_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/login_screen.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/screens/common/staff/manage_staff_screen.dart';
+import 'package:billberrylite/presentation/screens/common/attendance/staff_attendance_screen.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
+import 'package:billberrylite/core/plan/mode_keys.dart';
+import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
+import 'package:billberrylite/domain/services/common/notification_service.dart';
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:billberrylite/presentation/screens/retail/purchase_order_list_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/damaged_goods_hub_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/sales_history_screen.dart';
@@ -46,6 +55,49 @@ class _HomeScreenState extends State<HomeScreen> {
     // constructor — sale/product/stockAlert all call _init(). Without this the
     // stat sat at 0 until the user opened Customers and came back.
     customerStore.loadCustomers();
+    _startShiftIfNeeded();
+  }
+
+  /// Open (or restore) this staff member's shift on dashboard load.
+  ///
+  /// Ported verbatim from restaurant's `welcome_Admin._startShiftIfNeeded` —
+  /// same order of checks, same hot-restart restore, same session persistence.
+  /// The one difference is `ModeKeys.shifts`, which resolves to
+  /// `retail.shifts` here and `shifts` there.
+  Future<void> _startShiftIfNeeded() async {
+    // A stale session must freeze staff hours at the last real business
+    // activity BEFORE anything else, or completing EOD later would extend
+    // them — this is what stops a shift reading as 67 hours.
+    if (await DayManagementService.isEodStrictlyPending()) {
+      await shiftStore.freezeStaleShiftsAndAttendance();
+      return;
+    }
+
+    // Shifts are a licensed module — skip auto-start when the plan omits it.
+    if (!PlanEnforce.allows(ModeKeys.shifts)) return;
+
+    final staffId = RestaurantSession.isAdmin
+        ? 'admin'
+        : (RestaurantSession.staffName ?? 'staff');
+    final staffName = RestaurantSession.staffName ??
+        (RestaurantSession.isAdmin ? 'Admin' : 'Staff');
+
+    // Restore from Hive in case of hot-restart, so we never open a second
+    // shift on top of one that is already running.
+    await shiftStore.loadActiveShiftForStaff(staffId);
+    if (shiftStore.hasOpenShift) {
+      await RestaurantSession.saveShiftSession(shiftStore.activeShift!.id);
+      return;
+    }
+
+    final ok = await shiftStore.startShift(
+      staffId: staffId,
+      staffName: staffName,
+    );
+    if (ok && shiftStore.activeShift != null && mounted) {
+      await RestaurantSession.saveShiftSession(shiftStore.activeShift!.id);
+      NotificationService.instance.showSuccess('Shift started');
+    }
   }
 
   Future<void> _loadStoreName() async {
@@ -516,10 +568,49 @@ class _HomeScreenState extends State<HomeScreen> {
     };
   }
 
+  /// Ask, then end the session and return to the login screen.
+  ///
+  /// `authService.logout()` clears RestaurantSession too, which auto-closes an
+  /// open shift and clocks the staff member out — see the callbacks wired in
+  /// `service_locator`'s retail branch.
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirmed = await showAppConfirmDialog(
+      context: context,
+      title: 'Logout',
+      message: 'Are you sure you want to logout?',
+      confirmLabel: 'Logout',
+      accent: AppColors.danger,
+      icon: Icons.logout_rounded,
+    );
+    if (!confirmed || !context.mounted) return;
+    await authService.logout();
+    if (!context.mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
   /// Built fresh on every build so the reactive Stock Alerts tile keeps
   /// tracking its observables — never hoist or memoise this list.
+  ///
+  /// **Role HIDES a card; plan entitlement does not.** A card the plan doesn't
+  /// cover stays visible and shows the upgrade sheet on tap (`_gated`), because
+  /// that is a "you could buy this" message. A card the role doesn't cover is
+  /// removed outright — no upgrade would grant it. Same split restaurant's
+  /// `welcome_Admin._getVisibleCards` uses, and the contract `PlanGuard`
+  /// documents.
+  ///
+  /// This filter is not belt-and-braces: the dashboard pushes with
+  /// `MaterialPageRoute`, so `RetailGuard` never runs for a card tap. For Cash
+  /// Drawer, Settings and Products this is the ONLY gate on that path.
+  ///
+  /// Attendance and Settings carry no permission by design — any role may clock
+  /// in/out, and the Settings hub holds Start Day, End of Day and Logout, which
+  /// a cashier must reach.
   List<Widget> _buildAllMenuCards(BuildContext context) {
     return [
+      if (RestaurantSession.canAccess('billing'))
       DashboardMenuCard(
         icon: Icons.point_of_sale_rounded,
         title: 'Billing',
@@ -536,6 +627,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       // One card for the whole catalog — products, their categories and the
       // attributes that build variants all live behind the Products hub.
+      if (RestaurantSession.canAccess('catalog'))
       DashboardMenuCard(
         icon: Icons.inventory_2_rounded,
         title: 'Products',
@@ -552,6 +644,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+      if (RestaurantSession.canAccess('customers'))
       DashboardMenuCard(
         icon: Icons.people_rounded,
         title: 'Customers',
@@ -566,6 +659,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+      if (RestaurantSession.canAccess('suppliers'))
       DashboardMenuCard(
         icon: Icons.storefront_rounded,
         title: 'Suppliers',
@@ -580,6 +674,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+      if (RestaurantSession.canAccess('purchase'))
       DashboardMenuCard(
         icon: Icons.assignment_rounded,
         title: 'Purchase Orders',
@@ -597,6 +692,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       // Returns, claims and write-offs raised from damaged goods on a GRN.
+      if (RestaurantSession.canAccess('purchase'))
       DashboardMenuCard(
         icon: Icons.assignment_return_rounded,
         title: 'Returns & Claims',
@@ -613,6 +709,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+      if (RestaurantSession.canAccess('billing'))
       DashboardMenuCard(
         icon: Icons.receipt_long_rounded,
         title: 'Sales',
@@ -627,6 +724,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+      if (RestaurantSession.canAccess('cashDrawer'))
       DashboardMenuCard(
         icon: Icons.account_balance_wallet_rounded,
         title: 'Cash Drawer',
@@ -641,6 +739,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+      if (RestaurantSession.canAccess('reports'))
       DashboardMenuCard(
         icon: Icons.bar_chart_rounded,
         title: 'Reports',
@@ -655,8 +754,41 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-      _buildStockAlertCard(context),
-      _buildExpiryAlertCard(context),
+      if (RestaurantSession.canAccess('inventory'))
+        _buildStockAlertCard(context),
+      if (RestaurantSession.canAccess('inventory'))
+        _buildExpiryAlertCard(context),
+      if (RestaurantSession.canAccess('manageStaff'))
+      DashboardMenuCard(
+        icon: Icons.people_rounded,
+        title: 'Manage Staff',
+        color: Colors.teal,
+        onTap: _gated(
+          context,
+          RetailEntKeys.users,
+          'Manage Staff',
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const ManageStaffScreen()),
+          ),
+        ),
+      ),
+      DashboardMenuCard(
+        icon: Icons.access_time_rounded,
+        title: 'Attendance',
+        color: Colors.deepPurple,
+        onTap: _gated(
+          context,
+          RetailEntKeys.attendance,
+          'Attendance',
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const StaffAttendanceScreen(),
+            ),
+          ),
+        ),
+      ),
       DashboardMenuCard(
         icon: Icons.settings_rounded,
         title: 'Settings',
@@ -670,6 +802,16 @@ class _HomeScreenState extends State<HomeScreen> {
             MaterialPageRoute(builder: (context) => const SettingsScreen()),
           ),
         ),
+      ),
+      // Deliberately carries NO permission: every role must be able to end
+      // their own session in one tap. It used to live inside Settings, whose
+      // sensitive tiles are Manager-only — burying the only sign-out behind a
+      // gated hub is how a cashier ends up stuck signed in.
+      DashboardMenuCard(
+        icon: Icons.logout_rounded,
+        title: 'Logout',
+        color: Colors.red,
+        onTap: () => _confirmLogout(context),
       ),
 
       // DashboardMenuCard(

@@ -203,8 +203,11 @@ class HiveBoxNames {
   /// Restaurant test bill box
   static const String testBillBox = 'testBillBox';
 
-  /// Restaurant shift management box
-  static const String restaurantShift = 'shiftBox';
+  /// Shift management box — shared between Restaurant and Retail (a device
+  /// only ever runs one mode, so one physical box is enough; see
+  /// ShiftRepository). String kept as 'shiftBox' — renaming the Dart
+  /// identifier does not touch stored data.
+  static const String shift = 'shiftBox';
 
   /// Cash movement events (Cash In / Cash Out during the day)
   static const String restaurantCashMovements = 'cashMovementsBox';
@@ -221,8 +224,10 @@ class HiveBoxNames {
   /// Restaurant POS Sessions
   static const String restaurantSessions = 'restaurantSessionsBox';
 
-  /// Staff attendance clock-in/out records
-  static const String restaurantAttendance = 'restaurantAttendanceBox';
+  /// Staff attendance clock-in/out records — shared between Restaurant and
+  /// Retail. String kept as 'restaurantAttendanceBox' so existing installs
+  /// and backups keep reading the same box.
+  static const String attendance = 'restaurantAttendanceBox';
 
   /// Item-level cancellation audit (items cancelled from a placed order, with reason)
   static const String restaurantItemCancellations = 'restaurantItemCancellationsBox';
@@ -340,6 +345,8 @@ class HiveBoxNames {
     retailExpenseCategory,
     retailExpense,
     tax,
+    shift,
+    attendance,
   ];
 
   /// All restaurant box names (for bulk operations like clearing/backup)
@@ -361,13 +368,13 @@ class HiveBoxNames {
     appCounters,
     testBillBox,
     customer,
-    restaurantShift,
+    shift,
     restaurantCashMovements,
     restaurantStockMovements,
     restaurantCashHandovers,
     restaurantPrinters,
     restaurantSessions,
-    restaurantAttendance,
+    attendance,
     restaurantItemCancellations,
     restaurantRecipes,
     restaurantRecipeProductions,
