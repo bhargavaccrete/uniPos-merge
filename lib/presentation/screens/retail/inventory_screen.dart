@@ -807,16 +807,10 @@ class _InventoryScreenState extends State<InventoryScreen>
         message: 'Try a different search term.',
       );
     }
-    return AppEmptyState(
+    return const AppEmptyState(
       icon: Icons.inventory_2_outlined,
       title: 'No products yet',
       message: 'Add your first product to start billing.',
-      action: CatalogPermission.canEdit
-          ? appEmptyStateAction(
-              label: 'Add Product',
-              onPressed: () => openAddProductScreen(context),
-            )
-          : null,
     );
   }
 

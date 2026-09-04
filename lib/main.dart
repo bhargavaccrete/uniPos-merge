@@ -68,10 +68,8 @@ void main() async {
     // Firing from addPostFrameCallback alone is unreliable on cold start: the
     // first frame paints during the launch-screen transition, before the
     // Android 13+ activity resumes, so the POST_NOTIFICATIONS dialog is
-    // silently dropped (it only appeared on the *second* launch).
-    if (AppConfig.isBusinessModeSet) {
-      _NotificationPermissionRequester.scheduleOnResume();
-    }
+    // scheduled on resume.
+    _NotificationPermissionRequester.scheduleOnResume();
   }, (error, stackTrace) {
     print('🔴🔴🔴 ZONE ERROR CAUGHT 🔴🔴🔴');
     print('Error: $error');

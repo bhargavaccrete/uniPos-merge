@@ -13,6 +13,8 @@ import 'package:billberrylite/presentation/widget/componets/common/primary_app_b
 import 'package:billberrylite/presentation/widget/componets/common/row_action_button.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../core/config/tariff_code_rule.dart';
@@ -52,6 +54,34 @@ final _qtyFormatters = <TextInputFormatter>[
 final _decimalQtyFormatters = <TextInputFormatter>[
   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
 ];
+
+/// Prompts a soft warning confirmation when selling price < cost price.
+/// Returns true if confirmed or if selling price >= cost price.
+Future<bool> confirmLossIfSellingBelowCost({
+  required BuildContext context,
+  required double sellingPrice,
+  required double? costPrice,
+}) async {
+  if (costPrice == null || costPrice <= 0 || sellingPrice >= costPrice) {
+    return true; // No loss, proceed directly
+  }
+
+  final loss = costPrice - sellingPrice;
+  final lossPct = ((loss / costPrice) * 100).toStringAsFixed(1);
+  final sym = CurrencyHelper.currentSymbol;
+
+  return await showAppConfirmDialog(
+    context: context,
+    title: 'Selling Below Cost Price?',
+    message: 'Selling Price ($sym${DecimalSettings.formatAmount(sellingPrice)}) '
+        'is lower than Cost Price ($sym${DecimalSettings.formatAmount(costPrice)}).\n\n'
+        'You will incur a loss of $sym${DecimalSettings.formatAmount(loss)} (-$lossPct% margin) per unit.',
+    confirmLabel: 'Continue & Save',
+    cancelLabel: 'Fix Price',
+    accent: AppColors.warning,
+    icon: Icons.warning_amber_rounded,
+  );
+}
 
 /// Everything about one product in one place: its details at the top, then every
 /// variant with the stock it carries and what it sells for.
@@ -1032,6 +1062,19 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
       return;
     }
 
+    final sellingPrice = double.tryParse(_sellingPriceController.text.trim()) ?? 0.0;
+    final costPrice = _costPriceController.text.trim().isEmpty
+        ? null
+        : double.tryParse(_costPriceController.text.trim());
+
+    if (!await confirmLossIfSellingBelowCost(
+      context: context,
+      sellingPrice: sellingPrice,
+      costPrice: costPrice,
+    )) {
+      return;
+    }
+
     setState(() => _saving = true);
 
     // Auto-generate only when left blank — never overwrite what was typed.
@@ -1258,12 +1301,18 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
     final v = widget.variant;
     _active = productStore.isSellable(v);
     _sellingPriceController = TextEditingController(
-      text: v.sellingPrice?.toString() ?? '',
+      text: v.sellingPrice == null
+          ? ''
+          : DecimalSettings.formatAmount(v.sellingPrice!),
     );
     _costPriceController = TextEditingController(
-      text: v.costPrice?.toString() ?? '',
+      text: v.costPrice == null
+          ? ''
+          : DecimalSettings.formatAmount(v.costPrice!),
     );
-    _mrpController = TextEditingController(text: v.mrp?.toString() ?? '');
+    _mrpController = TextEditingController(
+      text: v.mrp == null ? '' : DecimalSettings.formatAmount(v.mrp!),
+    );
     _minStockController = TextEditingController(
       text: v.minStock?.toString() ?? '',
     );
@@ -1371,6 +1420,19 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
       NotificationService.instance.showError(
         'Barcode "$newBarcode" is already used by another variant',
       );
+      return;
+    }
+
+    final sellingPrice = double.tryParse(_sellingPriceController.text.trim()) ?? 0.0;
+    final costPrice = _costPriceController.text.trim().isEmpty
+        ? null
+        : double.tryParse(_costPriceController.text.trim());
+
+    if (!await confirmLossIfSellingBelowCost(
+      context: context,
+      sellingPrice: sellingPrice,
+      costPrice: costPrice,
+    )) {
       return;
     }
 

@@ -17,6 +17,8 @@ import '../../../core/plan/plan_enforcement.dart';
 import '../../../core/plan/retail_entitlement_keys.dart';
 import '../../../domain/services/retail/return_math.dart';
 import '../../../domain/services/retail/return_service.dart';
+import '../../../domain/services/retail/sale_return_reason.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/util/restaurant/staticswitch.dart';
 
 class SaleReturnScreen extends StatefulWidget {
@@ -47,10 +49,21 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
   String _refundMethod = 'cash';
   String _returnType = 'full'; // full or partial
 
+  /// Why the goods are coming back. Required — the Sales Refund report is only
+  /// worth pulling if every row can answer it, so there is no sensible default.
+  SaleReturnReason? _returnReason;
+  final TextEditingController _returnNoteController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
     _loadSaleData();
+  }
+
+  @override
+  void dispose() {
+    _returnNoteController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSaleData() async {
@@ -170,6 +183,19 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
       return;
     }
 
+    if (_returnReason == null) {
+      NotificationService.instance.showError('Select a return reason.');
+      return;
+    }
+
+    if (_returnReason!.requiresNote &&
+        _returnNoteController.text.trim().isEmpty) {
+      NotificationService.instance.showError(
+        'A note is required for that reason.',
+      );
+      return;
+    }
+
     if (!AppSettings.refundsEnabled) {
       NotificationService.instance.showError('Refunds are disabled in Settings');
       return;
@@ -219,6 +245,8 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
         returnSaleId = await _returnService.processFullReturn(
           originalSaleId: widget.saleId,
           refundMethod: _refundMethod,
+          returnReason: _returnReason!.code,
+          returnNote: _returnNote,
         );
       } else {
         if (_selectedItems.isEmpty) {
@@ -229,6 +257,8 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
           originalSaleId: widget.saleId,
           itemsToReturn: _selectedItems,
           refundMethod: _refundMethod,
+          returnReason: _returnReason!.code,
+          returnNote: _returnNote,
         );
       }
 
@@ -265,6 +295,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                     _buildOriginalSaleCard(),
                     _buildReturnTypeSelector(),
                     _buildRefundMethodSelector(),
+                    _buildReturnReasonSelector(),
                     if (_returnType == 'partial') _buildItemsList(),
                     _buildSummaryCard(),
                     SizedBox(height: AppResponsive.largeSpacing(context)),
@@ -565,6 +596,63 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  /// Trimmed note, or null when blank — an empty string in Hive reads as
+  /// "a note was given" everywhere downstream.
+  String? get _returnNote {
+    final text = _returnNoteController.text.trim();
+    return text.isEmpty ? null : text;
+  }
+
+  Widget _buildReturnReasonSelector() {
+    return Container(
+      margin: AppResponsive.padding(context),
+      padding: AppResponsive.padding(context),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Return Reason',
+            style: TextStyle(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final reason in SaleReturnReason.all)
+                ChoiceChip(
+                  label: Text(reason.label),
+                  labelStyle: TextStyle(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                  ),
+                  selected: _returnReason?.code == reason.code,
+                  onSelected: (_) => setState(() => _returnReason = reason),
+                ),
+            ],
+          ),
+          if (_returnReason?.requiresNote ?? false) ...[
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
+            AppTextField(
+              controller: _returnNoteController,
+              label: 'Note',
+              hint: 'Why is this coming back?',
+            ),
+          ],
         ],
       ),
     );

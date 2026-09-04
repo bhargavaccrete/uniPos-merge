@@ -176,6 +176,7 @@ class ReturnService {
     required String originalSaleId,
     required String refundMethod,
     String? returnReason,
+    String? returnNote,
   }) async {
     final remaining = await remainingReturnable(originalSaleId);
     final toReturn = <String, double>{
@@ -191,6 +192,7 @@ class ReturnService {
       itemsToReturn: toReturn,
       refundMethod: refundMethod,
       returnReason: returnReason,
+      returnNote: returnNote,
     );
     return outcome.returnSaleId;
   }
@@ -201,6 +203,7 @@ class ReturnService {
     required Map<String, double> itemsToReturn,
     required String refundMethod,
     String? returnReason,
+    String? returnNote,
     /// Cash that actually left the till, when the caller knows better than the
     /// return value does.
     ///
@@ -215,6 +218,7 @@ class ReturnService {
       itemsToReturn: itemsToReturn,
       refundMethod: refundMethod,
       returnReason: returnReason,
+      returnNote: returnNote,
       cashRefundOverride: cashRefundOverride,
     );
     return outcome.returnSaleId;
@@ -231,6 +235,7 @@ class ReturnService {
     required Map<String, double> itemsToReturn,
     required String refundMethod,
     String? returnReason,
+    String? returnNote,
     double? cashRefundOverride,
   }) async {
     // ---- validate: nothing is written until every check passes -------------
@@ -297,6 +302,8 @@ class ReturnService {
         original: originalSale,
         figures: figures,
         refundMethod: refundMethod,
+        returnReason: returnReason,
+        returnNote: returnNote,
       ),
       _buildReturnLines(returnSaleId: returnSaleId, figures: figures),
     );
@@ -352,6 +359,8 @@ class ReturnService {
     required SaleModel original,
     required ReturnFigures figures,
     required String refundMethod,
+    required String? returnReason,
+    required String? returnNote,
   }) {
     final now = DateTime.now().toIso8601String();
     final gst = figures.taxAmount;
@@ -387,6 +396,10 @@ class ReturnService {
       // The refund belongs to the shift that processed it, not the one that
       // made the original sale.
       shiftId: RestaurantSession.currentShiftId,
+      // Why the goods came back. Stored on the return document, never on the
+      // sale being reversed — the original's identity is immutable.
+      returnReason: returnReason,
+      returnNote: returnNote,
     );
   }
 

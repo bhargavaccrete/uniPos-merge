@@ -4,11 +4,22 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
-import '../../../core/config/tariff_code_rule.dart';
 import '../../../core/constants/label_layouts.dart';
 import '../../../util/common/currency_helper.dart';
 import '../../../util/common/decimal_settings.dart';
 import 'label_layout_plan.dart';
+
+/// Cut-guide ink.
+///
+/// Dark grey, and **solid**. The first attempt was a light dashed hairline,
+/// which is the conventional "crop mark" look and was effectively invisible:
+/// at preview resolution a 0.4 pt grey500 dash is about one anti-aliased pixel
+/// and disappears into the paper. A guide you cannot see is worse than none.
+const PdfColor kCutGuideColor = PdfColors.grey700;
+
+/// Thin enough to cut down the middle of without leaving grey on either piece,
+/// thick enough to survive rasterisation at any preview or printer DPI.
+const double kCutGuideWidth = 0.5;
 
 /// One label's worth of resolved text.
 ///
@@ -36,7 +47,6 @@ class LabelSpec {
 
   final String? brand;
   final String? sku;
-  final String? hsnCode;
 
   const LabelSpec({
     required this.productName,
@@ -46,7 +56,6 @@ class LabelSpec {
     this.sellingPrice,
     this.brand,
     this.sku,
-    this.hsnCode,
   });
 
   bool get hasBarcode => barcode.trim().isNotEmpty;
@@ -108,7 +117,15 @@ class LabelPdfService {
   /// Every label is positioned absolutely from the layout's margins and pitch
   /// rather than by flow layout, because a die-cut sheet is unforgiving: a
   /// fraction of a millimetre of drift compounds across 13 rows.
-  Future<pw.Document> build(List<LabelSpec> labels) async {
+  ///
+  /// [cutGuides] draws the cut grid described in [_cutGuides]. On by default
+  /// because most shops print onto plain A4 and cut; it is turned OFF for a
+  /// real die-cut sticker sheet, where the lines would print across the
+  /// stickers themselves.
+  Future<pw.Document> build(
+    List<LabelSpec> labels, {
+    bool cutGuides = true,
+  }) async {
     final doc = pw.Document();
     if (labels.isEmpty) return doc;
 
@@ -133,6 +150,8 @@ class LabelPdfService {
             final measure = _measurer(context, baseFont, boldFont);
             return pw.Stack(
               children: [
+                // First, so the labels always draw over the guides.
+                if (cutGuides) _cutGuides(pageLabels.length),
                 for (var i = 0; i < pageLabels.length; i++)
                   _positioned(pageLabels[i], i, measure),
               ],
@@ -198,6 +217,66 @@ class LabelPdfService {
     };
   }
 
+  /// The grid the shop cuts along: a solid vertical line between every column
+  /// and a solid horizontal line between every row, drawn under the labels.
+  ///
+  /// One layer per page rather than a border per label, for two reasons:
+  /// * **One cut per boundary.** The lines sit in the middle of the 2.5 mm
+  ///   gutter, so a trimmer separates two columns in a single pass. Per-label
+  ///   borders would put two lines 2.5 mm apart and leave a sliver between them.
+  /// * **It ends where the labels end.** Only the rows actually used are ruled,
+  ///   so a sheet of three labels is three boxes, not a grid of 65.
+  ///
+  /// No line can ever cross a barcode: every one of them lands on a gutter
+  /// midpoint or a shared row edge, both of which are outside the label's own
+  /// padding.
+  ///
+  /// Drawn straight onto the canvas rather than as widgets: one path of ~19
+  /// segments replaces the several hundred boxes a widget grid would need.
+  pw.Widget _cutGuides(int labelsOnPage) {
+    final rowsUsed = layout.rowsUsedFor(labelsOnPage);
+    if (rowsUsed <= 0) return pw.SizedBox();
+
+    final xs = layout.cutXsMm();
+    final ys = layout.cutYsMm(rowsUsed);
+    final pageWidth = kA4WidthMm * PdfPageFormat.mm;
+    final pageHeight = kA4HeightMm * PdfPageFormat.mm;
+
+    return pw.Positioned(
+      left: 0,
+      top: 0,
+      child: pw.SizedBox(
+        width: pageWidth,
+        height: pageHeight,
+        child: pw.CustomPaint(
+          size: PdfPoint(pageWidth, pageHeight),
+          painter: (canvas, size) {
+            // The canvas origin is the box's BOTTOM-left; the layout measures
+            // from the top, as the rest of this file does.
+            double x(double mm) => mm * PdfPageFormat.mm;
+            double y(double mm) => size.y - mm * PdfPageFormat.mm;
+
+            canvas
+              ..setStrokeColor(kCutGuideColor)
+              ..setLineWidth(kCutGuideWidth);
+
+            for (final vx in xs) {
+              canvas
+                ..moveTo(x(vx), y(ys.first))
+                ..lineTo(x(vx), y(ys.last));
+            }
+            for (final hy in ys) {
+              canvas
+                ..moveTo(x(xs.first), y(hy))
+                ..lineTo(x(xs.last), y(hy));
+            }
+            canvas.strokePath();
+          },
+        ),
+      ),
+    );
+  }
+
   /// One label placed at grid slot [index], filling left-to-right then down.
   pw.Widget _positioned(LabelSpec spec, int index, LabelTextMeasurer measure) {
     final col = index % layout.columns;
@@ -218,7 +297,7 @@ class LabelPdfService {
   /// A single 38 x 21 mm label, drawn from its plan.
   ///
   /// Reading order top to bottom: product, brand, variant, price, protected
-  /// whitespace, bars, the human-readable value, HSN. Every one of those is a
+  /// whitespace, bars, the human-readable value, SKU. Every one of those is a
   /// fixed-height box, so none of them can grow into its neighbour.
   pw.Widget _label(LabelSpec spec, LabelTextMeasurer measure) {
     final plan = LabelPlanner.plan(
@@ -247,7 +326,6 @@ class LabelPdfService {
           pw.SizedBox(height: plan.quietGap),
           _textBox(plan.value, bold: false, color: PdfColors.black),
           _textBox(plan.sku, bold: false, color: PdfColors.grey700),
-          _textBox(plan.hsn, bold: false, color: PdfColors.grey700),
           pw.SizedBox(height: plan.padBottom),
         ],
       ),
@@ -395,7 +473,6 @@ class LabelPdfService {
       priceText = 'PRICE ${money(selling)}';
     }
 
-    final hsn = spec.hsnCode?.trim() ?? '';
     final sku = spec.sku?.trim() ?? '';
 
     return LabelContent(
@@ -410,8 +487,6 @@ class LabelPdfService {
       barcodeValue: spec.hasBarcode ? spec.barcode.trim() : '',
       barcodeFallback: 'no barcode',
       skuText: sku.isEmpty ? '' : 'SKU: $sku',
-      // An absent code prints nothing at all — no label, no reserved line.
-      hsnText: hsn.isEmpty ? '' : '${TariffCodeRule.shortLabel} $hsn',
     );
   }
 

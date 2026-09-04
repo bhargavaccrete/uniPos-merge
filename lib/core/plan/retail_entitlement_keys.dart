@@ -52,6 +52,20 @@ class RetailEntKeys {
   static const reportsTopSelling = 'retail.reports.top_selling';
   static const reportsProfit = 'retail.reports.profit';
   static const reportsGst = 'retail.reports.gst';
+  // Covers all THREE give-away mechanisms the Discounts Given report totals —
+  // bill/line discounts, price overrides and loyalty redemption — not just the
+  // one that lands in `SaleModel.discountAmount`.
+  //
+  // Minted rather than reusing a billing key because discounting is gated by
+  // ROLE, not entitlement: `LineDiscountService.canDiscount` reads
+  // `RestaurantSession.canAccess('billingDiscount')` and there is no
+  // `billingDiscount` entitlement to reuse. No existing key owns "reporting
+  // what was given away".
+  static const reportsDiscounts = 'retail.reports.discounts';
+  // Ad-hoc lines typed at the POS. Minted rather than reused because adding
+  // a quick item is deliberately UNGATED at the till — there is no billing
+  // key that owns it, so nothing exists to point the report at.
+  static const reportsQuickItems = 'retail.reports.quick_items';
   static const reportsLowStock = 'retail.reports.low_stock';
   static const reportsStockAdjustment = 'retail.reports.stock_adjustment';
   // Purchasing side
@@ -75,6 +89,9 @@ class RetailEntKeys {
       'retail.reports.staff_performance';
   // NOTE: the Credit Reports tile deliberately has no key of its own — it reads
   // [billingCredit], the same key its route guard uses. One responsibility, one key.
+  // The Sales Refunds report tile follows the same rule and reads
+  // [billingReturns] — the key that already owns the refund responsibility and
+  // guards the write path in `sale_return_screen.dart`.
 
   // ── Actions (add/edit/delete/create/void/print/export) ───────────────────────
   // Mirrors restaurant's action granularity (EntKeys). Bill actions:

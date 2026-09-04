@@ -30,7 +30,6 @@ void main() {
     double? selling = 999,
     String? brand,
     String? sku,
-    String? hsn,
   }) =>
       LabelSpec(
         productName: name,
@@ -40,7 +39,6 @@ void main() {
         sellingPrice: selling,
         brand: brand,
         sku: sku,
-        hsnCode: hsn,
       );
 
   VarianteModel variant({String? barcode, double stock = 12}) => VarianteModel(
@@ -95,6 +93,72 @@ void main() {
 
     test('a negative count is zero pages, not a crash', () {
       expect(layout.pagesFor(-5), 0);
+    });
+  });
+
+  // ==========================================================================
+  // Cut guides. Pure arithmetic, and the thing a wrong number here costs is a
+  // sheet cut through the middle of a barcode.
+  group('Cut guides', () {
+    const layout = kLabelLayout65Up;
+
+    test('one line per boundary, both outer trims included', () {
+      expect(layout.cutXsMm(), hasLength(layout.columns + 1));
+      expect(layout.cutYsMm(layout.rows), hasLength(layout.rows + 1));
+    });
+
+    test('vertical lines run down the middle of the gutter', () {
+      final xs = layout.cutXsMm();
+      // Half a gutter outside the first label, and the same past the last.
+      expect(xs.first, closeTo(layout.marginLeftMm - layout.columnGapMm / 2, 0.001));
+      for (var c = 1; c < xs.length; c++) {
+        expect(xs[c] - xs[c - 1], closeTo(layout.columnPitchMm, 0.001));
+      }
+      // A cut on the line takes half the gutter off each side and leaves the
+      // label itself untouched.
+      final labelRight = layout.marginLeftMm + layout.labelWidthMm;
+      expect(xs[1] - labelRight, closeTo(layout.columnGapMm / 2, 0.001));
+    });
+
+    test('horizontal lines sit on the shared edge, one cut per row', () {
+      final ys = layout.cutYsMm(layout.rows);
+      expect(ys.first, closeTo(layout.marginTopMm, 0.001));
+      expect(ys[1] - ys[0], closeTo(layout.rowPitchMm, 0.001));
+      expect(ys.last, closeTo(layout.marginTopMm + layout.gridHeightMm, 0.001));
+    });
+
+    test('every line stays on the paper', () {
+      final xs = layout.cutXsMm();
+      final ys = layout.cutYsMm(layout.rows);
+      expect(xs.first, greaterThanOrEqualTo(0));
+      expect(xs.last, lessThanOrEqualTo(kA4WidthMm));
+      expect(ys.first, greaterThanOrEqualTo(0));
+      expect(ys.last, lessThanOrEqualTo(kA4HeightMm));
+    });
+
+    // The grid stops where the labels stop: three labels is three boxes, not a
+    // page ruled into 65.
+    test('only the rows actually used are ruled', () {
+      expect(layout.rowsUsedFor(0), 0);
+      expect(layout.rowsUsedFor(1), 1);
+      expect(layout.rowsUsedFor(5), 1);
+      expect(layout.rowsUsedFor(6), 2);
+      expect(layout.rowsUsedFor(65), 13);
+      // A count past a full sheet is one page's worth of rows, never more.
+      expect(layout.rowsUsedFor(200), 13);
+      expect(layout.rowsUsedFor(-5), 0);
+      expect(layout.cutYsMm(layout.rowsUsedFor(3)), hasLength(2));
+    });
+
+    test('a sheet with guides still builds and is bigger than one without',
+        () async {
+      const svc = LabelPdfService();
+      final labels = LabelPdfService.expand([(spec(), 7)]);
+      final with_ = await (await svc.build(labels)).save();
+      final without = await (await svc.build(labels, cutGuides: false)).save();
+      expect(with_.length, greaterThan(0));
+      expect(with_.length, greaterThan(without.length),
+          reason: 'the guide layer should add drawing commands');
     });
   });
 
@@ -371,7 +435,7 @@ void main() {
     });
 
     test('builds with every optional field present, and with none', () async {
-      final rich = spec(brand: 'Levis', sku: 'APP-000042', hsn: '6109');
+      final rich = spec(brand: 'Levis', sku: 'APP-000042');
       final bare = LabelSpec(productName: 'Plain', barcode: 'BB0000000001');
       await expectLater(svc.build([rich, bare]), completes);
     });
@@ -436,7 +500,6 @@ void main() {
       band('quiet', p.quietGap);
       band('value', p.value.height);
       band('sku', p.sku.height);
-      band('hsn', p.hsn.height);
       return out;
     }
 
@@ -472,7 +535,6 @@ void main() {
         p.variant,
         p.value,
         p.sku,
-        p.hsn,
       ];
       for (final line in lines) {
         if (line.isEmpty) continue;
@@ -516,7 +578,6 @@ void main() {
         sku: 'AIR2-BLK-9',
         mrp: 2000,
         sellingPrice: 1500,
-        hsnCode: '6404',
       ),
       '2 medium name and two attributes': const LabelSpec(
         productName: 'V-Neck T-Shirt',
@@ -526,7 +587,6 @@ void main() {
         sku: 'TS-BLU-L',
         mrp: 1299,
         sellingPrice: 999,
-        hsnCode: '6109',
       ),
       '3 very long product name': const LabelSpec(
         productName:
@@ -537,7 +597,6 @@ void main() {
         sku: 'PC-VN-XXL-NVY',
         mrp: 2499,
         sellingPrice: 1799,
-        hsnCode: '6109',
       ),
       '4 very long variant description': const LabelSpec(
         productName: 'Running Shoe',
@@ -552,11 +611,11 @@ void main() {
         productName: 'Air 2',
         variantDescriptor: 'Size: 9',
         barcode: 'BB0000000005',
+        sku: 'AIR2-BLK-9',
         mrp: 2000,
         sellingPrice: 1500,
-        hsnCode: '6404',
       ),
-      '6 no HSN': const LabelSpec(
+      '6 no SKU': const LabelSpec(
         productName: 'Air 2',
         variantDescriptor: 'Size: 9',
         brand: 'Nike',
@@ -597,7 +656,6 @@ void main() {
         barcode: 'BB0000000011',
         mrp: 250000,
         sellingPrice: 199999,
-        hsnCode: '7113',
       ),
       '12 a single unbreakably long word': const LabelSpec(
         productName: 'Pneumonoultramicroscopicsilicovolcanoconiosis',
@@ -652,24 +710,37 @@ void main() {
           greaterThan(with_.barsHeight + with_.gapAbove + with_.padBottom));
     });
 
-    test('no HSN means no empty line, and the freed space is put to use', () {
-      final withHsn = planForSpec(cases['1 short, everything present']!);
-      final p = planForSpec(cases['6 no HSN']!);
-      expect(p.hsn.height, 0);
+    test('no SKU means no empty line, and the freed space is put to use', () {
+      final withSku = planForSpec(cases['1 short, everything present']!);
+      final p = planForSpec(cases['6 no SKU']!);
+      expect(p.sku.height, 0);
       expect(p.fits, isTrue);
       expect(p.gapAbove, greaterThanOrEqualTo(LabelMetrics.gapAboveMin));
       // The line it would have taken becomes barcode, not a hole at the foot.
-      expect(p.barsHeight, greaterThan(withHsn.barsHeight));
-      expect(p.usedHeight, closeTo(withHsn.usedHeight, 0.01));
+      expect(p.barsHeight, greaterThan(withSku.barsHeight));
+      expect(p.usedHeight, closeTo(withSku.usedHeight, 0.01));
     });
 
-    test('HSN, when present, sits below the barcode value and the SKU', () {
+    // A tariff code is accounting data, not shelf data. It was dropped from the
+    // label so the SKU is the last line, and nothing may put it back silently.
+    test('no HSN or tariff code reaches the label, whatever the spec carries',
+        () {
+      for (final s in cases.values) {
+        final content = LabelPdfService.contentFor(s);
+        final printed = [
+          content.name,
+          content.brand,
+          content.variant,
+          content.mrpText,
+          content.priceText,
+          content.barcodeValue,
+          content.skuText,
+        ].join(' ');
+        expect(printed, isNot(contains('HSN')),
+            reason: '${s.productName}: an HSN line came back');
+      }
       final p = planForSpec(cases['1 short, everything present']!);
-      final order = bands(p).map((b) => b.$1).toList();
-      expect(order.indexOf('hsn'), greaterThan(order.indexOf('sku')));
-      expect(order.indexOf('sku'), greaterThan(order.indexOf('value')));
-      expect(order.indexOf('value'), greaterThan(order.indexOf('bars')));
-      expect(p.hsn.text, 'HSN 6404');
+      expect(bands(p).last.$1, 'sku');
     });
 
     test('MRP only is shown once, at price emphasis', () {
@@ -756,7 +827,6 @@ void main() {
         'quiet',
         'value',
         'sku',
-        'hsn',
       ]);
     });
 
@@ -771,7 +841,6 @@ void main() {
         sku: 'TS-BLU-L',
         mrp: 19,
         sellingPrice: 16,
-        hsnCode: '6109',
       );
       final content = LabelPdfService.contentFor(s);
       // What the graphic encodes and what is printed under it are one value.
@@ -785,8 +854,7 @@ void main() {
       expect(p.sku.text, 'SKU: TS-BLU-L');
       final order = bands(p).map((b) => b.$1).toList();
       expect(order.indexOf('sku'), greaterThan(order.indexOf('value')));
-      expect(order.indexOf('hsn'), greaterThan(order.indexOf('sku')));
-      assertSane(p, 'value / SKU / HSN stack');
+      assertSane(p, 'value / SKU stack');
     });
 
     test('an SKU-shaped barcode is still printed as the barcode', () {
@@ -811,16 +879,15 @@ void main() {
         variantDescriptor: 'Size: 9',
         barcode: 'BB0000000001',
         mrp: 2000,
-        hsnCode: '6404',
       );
       final p = planForSpec(s);
       expect(p.sku.height, 0);
       expect(bands(p).map((b) => b.$1), isNot(contains('sku')));
-      final order = bands(p).map((b) => b.$1).toList();
-      expect(order.indexOf('hsn'), greaterThan(order.indexOf('value')));
+      // With the SKU gone the value is the last thing on the label.
+      expect(bands(p).last.$1, 'value');
     });
 
-    test('no HSN still leaves the SKU directly under the value', () {
+    test('the SKU sits directly under the barcode value', () {
       const s = LabelSpec(
         productName: 'Air 2',
         variantDescriptor: 'Size: 9',
@@ -829,14 +896,13 @@ void main() {
         mrp: 2000,
       );
       final p = planForSpec(s);
-      expect(p.hsn.height, 0);
       expect(p.sku.text, 'SKU: TS-BLU-L');
       expect(bands(p).map((b) => b.$1).toList(),
           containsAllInOrder(['bars', 'quiet', 'value', 'sku']));
     });
 
     // The regression that started this: a label whose name, brand, variant,
-    // price, barcode, value AND HSN are all present must still fit, because
+    // price, barcode, value AND SKU are all present must still fit, because
     // that is the everyday garment case.
     test('the fullest realistic label still fits with room for the bars', () {
       final p = planForSpec(cases['2 medium name and two attributes']!);
@@ -853,7 +919,7 @@ void main() {
         mrpText: 'MRP 2000',
         priceText: 'PRICE 1500',
         barcodeValue: 'BB0000000001',
-        hsnText: 'HSN 6404',
+        skuText: 'SKU: AIR2-BLK-9',
       ));
       final tall = LabelPlanner.plan(
         content: const LabelContent(
@@ -863,7 +929,7 @@ void main() {
           mrpText: 'MRP 2000',
           priceText: 'PRICE 1500',
           barcodeValue: 'BB0000000001',
-          hsnText: 'HSN 6404',
+          skuText: 'SKU: AIR2-BLK-9',
         ),
         widthPt: kLabelLayout65Up.labelWidthMm * kPtPerMm,
         heightPt: 30 * kPtPerMm,

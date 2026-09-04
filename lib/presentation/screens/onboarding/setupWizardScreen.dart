@@ -24,6 +24,7 @@ import '../../../util/color.dart';
 import '../../../util/common/app_responsive.dart';
 import '../../../util/responsive.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/routes/routes_name.dart';
 import '../restaurant/welcome_Admin.dart';
 import 'businessTypeScreen.dart';
 import 'add_product_screen.dart'; // Unified Add Product Screen
@@ -210,6 +211,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
       );
 
       await _store.completeSetup();
+      await RestaurantSession.saveAdminSession();
 
       final hasPendingKey =
           await locator<LicenseStore>().getPendingKey() != null;
@@ -218,7 +220,6 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         Navigator.pop(context); // dismiss loading indicator
 
         if (AppConfig.isRestaurant) {
-          await RestaurantSession.saveAdminSession();
           if (hasPendingKey) {
             // Hand off activation to the success screen — it fires the API
             // and shows the result before the user reaches the dashboard.
@@ -249,7 +250,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
               ),
             );
           } else {
-            Navigator.pushReplacementNamed(context, '/retail-billing');
+            Navigator.pushReplacementNamed(context, RouteNames.retailMenu);
           }
         }
       }

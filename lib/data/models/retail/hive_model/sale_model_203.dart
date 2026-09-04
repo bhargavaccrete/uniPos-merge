@@ -157,6 +157,21 @@ class SaleModel extends HiveObject {
   @HiveField(33)
   final String? shiftId;
 
+  /// Why the goods came back — a [SaleReturnReason] code, never a label.
+  ///
+  /// Set only on a return document (`isReturn == true`); null on every forward
+  /// sale, which is also how all pre-existing records read back. A code rather
+  /// than free text so the Sales Refund report can group by it — the same
+  /// choice `lineDiscountReason` and `overrideReason` made on the sale line.
+  @HiveField(34)
+  final String? returnReason;
+
+  /// Free text accompanying [returnReason]. The picker demands it when the
+  /// chosen reason says so — today that is `other`, where the code alone
+  /// explains nothing.
+  @HiveField(35)
+  final String? returnNote;
+
   SaleModel({
     required this.saleId,
     this.customerId,
@@ -192,6 +207,8 @@ class SaleModel extends HiveObject {
     this.lineDiscountTotal,
     this.exchangeGroupId,
     this.shiftId,
+    this.returnReason,
+    this.returnNote,
   })  : isReturn = isReturn ?? false,
         paidAmount = paidAmount ?? totalAmount,
         dueAmount = dueAmount ?? 0.0,
@@ -506,6 +523,8 @@ class SaleModel extends HiveObject {
     double? lineDiscountTotal,
     String? exchangeGroupId,
     String? shiftId,
+    String? returnReason,
+    String? returnNote,
   }) {
     return SaleModel(
       saleId: saleId ?? this.saleId,
@@ -547,6 +566,12 @@ class SaleModel extends HiveObject {
       lineDiscountTotal: lineDiscountTotal ?? this.lineDiscountTotal,
       exchangeGroupId: exchangeGroupId ?? this.exchangeGroupId,
       shiftId: shiftId ?? this.shiftId,
+      // Must survive a copy for the same reason discountReason must:
+      // `ExchangeService._stamp` copyWith's the freshly written return document
+      // to rewrite its payment legs, so dropping these would wipe the reason on
+      // every exchange leg while leaving plain refunds correct.
+      returnReason: returnReason ?? this.returnReason,
+      returnNote: returnNote ?? this.returnNote,
     );
   }
 
@@ -593,6 +618,8 @@ class SaleModel extends HiveObject {
       'lineDiscountTotal': lineDiscountTotal,
       'exchangeGroupId': exchangeGroupId,
       'shiftId': shiftId,
+      'returnReason': returnReason,
+      'returnNote': returnNote,
     };
   }
 
@@ -645,6 +672,8 @@ class SaleModel extends HiveObject {
           (map['lineDiscountTotal'] as num?)?.toDouble(),
       exchangeGroupId: map['exchangeGroupId'] as String?,
       shiftId: map['shiftId'] as String?,
+      returnReason: map['returnReason'] as String?,
+      returnNote: map['returnNote'] as String?,
     );
   }
 }

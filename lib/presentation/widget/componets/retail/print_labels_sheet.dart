@@ -12,7 +12,6 @@ import 'package:billberrylite/util/common/app_responsive.dart';
 import '../../../../data/models/retail/hive_model/product_model_200.dart';
 import '../../../../data/models/retail/hive_model/variante_model_201.dart';
 import '../../../../domain/services/common/notification_service.dart';
-import '../../../../domain/services/retail/barcode_generator_service.dart';
 import '../../../../domain/services/retail/label_pdf_service.dart';
 import '../../../../domain/services/retail/print_service.dart';
 
@@ -80,6 +79,11 @@ class _PrintLabelsSheetState extends State<PrintLabelsSheet> {
   final _controllers = <String, TextEditingController>{};
 
   bool _busy = false;
+
+  /// Grid to cut along. Defaults on: most shops print onto plain A4 and
+  /// cut by hand. Turned off for a real die-cut sticker sheet, where the lines
+  /// would print across the stickers.
+  bool _cutGuides = true;
 
   @override
   void initState() {
@@ -223,7 +227,6 @@ class _PrintLabelsSheetState extends State<PrintLabelsSheet> {
           sellingPrice: v.sellingPrice,
           brand: widget.product.brandName,
           sku: v.sku,
-          hsnCode: v.hsnCode ?? widget.product.hsnCode,
         ),
         copies,
       ));
@@ -237,7 +240,11 @@ class _PrintLabelsSheetState extends State<PrintLabelsSheet> {
       NotificationService.instance.showWarning('Select at least one variant.');
       return;
     }
-    await PrintService().showLabelPreview(context: context, labels: labels);
+    await PrintService().showLabelPreview(
+      context: context,
+      labels: labels,
+      cutGuides: _cutGuides,
+    );
   }
 
   Future<void> _print() async {
@@ -248,7 +255,7 @@ class _PrintLabelsSheetState extends State<PrintLabelsSheet> {
     }
     setState(() => _busy = true);
     try {
-      await PrintService().printLabels(labels);
+      await PrintService().printLabels(labels, cutGuides: _cutGuides);
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) NotificationService.instance.showError('Print failed: $e');
@@ -460,6 +467,39 @@ class _PrintLabelsSheetState extends State<PrintLabelsSheet> {
     );
   }
 
+  /// Plain paper vs. a pre-cut sticker sheet — the only choice that changes the
+  /// sheet itself, so it sits with the totals rather than behind a menu.
+  Widget _cutGuidesToggle(BuildContext context) {
+    return InkWell(
+      onTap: _busy ? null : () => setState(() => _cutGuides = !_cutGuides),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 36,
+            height: 36,
+            child: Checkbox(
+              value: _cutGuides,
+              onChanged:
+                  _busy ? null : (on) => setState(() => _cutGuides = on ?? true),
+              activeColor: AppColors.primary,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              'Cut guides  ·  lines between labels to cut along',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.captionFontSize(context),
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _footer(BuildContext context) {
     final total = _totalLabels;
     final pages = _pages;
@@ -473,6 +513,7 @@ class _PrintLabelsSheetState extends State<PrintLabelsSheet> {
       ),
       child: Column(
         children: [
+          _cutGuidesToggle(context),
           Row(
             children: [
               Expanded(

@@ -65,6 +65,35 @@ class LabelLayout {
     return (labelCount + perPage - 1) ~/ perPage;
   }
 
+  /// Rows actually occupied by [labelCount] labels on one sheet.
+  ///
+  /// Cut guides are drawn only over these, so a sheet of three labels is not
+  /// covered in a grid of 65 empty boxes.
+  int rowsUsedFor(int labelCount) {
+    if (labelCount <= 0) return 0;
+    final used = (labelCount + columns - 1) ~/ columns;
+    return used > rows ? rows : used;
+  }
+
+  /// Vertical cut lines, in millimetres from the LEFT page edge — one per
+  /// column boundary, including both outer trims.
+  ///
+  /// Each line runs down the MIDDLE of the gutter rather than along a label's
+  /// own edge, so one pass of a trimmer separates two columns. A line on each
+  /// edge would need two passes and leave a 2.5 mm sliver between them.
+  List<double> cutXsMm() => [
+        for (var c = 0; c <= columns; c++)
+          marginLeftMm - columnGapMm / 2 + c * columnPitchMm,
+      ];
+
+  /// Horizontal cut lines, in millimetres from the TOP page edge, for the first
+  /// [rowsUsed] rows. Same midpoint rule; with no vertical gap the midpoint is
+  /// the shared edge, which is why rows need a single cut each.
+  List<double> cutYsMm(int rowsUsed) => [
+        for (var r = 0; r <= rowsUsed; r++)
+          marginTopMm - rowGapMm / 2 + r * rowPitchMm,
+      ];
+
   /// Does the grid fit the page it is meant for? Guards a future edit that
   /// changes one number and silently pushes the last column off the paper.
   bool fitsWithin({required double pageWidthMm, required double pageHeightMm}) =>

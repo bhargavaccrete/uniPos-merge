@@ -580,9 +580,15 @@ class PrintService {
   ///
   /// Read-only with respect to the catalogue: [labels] are already-resolved
   /// values, so printing can never mint or change a barcode.
-  Future<void> printLabels(List<LabelSpec> labels) async {
+  ///
+  /// [cutGuides] draws the cut grid — on for plain paper, off for a
+  /// pre-cut sticker sheet.
+  Future<void> printLabels(
+    List<LabelSpec> labels, {
+    bool cutGuides = true,
+  }) async {
     if (labels.isEmpty) return;
-    final pdf = await _labelPdfService.build(labels);
+    final pdf = await _labelPdfService.build(labels, cutGuides: cutGuides);
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat _) async => pdf.save(),
       name: 'Labels_${labels.length}',
@@ -595,9 +601,10 @@ class PrintService {
   Future<void> showLabelPreview({
     required BuildContext context,
     required List<LabelSpec> labels,
+    bool cutGuides = true,
   }) async {
     if (labels.isEmpty) return;
-    final pdf = await _labelPdfService.build(labels);
+    final pdf = await _labelPdfService.build(labels, cutGuides: cutGuides);
 
     if (!context.mounted) return;
     await Navigator.of(context).push(

@@ -51,13 +51,15 @@ class SaleModelAdapter extends TypeAdapter<SaleModel> {
       lineDiscountTotal: fields[31] as double?,
       exchangeGroupId: fields[32] as String?,
       shiftId: fields[33] as String?,
+      returnReason: fields[34] as String?,
+      returnNote: fields[35] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, SaleModel obj) {
     writer
-      ..writeByte(34)
+      ..writeByte(36)
       ..writeByte(0)
       ..write(obj.saleId)
       ..writeByte(1)
@@ -125,7 +127,11 @@ class SaleModelAdapter extends TypeAdapter<SaleModel> {
       ..writeByte(32)
       ..write(obj.exchangeGroupId)
       ..writeByte(33)
-      ..write(obj.shiftId);
+      ..write(obj.shiftId)
+      ..writeByte(34)
+      ..write(obj.returnReason)
+      ..writeByte(35)
+      ..write(obj.returnNote);
   }
 
   @override

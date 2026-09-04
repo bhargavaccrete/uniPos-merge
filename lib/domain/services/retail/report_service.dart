@@ -14,7 +14,12 @@ import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.d
 import 'package:billberrylite/data/models/retail/hive_model/grn_item_model_214.dart';
 import 'package:billberrylite/data/repositories/retail/credit_payment_repository.dart';
 import 'package:billberrylite/data/repositories/retail/grn_item_repository.dart';
+import 'package:billberrylite/domain/services/retail/exchange_service.dart';
 import 'package:billberrylite/domain/services/retail/gst_service.dart';
+import 'package:billberrylite/domain/services/retail/line_discount_reason.dart';
+import 'package:billberrylite/domain/services/retail/price_override_reason.dart';
+import 'package:billberrylite/domain/services/retail/quick_item_service.dart';
+import 'package:billberrylite/domain/services/retail/sale_return_reason.dart';
 import 'package:billberrylite/domain/store/retail/product_store.dart' show kInactiveVariantStatus;
 import 'package:billberrylite/domain/services/retail/inventory_service.dart';
 import 'package:billberrylite/domain/services/retail/sales_totals.dart';
@@ -379,6 +384,32 @@ class ReportService {
   /// Deliberately three functions rather than one for now: the sharing question
   /// is open until these reports are corrected and covered.
 
+  // ── Ad-hoc lines in a grouped report ──────────────────────────────────────
+
+  /// The one bucket every quick item folds into on a grouped report.
+  ///
+  /// `QuickItemService` mints a UNIQUE productId AND variantId per line, on
+  /// purpose — a shared id would label every ad-hoc sale ever made with
+  /// whichever name happened to sell first. The cost is that a report grouping
+  /// on those ids gets one row per SALE LINE: fifty sales of "Gift Wrap" became
+  /// fifty single-sale rows, and Top Selling ranked them as fifty separate
+  /// products, crowding out the real ones.
+  ///
+  /// So the grouped reports fold them onto this key instead. Revenue still
+  /// reconciles with `netRevenue` on Daily/Monthly because the lines are
+  /// collapsed, never dropped. The per-name breakdown lives in
+  /// [getQuickItemsReport], which is the report that can carry it — these three
+  /// are keyed on catalogue ids a quick item does not have.
+  static const String quickItemGroupId = 'QUICK-ITEMS';
+  static const String quickItemGroupName = 'Quick Items';
+
+  /// Grouping key for a line: its catalogue product, or the shared ad-hoc
+  /// bucket. Reads `varianteId` because that is the id carrying the prefix.
+  static String _productGroupId(SaleItemModel item) =>
+      QuickItemService.isQuickItem(item.varianteId)
+          ? quickItemGroupId
+          : item.productId;
+
   /// Get sales report grouped by products
   Future<List<Map<String, dynamic>>> getProductWiseSalesReport({DateTime? startDate, DateTime? endDate}) async {
     final lines = await _signedLinesInWindow(startDate, endDate);
@@ -387,12 +418,18 @@ class ReportService {
     final Map<String, Map<String, dynamic>> productStats = {};
 
     for (final (:item, :sign) in lines) {
-      if (!productStats.containsKey(item.productId)) {
-        productStats[item.productId] = {
-          'productId': item.productId,
+      // Ad-hoc lines share one bucket — see [quickItemGroupId].
+      final key = _productGroupId(item);
+      final isQuick = key == quickItemGroupId;
+
+      if (!productStats.containsKey(key)) {
+        productStats[key] = {
+          'productId': key,
           // Defaulted here, not at each call site: `SaleItemModel.productName`
           // is nullable and screens cast this straight to `String`.
-          'productName': item.productName ?? 'Unknown',
+          'productName':
+              isQuick ? quickItemGroupName : (item.productName ?? 'Unknown'),
+          'isQuickItem': isQuick,
           'totalQuantity': 0.0,
           'totalRevenue': 0.0,
           'totalDiscount': 0.0,
@@ -400,10 +437,10 @@ class ReportService {
         };
       }
 
-      productStats[item.productId]!['totalQuantity'] += item.qty * sign;
-      productStats[item.productId]!['totalRevenue'] += item.total * sign;
-      productStats[item.productId]!['totalDiscount'] += (item.discountAmount ?? 0.0) * sign;
-      productStats[item.productId]!['totalTax'] += (item.taxAmount ?? 0.0) * sign;
+      productStats[key]!['totalQuantity'] += item.qty * sign;
+      productStats[key]!['totalRevenue'] += item.total * sign;
+      productStats[key]!['totalDiscount'] += (item.discountAmount ?? 0.0) * sign;
+      productStats[key]!['totalTax'] += (item.taxAmount ?? 0.0) * sign;
     }
 
     // Rounded here, then sorted, so the order matches the figures shown.
@@ -440,19 +477,29 @@ class ReportService {
     final Map<String, Map<String, dynamic>> variantStats = {};
 
     for (final (:item, :sign) in lines) {
-      if (!variantStats.containsKey(item.varianteId)) {
-        variantStats[item.varianteId] = {
-          'variantId': item.varianteId,
-          'productId': item.productId,
+      // Same fold as the product-wise report: a quick item mints a unique
+      // variantId per line too, so grouping on it raw gives one row per sale.
+      final isQuick = QuickItemService.isQuickItem(item.varianteId);
+      final key = isQuick ? quickItemGroupId : item.varianteId;
+
+      if (!variantStats.containsKey(key)) {
+        variantStats[key] = {
+          'variantId': key,
+          'productId': _productGroupId(item),
           // Defaulted here, not at each call site: `SaleItemModel.productName`
           // is nullable and screens cast this straight to `String`.
-          'productName': item.productName ?? 'Unknown',
-          'size': item.size,
-          'color': item.color,
+          'productName':
+              isQuick ? quickItemGroupName : (item.productName ?? 'Unknown'),
+          'isQuickItem': isQuick,
+          'size': isQuick ? null : item.size,
+          'color': isQuick ? null : item.color,
           // Descriptor resolved from the sale's own record, so reports match
-          // the receipt even if the variant was edited afterwards.
-          'variantLabel': attributeStore.describeAttributes(item.attributes,
-              size: item.size, color: item.color),
+          // the receipt even if the variant was edited afterwards. A quick item
+          // has no attributes to describe.
+          'variantLabel': isQuick
+              ? ''
+              : attributeStore.describeAttributes(item.attributes,
+                  size: item.size, color: item.color),
           'totalQuantity': 0.0,
           'totalRevenue': 0.0,
           'totalDiscount': 0.0,
@@ -460,10 +507,10 @@ class ReportService {
         };
       }
 
-      variantStats[item.varianteId]!['totalQuantity'] += item.qty * sign;
-      variantStats[item.varianteId]!['totalRevenue'] += item.total * sign;
-      variantStats[item.varianteId]!['totalDiscount'] += (item.discountAmount ?? 0.0) * sign;
-      variantStats[item.varianteId]!['totalTax'] += (item.taxAmount ?? 0.0) * sign;
+      variantStats[key]!['totalQuantity'] += item.qty * sign;
+      variantStats[key]!['totalRevenue'] += item.total * sign;
+      variantStats[key]!['totalDiscount'] += (item.discountAmount ?? 0.0) * sign;
+      variantStats[key]!['totalTax'] += (item.taxAmount ?? 0.0) * sign;
     }
 
     // Rounded here, then sorted, so the order matches the figures shown.
@@ -495,14 +542,21 @@ class ReportService {
     final Map<String, Map<String, dynamic>> categoryStats = {};
 
     for (final (:item, :sign) in lines) {
+      // Ad-hoc lines get their OWN bucket rather than falling into
+      // 'Uncategorized'. They are not products missing a category — they were
+      // never in the catalogue — and mixing the two hides both.
+      final isQuick = QuickItemService.isQuickItem(item.varianteId);
       final categoryId = categoryIdByProductId[item.productId] ?? '';
       final name = categoryNameById[categoryId];
 
       // Blank, unknown and deleted-category ids all collapse into a single
       // bucket, so a deleted category can't produce several rows that are all
       // labelled 'Uncategorized'.
-      final key = name == null ? '' : categoryId;
-      final label = name ?? 'Uncategorized';
+      final key = isQuick
+          ? quickItemGroupId
+          : (name == null ? '' : categoryId);
+      final label =
+          isQuick ? quickItemGroupName : (name ?? 'Uncategorized');
 
       final stat = categoryStats.putIfAbsent(
           key,
@@ -520,7 +574,9 @@ class ReportService {
       stat['totalRevenue'] += item.total * sign;
       stat['totalDiscount'] += (item.discountAmount ?? 0.0) * sign;
       stat['totalTax'] += (item.taxAmount ?? 0.0) * sign;
-      (stat['productCount'] as Set<String>).add(item.productId);
+      // Grouped id, not the raw one: every quick line has a unique productId,
+      // so counting those raw made 50 ad-hoc sales read as 50 products.
+      (stat['productCount'] as Set<String>).add(_productGroupId(item));
     }
 
     // Convert to list and calculate product count
@@ -538,6 +594,391 @@ class ReportService {
       ..sort((a, b) => _byRevenueDesc(a, b, 'categoryId'));
 
     return statsList;
+  }
+
+  // ==================== Quick Items Report ====================
+
+  /// Ad-hoc lines typed at the POS, grouped by the NAME the cashier entered.
+  ///
+  /// This is the only report keyed on the typed name rather than a catalogue
+  /// id, and it has to be: `QuickItemService` mints a fresh productId and
+  /// variantId for every line, so id-grouping gives one row per sale. Folding
+  /// on the name is what turns fifty "Gift Wrap" lines back into one row of
+  /// fifty — and a name that keeps recurring is a product missing from the
+  /// catalogue, which is the useful thing to learn here.
+  ///
+  /// Why this needs watching at all: a quick item is the one price-setting
+  /// action at the till with **no permission gate** (`posscreen.dart` —
+  /// deliberate, since nothing is being moved off a settled figure), it
+  /// **deducts no stock** (`RetailInventoryService` skips the line), and it
+  /// carries **no cost price**, so its margin is unknown rather than total. The
+  /// Profit report already flags the last of those through `unknownCostLines`;
+  /// nothing surfaced the first two.
+  ///
+  /// Names are folded case-insensitively on their trimmed form, so "gift wrap"
+  /// and "Gift Wrap" are one row. The display keeps the first spelling seen.
+  ///
+  /// Returns are netted, not dropped — same rule as every other line-level
+  /// report, so a quick item sold and then refunded reads as zero rather than
+  /// as revenue.
+  Future<List<Map<String, dynamic>>> getQuickItemsReport({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    // Joined through the sale rather than `_signedLinesInWindow`, because
+    // `SaleItemModel` carries no date of its own and this report reports when a
+    // name was last sold.
+    final window = await _salesInWindow(startDate, endDate);
+    final itemsBySaleId = await _itemsBySaleId();
+
+    final stats = <String, Map<String, dynamic>>{};
+    // Denominator for each row's share. Every line in the window, quick or
+    // not — the question is what fraction of takings never touched the
+    // catalogue.
+    var windowRevenue = 0.0;
+
+    for (final sale in window.all) {
+      final sign = RetailSaleFilter.revenueSign(sale);
+      final soldAt = _reportedAt(sale);
+
+      for (final item in itemsBySaleId[sale.saleId] ?? const <SaleItemModel>[]) {
+        windowRevenue += item.total * sign;
+
+        if (!QuickItemService.isQuickItem(item.varianteId)) continue;
+
+        final display = (item.productName ?? 'Unnamed').trim();
+        final key = display.toLowerCase();
+
+        final stat = stats.putIfAbsent(
+          key,
+          () => <String, dynamic>{
+            'itemName': display.isEmpty ? 'Unnamed' : display,
+            'lineCount': 0,
+            'totalQuantity': 0.0,
+            'totalRevenue': 0.0,
+            'totalDiscount': 0.0,
+            'totalTax': 0.0,
+            'gstRates': <double>{},
+            'firstSold': soldAt,
+            'lastSold': soldAt,
+          },
+        );
+
+        // Forward lines only: a refund is not another time it was sold.
+        if (sign > 0) stat['lineCount'] += 1;
+        stat['totalQuantity'] += item.qty * sign;
+        stat['totalRevenue'] += item.total * sign;
+        stat['totalDiscount'] += (item.discountAmount ?? 0.0) * sign;
+        stat['totalTax'] += (item.taxAmount ?? 0.0) * sign;
+
+        final rate = item.gstRate;
+        if (rate != null) (stat['gstRates'] as Set<double>).add(rate);
+
+        if (soldAt != null) {
+          final first = stat['firstSold'] as DateTime?;
+          final last = stat['lastSold'] as DateTime?;
+          if (first == null || soldAt.isBefore(first)) stat['firstSold'] = soldAt;
+          if (last == null || soldAt.isAfter(last)) stat['lastSold'] = soldAt;
+        }
+      }
+    }
+
+    final rows = stats.values.map((stat) {
+      final qty = stat['totalQuantity'] as double;
+      final revenue = stat['totalRevenue'] as double;
+      final rates = (stat['gstRates'] as Set<double>).toList()..sort();
+
+      return <String, dynamic>{
+        'itemName': stat['itemName'],
+        'lineCount': stat['lineCount'],
+        'totalQuantity': _r3(qty),
+        'totalRevenue': _r2(revenue),
+        'totalDiscount': _r2(stat['totalDiscount'] as double),
+        'totalTax': _r2(stat['totalTax'] as double),
+        // Charged per unit on balance. Zero quantity means it was sold and
+        // fully returned — an average price would be a division by zero, and
+        // there is no meaningful figure to show.
+        'avgPrice': qty == 0 ? 0.0 : _r2(revenue / qty),
+        'gstRates': rates,
+        // Per-row, so the screen's total share is just the sum of the column
+        // rather than a figure smuggled onto every row.
+        'shareOfRevenuePct':
+            windowRevenue == 0 ? 0.0 : _r2(revenue / windowRevenue * 100),
+        'firstSold': (stat['firstSold'] as DateTime?)?.toIso8601String(),
+        'lastSold': (stat['lastSold'] as DateTime?)?.toIso8601String(),
+      };
+    }).toList()
+      ..sort((a, b) {
+        final byRevenue =
+            (b['totalRevenue'] as double).compareTo(a['totalRevenue'] as double);
+        if (byRevenue != 0) return byRevenue;
+        return (a['itemName'] as String).compareTo(b['itemName'] as String);
+      });
+
+    return rows;
+  }
+
+  // ==================== Sales Refund Report ====================
+
+  /// customerId -> display name, read once per report.
+  ///
+  /// Goes through the REPOSITORY, not `customerStore.customers`: CustomerStore
+  /// is the one store here that does not hydrate in its constructor, so a
+  /// report opened straight from the hub would find that list empty.
+  Future<Map<String, String>> _customerNameById() async {
+    final all = await customerRepository.getAllCustomers();
+    return {
+      for (final c in all)
+        if ((c.name ?? '').trim().isNotEmpty) c.customerId: c.name!.trim(),
+    };
+  }
+
+  /// shiftId -> staff name, read once per report.
+  ///
+  /// `SaleModel` carries no staffId — `shiftId` is the only staff link there
+  /// is, and it is null on every row written before shifts existed. Callers
+  /// must render a placeholder rather than dropping those rows.
+  Future<Map<String, String>> _staffNameByShiftId() async {
+    final all = await shiftRepository.getAllShifts();
+    return {for (final s in all) s.id: s.staffName};
+  }
+
+  /// Every refund document raised in the window, one row per credit note.
+  ///
+  /// **Headers, not lines — so the sign rule does NOT apply here.** A return's
+  /// header amounts are stored already negated (`return_service.dart`), which
+  /// is what lets Daily/Monthly net them by a plain fold. This report is *about*
+  /// returns, so it reports magnitudes: applying [RetailSaleFilter.revenueSign]
+  /// on top would double-negate every figure.
+  ///
+  /// **Returned value and money paid out are different numbers**, and the gap
+  /// is the point of the report:
+  /// - `appliedToDue` — value that cancelled an unpaid invoice instead of being
+  ///   handed over. `ReturnService` settles against `dueAmount` first.
+  /// - `paidOut` — what actually left the till. On an EXCHANGE most of the
+  ///   value crosses to the replacement sale as goods, so it is read from the
+  ///   payment legs with the `exchange_credit` accounting leg removed rather
+  ///   than derived from the header.
+  ///
+  /// Exchange legs are INCLUDED and flagged, never dropped: an exchange's
+  /// return half is a real return document, and excluding it would make this
+  /// report disagree with `netRevenue`, the profit reports and EOD, all of
+  /// which net every `isReturn` row.
+  Future<List<Map<String, dynamic>>> getSalesRefundReport({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final window = await _salesInWindow(startDate, endDate);
+    // Bail before the extra box reads: a period with no refunds is the common
+    // case, and it should cost one bounded read rather than four full scans.
+    if (window.returns.isEmpty) return const [];
+
+    final allSales = await saleStore.getAllSales();
+    final originalById = {for (final s in allSales) s.saleId: s};
+
+    // referenceId -> value written off a due by that return.
+    final adjustments = <String, double>{};
+    for (final p in await CreditPaymentRepository().getAllPayments()) {
+      if (!p.isReturnAdjustment) continue;
+      final ref = p.referenceId;
+      if (ref == null) continue;
+      adjustments[ref] = (adjustments[ref] ?? 0) + p.amount;
+    }
+
+    final customerNames = await _customerNameById();
+    final staffNames = await _staffNameByShiftId();
+
+    final rows = <Map<String, dynamic>>[];
+
+    for (final sale in window.returns) {
+      final refundValue = sale.totalAmount.abs();
+      final appliedToDue = adjustments[sale.saleId] ?? 0.0;
+      final isExchange = sale.exchangeGroupId != null;
+
+      // On an exchange the legs were rewritten by `ExchangeService._stamp`
+      // AFTER the return was written, so the header no longer describes what
+      // changed hands. Read the money legs instead.
+      final double paidOut;
+      if (isExchange) {
+        var money = 0.0;
+        for (final leg in sale.paymentList) {
+          if (ExchangeService.isExchangeCredit(leg['method'] as String?)) {
+            continue;
+          }
+          money += ((leg['amount'] as num?) ?? 0).toDouble().abs();
+        }
+        paidOut = money;
+      } else {
+        final remainder = refundValue - appliedToDue;
+        paidOut = remainder > 0 ? remainder : 0.0;
+      }
+
+      final original = originalById[sale.originalSaleId];
+      final returnedAt = _reportedAt(sale);
+      final soldAt = original == null ? null : _reportedAt(original);
+
+      rows.add({
+        'returnSaleId': sale.saleId,
+        'date': sale.createdAt,
+        'originalSaleId': sale.originalSaleId,
+        'originalSaleDate': original?.createdAt,
+        'daysToReturn': (returnedAt == null || soldAt == null)
+            ? null
+            : returnedAt.difference(soldAt).inDays,
+        'customerId': sale.customerId,
+        'customerName': customerNames[sale.customerId] ?? 'Walk-in',
+        // The one return header field stored POSITIVE.
+        'totalItems': sale.totalItems,
+        'refundValue': _r2(refundValue),
+        'subtotal': _r2(sale.subtotal.abs()),
+        'discountAmount': _r2(sale.discountAmount.abs()),
+        'taxAmount': _r2(sale.taxAmount.abs()),
+        // A return header's paymentType IS the refund method.
+        'refundMethod': sale.paymentType,
+        'appliedToDue': _r2(appliedToDue),
+        'paidOut': _r2(paidOut),
+        'returnReason': sale.returnReason,
+        'returnReasonLabel': sale.returnReason != null
+            ? SaleReturnReason.labelFor(sale.returnReason!)
+            : (isExchange ? 'Exchange' : 'Not recorded'),
+        'returnNote': sale.returnNote,
+        'isExchange': isExchange,
+        'exchangeGroupId': sale.exchangeGroupId,
+        'shiftId': sale.shiftId,
+        'staffName': staffNames[sale.shiftId] ?? '—',
+      });
+    }
+
+    // Newest first, with the id as the tie-break: `List.sort` is not stable in
+    // Dart and two refunds can share an instant.
+    rows.sort((a, b) {
+      final byDate = (b['date'] as String).compareTo(a['date'] as String);
+      if (byDate != 0) return byDate;
+      return (a['returnSaleId'] as String)
+          .compareTo(b['returnSaleId'] as String);
+    });
+
+    return rows;
+  }
+
+  // ==================== Discounts Given Report ====================
+
+  /// Every sale where money was given away, with the three mechanisms that do
+  /// it kept apart.
+  ///
+  /// Only one of the three lands in `SaleModel.discountAmount`, which is why a
+  /// report that sums that field alone understates what the shop actually gave:
+  /// - **Discount** — bill + line, in `discountAmount`. `lineDiscountAmount` is
+  ///   a SUBSET of the line's `discountAmount`, never a sibling, so the split
+  ///   is derived per line through [SaleItemModel.billDiscountShare] rather
+  ///   than by subtracting the header's `lineDiscountTotal` — which is null on
+  ///   every sale written before line discounts existed.
+  /// - **Price override** — invisible in `discountAmount`. `line.price` is
+  ///   already the overridden figure, so an override silently lowers `subtotal`
+  ///   and has to be recovered as `(originalPrice - price) x qty`.
+  /// - **Loyalty redemption** — invisible too, stored only as a point count and
+  ///   applied after the discount is final, where it also cuts GST.
+  ///
+  /// The three are genuinely disjoint (see `CartCalculationService`), so their
+  /// sum is a real figure rather than an approximation.
+  ///
+  /// **Lines, not headers — so the sign rule DOES apply.** A return emits its
+  /// own negative row that nets the original, matching how the profit reports
+  /// list returns. Loyalty is the one exception: a return header never carries
+  /// `loyaltyPointsUsed`, and redeemed points are not given back on a refund,
+  /// so no reversal is synthesised.
+  Future<List<Map<String, dynamic>>> getDiscountReport({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final window = await _salesInWindow(startDate, endDate);
+    final itemsBySaleId = await _itemsBySaleId();
+    final customerNames = await _customerNameById();
+    final staffNames = await _staffNameByShiftId();
+
+    final rows = <Map<String, dynamic>>[];
+
+    for (final sale in window.all) {
+      final sign = RetailSaleFilter.revenueSign(sale);
+      final lines = itemsBySaleId[sale.saleId] ?? const <SaleItemModel>[];
+
+      var listValue = 0.0;
+      var overrideDelta = 0.0;
+      var lineDiscount = 0.0;
+      var billDiscount = 0.0;
+      final overrideReasons = <String>{};
+      final lineDiscountReasons = <String>{};
+
+      for (final line in lines) {
+        // What the goods would have fetched at the catalogue price they were
+        // rung up against — before any of the three mechanisms.
+        listValue += (line.originalPrice ?? line.price) * line.qty * sign;
+
+        if (line.isPriceOverridden) {
+          overrideDelta += line.overrideDeltaPerUnit * line.qty * sign;
+          final reason = line.overrideReason;
+          if (reason != null && reason.isNotEmpty) {
+            overrideReasons.add(PriceOverrideReason.labelFor(reason));
+          }
+        }
+
+        lineDiscount += (line.lineDiscountAmount ?? 0.0) * sign;
+        billDiscount += line.billDiscountShare * sign;
+
+        final lineReason = line.lineDiscountReason;
+        if (lineReason != null && lineReason.isNotEmpty) {
+          lineDiscountReasons.add(LineDiscountReason.labelFor(lineReason));
+        }
+      }
+
+      // Header field, unsigned by design — see the doc comment.
+      final loyaltyPoints = sale.loyaltyPointsUsed ?? 0;
+      final loyaltyValue = loyaltyPoints.toDouble();
+
+      final discountTotal = billDiscount + lineDiscount;
+      final totalGivenAway = discountTotal + overrideDelta + loyaltyValue;
+
+      // Half a paisa, so a rounding tail never becomes a row.
+      if (totalGivenAway.abs() <= 0.005) continue;
+
+      rows.add({
+        'saleId': sale.saleId,
+        'date': sale.createdAt,
+        'customerId': sale.customerId,
+        'customerName': customerNames[sale.customerId] ?? 'Walk-in',
+        'paymentType': sale.paymentType,
+        'isReturn': RetailSaleFilter.isReturn(sale),
+        'exchangeGroupId': sale.exchangeGroupId,
+        'totalItems': RetailSaleFilter.signedItemCount(sale),
+        'listValue': _r2(listValue),
+        'billDiscount': _r2(billDiscount),
+        'lineDiscount': _r2(lineDiscount),
+        'discountTotal': _r2(discountTotal),
+        'overrideDelta': _r2(overrideDelta),
+        'loyaltyPointsUsed': loyaltyPoints,
+        'loyaltyValue': _r2(loyaltyValue),
+        'totalGivenAway': _r2(totalGivenAway),
+        // Header, already signed on a return — no .abs().
+        'netTotal': _r2(sale.totalAmount),
+        'giveawayPct':
+            listValue == 0 ? 0.0 : _r2(totalGivenAway / listValue * 100),
+        'discountType': sale.discountType,
+        'discountValue': sale.discountValue,
+        'discountReason': sale.discountReason,
+        'overrideReasons': overrideReasons.join(', '),
+        'lineDiscountReasons': lineDiscountReasons.join(', '),
+        'staffName': staffNames[sale.shiftId] ?? '—',
+      });
+    }
+
+    rows.sort((a, b) {
+      final byValue = (b['totalGivenAway'] as double)
+          .compareTo(a['totalGivenAway'] as double);
+      if (byValue != 0) return byValue;
+      return (a['saleId'] as String).compareTo(b['saleId'] as String);
+    });
+
+    return rows;
   }
 
   // ==================== Supplier-wise Purchase Report ====================

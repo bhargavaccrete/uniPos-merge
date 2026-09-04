@@ -26,7 +26,7 @@ class LabelTextSize {
 
   /// The **ink box** — what the PDF writer actually advances a line by, not the
   /// font's nominal line height. Measured, because for Poppins it runs from
-  /// ~0.71 em (`HSN 6109`) to ~1.25 em (bold, with accents and descenders); a
+  /// ~0.71 em (`SKU: 6109`) to ~1.25 em (bold, with accents and descenders); a
   /// single assumed factor is simultaneously too tight for one and wasteful for
   /// the other.
   final double height;
@@ -109,11 +109,9 @@ class LabelMetrics {
   static const LabelFontRange value = LabelFontRange(5.0, 4.4);
 
   /// Shop-internal code, printed under the barcode value. Reference data, so
-  /// it sits at the same weight as HSN — it must never be mistaken for the
-  /// barcode itself.
+  /// it sits at the quietest weight on the label — it must never be mistaken
+  /// for the barcode itself.
   static const LabelFontRange sku = LabelFontRange(3.9, 3.4);
-
-  static const LabelFontRange hsn = LabelFontRange(3.9, 3.4);
 
   /// Protected whitespace between the price row and the bars. The reason the
   /// price can no longer touch the barcode.
@@ -169,10 +167,6 @@ class LabelContent {
   /// be read as the barcode value above it.
   final String skuText;
 
-  /// e.g. `HSN 6109` — empty when the product has no HSN, and then the line
-  /// takes no space at all.
-  final String hsnText;
-
   const LabelContent({
     required this.name,
     this.brand = '',
@@ -182,7 +176,6 @@ class LabelContent {
     this.barcodeValue = '',
     this.barcodeFallback = '',
     this.skuText = '',
-    this.hsnText = '',
   });
 }
 
@@ -231,7 +224,6 @@ class LabelPlan {
 
   final FittedLine value;
   final FittedLine sku;
-  final FittedLine hsn;
 
   /// Slack pushed to the bottom so a sparse label reads as balanced rather
   /// than top-heavy.
@@ -256,7 +248,6 @@ class LabelPlan {
     required this.quietGap,
     required this.value,
     required this.sku,
-    required this.hsn,
     required this.padBottom,
     required this.contentWidth,
     required this.contentHeight,
@@ -279,7 +270,6 @@ class LabelPlan {
       quietGap +
       value.height +
       sku.height +
-      hsn.height +
       padBottom;
 
   /// The single invariant worth testing: the label fits its own sticker.
@@ -403,14 +393,6 @@ class LabelPlanner {
       bold: false,
       measure: measure,
     );
-    final hsn = _fitOneLine(
-      content.hsnText,
-      maxWidth: contentWidth,
-      fontSize: LabelMetrics.hsn.at(t),
-      floor: LabelMetrics.hsn.min,
-      bold: false,
-      measure: measure,
-    );
 
     final gapAbove = LabelMetrics.gapAboveMax -
         (LabelMetrics.gapAboveMax - LabelMetrics.gapAboveMin) * t;
@@ -426,8 +408,7 @@ class LabelPlanner {
         gapAbove +
         quietGap +
         value.height +
-        sku.height +
-        hsn.height;
+        sku.height;
 
     return LabelPlan(
       nameLines: nameLines,
@@ -440,7 +421,6 @@ class LabelPlanner {
       quietGap: quietGap,
       value: value,
       sku: sku,
-      hsn: hsn,
       padBottom: 0,
       contentWidth: contentWidth,
       contentHeight: contentHeight,
@@ -465,7 +445,6 @@ class LabelPlanner {
       quietGap: plan.quietGap,
       value: plan.value,
       sku: plan.sku,
-      hsn: plan.hsn,
       padBottom: slack * 0.45,
       contentWidth: plan.contentWidth,
       contentHeight: plan.contentHeight,

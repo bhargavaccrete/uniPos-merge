@@ -400,6 +400,7 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                               : Text(
                                   'Save Information',
                                   style: TextStyle(
+                                    color: AppColors.white,
                                     fontSize: AppResponsive.subheadingFontSize(
                                       context,
                                     ),

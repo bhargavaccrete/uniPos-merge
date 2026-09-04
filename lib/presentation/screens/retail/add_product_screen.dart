@@ -28,6 +28,9 @@ import 'package:billberrylite/presentation/widget/componets/common/row_action_bu
 import 'package:billberrylite/domain/services/common/notification_service.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:uuid/uuid.dart';
 
@@ -55,6 +58,34 @@ final _qtyFormatters = <TextInputFormatter>[
 final _decimalQtyFormatters = <TextInputFormatter>[
   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
 ];
+
+/// Prompts a soft warning confirmation when selling price < cost price.
+/// Returns true if confirmed or if selling price >= cost price.
+Future<bool> _confirmLossIfSellingBelowCost({
+  required BuildContext context,
+  required double sellingPrice,
+  required double? costPrice,
+}) async {
+  if (costPrice == null || costPrice <= 0 || sellingPrice >= costPrice) {
+    return true; // No loss, proceed directly
+  }
+
+  final loss = costPrice - sellingPrice;
+  final lossPct = ((loss / costPrice) * 100).toStringAsFixed(1);
+  final sym = CurrencyHelper.currentSymbol;
+
+  return await showAppConfirmDialog(
+    context: context,
+    title: 'Selling Below Cost Price?',
+    message: 'Selling Price ($sym${DecimalSettings.formatAmount(sellingPrice)}) '
+        'is lower than Cost Price ($sym${DecimalSettings.formatAmount(costPrice)}).\n\n'
+        'You will incur a loss of $sym${DecimalSettings.formatAmount(loss)} (-$lossPct% margin) per unit.',
+    confirmLabel: 'Continue & Save',
+    cancelLabel: 'Fix Price',
+    accent: AppColors.warning,
+    icon: Icons.warning_amber_rounded,
+  );
+}
 
 /// Single entry point for "Add Product" so the inventory list, its empty state
 /// and the Products hub all open the form the same way.
@@ -710,6 +741,32 @@ class _AddProductScreenState extends State<AddProductScreen> {
         NotificationService.instance.showError(
           'Barcode "$barcode" is already used by another variant',
         );
+        return;
+      }
+    }
+
+    // Warn if any manual variant is being saved below cost price
+    for (final variant in manualVariants) {
+      final sp = double.tryParse(variant.priceController.text.trim()) ?? 0.0;
+      final cpText = variant.costPriceController.text.trim();
+      final cp = cpText.isEmpty ? null : double.tryParse(cpText);
+
+      if (!await _confirmLossIfSellingBelowCost(
+        context: context,
+        sellingPrice: sp,
+        costPrice: cp,
+      )) {
+        return;
+      }
+    }
+
+    // Warn if any generated variant is being saved below cost price
+    for (final variant in _generatedVariants) {
+      if (!await _confirmLossIfSellingBelowCost(
+        context: context,
+        sellingPrice: variant.sellingPrice ?? 0.0,
+        costPrice: variant.costPrice,
+      )) {
         return;
       }
     }

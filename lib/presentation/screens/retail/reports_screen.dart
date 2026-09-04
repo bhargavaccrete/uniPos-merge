@@ -5,6 +5,9 @@ import 'package:billberrylite/presentation/widget/componets/common/primary_app_b
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/presentation/screens/retail/reports/daily_sales_report_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/reports/discount_report_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/reports/quick_items_report_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/reports/sales_refund_report_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/reports/monthly_sales_report_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/reports/product_wise_sales_report_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/reports/variant_wise_sales_report_screen.dart';
@@ -132,6 +135,53 @@ class ReportsScreen extends StatelessWidget {
                 ),
               ),
               entitlementKey: RetailEntKeys.reportsTopSelling,
+            ),
+            // Refunds and give-aways sit in SALES, not Financial: they describe
+            // sale transactions, not the shop's cash position.
+            _buildReportCard(
+              context,
+              title: 'Sales Refunds',
+              subtitle: 'Refunds, returned value and reasons',
+              // Deliberately not Icons.assignment_return — Purchase Returns
+              // below already owns that glyph, and the two reports are close
+              // enough in wording without sharing an icon too.
+              icon: Icons.currency_exchange,
+              color: const Color(0xFFD32F2F),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SalesRefundReportScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.billingReturns,
+            ),
+            _buildReportCard(
+              context,
+              title: 'Discounts Given',
+              subtitle: 'Discounts, price overrides and points redeemed',
+              icon: Icons.percent_rounded,
+              color: const Color(0xFFEF6C00),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const DiscountReportScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsDiscounts,
+            ),
+            _buildReportCard(
+              context,
+              title: 'Quick Items',
+              subtitle: 'Sold without a catalogue entry',
+              icon: Icons.add_shopping_cart_outlined,
+              color: const Color(0xFF00838F),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const QuickItemsReportScreen(),
+                ),
+              ),
+              entitlementKey: RetailEntKeys.reportsQuickItems,
             ),
             const SizedBox(height: 16),
             _buildSectionHeader(context, 'Purchase Reports'),
