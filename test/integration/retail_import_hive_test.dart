@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:archive/archive.dart';
 import 'package:csv/csv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
@@ -791,6 +792,65 @@ void main() {
     List<List<dynamic>> productsSheetOf(List<int> bytes) =>
         RetailImportFileReader.excelRows(Uint8List.fromList(bytes));
 
+    /// Every worksheet's raw XML, keyed by part name.
+    Map<String, String> sheetXmlOf(List<int> bytes) {
+      final archive = ZipDecoder().decodeBytes(bytes);
+      return {
+        for (final f in archive.files)
+          if (f.name.startsWith('xl/worksheets/sheet'))
+            f.name: utf8.decode(f.content as List<int>),
+      };
+    }
+
+    test('the workbook contains NO formula cells at all', () async {
+      // Regression, found twice the hard way. xlsio writes `setFormula` into
+      // <f> verbatim — leading '=' included, which OOXML forbids — and never
+      // writes a cached <v>. Excel cannot resolve such a cell, and a list
+      // validation whose SOURCE contains one renders entirely blank, hiding
+      // the good literal rows above it. Nothing in this template may compute.
+      await categoryStore.loadCategories();
+      await taxStore.loadTaxes();
+
+      final xml = sheetXmlOf(RetailImportTemplateBuilder().build());
+      expect(xml, isNotEmpty);
+      for (final entry in xml.entries) {
+        expect(
+          entry.value,
+          isNot(contains('<f>')),
+          reason: '${entry.key} has a formula cell',
+        );
+      }
+    });
+
+    test('every dropdown reads a range that starts at the first data row and '
+        'covers the seeded rows plus spares', () async {
+      await categoryStore.loadCategories();
+      await taxStore.loadTaxes();
+
+      final joined = sheetXmlOf(RetailImportTemplateBuilder().build()).values
+          .join();
+      final sources = RegExp(r'<formula1>([^<]*)</formula1>')
+          .allMatches(joined)
+          .map((m) => m.group(1)!)
+          .toList();
+
+      // Category and Tax read a sheet range; Unit is an inline literal list.
+      final ranges = sources.where((s) => s.contains('!')).toList();
+      expect(ranges, hasLength(2));
+      for (final range in ranges) {
+        // Row 3 is the first data row — a range starting at 1 or 2 would put
+        // the header and the yellow instruction text in the dropdown.
+        expect(range, contains(r'$3:'), reason: range);
+        final last = int.parse(RegExp(r'\$(\d+)$').firstMatch(range)!.group(1)!);
+        expect(
+          last,
+          greaterThan(3),
+          reason: '$range must reach past the seeded rows so a hand-added '
+              'category or rate is included',
+        );
+      }
+    });
+
     test('the xlsio-written workbook is readable by the excel package and its '
         'sample rows all validate', () async {
       await categoryStore.loadCategories();
@@ -825,6 +885,7 @@ void main() {
         'milk_1l',
         'cotton_socks',
         'tshirt_vneck',
+        'belt_classic',
       ]);
     });
 
@@ -876,10 +937,21 @@ void main() {
       store.preview = RetailImportParser.parse(store.parsedRows.toList());
       await store.importData();
 
-      expect(store.outcome!.productsCreated, 6);
-      expect(store.outcome!.variantsImported, 11);
+      expect(store.outcome!.productsCreated, 7);
+      expect(store.outcome!.variantsImported, 13);
       expect(store.outcome!.rowsRejected, 0);
       expect(store.outcome!.groupsFailed, 0);
+
+      // The three-option sample stores all three as attributes — the template
+      // demonstrates the wider Option block, not just Size + Color. Compared as
+      // an unordered set: box iteration order is not a guarantee.
+      expect(
+        variantsOf('Classic Belt').map((v) => v.customAttributes),
+        containsAll([
+          {'Size': 'M', 'Color': 'Black', 'Material': 'Leather'},
+          {'Size': 'L', 'Color': 'Brown', 'Material': 'Canvas'},
+        ]),
+      );
 
       // The weighed sample really is decimal once stored.
       final potato = variantsOf('Potato (Loose)').single;

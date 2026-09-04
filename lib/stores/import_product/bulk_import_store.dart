@@ -693,8 +693,10 @@ abstract class _BulkImportStore with Store {
 
     for (final tax in taxStore.taxes) {
       final rate = tax.taxperecentage ?? 0;
-      if (label == '${tax.taxname} ($rate%)') {
-        return (taxId: tax.id, gstRate: rate);
+      // Same helper the template writes with, so the exact match cannot be
+      // broken by a rate rendering as "5.0" on one side and "5" on the other.
+      if (label == retailTaxLabel(tax.taxname, rate)) {
+        return (taxId: tax.id, gstRate: rate.toDouble());
       }
     }
 

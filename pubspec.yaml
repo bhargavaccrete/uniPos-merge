@@ -121,6 +121,10 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
+  # Test-only: unzips the generated .xlsx so the import-template tests can
+  # assert on its raw OOXML (no formula cells, correct dropdown ranges).
+  archive: ^3.6.1
+
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

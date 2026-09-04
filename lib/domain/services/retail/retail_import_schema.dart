@@ -13,6 +13,7 @@
 library;
 
 import 'package:billberrylite/core/config/tariff_code_rule.dart';
+import 'package:billberrylite/core/config/tax_label_rule.dart';
 import 'package:billberrylite/core/constants/item_units.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 
@@ -22,32 +23,78 @@ import 'package:billberrylite/util/common/currency_helper.dart';
 
 /// Every column of the Products sheet, in template order.
 ///
-/// Columns 0-17 are the original layout and must keep their positions: a
-/// workbook downloaded before SKU/Unit/Expiry existed is still a valid import,
-/// and it is matched positionally whenever its header row cannot be read.
+/// Grouped by OWNERSHIP, which is the sheet's one real rule: identity, then the
+/// product-level block that is read from the first row of each Handle only,
+/// then the per-variant columns. Unit deliberately precedes Stock — it is what
+/// decides whether a fractional Stock is legal, so a shop should meet it first.
+///
+/// This order is free to change: it is the *display* order only. What a file
+/// without readable headers is measured against is [_legacyPositions], which is
+/// frozen. Adding a column here therefore no longer has to mean appending it.
 enum RetailImportColumn {
   handle,
   name,
   category,
   description,
+  // ── Product-level: first row of each Handle only ──
+  unit,
+  taxRate,
+  hsnCode,
+  expiryDate,
+  // ── Variant identity ──
   option1Name,
   option1Value,
   option2Name,
   option2Value,
   option3Name,
   option3Value,
+  option4Name,
+  option4Value,
+  option5Name,
+  option5Value,
+  sku,
+  barcode,
+  // ── Variant numbers ──
   costPrice,
   sellingPrice,
   mrp,
   stock,
-  barcode,
   minStock,
-  taxRate,
-  hsnCode,
-  sku,
-  unit,
-  expiryDate,
 }
+
+/// Where each column sat in the original 21-column template — FROZEN.
+///
+/// Used only as the fallback for a file whose header row cannot be read, which
+/// in practice means a workbook downloaded or hand-made before the columns were
+/// regrouped. Decoupling this from `RetailImportColumn.index` is what makes the
+/// display order above safe to change.
+///
+/// Columns added after that layout (Option4/5) have no legacy position and map
+/// to -1, which [_HeaderMap.cell] reads as "absent" rather than reaching into
+/// whatever now occupies that index.
+const Map<RetailImportColumn, int> _legacyPositions = {
+  RetailImportColumn.handle: 0,
+  RetailImportColumn.name: 1,
+  RetailImportColumn.category: 2,
+  RetailImportColumn.description: 3,
+  RetailImportColumn.option1Name: 4,
+  RetailImportColumn.option1Value: 5,
+  RetailImportColumn.option2Name: 6,
+  RetailImportColumn.option2Value: 7,
+  RetailImportColumn.option3Name: 8,
+  RetailImportColumn.option3Value: 9,
+  RetailImportColumn.costPrice: 10,
+  RetailImportColumn.sellingPrice: 11,
+  RetailImportColumn.mrp: 12,
+  RetailImportColumn.stock: 13,
+  RetailImportColumn.barcode: 14,
+  RetailImportColumn.minStock: 15,
+  RetailImportColumn.taxRate: 16,
+  RetailImportColumn.hsnCode: 17,
+  RetailImportColumn.sku: 18,
+  RetailImportColumn.unit: 19,
+  RetailImportColumn.expiryDate: 20,
+};
 
 /// Header text written into row 1 of the Products sheet. `*` marks required.
 ///
@@ -58,36 +105,43 @@ const Map<RetailImportColumn, String> kRetailImportHeaders = {
   RetailImportColumn.name: 'Name*',
   RetailImportColumn.category: 'Category*',
   RetailImportColumn.description: 'Description',
+  RetailImportColumn.unit: 'Unit',
+  RetailImportColumn.taxRate: 'Tax Rate',
+  RetailImportColumn.hsnCode: 'HSN Code',
+  RetailImportColumn.expiryDate: 'Expiry Date',
   RetailImportColumn.option1Name: 'Option1 Name',
   RetailImportColumn.option1Value: 'Option1 Value',
   RetailImportColumn.option2Name: 'Option2 Name',
   RetailImportColumn.option2Value: 'Option2 Value',
   RetailImportColumn.option3Name: 'Option3 Name',
   RetailImportColumn.option3Value: 'Option3 Value',
+  RetailImportColumn.option4Name: 'Option4 Name',
+  RetailImportColumn.option4Value: 'Option4 Value',
+  RetailImportColumn.option5Name: 'Option5 Name',
+  RetailImportColumn.option5Value: 'Option5 Value',
+  RetailImportColumn.sku: 'SKU',
+  RetailImportColumn.barcode: 'Barcode',
   RetailImportColumn.costPrice: 'Cost Price',
   RetailImportColumn.sellingPrice: 'Selling Price*',
   RetailImportColumn.mrp: 'MRP',
   RetailImportColumn.stock: 'Stock',
-  RetailImportColumn.barcode: 'Barcode',
   RetailImportColumn.minStock: 'Min Stock',
-  RetailImportColumn.taxRate: 'Tax Rate',
-  RetailImportColumn.hsnCode: 'HSN Code',
-  RetailImportColumn.sku: 'SKU',
-  RetailImportColumn.unit: 'Unit',
-  RetailImportColumn.expiryDate: 'Expiry Date',
 };
 
 /// Display label for one header cell.
 ///
-/// Every column is fixed except the tariff-code one, whose name varies by
-/// country — HSN in India, HTS in the US, CN/TARIC across the EU. The canonical
-/// 'HSN Code' stays in [kRetailImportHeaders] as the storage-side name, and
-/// every country's spelling is accepted on read via [_headerAliases], so a
+/// Two columns are named differently per country, and both keep their canonical
+/// spelling in [kRetailImportHeaders] as the storage-side name:
+///  * the tariff code — HSN in India, HTS in the US, CN/TARIC across the EU;
+///  * the tax — GST in India, VAT across the EU/UK, Sales Tax in the US.
+///
+/// Every country's spelling is accepted on read via [_headerAliases], so a
 /// template generated in one country still imports on a device set to another.
-String retailImportHeaderLabel(RetailImportColumn column) =>
-    column == RetailImportColumn.hsnCode
-        ? TariffCodeRule.label
-        : kRetailImportHeaders[column]!;
+String retailImportHeaderLabel(RetailImportColumn column) => switch (column) {
+  RetailImportColumn.hsnCode => TariffCodeRule.label,
+  RetailImportColumn.taxRate => '${TaxLabelRule.name} Rate',
+  _ => kRetailImportHeaders[column]!,
+};
 
 /// The ordered header row, for the template builder.
 List<String> get kRetailImportHeaderRow =>
@@ -112,7 +166,19 @@ const Map<String, RetailImportColumn> _headerAliases = {
   'uom': RetailImportColumn.unit,
   'unitofmeasure': RetailImportColumn.unit,
   'expiry': RetailImportColumn.expiryDate,
+  // Every country's name for the tax column, for the same reason as the tariff
+  // codes below — the header is written as "GST Rate" / "VAT Rate" / "Sales Tax
+  // Rate" depending on where the template was generated. See
+  // [retailImportHeaderLabel].
   'tax': RetailImportColumn.taxRate,
+  'taxpercent': RetailImportColumn.taxRate,
+  'taxpercentage': RetailImportColumn.taxRate,
+  'gst': RetailImportColumn.taxRate,
+  'gstrate': RetailImportColumn.taxRate,
+  'vat': RetailImportColumn.taxRate,
+  'vatrate': RetailImportColumn.taxRate,
+  'salestax': RetailImportColumn.taxRate,
+  'salestaxrate': RetailImportColumn.taxRate,
   // Every country's name for the tariff-code column, so a template downloaded
   // in one country still imports on a device set to another. See
   // [retailImportHeaderLabel].
@@ -139,6 +205,24 @@ const Map<String, RetailImportColumn> _headerAliases = {
   'cntariccode': RetailImportColumn.hsnCode,
 };
 
+/// The one spelling of a tax dropdown entry: `"GST (5%)"`, `"VAT (12.5%)"`.
+///
+/// Shared by the template builder (which writes it) and
+/// `BulkImportStore._resolveTaxFromLabel` (which matches it back to a Tax
+/// entity by exact string). Keeping the two ends on one function is what stops
+/// a rate rendering as `5.0` on one side and `5` on the other — a mismatch
+/// there still imports, but silently drops the `taxId` link and keeps only the
+/// raw rate.
+///
+/// A whole rate loses its `.0`; a fractional one keeps its digits.
+String retailTaxLabel(String name, num rate) {
+  final value = rate.toDouble();
+  final text = value == value.roundToDouble()
+      ? value.toInt().toString()
+      : value.toString();
+  return '$name ($text%)';
+}
+
 /// Reduces a header cell to a comparison key: case, spacing, punctuation and
 /// the `*` required-marker all stop mattering.
 String _headerKey(String raw) =>
@@ -150,11 +234,15 @@ class _HeaderMap {
 
   const _HeaderMap(this._byColumn);
 
-  /// Builds a map from [headerRow], falling back to template positions for any
+  /// Builds a map from [headerRow], falling back to [_legacyPositions] for any
   /// column the row does not name. A row is only trusted as headers when it
   /// names at least Handle, Name and Selling Price — otherwise the file has no
   /// header row worth reading and everything stays positional, exactly as the
   /// importer behaved before.
+  ///
+  /// The fallback targets the ORIGINAL layout, not the current one: a file the
+  /// parser cannot read the headers of is an old or hand-made file, and the
+  /// current template's own instructions tell shops not to delete row 1.
   factory _HeaderMap.from(List<dynamic> headerRow) {
     final found = <RetailImportColumn, int>{};
     for (var i = 0; i < headerRow.length; i++) {
@@ -180,13 +268,14 @@ class _HeaderMap {
     if (!recognised) return _HeaderMap.positional();
 
     for (final column in RetailImportColumn.values) {
-      found.putIfAbsent(column, () => column.index);
+      found.putIfAbsent(column, () => _legacyPositions[column] ?? -1);
     }
     return _HeaderMap(found);
   }
 
-  factory _HeaderMap.positional() =>
-      _HeaderMap({for (final c in RetailImportColumn.values) c: c.index});
+  factory _HeaderMap.positional() => _HeaderMap({
+    for (final c in RetailImportColumn.values) c: _legacyPositions[c] ?? -1,
+  });
 
   int indexOf(RetailImportColumn column) => _byColumn[column]!;
 
@@ -644,6 +733,10 @@ class RetailImportParser {
         ? null
         : catalogue.existingVariantKeys(name);
 
+    // Five option TYPES per product. Storage is not the limit — a variant's
+    // attributes are a plain map, and the importer mints any attribute it has
+    // not seen — so this is only how wide the sheet is willing to be. More
+    // option VALUES (S/M/L/XL) never needs another pair; it needs another ROW.
     const optionColumns = [
       (
         RetailImportColumn.option1Name,
@@ -659,6 +752,16 @@ class RetailImportParser {
         RetailImportColumn.option3Name,
         RetailImportColumn.option3Value,
         'Option3',
+      ),
+      (
+        RetailImportColumn.option4Name,
+        RetailImportColumn.option4Value,
+        'Option4',
+      ),
+      (
+        RetailImportColumn.option5Name,
+        RetailImportColumn.option5Value,
+        'Option5',
       ),
     ];
 

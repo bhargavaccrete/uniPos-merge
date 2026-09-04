@@ -1,6 +1,7 @@
 import 'package:syncfusion_flutter_xlsio/xlsio.dart';
 
 import '../../../../core/config/tariff_code_rule.dart';
+import '../../../../core/config/tax_label_rule.dart';
 import '../../../../core/constants/item_units.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../domain/services/retail/retail_import_schema.dart';
@@ -28,10 +29,24 @@ class RetailImportTemplateBuilder {
   /// Last data row dropdowns/validation are applied to.
   static const int _validationLastRow = 500;
 
-  /// Last row the Categories/Taxes reference lists span. A fixed range is
-  /// required for a range-based dropdown; existing categories/taxes are
-  /// seeded live below, so this only matters for room to add more by hand.
-  static const int _listSourceLastRow = 60;
+  /// First data row on every sheet — row 1 is headers, row 2 the yellow
+  /// instruction row.
+  static const int _firstDataRow = 3;
+
+  /// Blank rows the Category/Tax dropdowns reach BEYOND the seeded ones, so a
+  /// category or rate typed onto the reference sheet shows up in the Products
+  /// dropdown without regenerating the template.
+  ///
+  /// It has to be a fixed pad. Excel resolves a list validation against a
+  /// static A1 range and xlsio cannot emit anything else — its `list` branch
+  /// (`serialize_workbook.dart`) writes `dataRangeVal.addressGlobal` and
+  /// ignores `firstFormula`, so the usual self-expanding tricks (a defined name
+  /// over `OFFSET`/`COUNTA`, or a Table column) have no way in.
+  ///
+  /// The cost is that Excel lists every cell of the source, so the spare rows
+  /// show as blank entries at the END of the dropdown. Twenty is the trade:
+  /// room for real additions without burying the seeded values.
+  static const int _spareListRows = 20;
 
   List<int> build() {
     final Workbook wb = Workbook();
@@ -61,9 +76,17 @@ class RetailImportTemplateBuilder {
     final Worksheet products = wb.worksheets.addWithName('Products');
 
     _buildInstructions(instructions, titleStyle, sectionStyle);
-    _buildCategories(categories, header, instr);
+    final categoryNames = _buildCategories(categories, header, instr);
     final taxLabels = _buildTaxes(taxes, header, instr);
-    _buildProducts(products, header, instr, categories, taxes, taxLabels);
+    _buildProducts(
+      products,
+      header,
+      instr,
+      categorySource: categories,
+      categoryNames: categoryNames,
+      taxSource: taxes,
+      taxLabels: taxLabels,
+    );
 
     final List<int> bytes = wb.saveAsStream();
     wb.dispose();
@@ -101,18 +124,27 @@ class RetailImportTemplateBuilder {
   /// 1-based worksheet column for [column].
   int _col(RetailImportColumn column) => column.index + 1;
 
-  /// A LIVE dropdown that reads its options from a column on another sheet.
-  /// [allowOther] behaviour is implicit: the error style is a warning, so
-  /// owners can still type a brand-new value (e.g. a new category) and it gets
-  /// picked up on import.
+  /// A dropdown that reads its options from a column on another sheet.
+  ///
+  /// [rowCount] is the number of rows seeded on that sheet; the range reaches
+  /// [_spareListRows] past them so rows the owner types later are included.
+  ///
+  /// "Allow other" behaviour is implicit: the error style is a warning, so
+  /// owners can still type a value that is not in the list and it is picked up
+  /// on import.
   void _dropdownFromRange(
     Worksheet s,
     RetailImportColumn column,
-    Range source, {
+    Worksheet source,
+    int sourceColumn,
+    int rowCount, {
     required String prompt,
-    required String addSheet,
-    int fromRow = 3,
+    required String errorText,
+    int fromRow = _firstDataRow,
   }) {
+    final int lastSourceRow = _firstDataRow + rowCount + _spareListRows - 1;
+    if (lastSourceRow < _firstDataRow) return;
+
     final Range r = s.getRangeByIndex(
       fromRow,
       _col(column),
@@ -121,13 +153,17 @@ class RetailImportTemplateBuilder {
     );
     final dv = r.dataValidation;
     dv.allowType = ExcelDataValidationType.user;
-    dv.dataRange = source;
+    dv.dataRange = source.getRangeByIndex(
+      _firstDataRow,
+      sourceColumn,
+      lastSourceRow,
+      sourceColumn,
+    );
     dv.promptBoxText = prompt;
     dv.showPromptBox = true;
     dv.errorStyle = ExcelDataValidationErrorStyle.warning;
     dv.errorBoxTitle = 'Not in list';
-    dv.errorBoxText =
-        'Pick from the list, or add it to the $addSheet sheet first.';
+    dv.errorBoxText = errorText;
   }
 
   /// A dropdown over a fixed list of values. Used for Unit, whose options are
@@ -171,34 +207,80 @@ class RetailImportTemplateBuilder {
       r++;
     }
 
+    final taxName = TaxLabelRule.name;
+
     line('QUICK START', style: section);
     line(
-      '1. Check the "Categories" and "Taxes" sheets — add more rows there if you need new ones.',
+      '1. Fill the "Products" sheet — it is the ONLY sheet that gets imported.',
     );
     line(
-      '2. Fill the "Products" sheet — use the dropdowns for Category, Tax Rate and Unit.',
+      '2. Use the dropdowns for Category, $taxName Rate and Unit where you can.',
     );
     line(
       '3. One row per variant. Give every variant of the same product the same Handle.',
     );
     line('4. Save this file and import it back into Bill Berry Lite.');
     r++;
+    line('NEW CATEGORIES AND $taxName RATES', style: section);
+    line(
+      '• To add a category: type its name in the first empty row of the "Categories" sheet.',
+    );
+    line(
+      '  It appears in the Products sheet dropdown straight away. Room for $_spareListRows more.',
+    );
+    line(
+      '• To add a $taxName rate: type it in the first empty row of the "Taxes" sheet, written',
+    );
+    line(
+      '  the same way as the ones already there — e.g. "$taxName (12%)".',
+    );
+    line(
+      '• The blank entries at the END of those dropdowns are the spare rows waiting to be filled.',
+    );
+    line(
+      '• You can also just TYPE a category or rate straight into the Products sheet. Excel warns',
+    );
+    line(
+      '  that it is not in the list — choose Yes. It is created when you import.',
+    );
+    line(
+      '• Only the "Products" sheet is imported. The other two feed the dropdowns and keep your',
+    );
+    line('  spelling consistent.');
+    r++;
     line('TIPS', style: section);
+    line(
+      '• Do NOT delete or rename row 1 — the header row is how columns are recognised.',
+    );
     line(
       '• Cells with a dropdown show a small arrow — click it to pick a value.',
     );
     line('• Click any header cell to read its tooltip (what to enter).');
     line('• Required columns are marked with * in the header row.');
     line(
-      '• You can still type a Category or Tax that isn\'t in the dropdown — it will be added automatically.',
+      '• Price and Stock must be numbers only (no currency symbols, no 1,000 separators).',
+    );
+    r++;
+    line('OPTIONS AND VARIANTS', style: section);
+    line(
+      '• Option columns are the option TYPES — Size, Color, Material. Up to 5 per product.',
     );
     line(
-      '• Price and Stock must be numbers only (no currency symbols, no 1,000 separators).',
+      '• More option VALUES (S, M, L, XL, XXL) means more ROWS, never more columns.',
+    );
+    line(
+      '  e.g. Size S/M/L in Red and Blue = 6 rows, all sharing one Handle, using 2 option columns.',
+    );
+    line(
+      '• Every row of a product must have a DIFFERENT combination of option values.',
+    );
+    line(
+      '• A product with no variants leaves every Option column blank and uses a single row.',
     );
     r++;
     line('UNIT, STOCK AND EXPIRY', style: section);
     line(
-      '• Unit, Expiry Date, Tax Rate and ${TariffCodeRule.label} belong to the PRODUCT — fill them on the first row of each Handle only.',
+      '• Unit, $taxName Rate, ${TariffCodeRule.label} and Expiry Date belong to the PRODUCT — fill them on the first row of each Handle only.',
     );
     line(
       '• Unit "piece" means the product is counted in whole numbers; Stock must then be a whole number.',
@@ -234,9 +316,12 @@ class RetailImportTemplateBuilder {
 
   List<String> _buildCategories(Worksheet s, Style header, Style instr) {
     _setHeaders(s, ['id', 'name*'], header);
+    // This sheet feeds the Products dropdown but is never imported itself; a
+    // category only reaches the app by being used on a Products row.
     _setInstruction(s, [
       'Leave blank — filled in automatically',
-      'Category name (e.g., Clothing)',
+      'Add a category in the first empty row and it appears in the Products '
+          'dropdown. Room for $_spareListRows more.',
     ], instr);
 
     final existing = categoryStore.categories.map((c) => c.name).toList();
@@ -251,42 +336,62 @@ class RetailImportTemplateBuilder {
 
   // ── Taxes (seeded with the shop's real named tax rates if any exist) ──────
 
+  /// India's official GST slabs — the only rates in the app that are safe to
+  /// pre-fill. Mirrors `taxSetupStep.dart`'s preset chips deliberately: that
+  /// screen offers no presets outside India because VAT and sales-tax rates
+  /// vary far too much per country to guess, and a wrong pre-filled rate is
+  /// worse than an empty sheet the owner has to fill in.
+  static const List<int> _indiaGstSlabs = [5, 12, 18, 28];
+
+  /// 1-based column on the Taxes sheet the Products dropdown reads.
+  static const int _taxLabelColumn = 1;
+
+  /// ONE literal column, exactly like Categories — deliberately not a
+  /// name + rate pair with a computed label beside it.
+  ///
+  /// That earlier shape needed a formula so a hand-added row could build its
+  /// own label, and formulas cannot survive this writer: xlsio emits the string
+  /// verbatim into `<f>`, leading `=` included, which OOXML forbids, and never
+  /// writes a cached `<v>`. Excel could not resolve those cells, and a list
+  /// validation whose source it cannot resolve renders ENTIRELY blank — taking
+  /// the perfectly good literal rows above them down too.
+  ///
+  /// So the column the owner types into is the column the dropdown reads, and
+  /// nothing in this workbook computes anything.
   List<String> _buildTaxes(Worksheet s, Style header, Style instr) {
-    _setHeaders(s, ['name*', 'rate%*'], header);
+    final taxName = TaxLabelRule.name;
+    _setHeaders(s, ['$taxName rate*'], header);
     _setInstruction(s, [
-      'Tax name (e.g., GST)',
-      'Rate as a number, e.g. 5',
+      'These fill the Products dropdown. Add one in the first empty row, '
+          'written the same way — e.g. "$taxName (12%)".',
     ], instr);
 
-    final existingTaxes = taxStore.taxes;
     final labels = <String>[];
+    void seed(String label) {
+      labels.add(label);
+      _setRow(s, _firstDataRow + labels.length - 1, [label]);
+    }
+
+    final existingTaxes = taxStore.taxes;
     if (existingTaxes.isNotEmpty) {
-      for (int i = 0; i < existingTaxes.length; i++) {
-        final tax = existingTaxes[i];
-        final rate = tax.taxperecentage ?? 0;
-        _setRow(s, 3 + i, [tax.taxname, rate]);
-        labels.add('${tax.taxname} ($rate%)');
+      for (final tax in existingTaxes) {
+        seed(retailTaxLabel(tax.taxname, tax.taxperecentage ?? 0));
       }
-    } else {
-      const defaults = [
-        {'name': 'GST', 'rate': 5.0},
-        {'name': 'GST', 'rate': 12.0},
-        {'name': 'GST', 'rate': 18.0},
-      ];
-      for (int i = 0; i < defaults.length; i++) {
-        final name = defaults[i]['name'] as String;
-        final rate = defaults[i]['rate'] as double;
-        _setRow(s, 3 + i, [name, rate]);
-        labels.add('$name ($rate%)');
+    } else if (TaxLabelRule.isIndia) {
+      // Everywhere else the sheet is left empty on purpose — the owner types
+      // their own rates. The Instructions sheet says so.
+      for (final rate in _indiaGstSlabs) {
+        seed(retailTaxLabel(taxName, rate));
       }
     }
-    s.getRangeByIndex(1, 1, 1, 2).autoFitColumns();
+
+    s.getRangeByIndex(1, 1, 1, _taxLabelColumn).columnWidth = 24;
     return labels;
   }
 
   // ── Products (the actual data-entry sheet) ─────────────────────────────────
 
-  /// Builds one Products row from named values, so a 21-column sample stays
+  /// Builds one Products row from named values, so a 25-column sample stays
   /// readable and a future column cannot silently shift the others.
   List<dynamic> _productRow({
     required String handle,
@@ -299,6 +404,10 @@ class RetailImportTemplateBuilder {
     String opt2Value = '',
     String opt3Name = '',
     String opt3Value = '',
+    String opt4Name = '',
+    String opt4Value = '',
+    String opt5Name = '',
+    String opt5Value = '',
     dynamic cost = '',
     dynamic price = '',
     dynamic mrp = '',
@@ -318,34 +427,39 @@ class RetailImportTemplateBuilder {
     put(RetailImportColumn.name, name);
     put(RetailImportColumn.category, category);
     put(RetailImportColumn.description, description);
+    put(RetailImportColumn.unit, unit);
+    put(RetailImportColumn.taxRate, tax);
+    put(RetailImportColumn.hsnCode, hsn);
+    put(RetailImportColumn.expiryDate, expiry);
     put(RetailImportColumn.option1Name, opt1Name);
     put(RetailImportColumn.option1Value, opt1Value);
     put(RetailImportColumn.option2Name, opt2Name);
     put(RetailImportColumn.option2Value, opt2Value);
     put(RetailImportColumn.option3Name, opt3Name);
     put(RetailImportColumn.option3Value, opt3Value);
+    put(RetailImportColumn.option4Name, opt4Name);
+    put(RetailImportColumn.option4Value, opt4Value);
+    put(RetailImportColumn.option5Name, opt5Name);
+    put(RetailImportColumn.option5Value, opt5Value);
+    put(RetailImportColumn.sku, sku);
+    put(RetailImportColumn.barcode, barcode);
     put(RetailImportColumn.costPrice, cost);
     put(RetailImportColumn.sellingPrice, price);
     put(RetailImportColumn.mrp, mrp);
     put(RetailImportColumn.stock, stock);
-    put(RetailImportColumn.barcode, barcode);
     put(RetailImportColumn.minStock, minStock);
-    put(RetailImportColumn.taxRate, tax);
-    put(RetailImportColumn.hsnCode, hsn);
-    put(RetailImportColumn.sku, sku);
-    put(RetailImportColumn.unit, unit);
-    put(RetailImportColumn.expiryDate, expiry);
     return values;
   }
 
   void _buildProducts(
     Worksheet s,
     Style header,
-    Style instr,
-    Worksheet categorySource,
-    Worksheet taxSource,
-    List<String> taxLabels,
-  ) {
+    Style instr, {
+    required Worksheet categorySource,
+    required List<String> categoryNames,
+    required Worksheet taxSource,
+    required List<String> taxLabels,
+  }) {
     // Headers come from the parser's own list — one source of truth.
     _setHeaders(s, kRetailImportHeaderRow, header);
 
@@ -354,26 +468,30 @@ class RetailImportTemplateBuilder {
       RetailImportColumn.name: 'Product name (on the first row of each group)',
       RetailImportColumn.category: 'Pick a category',
       RetailImportColumn.description: 'Optional, first row only',
+      RetailImportColumn.unit:
+          'piece = whole numbers. kg/gm/liter/ml allow decimals. First row only',
+      RetailImportColumn.taxRate:
+          'Pick a rate (first row of each group only)',
+      RetailImportColumn.hsnCode: 'Optional, first row only',
+      RetailImportColumn.expiryDate: 'Optional, YYYY-MM-DD. First row only',
       RetailImportColumn.option1Name: 'e.g. Size',
       RetailImportColumn.option1Value: 'e.g. Small',
       RetailImportColumn.option2Name: 'e.g. Color',
       RetailImportColumn.option2Value: 'e.g. Red',
-      RetailImportColumn.option3Name: '',
-      RetailImportColumn.option3Value: '',
+      RetailImportColumn.option3Name: 'e.g. Material',
+      RetailImportColumn.option3Value: 'e.g. Cotton',
+      RetailImportColumn.option4Name: 'Optional 4th option type',
+      RetailImportColumn.option4Value: '',
+      RetailImportColumn.option5Name: 'Optional 5th option type',
+      RetailImportColumn.option5Value: '',
+      RetailImportColumn.sku: 'Optional — generated if blank',
+      RetailImportColumn.barcode:
+          'Optional — generated if blank, must be unique',
       RetailImportColumn.costPrice: 'Optional',
       RetailImportColumn.sellingPrice: 'Required: number only',
       RetailImportColumn.mrp: 'Optional',
       RetailImportColumn.stock: 'Optional, defaults to 0',
-      RetailImportColumn.barcode:
-          'Optional — generated if blank, must be unique',
       RetailImportColumn.minStock: 'Optional, defaults to 5',
-      RetailImportColumn.taxRate:
-          'Pick a tax rate (first row of each group only)',
-      RetailImportColumn.hsnCode: 'Optional, first row only',
-      RetailImportColumn.sku: 'Optional — generated if blank',
-      RetailImportColumn.unit:
-          'piece = whole numbers. kg/gm/liter/ml allow decimals. First row only',
-      RetailImportColumn.expiryDate: 'Optional, YYYY-MM-DD. First row only',
     };
     _setInstruction(
       s,
@@ -514,13 +632,48 @@ class RetailImportTemplateBuilder {
       );
     }
 
-    // Category dropdown — live from the Categories sheet (column B, data row 3+).
+    // 7. THREE option types on one product, so the wider Option block is not
+    //    left unexplained. Option4/5 exist for the same reason and need no
+    //    sample of their own — they behave identically.
+    for (final variant in const [
+      ('M', 'Black', 'Leather', 45.00, 90.00, 8, 'BELT-M-BLK-L'),
+      ('L', 'Brown', 'Canvas', 30.00, 65.00, 6, 'BELT-L-BRN-C'),
+    ]) {
+      final isFirst = variant.$1 == 'M';
+      sample(
+        _productRow(
+          handle: 'belt_classic',
+          name: 'Classic Belt',
+          category: 'Clothing',
+          description: 'Adjustable belt',
+          opt1Name: 'Size',
+          opt1Value: variant.$1,
+          opt2Name: 'Color',
+          opt2Value: variant.$2,
+          opt3Name: 'Material',
+          opt3Value: variant.$3,
+          cost: variant.$4,
+          price: variant.$5,
+          stock: variant.$6,
+          barcode: variant.$7,
+          minStock: 3,
+          unit: isFirst ? 'piece' : '',
+        ),
+      );
+    }
+
+    // Category dropdown — the Categories sheet's name column (B), sized to the
+    // rows actually seeded.
     _dropdownFromRange(
       s,
       RetailImportColumn.category,
-      categorySource.getRangeByName('B3:B$_listSourceLastRow'),
-      prompt: 'Pick a category (add new ones in the Categories sheet).',
-      addSheet: 'Categories',
+      categorySource,
+      2,
+      categoryNames.length,
+      prompt: 'Pick a category, or type a new one — it is created on import.',
+      errorText:
+          'Not one of your existing categories. You can still use it — a new '
+          'category is created when the file is imported.',
     );
 
     // Unit dropdown — the app's canonical list, so a value that cannot be
@@ -535,27 +688,20 @@ class RetailImportTemplateBuilder {
       errorText: 'Use one of: ${kItemUnits.join(', ')}.',
     );
 
-    // Tax Rate dropdown — no single-column source matches "Name (Rate%)", so
-    // build a helper column on the Taxes sheet that concatenates name+rate for
-    // every row in the dropdown's range (not just currently-populated ones),
-    // so taxes added later by hand also get a computed label automatically.
-    // Labelled so it doesn't look like unexplained stray data on that sheet.
-    taxSource.getRangeByIndex(1, 3).setText('Label (auto)');
-    taxSource.getRangeByIndex(1, 3).cellStyle = header;
-    taxSource.getRangeByIndex(2, 3).setText('Auto-generated — do not edit');
-    taxSource.getRangeByIndex(2, 3).cellStyle = instr;
-    for (int r = 3; r <= _listSourceLastRow; r++) {
-      taxSource
-          .getRangeByIndex(r, 3)
-          .setFormula('=IF(A$r="","",A$r&" ("&B$r&"%)")');
-    }
-    taxSource.getRangeByIndex(1, 3).columnWidth = 20;
+    // Tax dropdown — the Taxes sheet's ready-made "Name (Rate%)" label column,
+    // written there as literal text by [_buildTaxes]. Skipped entirely when the
+    // shop has no rates seeded: an empty dropdown reads as a broken one.
+    final taxName = TaxLabelRule.name;
     _dropdownFromRange(
       s,
       RetailImportColumn.taxRate,
-      taxSource.getRangeByName('C3:C$_listSourceLastRow'),
-      prompt: 'Pick a tax rate (add new ones in the Taxes sheet).',
-      addSheet: 'Taxes',
+      taxSource,
+      _taxLabelColumn,
+      taxLabels.length,
+      prompt: 'Pick a $taxName rate. First row of each Handle only.',
+      errorText:
+          'Not one of your saved $taxName rates. You can still type your own, '
+          'written like "$taxName (12%)" or just 12.',
     );
   }
 }

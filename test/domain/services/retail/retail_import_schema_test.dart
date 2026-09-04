@@ -14,6 +14,10 @@ void main() {
 
   /// A full-width row. Every field defaults to something valid so each test
   /// only states what it is actually exercising.
+  ///
+  /// Cells are placed BY COLUMN, never by literal position, so the display
+  /// order of [RetailImportColumn] stays free to change — which is the whole
+  /// point of the parser matching headers by name.
   List<dynamic> row({
     String handle = 'h1',
     String name = 'Product',
@@ -25,6 +29,10 @@ void main() {
     String opt2Value = '',
     String opt3Name = '',
     String opt3Value = '',
+    String opt4Name = '',
+    String opt4Value = '',
+    String opt5Name = '',
+    String opt5Value = '',
     String cost = '',
     String price = '10',
     String mrp = '',
@@ -36,29 +44,37 @@ void main() {
     String sku = '',
     String unit = '',
     String expiry = '',
-  }) => [
-    handle,
-    name,
-    category,
-    description,
-    opt1Name,
-    opt1Value,
-    opt2Name,
-    opt2Value,
-    opt3Name,
-    opt3Value,
-    cost,
-    price,
-    mrp,
-    stock,
-    barcode,
-    minStock,
-    tax,
-    hsn,
-    sku,
-    unit,
-    expiry,
-  ];
+  }) {
+    final cells = List<dynamic>.filled(RetailImportColumn.values.length, '');
+    void put(RetailImportColumn c, String v) => cells[c.index] = v;
+
+    put(RetailImportColumn.handle, handle);
+    put(RetailImportColumn.name, name);
+    put(RetailImportColumn.category, category);
+    put(RetailImportColumn.description, description);
+    put(RetailImportColumn.unit, unit);
+    put(RetailImportColumn.taxRate, tax);
+    put(RetailImportColumn.hsnCode, hsn);
+    put(RetailImportColumn.expiryDate, expiry);
+    put(RetailImportColumn.option1Name, opt1Name);
+    put(RetailImportColumn.option1Value, opt1Value);
+    put(RetailImportColumn.option2Name, opt2Name);
+    put(RetailImportColumn.option2Value, opt2Value);
+    put(RetailImportColumn.option3Name, opt3Name);
+    put(RetailImportColumn.option3Value, opt3Value);
+    put(RetailImportColumn.option4Name, opt4Name);
+    put(RetailImportColumn.option4Value, opt4Value);
+    put(RetailImportColumn.option5Name, opt5Name);
+    put(RetailImportColumn.option5Value, opt5Value);
+    put(RetailImportColumn.sku, sku);
+    put(RetailImportColumn.barcode, barcode);
+    put(RetailImportColumn.costPrice, cost);
+    put(RetailImportColumn.sellingPrice, price);
+    put(RetailImportColumn.mrp, mrp);
+    put(RetailImportColumn.stock, stock);
+    put(RetailImportColumn.minStock, minStock);
+    return cells;
+  }
 
   /// Header row + data rows, the shape `BulkImportStore.parsedRows` holds.
   List<List<dynamic>> sheet(List<List<dynamic>> dataRows) => [
@@ -66,30 +82,29 @@ void main() {
     ...dataRows,
   ];
 
-  /// The yellow instruction row the downloaded template puts at row 2.
-  List<dynamic> instructionRow() => [
-    'Groups variants',
-    'Product name',
-    'Pick a category',
-    'Optional',
-    'e.g. Size',
-    'e.g. Small',
-    'e.g. Color',
-    'e.g. Red',
-    '',
-    '',
-    'Optional',
-    'Required: number only',
-    'Optional',
-    'Optional, defaults to 0',
-    'Optional, must be unique',
-    'Optional, defaults to 5',
-    'Pick a tax rate',
-    'Optional',
-    'Optional',
-    'piece unless sold by weight',
-    'YYYY-MM-DD',
-  ];
+  /// The yellow instruction row the downloaded template puts at row 2 — prose
+  /// in the numeric columns is exactly what marks it as instructions.
+  List<dynamic> instructionRow() => row(
+    handle: 'Groups variants',
+    name: 'Product name',
+    category: 'Pick a category',
+    description: 'Optional',
+    opt1Name: 'e.g. Size',
+    opt1Value: 'e.g. Small',
+    opt2Name: 'e.g. Color',
+    opt2Value: 'e.g. Red',
+    cost: 'Optional',
+    price: 'Required: number only',
+    mrp: 'Optional',
+    stock: 'Optional, defaults to 0',
+    barcode: 'Optional, must be unique',
+    minStock: 'Optional, defaults to 5',
+    tax: 'Pick a tax rate',
+    hsn: 'Optional',
+    sku: 'Optional',
+    unit: 'piece unless sold by weight',
+    expiry: 'YYYY-MM-DD',
+  );
 
   /// All error messages, for readable assertions.
   List<String> errorText(RetailImportParseResult r) =>
@@ -764,7 +779,7 @@ void main() {
       final r = RetailImportParser.parse(
         sheet([
           row(handle: 'a', name: 'A'),
-          List.filled(21, ''),
+          List.filled(RetailImportColumn.values.length, ''),
           row(handle: 'b', name: 'B'),
         ]),
       );
@@ -962,8 +977,11 @@ void main() {
       expect(r.groups.single.name, 'Loose Headers');
     });
 
-    test('an unrecognisable header row falls back to template positions', () {
-      // No recognisable header names at all — the old positional behaviour.
+    test('an unrecognisable header row falls back to the ORIGINAL 21-column '
+        'layout, not the current one', () {
+      // No recognisable header names at all. The fallback is frozen to the
+      // layout that shipped first, so regrouping the columns for readability
+      // cannot change how a headerless legacy file is read.
       final r = RetailImportParser.parse([
         List.filled(21, 'col'),
         [
@@ -1001,12 +1019,158 @@ void main() {
         kRetailImportHeaderRow,
         hasLength(RetailImportColumn.values.length),
       );
-      expect(kRetailImportHeaderRow, hasLength(21));
-      // The first 18 must keep their historical positions.
-      expect(kRetailImportHeaderRow.take(18).last, 'HSN Code');
-      expect(kRetailImportHeaderRow[18], 'SKU');
-      expect(kRetailImportHeaderRow[19], 'Unit');
-      expect(kRetailImportHeaderRow[20], 'Expiry Date');
+      expect(kRetailImportHeaderRow, hasLength(25));
+      expect(kRetailImportHeaders.keys, containsAll(RetailImportColumn.values));
+    });
+
+    test('columns are grouped by ownership: product-level before the variant '
+        'columns, and Unit before Stock', () {
+      int at(RetailImportColumn c) => c.index;
+
+      // The product-level block sits together, straight after Description.
+      for (final productLevel in const [
+        RetailImportColumn.unit,
+        RetailImportColumn.taxRate,
+        RetailImportColumn.hsnCode,
+        RetailImportColumn.expiryDate,
+      ]) {
+        expect(at(productLevel), greaterThan(at(RetailImportColumn.category)));
+        expect(
+          at(productLevel),
+          lessThan(at(RetailImportColumn.option1Name)),
+          reason: '$productLevel is filled once per Handle, so it comes first',
+        );
+      }
+
+      // Unit decides whether a fractional Stock is legal — a shop must meet it
+      // before it types Stock, not eighteen columns later.
+      expect(
+        at(RetailImportColumn.unit),
+        lessThan(at(RetailImportColumn.stock)),
+      );
+      expect(
+        at(RetailImportColumn.sellingPrice),
+        greaterThan(at(RetailImportColumn.option5Value)),
+      );
+    });
+  });
+
+  // ── The tax dropdown label ────────────────────────────────────────────────
+
+  group('retailTaxLabel', () {
+    test('a whole rate loses its .0, a fractional one keeps its digits', () {
+      // The template writes this and BulkImportStore matches it back by exact
+      // string; a "5" / "5.0" drift silently drops the taxId link.
+      expect(retailTaxLabel('GST', 5.0), 'GST (5%)');
+      expect(retailTaxLabel('GST', 5), 'GST (5%)');
+      expect(retailTaxLabel('VAT', 12.5), 'VAT (12.5%)');
+      expect(retailTaxLabel('Sales Tax', 0), 'Sales Tax (0%)');
+    });
+
+    test('the label it writes is one the label parser can read back', () {
+      // The fallback path in _resolveTaxFromLabel, pinned here because it is
+      // the only part of that contract with no Hive in it.
+      for (final probe in [
+        (retailTaxLabel('GST', 18.0), '18'),
+        (retailTaxLabel('VAT', 12.5), '12.5'),
+      ]) {
+        final match = RegExp(r'\(([\d.]+)%\)').firstMatch(probe.$1);
+        expect(match?.group(1), probe.$2, reason: probe.$1);
+      }
+    });
+  });
+
+  // ── Five option types ─────────────────────────────────────────────────────
+
+  group('option types', () {
+    test('five option types on one row all become attributes', () {
+      final r = RetailImportParser.parse(
+        sheet([
+          row(
+            handle: 'belt',
+            name: 'Belt',
+            opt1Name: 'Size',
+            opt1Value: 'M',
+            opt2Name: 'Color',
+            opt2Value: 'Black',
+            opt3Name: 'Material',
+            opt3Value: 'Leather',
+            opt4Name: 'Buckle',
+            opt4Value: 'Steel',
+            opt5Name: 'Width',
+            opt5Value: '35mm',
+          ),
+        ]),
+      );
+
+      expect(r.errors, isEmpty, reason: errorText(r).join('\n'));
+      expect(r.groups.single.variants.single.attributes, {
+        'Size': 'M',
+        'Color': 'Black',
+        'Material': 'Leather',
+        'Buckle': 'Steel',
+        'Width': '35mm',
+      });
+      expect(r.groups.single.hasVariants, isTrue);
+    });
+
+    test('Option4 and Option5 validate like the first three', () {
+      final r = RetailImportParser.parse(
+        sheet([row(opt4Name: 'Buckle', opt4Value: '')]),
+      );
+      expect(errorText(r).join(), contains('Option4'));
+      expect(errorText(r).join(), contains('both a name and a value'));
+    });
+
+    test('the same option name in two different columns is caught', () {
+      final r = RetailImportParser.parse(
+        sheet([
+          row(
+            opt1Name: 'Size',
+            opt1Value: 'S',
+            opt5Name: 'size',
+            opt5Value: 'M',
+          ),
+        ]),
+      );
+      expect(errorText(r).join(), contains('used twice on this row'));
+    });
+
+    test('more option VALUES needs more ROWS, not more columns', () {
+      // Five sizes across one option type — the case the extra columns are
+      // NOT for. Two option columns still cover it.
+      final r = RetailImportParser.parse(
+        sheet([
+          for (final size in ['S', 'M', 'L', 'XL', 'XXL'])
+            row(
+              handle: 'tee',
+              name: 'Tee',
+              opt1Name: 'Size',
+              opt1Value: size,
+              barcode: 'TEE-$size',
+            ),
+        ]),
+      );
+
+      expect(r.errors, isEmpty, reason: errorText(r).join('\n'));
+      expect(r.groups.single.variants, hasLength(5));
+    });
+
+    test('a legacy file naming only Option1-3 leaves 4 and 5 absent rather '
+        'than reading whatever now sits at their old index', () {
+      final r = RetailImportParser.parse([
+        const [
+          'Handle*',
+          'Name*',
+          'Selling Price*',
+          'Option1 Name',
+          'Option1 Value',
+        ],
+        const ['h1', 'Legacy', '10', 'Size', 'S'],
+      ]);
+
+      expect(r.errors, isEmpty, reason: errorText(r).join('\n'));
+      expect(r.groups.single.variants.single.attributes, {'Size': 'S'});
     });
   });
 
