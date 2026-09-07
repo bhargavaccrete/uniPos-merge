@@ -471,7 +471,7 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
               ),
             ),
             title: Text(
-              'INV-${shortRef(invoice.saleId)}',
+              saleRef(invoice.saleId),
               style: TextStyle(
                 fontSize: AppResponsive.bodyFontSize(context),
                 fontWeight: FontWeight.w500,

@@ -265,7 +265,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
       if (mounted) {
         Navigator.pop(context, true); // Return to previous screen
         NotificationService.instance.showSuccess(
-          'Return processed • ${shortRef(returnSaleId, length: 13)}',
+          'Return processed • ${saleRef(returnSaleId)}',
         );
       }
     } catch (e) {
@@ -377,7 +377,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
             ),
           ),
           SizedBox(height: AppResponsive.mediumSpacing(context)),
-          _buildInfoRow('Sale ID', shortRef(_sale!.saleId, length: 13)),
+          _buildInfoRow('Sale ID', saleRef(_sale!.saleId)),
           _buildInfoRow('Total Items', '${_sale!.totalItems}'),
           _buildInfoRow('Total Amount', formatMoney(_sale!.totalAmount)),
           _buildInfoRow('Payment Type', _sale!.paymentType.toUpperCase()),

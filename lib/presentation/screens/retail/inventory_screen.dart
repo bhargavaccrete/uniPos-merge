@@ -588,7 +588,9 @@ class _InventoryScreenState extends State<InventoryScreen>
         if (rows.isEmpty) return _buildEmptyState();
 
         return ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          // Bottom pad clears the host's FAB, matching the Categories tab —
+          // without it the last product card sits under the + button.
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
           itemCount: rows.length,
           itemBuilder: (context, index) => _buildProductCard(rows[index]),
         );

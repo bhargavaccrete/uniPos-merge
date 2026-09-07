@@ -31,3 +31,13 @@ String shortRef(
   final cut = value.substring(0, length).toUpperCase();
   return ellipsis ? '$cut…' : cut;
 }
+
+/// Reference for a sale or return document.
+///
+/// Sales minted since invoice numbering are already short and meaningful
+/// (`INV-20260907-001`) and must survive whole — trimming one to 13 characters
+/// would cut the sequence off and make two sales of the same day look alike.
+/// Everything longer is still a generated id (a legacy UUID sale, or
+/// `RTN_<uuid>`) and gets the readable prefix.
+String saleRef(String? id, {bool ellipsis = false}) =>
+    shortRef(id, length: 13, minLength: 20, ellipsis: ellipsis);

@@ -87,8 +87,9 @@ abstract class _CartStore with Store {
     _loadActiveTabItems();
 
     // Tax mode lives in SharedPreferences, so it can't be read synchronously
-    // here. Load it in the background; `bill` recomputes when it lands.
-    loadTaxMode();
+    // here. Start it in the background; `bill` recomputes when it lands, and
+    // cart writes await the same future rather than racing it.
+    ensureTaxModeLoaded();
   }
 
   @observable
@@ -137,9 +138,39 @@ abstract class _CartStore with Store {
         loyaltyRedemption: loyaltyRedemption,
       );
 
+  /// The first tax-mode read, kept so callers can await it. The constructor
+  /// starts it but cannot await; a line added in that window would otherwise be
+  /// priced under the default rather than the saved mode.
+  Future<void>? _taxModeLoad;
+
   @action
   Future<void> loadTaxMode() async {
     isTaxInclusive = await RetailBillingService.loadTaxInclusive();
+  }
+
+  Future<void> ensureTaxModeLoaded() => _taxModeLoad ??= loadTaxMode();
+
+  /// The tax mode, guaranteed loaded. Every cart write reads it from HERE, not
+  /// from `gstService` directly — the row and the bill must be built under one
+  /// mode, and a per-row prefs read could differ from the store's copy.
+  Future<bool> _taxMode() async {
+    await ensureTaxModeLoaded();
+    return isTaxInclusive;
+  }
+
+  /// The ONLY way to change retail's tax mode.
+  ///
+  /// Writing the preference without this left the store holding the old value —
+  /// the bill kept computing the previous way until the app restarted, and
+  /// checkout then FROZE that stale mode onto the saved sale, so every reprint
+  /// of that receipt rendered wrong.
+  @action
+  Future<void> setTaxMode(bool inclusive) async {
+    await gstService.setTaxInclusiveMode(inclusive);
+    isTaxInclusive = inclusive;
+    // Mark the initial load satisfied so a later ensure() can't re-read a value
+    // this call has already superseded.
+    _taxModeLoad ??= Future.value();
   }
 
   @action
@@ -161,6 +192,10 @@ abstract class _CartStore with Store {
     discountType = DiscountType.amount;
     discountValue = 0;
     loyaltyRedemption = 0;
+    // The attached customer is sale state too. `selectedCustomer` is global and
+    // nothing else dropped it, so the next bill inherited the previous
+    // customer — and with them their loyalty points, credit and customerId.
+    customerStore.selectCustomer(null);
   }
 
   /// Create initial default tab
@@ -356,7 +391,7 @@ abstract class _CartStore with Store {
     final effectiveHsnCode = _getEffectiveHsnCode(variant, product);
 
     // Check if tax inclusive mode is enabled
-    final taxInclusive = await gstService.isTaxInclusiveMode();
+    final taxInclusive = await _taxMode();
 
     if (index != -1) {
       // Update quantity for existing item
@@ -495,7 +530,7 @@ abstract class _CartStore with Store {
     // Same gate [_getEffectiveGstRate] applies: a business not registered for
     // tax bills at 0 no matter what was picked.
     final effectiveGstRate = TaxFeature.enabled ? gstRate : 0.0;
-    final taxInclusive = await gstService.isTaxInclusiveMode();
+    final taxInclusive = await _taxMode();
 
     final variantId = QuickItemService.newVariantId();
     final newItem = CartItemModel.create(
@@ -574,7 +609,7 @@ abstract class _CartStore with Store {
     final isRevert = newPrice == cataloguePrice;
     final trimmedNote = (note ?? '').trim();
 
-    final taxInclusive = await gstService.isTaxInclusiveMode();
+    final taxInclusive = await _taxMode();
 
     // The override changes the line's gross, so a percentage line discount must
     // be re-resolved against the new price — and a flat one re-capped to it.
@@ -721,7 +756,7 @@ abstract class _CartStore with Store {
     }
 
     final trimmedNote = (note ?? '').trim();
-    final taxInclusive = await gstService.isTaxInclusiveMode();
+    final taxInclusive = await _taxMode();
 
     final updatedItem = CartItemModel.create(
       cartItemId: item.cartItemId,
@@ -867,7 +902,7 @@ abstract class _CartStore with Store {
       }
     }
 
-    final taxInclusive = await gstService.isTaxInclusiveMode();
+    final taxInclusive = await _taxMode();
 
     // Percentage discounts follow the new quantity; flat ones are carried.
     final ld = _reResolveLineDiscount(item, item.price * quantity);
@@ -934,7 +969,7 @@ abstract class _CartStore with Store {
     }
 
     // Check if tax inclusive mode is enabled
-    final taxInclusive = await gstService.isTaxInclusiveMode();
+    final taxInclusive = await _taxMode();
 
     final ld = _reResolveLineDiscount(item, item.price * requestedQty);
 
@@ -980,7 +1015,7 @@ abstract class _CartStore with Store {
         final updatedQty = item.qty - step;
 
         // Check if tax inclusive mode is enabled
-        final taxInclusive = await gstService.isTaxInclusiveMode();
+        final taxInclusive = await _taxMode();
 
         final ld = _reResolveLineDiscount(item, item.price * updatedQty);
 

@@ -95,16 +95,29 @@ void main() {
 
     test('carries both the short invoice and the full key', () async {
       final export = CreditReportExport.creditSales(
-        sales: [sale('abcdef-123456')],
+        sales: [sale('INV-20260907-001')],
         totalCreditSales: 500,
         period: 'All time',
       );
 
       final row = export.rows.single;
-      // One to match a row on screen…
-      expect(row[0], startsWith('INV-'));
+      // One to match a row on screen — a sale's own invoice number now, not an
+      // 'INV-' glued onto a UUID.
+      expect(row[0], 'INV-20260907-001');
       // …the other to trace it back to the record.
-      expect(row[1], 'abcdef-123456');
+      expect(row[1], 'INV-20260907-001');
+    });
+
+    test('a legacy UUID sale exports a readable short reference', () async {
+      final export = CreditReportExport.creditSales(
+        sales: [sale('abcdef-123456-7890-abcd')],
+        totalCreditSales: 500,
+        period: 'All time',
+      );
+
+      final row = export.rows.single;
+      expect(row[0], 'ABCDEF-123456');
+      expect(row[1], 'abcdef-123456-7890-abcd');
     });
 
     test('money columns are formatted, and paid + due reconcile to total',

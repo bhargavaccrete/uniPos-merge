@@ -1,4 +1,5 @@
 import '../../../core/di/service_locator.dart';
+import '../../../util/common/tax_split.dart';
 import '../../../data/models/retail/hive_model/cart_model_202.dart';
 import '../restaurant/cart_calculation_service.dart';
 import 'gst_service.dart';
@@ -207,7 +208,7 @@ class RetailBillingService {
     for (int i = 0; i < items.length; i++) {
       final r = calc.lineResults[i];
       final gst = _r2(r.gstAmount);
-      final half = _r2(gst / 2);
+      final halves = TaxSplit.halves(gst);
       lines.add(RetailBillLine(
         item: items[i],
         originalAmount: _r2(r.originalAmount),
@@ -215,22 +216,22 @@ class RetailBillingService {
         lineDiscountAmount: _r2(r.lineDiscountAmount),
         taxableAmount: _r2(r.taxableAmount),
         gstAmount: gst,
-        cgstAmount: half,
-        sgstAmount: half,
+        cgstAmount: halves.cgst,
+        sgstAmount: halves.sgst,
         gstRatePercent: _r2(r.taxRate * 100.0),
       ));
     }
 
     final totalGst = _r2(calc.totalGST);
-    final halfGst = _r2(totalGst / 2);
+    final totalHalves = TaxSplit.halves(totalGst);
 
     return RetailBill(
       itemTotal: _r2(calc.itemTotal),
       discountAmount: _r2(calc.discountAmount),
       taxableAmount: _r2(calc.taxableAmount),
       totalGst: totalGst,
-      cgstAmount: halfGst,
-      sgstAmount: halfGst,
+      cgstAmount: totalHalves.cgst,
+      sgstAmount: totalHalves.sgst,
       loyaltyRedemption: _r2(calc.loyaltyRedemptionAmount),
       roundOff: _r2(calc.roundOffAmount),
       grandTotal: _r2(calc.grandTotal),

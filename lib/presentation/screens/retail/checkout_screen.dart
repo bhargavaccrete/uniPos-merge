@@ -28,7 +28,6 @@ import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/common/loyalty_points.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 
-import 'package:uuid/uuid.dart';
 
 import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
@@ -188,6 +187,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   double get _totalSgstAmount => _bill.sgstAmount;
   double get _grandTotal => _bill.grandTotal;
 
+  // ==================== TAX PRESENTATION ====================
+  // Inclusive and exclusive pricing need different wording for the SAME rows.
+  // Under exclusive the tax is added to reach the total; under inclusive it was
+  // always inside the item price, so a "+" reads as a second charge.
+
+  /// "+ " on an exclusive bill, nothing on an inclusive one.
+  String get _taxSign => _bill.isTaxInclusive ? '' : '+ ';
+
+  /// Label for the combined tax row.
+  String get _taxLabel {
+    final base = _splitsTax ? 'Total $_taxName' : _taxName;
+    return _bill.isTaxInclusive ? '$base (included)' : base;
+  }
+
+  /// Whether the taxable base is worth a row of its own — only when it differs
+  /// from the Item Total the customer can already see.
+  bool get _showTaxableRow =>
+      (_subtotal - _totalTaxableAmount).abs() > 0.009;
+
   /// Process a Credit/Pay Later sale
   /// Plan gate — blocks a NEW bill once the per-day cap is reached. Counts
   /// today's completed sales. No-op until a retail manifest is present, and
@@ -321,7 +339,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
 
     try {
-      final saleId = const Uuid().v4();
+      final saleId = await saleStore.nextInvoiceNumber();
 
       // Same rule as the paid path: one bill snapshot drives the record, the
       // lines and the credit balance.
@@ -516,8 +534,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
 
     try {
-      // Generate unique sale ID
-      final saleId = const Uuid().v4();
+      // A human invoice number, not a UUID — the customer quotes it and staff
+      // search by it. Minted here at submit, so an abandoned checkout never
+      // burns a number.
+      final saleId = await saleStore.nextInvoiceNumber();
 
       // Snapshot the bill ONCE. Everything below — the sale record, the line
       // items and the receipt — must come from this same instance, or the
@@ -694,6 +714,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     billTotal: _grandTotal,
                     onPaymentChanged: _onPaymentChanged,
                     onValidationChanged: _onValidationChanged,
+                    // Lets the widget label the amount box as what is being
+                    // taken NOW and state the shortfall instead of flagging it
+                    // as an error — the shortfall is the intent here.
+                    allowPartial: _allowPartialPayment,
                   ),
                   const SizedBox(height: 12),
                   _buildPartialPaymentCard(),
@@ -839,7 +863,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     precision,
                   );
                   return _buildSummaryRow(
-                    'Subtotal',
+                    // The same figure means two different things by mode, so
+                    // the label has to say which — it is the tax-inclusive
+                    // gross under inclusive pricing and the pre-tax base under
+                    // exclusive. Matches the Total Summary card's wording.
+                    _bill.isTaxInclusive ? 'Subtotal (incl. $_taxName)'
+                        : 'Subtotal',
                     '$symbol$formattedSubtotal',
                     isBold: false,
                   );
@@ -932,10 +961,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ),
                   ],
                   textAlign: TextAlign.right,
-                  prefixWidget: Padding(
-                    padding: const EdgeInsets.only(left: 12, right: 4),
-                    child: Text(CurrencyHelper.currentSymbol),
-                  ),
+                  // The affix has to follow the mode, or a 25% discount reads
+                  // as "₹25". Percentage takes the leading icon the line
+                  // discount dialog uses; an amount keeps the currency symbol.
+                  icon: retailCartStore.discountType == DiscountType.percentage
+                      ? Icons.percent_rounded
+                      : null,
+                  prefixWidget:
+                      retailCartStore.discountType == DiscountType.percentage
+                      ? null
+                      : Padding(
+                          padding: const EdgeInsets.only(left: 12, right: 4),
+                          child: Text(CurrencyHelper.currentSymbol),
+                        ),
                   onChanged: (value) {
                     setState(() {});
                   },
@@ -1081,7 +1119,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ],
                 ),
               ],
-              if (_allowPartialPayment && hasCustomer && _balanceDue > 0) ...[
+              // Both halves of the split, always — the payment widget starts
+              // pre-filled with the WHOLE bill, so a partial sale where nothing
+              // was reduced would otherwise look partial while recording as
+              // fully paid.
+              if (_allowPartialPayment && hasCustomer) ...[
                 const Divider(
                   height: 20,
                   thickness: 0.5,
@@ -1091,10 +1133,30 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
+                      'Collecting Now',
+                      style: TextStyle(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        color: const Color(0xFF6B6B6B),
+                      ),
+                    ),
+                    Text(
+                      '$symbol${_totalPaid.toStringAsFixed(precision)}',
+                      style: TextStyle(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
                       'Balance Due',
                       style: TextStyle(
                         fontSize: AppResponsive.bodyFontSize(context),
-                        color: Color(0xFF6B6B6B),
+                        color: const Color(0xFF6B6B6B),
                       ),
                     ),
                     Text(
@@ -1102,10 +1164,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       style: TextStyle(
                         fontSize: AppResponsive.subheadingFontSize(context),
                         fontWeight: FontWeight.w700,
+                        color: _balanceDue > 0 ? null : const Color(0xFF6B6B6B),
                       ),
                     ),
                   ],
                 ),
+                if (_balanceDue <= 0) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: Color(0xFF6B6B6B),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'The full bill is tendered — this records as fully '
+                          'paid. Reduce the amount above to leave a balance.',
+                          style: TextStyle(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            color: const Color(0xFF6B6B6B),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ],
           ),
@@ -1443,7 +1529,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   // can see what the discount came off.
                   _buildSummaryRow(
                     _bill.isTaxInclusive
-                        ? 'Item Total (incl. tax)'
+                        ? 'Item Total (incl. $_taxName)'
                         : 'Item Total',
                     '$symbol${_subtotal.toStringAsFixed(precision)}',
                     isBold: false,
@@ -1475,6 +1561,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ),
                       const SizedBox(height: 8),
                     ],
+                  ],
+                  // Shown whenever it differs from the Item Total — i.e. under
+                  // inclusive pricing (tax was extracted) or after a discount.
+                  // It used to be gated on the discount alone, so an inclusive
+                  // bill jumped from "Item Total 100" to "Grand Total 100" with
+                  // a "+15.25" tax row between them and nothing to reconcile
+                  // against. On an exclusive bill with no discount it equals the
+                  // Item Total, so repeating it would be noise.
+                  if (_showTaxableRow) ...[
                     _buildSummaryRow(
                       'Taxable Amount',
                       '$symbol${_totalTaxableAmount.toStringAsFixed(precision)}',
@@ -1486,22 +1581,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     if (_splitsTax && _taxComponents != null) ...[
                       _buildSummaryRow(
                         _taxComponents.first,
-                        '+ $symbol${_totalCgstAmount.toStringAsFixed(precision)}',
+                        '$_taxSign$symbol${_totalCgstAmount.toStringAsFixed(precision)}',
                         isBold: false,
                         color: const Color(0xFF4CAF50),
                       ),
                       const SizedBox(height: 4),
                       _buildSummaryRow(
                         _taxComponents.second,
-                        '+ $symbol${_totalSgstAmount.toStringAsFixed(precision)}',
+                        '$_taxSign$symbol${_totalSgstAmount.toStringAsFixed(precision)}',
                         isBold: false,
                         color: const Color(0xFF4CAF50),
                       ),
                       const SizedBox(height: 8),
                     ],
                     _buildSummaryRow(
-                      'Total $_taxName',
-                      '+ $symbol${_totalGstAmount.toStringAsFixed(precision)}',
+                      // "Total" only means something when the two component
+                      // rows above it were actually shown. Under VAT or sales
+                      // tax there is nothing to total. Under inclusive pricing
+                      // the tax is already in the Item Total, so say so rather
+                      // than leaving a bare figure that looks addable.
+                      _taxLabel,
+                      '$_taxSign$symbol${_totalGstAmount.toStringAsFixed(precision)}',
                       isBold: false,
                       color: const Color(0xFF4CAF50),
                     ),
@@ -1587,7 +1687,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       builder: (dialogContext) => AppDialogShell(
         // A partly-settled bill is not "paid" — title and accent both say so.
         title: isPartial ? 'Partial Payment Received' : 'Payment Successful!',
-        subtitle: 'Receipt #${shortRef(sale.saleId)}',
+        subtitle: 'Receipt ${saleRef(sale.saleId)}',
         accent: isPartial ? AppColors.warning : AppColors.success,
         icon: isPartial ? Icons.schedule_rounded : Icons.check_circle,
         body: Column(
@@ -1765,7 +1865,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       barrierDismissible: false,
       builder: (dialogContext) => AppDialogShell(
         title: 'Credit Sale Recorded!',
-        subtitle: 'Invoice #${shortRef(sale.saleId)}',
+        subtitle: 'Invoice ${saleRef(sale.saleId)}',
         accent: AppColors.warning,
         icon: Icons.schedule,
         body: Column(

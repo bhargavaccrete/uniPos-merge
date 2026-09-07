@@ -200,22 +200,16 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     _netByMethod[key] = (_netByMethod[key] ?? 0) + amount;
   }
 
-  /// Splits a sale across its payment methods. Uses `paymentListJson` when the
-  /// sale was split, exactly like [_cashComponentOf], so the summary and the
-  /// drawer balance can never disagree about the cash slice.
+  /// Splits a sale across its payment methods — the SHARED decomposition, the
+  /// same one [_cashComponentOf] reads, so the summary and the drawer balance
+  /// can never disagree about the cash slice.
+  ///
+  /// This used to consult the legs only when `isSplitPayment` was true and fall
+  /// back to `paymentType + totalAmount` otherwise. A partly-paid single-method
+  /// bill takes that fallback, so ₹50 tendered against a ₹200 bill was counted
+  /// as ₹200 collected.
   void _accumulateMethods(SaleModel s) {
-    if (s.isSplitPayment == true &&
-        s.paymentListJson != null &&
-        s.paymentListJson!.isNotEmpty) {
-      for (final p in s.paymentList) {
-        _addToMethod(
-          p['method'] as String?,
-          (p['amount'] as num?)?.toDouble() ?? 0.0,
-        );
-      }
-      return;
-    }
-    _addToMethod(s.paymentType, s.totalAmount);
+    CashDrawerLedger.settledLegsOf(s).forEach(_addToMethod);
   }
 
   double _method(String key) => _netByMethod[key] ?? 0.0;

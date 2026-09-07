@@ -1,4 +1,5 @@
 import 'package:mobx/mobx.dart';
+import 'package:billberrylite/util/common/short_ref.dart';
 import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model_218.dart';
 import 'package:billberrylite/data/repositories/retail/credit_payment_repository.dart';
 import 'package:billberrylite/data/repositories/common/customer_repository.dart';
@@ -368,7 +369,7 @@ abstract class _CreditStore with Store {
             id: sale.saleId,
             date: sale.date,
             type: LedgerEntryType.creditSale,
-            description: 'Credit Sale (INV-${sale.saleId.substring(0, 8).toUpperCase()})',
+            description: 'Credit Sale (${saleRef(sale.saleId)})',
             amount: sale.totalAmount,
             runningBalance: runningBalance,
             saleId: sale.saleId,

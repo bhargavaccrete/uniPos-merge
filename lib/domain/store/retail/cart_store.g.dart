@@ -196,6 +196,14 @@ mixin _$CartStore on _CartStore, Store {
     return _$loadTaxModeAsyncAction.run(() => super.loadTaxMode());
   }
 
+  late final _$setTaxModeAsyncAction =
+      AsyncAction('_CartStore.setTaxMode', context: context);
+
+  @override
+  Future<void> setTaxMode(bool inclusive) {
+    return _$setTaxModeAsyncAction.run(() => super.setTaxMode(inclusive));
+  }
+
   late final _$addItemAsyncAction =
       AsyncAction('_CartStore.addItem', context: context);
 

@@ -3,6 +3,7 @@ import 'package:billberrylite/core/constants/hive_type_ids.dart';
 import 'package:uuid/uuid.dart';
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/util/restaurant/staticswitch.dart';
+import 'package:billberrylite/util/common/tax_split.dart';
 
 part 'sale_item_model_204.g.dart';
 
@@ -257,8 +258,9 @@ class SaleItemModel extends HiveObject {
       finalTotal = _roundTo2Decimals(taxableAmt + gstAmt);
     }
 
-    final cgst = _roundTo2Decimals(gstAmt / 2);
-    final sgst = _roundTo2Decimals(gstAmt / 2);
+    final halves = TaxSplit.halves(gstAmt);
+    final cgst = halves.cgst;
+    final sgst = halves.sgst;
 
     return SaleItemModel(
       saleItemId: _uuid.v4(),
@@ -323,8 +325,9 @@ class SaleItemModel extends HiveObject {
     String? lineDiscountReason,
     String? lineDiscountNote,
   }) {
-    final cgst = _roundTo2Decimals(gstAmount / 2);
-    final sgst = _roundTo2Decimals(gstAmount / 2);
+    final halves = TaxSplit.halves(gstAmount);
+    final cgst = halves.cgst;
+    final sgst = halves.sgst;
 
     return SaleItemModel(
       saleItemId: _uuid.v4(),

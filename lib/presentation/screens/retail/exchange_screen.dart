@@ -378,7 +378,7 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
           children: [
             _sectionTitle('Original Sale'),
             SizedBox(height: AppResponsive.mediumSpacing(context)),
-            _row('Bill', shortRef(_sale!.saleId, length: 13)),
+            _row('Bill', saleRef(_sale!.saleId)),
             _row('Paid By', _sale!.paymentType.toUpperCase()),
             _row('Amount', formatMoney(_sale!.totalAmount)),
             if (_sale!.dueAmount > 0)

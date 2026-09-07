@@ -3,6 +3,7 @@
 
 
 import 'package:billberrylite/core/config/tax_label_rule.dart';
+import 'package:billberrylite/util/common/tax_split.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model_218.dart';
 import 'package:billberrylite/data/models/retail/hive_model/grn_model_213.dart';
@@ -141,10 +142,9 @@ class ReportService {
   ///
   /// Sign is preserved — a credit note's negative GST yields two negative
   /// components that still sum to it.
-  static ({double cgst, double sgst}) _splitGst(double totalGst) {
-    final cgst = _r2(totalGst / 2);
-    return (cgst: cgst, sgst: _r2(totalGst - cgst));
-  }
+  /// This report's rule is now the app-wide one — see [TaxSplit].
+  static ({double cgst, double sgst}) _splitGst(double totalGst) =>
+      TaxSplit.halves(totalGst);
   static double _r3(double v) => double.parse(v.toStringAsFixed(3));
 
   /// Deterministic order for a line-level report row: revenue desc, then

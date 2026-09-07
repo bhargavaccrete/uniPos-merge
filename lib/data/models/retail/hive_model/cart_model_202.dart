@@ -1,5 +1,6 @@
 import 'package:hive/hive.dart';
 import 'package:billberrylite/core/constants/hive_type_ids.dart';
+import 'package:billberrylite/util/common/tax_split.dart';
 
 part 'cart_model_202.g.dart';
 
@@ -221,8 +222,9 @@ class CartItemModel extends HiveObject {
       finalTotal = _roundTo2Decimals(taxableAmt); // Line item total WITHOUT GST
     }
 
-    final cgst = _roundTo2Decimals(gstAmt / 2);
-    final sgst = _roundTo2Decimals(gstAmt / 2);
+    final halves = TaxSplit.halves(gstAmt);
+    final cgst = halves.cgst;
+    final sgst = halves.sgst;
 
     return CartItemModel(
       cartItemId: cartItemId,

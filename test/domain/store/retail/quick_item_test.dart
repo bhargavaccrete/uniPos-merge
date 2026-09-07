@@ -91,15 +91,17 @@ void main() {
     });
 
     test('money is computed by the same factory catalogue lines use', () {
-      // 45 x 1 at 5%: taxable 45, GST 2.25, split evenly across CGST/SGST.
+      // 45 x 1 at 5%: taxable 45, GST 2.25, split across CGST/SGST.
       final line = quickLine(price: 45, gstRate: 5);
 
       expect(line.taxableAmount, equals(45.0));
       expect(line.gstAmount, equals(2.25));
-      // Halves are rounded to 2dp by the factory, exactly as they are for a
-      // catalogue line — 1.125 becomes 1.13, not 1.125.
+      // An odd half-paisa goes to CGST and SGST takes the remainder, so the two
+      // always add back to gstAmount. Rounding both to 1.13 printed 2.26 — a
+      // paisa more than the customer paid. See TaxSplit.
       expect(line.cgstAmount, equals(1.13));
-      expect(line.sgstAmount, equals(1.13));
+      expect(line.sgstAmount, equals(1.12));
+      expect(line.cgstAmount! + line.sgstAmount!, closeTo(line.gstAmount!, 1e-9));
     });
   });
 

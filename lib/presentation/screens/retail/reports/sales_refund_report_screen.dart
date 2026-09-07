@@ -126,10 +126,10 @@ class SalesRefundReportScreen extends StatelessWidget {
 
         return DataRow(
           cells: [
-            DataCell(Text(shortRef(row['returnSaleId'] as String, length: 13))),
+            DataCell(Text(saleRef(row['returnSaleId'] as String))),
             DataCell(Text(_dateTime(row['date'] as String))),
             DataCell(
-              Text(original == null ? '—' : shortRef(original, length: 13)),
+              Text(original == null ? '—' : saleRef(original)),
             ),
             DataCell(Text(row['customerName'] as String)),
             DataCell(Text(row['returnReasonLabel'] as String)),

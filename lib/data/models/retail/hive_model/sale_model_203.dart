@@ -3,6 +3,7 @@
 import 'dart:convert';
 import 'package:hive/hive.dart';
 import 'package:billberrylite/core/constants/hive_type_ids.dart';
+import 'package:billberrylite/util/common/tax_split.dart';
 
 part 'sale_model_203.g.dart';
 
@@ -273,8 +274,9 @@ class SaleModel extends HiveObject {
     String? shiftId,
   }) {
     final now = DateTime.now().toIso8601String();
-    final cgst = double.parse((totalGstAmount / 2).toStringAsFixed(2));
-    final sgst = double.parse((totalGstAmount / 2).toStringAsFixed(2));
+    final halves = TaxSplit.halves(totalGstAmount);
+    final cgst = halves.cgst;
+    final sgst = halves.sgst;
 
     return SaleModel(
       saleId: saleId,
@@ -330,8 +332,9 @@ class SaleModel extends HiveObject {
     double? amountCollected,
   }) {
     final now = DateTime.now().toIso8601String();
-    final cgst = double.parse((totalGstAmount / 2).toStringAsFixed(2));
-    final sgst = double.parse((totalGstAmount / 2).toStringAsFixed(2));
+    final halves = TaxSplit.halves(totalGstAmount);
+    final cgst = halves.cgst;
+    final sgst = halves.sgst;
 
     // Clamp to the bill: tendering more than the total is change, not an
     // over-payment, so paidAmount must never exceed totalAmount.
@@ -426,8 +429,9 @@ class SaleModel extends HiveObject {
     String? shiftId,
   }) {
     final now = DateTime.now().toIso8601String();
-    final cgst = double.parse((totalGstAmount / 2).toStringAsFixed(2));
-    final sgst = double.parse((totalGstAmount / 2).toStringAsFixed(2));
+    final halves = TaxSplit.halves(totalGstAmount);
+    final cgst = halves.cgst;
+    final sgst = halves.sgst;
 
     return SaleModel(
       saleId: saleId,

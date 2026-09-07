@@ -5,6 +5,7 @@ import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.
 
 import '../../../data/repositories/retail/sale_repository.dart';
 import '../../../data/repositories/retail/sale_item_repository.dart';
+import '../../services/common/document_number_service.dart';
 
 part 'sale_store.g.dart';
 
@@ -33,6 +34,22 @@ abstract class _SaleStore with Store {
     await loadSales();
     await loadSalesStats();
   }
+
+  final DocumentNumberService _numbers = DocumentNumberService();
+
+  /// The next invoice number — `INV-20260907-001`.
+  ///
+  /// Sales used to be keyed by a raw UUID, which is unique but unusable: a
+  /// customer cannot quote `E7FE242F-1CB3` and staff cannot find it. Same
+  /// dated-counter service the PO, GRN and exchange documents already use, so
+  /// every document in the app reads alike.
+  ///
+  /// Call at SUBMIT, never when the checkout screen opens — the counter never
+  /// goes backwards, so a number consumed by an abandoned form is a gap in the
+  /// sequence. `exists` covers the one case the counter cannot: `appCounters`
+  /// restored or wiped while the sales box was not.
+  Future<String> nextInvoiceNumber() =>
+      _numbers.next('INV', isTaken: _saleRepository.exists);
 
   // ==================== SALE OPERATIONS ====================
 

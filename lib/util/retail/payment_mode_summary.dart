@@ -1,6 +1,7 @@
 import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/domain/services/retail/exchange_service.dart';
+import 'package:billberrylite/util/retail/cash_drawer_ledger.dart';
 
 /// Aggregates retail sales into one [PaymentSummary] per payment method.
 ///
@@ -17,6 +18,30 @@ import 'package:billberrylite/domain/services/retail/exchange_service.dart';
 class RetailPaymentModeSummary {
   RetailPaymentModeSummary._();
 
+  /// The legs a summary should count for one sale.
+  ///
+  /// A SHORT-PAID bill never put its full bill allocation anywhere: only
+  /// `paidAmount` was collected and the balance went onto the customer's
+  /// account at checkout. `CashDrawerLedger` holds that correction — including
+  /// for rows written before the leg stored the tendered amount — so EOD and
+  /// the cash drawer cannot disagree about what came in.
+  static List<Map<String, dynamic>> _legsOf(SaleModel sale) {
+    if (sale.dueAmount > 0.009) {
+      return CashDrawerLedger.settledLegsOf(sale)
+          .entries
+          .map((e) => <String, dynamic>{'method': e.key, 'amount': e.value})
+          .toList();
+    }
+    // Keyed off the JSON, not `isSplitPayment` — that flag is null on older
+    // rows, and the stored legs are the source of truth either way.
+    if (sale.paymentListJson != null && sale.paymentListJson!.isNotEmpty) {
+      return sale.paymentList;
+    }
+    return [
+      {'method': sale.paymentType, 'amount': sale.totalAmount},
+    ];
+  }
+
   /// One [PaymentSummary] per method, sorted by amount descending.
   static List<PaymentSummary> summarize(List<SaleModel> sales) {
     final paymentTotals = <String, double>{};
@@ -24,34 +49,22 @@ class RetailPaymentModeSummary {
     double grandTotal = 0.0;
 
     for (final sale in sales) {
-      // Keyed off the JSON, not `isSplitPayment` — that flag is null on older
-      // rows, and the stored legs are the source of truth either way.
-      final hasLegs =
-          sale.paymentListJson != null && sale.paymentListJson!.isNotEmpty;
-
-      if (hasLegs) {
-        for (final leg in sale.paymentList) {
-          // SUPPRESSED: the exchange-credit leg is an internal accounting
-          // entry, not money. It exists so each document's legs sum to its own
-          // total; counting it here would report the whole value of swapped
-          // goods as though it had been tendered.
-          if (ExchangeService.isExchangeCredit(leg['method'] as String?)) {
-            continue;
-          }
-          final method = normalizeMethod(leg['method'] as String?);
-          // `as double` used to be a live crash: jsonDecode returns an int for
-          // a whole-rupee leg, and an int is not a double.
-          final amount = (leg['amount'] as num?)?.toDouble() ?? 0.0;
-
-          paymentTotals[method] = (paymentTotals[method] ?? 0.0) + amount;
-          paymentCounts[method] = (paymentCounts[method] ?? 0) + 1;
-          grandTotal += amount;
+      for (final leg in _legsOf(sale)) {
+        // SUPPRESSED: the exchange-credit leg is an internal accounting
+        // entry, not money. It exists so each document's legs sum to its own
+        // total; counting it here would report the whole value of swapped
+        // goods as though it had been tendered.
+        if (ExchangeService.isExchangeCredit(leg['method'] as String?)) {
+          continue;
         }
-      } else {
-        final method = normalizeMethod(sale.paymentType);
-        paymentTotals[method] = (paymentTotals[method] ?? 0.0) + sale.totalAmount;
+        final method = normalizeMethod(leg['method'] as String?);
+        // `as double` used to be a live crash: jsonDecode returns an int for
+        // a whole-rupee leg, and an int is not a double.
+        final amount = (leg['amount'] as num?)?.toDouble() ?? 0.0;
+
+        paymentTotals[method] = (paymentTotals[method] ?? 0.0) + amount;
         paymentCounts[method] = (paymentCounts[method] ?? 0) + 1;
-        grandTotal += sale.totalAmount;
+        grandTotal += amount;
       }
     }
 

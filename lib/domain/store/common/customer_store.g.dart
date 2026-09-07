@@ -51,6 +51,13 @@ mixin _$CustomerStore on _CustomerStore, Store {
           Computed<List<Customer>>(() => super.frequentCustomers,
               name: '_CustomerStore.frequentCustomers'))
       .value;
+  Computed<List<Customer>>? _$recentCustomersComputed;
+
+  @override
+  List<Customer> get recentCustomers => (_$recentCustomersComputed ??=
+          Computed<List<Customer>>(() => super.recentCustomers,
+              name: '_CustomerStore.recentCustomers'))
+      .value;
   Computed<double>? _$totalOutstandingCreditComputed;
 
   @override
@@ -405,6 +412,7 @@ customerCount: ${customerCount},
 hasSelection: ${hasSelection},
 topCustomersByPoints: ${topCustomersByPoints},
 frequentCustomers: ${frequentCustomers},
+recentCustomers: ${recentCustomers},
 totalOutstandingCredit: ${totalOutstandingCredit},
 customersWithCreditCount: ${customersWithCreditCount}
     ''';

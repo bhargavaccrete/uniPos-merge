@@ -1137,7 +1137,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Bill #${shortRef(sale.saleId)}',
+                        saleRef(sale.saleId),
                         style: GoogleFonts.poppins(
                           fontSize: AppResponsive.bodyFontSize(context),
                           fontWeight: FontWeight.w600,

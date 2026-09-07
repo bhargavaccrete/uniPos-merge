@@ -48,7 +48,10 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
   }
 
   Future<void> _toggleTaxInclusiveMode(bool value) async {
-    await _gstService.setTaxInclusiveMode(value);
+    // Through the store, not GstService directly: the store holds the copy the
+    // bill is computed from, and writing only the preference left it stale
+    // until the app restarted.
+    await retailCartStore.setTaxMode(value);
     setState(() => _taxInclusiveMode = value);
   }
 

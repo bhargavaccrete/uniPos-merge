@@ -7,6 +7,7 @@ import 'package:billberrylite/util/restaurant/print_settings.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/core/plan/mode_keys.dart';
 import 'package:billberrylite/core/config/app_config.dart';
+import 'package:billberrylite/core/config/tax_label_rule.dart';
 import 'package:billberrylite/domain/services/restaurant/tax_breakdown.dart';
 import 'package:billberrylite/core/di/service_locator.dart' show taxStore;
 // describeAttributeMap only — NOT the store, which is retail-only and would
@@ -462,7 +463,7 @@ class EscPosReceiptBuilder {
       final totalGst = sale.totalGstAmount ?? 0; // authoritative — matches order
       bytes.addAll(_divider(cols));
       bytes.addAll(
-          _text(_formatRow4('Tax', 'Taxable', 'GST', 'Total', cols)));
+          _text(_formatRow4('Tax', 'Taxable', TaxLabelRule.name, 'Total', cols)));
       for (final l in taxLines) {
         bytes.addAll(_text(_formatRow4(_taxLabel(l.ratePercent),
             _fmt(l.taxable), _fmt(l.gst), _fmt(l.taxable + l.gst), cols)));
@@ -529,7 +530,7 @@ class EscPosReceiptBuilder {
     // ── FOOTER ──
     bytes.addAll(_alignCenter);
     if (receiptData.taxEnabled && isTaxInclusive) {
-      bytes.addAll(_text('All prices include GST'));
+      bytes.addAll(_text('All prices include ${TaxLabelRule.name}'));
     }
     // Custom footer / "Thank You" message — owner-editable in Print
     // Customization. Multi-line via \n; blank prints nothing.
@@ -803,7 +804,7 @@ class EscPosReceiptBuilder {
     final rateStr = ratePercent % 1 == 0
         ? ratePercent.toStringAsFixed(0)
         : ratePercent.toStringAsFixed(2);
-    String name = 'GST';
+    String name = TaxLabelRule.name;
     for (final t in taxStore.taxes) {
       if (((t.taxperecentage ?? 0) - ratePercent).abs() < 0.001 &&
           t.taxname.trim().isNotEmpty) {

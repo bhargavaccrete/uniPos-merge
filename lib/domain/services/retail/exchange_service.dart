@@ -454,7 +454,9 @@ class ExchangeService {
       );
 
       // ---- 4. the REPLACEMENT half ----------------------------------------
-      final replacementSaleId = _uuid.v4();
+      // The replacement is an ordinary sale, so it carries an ordinary invoice
+      // number rather than a bare UUID.
+      final replacementSaleId = await saleStore.nextInvoiceNumber();
       try {
         await _writeReplacement(
           saleId: replacementSaleId,

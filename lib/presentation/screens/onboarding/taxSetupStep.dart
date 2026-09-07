@@ -828,8 +828,10 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
                   : () async {
                       widget.store.saveTaxDetails();
                       if (AppConfig.isRetail) {
-                        await gstService
-                            .setTaxInclusiveMode(widget.store.taxInclusive);
+                        // Through the store so its in-memory copy matches the
+                        // preference — see CartStore.setTaxMode.
+                        await retailCartStore
+                            .setTaxMode(widget.store.taxInclusive);
                         if (_taxes.isNotEmpty) {
                           final defaultTax = _taxes.firstWhere(
                             (t) => t.isDefault,

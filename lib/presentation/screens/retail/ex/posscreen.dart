@@ -9,6 +9,8 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
+import 'package:billberrylite/core/config/tax_feature.dart';
+import 'package:billberrylite/core/config/tax_label_rule.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/retail/expiry_date_field.dart';
 import 'package:billberrylite/domain/services/retail/expiry_status.dart';
@@ -1944,6 +1946,17 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     );
   }
 
+  /// Caption above the footer total. Named for the country's tax and silent
+  /// when the business is not registered for tax at all.
+  String get _totalCaption {
+    if (!TaxFeature.enabled || retailCartStore.bill.totalGst <= 0) {
+      return 'Total';
+    }
+    return retailCartStore.bill.isTaxInclusive
+        ? 'Total (incl. ${TaxLabelRule.name})'
+        : 'Total (with ${TaxLabelRule.name})';
+  }
+
   Widget _buildSimpleSummary(BuildContext context) {
     return Observer(
       builder: (context) {
@@ -2016,7 +2029,11 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Total',
+                        // Say WHY the total differs from the line prices. On an
+                        // exclusive bill the footer is the sum plus tax, which
+                        // read as an unexplained jump; on an inclusive one it
+                        // matches, and saying so is still worth a word.
+                        _totalCaption,
                         style: GoogleFonts.poppins(
                           fontSize: AppResponsive.captionFontSize(context),
                           color: AppColors.textSecondary,

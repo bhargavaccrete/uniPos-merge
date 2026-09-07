@@ -68,6 +68,22 @@ abstract class _CustomerStore with Store {
     return sorted.take(10).toList();
   }
 
+  /// Most recently transacted customers, newest first — what the checkout
+  /// picker offers before anything is typed. `lastVisitAt` is stamped by
+  /// `updatePurchaseAmount`/`incrementVisitCount`; ISO-8601 sorts
+  /// chronologically as a string, and a customer who has never bought falls
+  /// back to when they were created.
+  @computed
+  List<Customer> get recentCustomers {
+    final sorted = customers.toList();
+    sorted.sort(
+      (a, b) => (b.lastVisitAt ?? b.createdAt).compareTo(
+        a.lastVisitAt ?? a.createdAt,
+      ),
+    );
+    return sorted.take(8).toList();
+  }
+
   @computed
   double get totalOutstandingCredit {
     return customers.fold(0.0, (sum, c) => sum + c.creditBalance);

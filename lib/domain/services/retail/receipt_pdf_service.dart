@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
@@ -21,6 +20,8 @@ import '../../../util/restaurant/staticswitch.dart';
 import '../restaurant/tax_breakdown.dart';
 import 'package:billberrylite/core/config/food_license_rule.dart';
 import 'package:billberrylite/core/config/tariff_code_rule.dart';
+import 'package:billberrylite/core/config/tax_label_rule.dart';
+import 'package:billberrylite/util/common/short_ref.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/common/loyalty_points.dart';
@@ -602,7 +603,7 @@ class ReceiptPdfService {
                 pw.Text(
                   data.billNumber != null
                       ? 'INV${data.billNumber}'
-                      : data.sale.saleId.substring(0, min(8, data.sale.saleId.length)).toUpperCase(),
+                      : saleRef(data.sale.saleId),
                   style: pw.TextStyle(fontSize: labelSize, fontWeight: pw.FontWeight.bold),
                 ),
               ],
@@ -740,35 +741,13 @@ class ReceiptPdfService {
           // Totals - Display only (NO calculations)
           // All values pre-calculated by CartCalculationService
           () {
-            // Derive the tax mode from the order totals (the stored flag can be
-            // stale and mismatch how THIS order was priced).
-            // Retail must fall back to the mode STORED on the sale. Gating the
-            // whole expression on `isRestaurant` made this always false in
-            // retail, so a tax-inclusive credit note — where the detector below
-            // cannot run, its gross being negative — printed exclusive labels.
-            final bool fallbackInclusive = AppConfig.isRestaurant
-                ? (data.isTaxInclusive ?? AppSettings.isTaxInclusive)
-                : (data.isTaxInclusive ?? false);
-            // Per-rate base for the GST table — the same figure the Amount
+            // One detector for all three receipt layouts — see
+            // [_receiptIsInclusive]. Held locally because the rows below read it
+            // several times.
+            final bool inclusive = _receiptIsInclusive(data);
+            // Per-rate base for the tax table — the same figure the Amount
             // column prints, so rows and the tax table can never disagree.
             double lineGross(SaleItemModel it) => receiptLineGross(it);
-            // Prefer the pre-calculated itemTotal, but fall back to the receipt's
-            // own line gross so the detector never relies on the stale flag.
-            final double itemsGross =
-                data.items.fold<double>(0, (s, it) => s + lineGross(it));
-            final double grossTotal = data.itemTotal ?? itemsGross;
-            final bool inclusive = grossTotal > 0
-                ? TaxBreakdown.isInclusiveFromTotals(
-                    grossBeforeDiscount: grossTotal,
-                    discount: data.sale.discountAmount,
-                    taxAmount: data.sale.taxAmount,
-                    grandTotal: data.sale.totalAmount,
-                    serviceCharge: data.serviceCharge ?? 0,
-                    loyaltyDiscount:
-                        (data.loyaltyPointsDiscount ?? 0).toDouble(),
-                    fallback: fallbackInclusive,
-                  )
-                : fallbackInclusive;
             // Per-rate tax summary. A line discount belongs to its own GST
             // bucket; only the ORDER-level remainder is spread proportionally.
             // Passing the total as billDiscount would deduct line discounts
@@ -907,13 +886,16 @@ class ReceiptPdfService {
           ..._buildUpiPaySection(data, qrSize: qrS, fontSize: totalRowSize, isSmallMedia: isSmallMedia, isPaperSaver: isPaperSaver),
 
           // Footer
+          // Outside the restaurant-only block: the ESC/POS builder prints this
+          // for both verticals, so keeping it in there made the SAME retail
+          // sale say different things depending on the printer route.
+          if (data.taxEnabled && _receiptIsInclusive(data))
+            pw.Text(
+              'All prices include ${TaxLabelRule.name}',
+              style: pw.TextStyle(fontSize: isSmallMedia ? 8 : 10),
+              textAlign: pw.TextAlign.center,
+            ),
           if (AppConfig.isRestaurant) ...[
-            if (data.taxEnabled && (data.isTaxInclusive ?? false))
-              pw.Text(
-                'All prices include GST',
-                style: pw.TextStyle(fontSize: isSmallMedia ? 8 : 10),
-                textAlign: pw.TextAlign.center,
-              ),
             // Dynamic footer / "Thank You" message (owner-editable, multi-line).
             if (PrintSettings.footerMessage.trim().isNotEmpty)
               pw.Text(
@@ -1111,7 +1093,7 @@ class ReceiptPdfService {
                   pw.Text(
                     data.billNumber != null
                         ? '# INV${data.billNumber}'
-                        : '# ${data.sale.saleId.substring(0, min(13, data.sale.saleId.length)).toUpperCase()}',
+                        : '# ${saleRef(data.sale.saleId)}',
                     style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
                   ),
                 if (showInvoiceNumber && showInvoiceDate) pw.SizedBox(height: 4),
@@ -1270,7 +1252,11 @@ class ReceiptPdfService {
             pw.Container(
               width: 250,
               child: () {
-                final isRestaurantInclusive = AppConfig.isRestaurant && (data.isTaxInclusive ?? AppSettings.isTaxInclusive);
+                // Was `AppConfig.isRestaurant && ...`, i.e. permanently false in
+                // retail — so a retail invoice priced tax-inclusive still
+                // printed "Sub Total (Before Tax)" and an added-looking GST row,
+                // and could never show the "Tax (Incl.)" line at all.
+                final isInclusive = _receiptIsInclusive(data);
 
                 // ✅ GOLDEN RULE: Only display pre-calculated values
                 // itemTotal: From CartCalculationService.itemTotal
@@ -1311,15 +1297,15 @@ class ReceiptPdfService {
                     if (showSubtotal) pw.Divider(thickness: 0.5),
 
                     // Sub Total / Taxable Amount — only for tax-exclusive
-                    if (!isRestaurantInclusive && showSubtotal)
+                    if (!isInclusive && showSubtotal)
                       _buildInvoiceTotalRow('Sub Total (Before Tax)', data.sale.subtotal),
                     // GST summary row (exclusive) — always shown so the invoice
                     // reconciles even when the detailed table above is toggled off.
-                    if (data.taxEnabled && !isRestaurantInclusive && data.sale.taxAmount > 0)
-                      _buildInvoiceTotalRow('GST', data.sale.taxAmount),
+                    if (data.taxEnabled && !isInclusive && data.sale.taxAmount > 0)
+                      _buildInvoiceTotalRow(TaxLabelRule.name, data.sale.taxAmount),
                     // Inclusive mode: the detailed table carries tax; when it's
                     // toggled off, show a single informational line instead.
-                    if (data.taxEnabled && isRestaurantInclusive && !showTax && data.sale.taxAmount > 0)
+                    if (data.taxEnabled && isInclusive && !showTax && data.sale.taxAmount > 0)
                       _buildInvoiceTotalRow('Tax (Incl.)', data.sale.taxAmount),
                     // Service / Delivery Charge
                     if ((data.serviceCharge ?? 0) > 0.009)
@@ -1434,9 +1420,12 @@ class ReceiptPdfService {
                 textAlign: pw.TextAlign.center,
               ),
               pw.SizedBox(height: 4),
-              if (AppConfig.isRestaurant && data.taxEnabled && (data.isTaxInclusive ?? false))
+              // Not restaurant-only: the ESC/POS builder prints this for both
+              // verticals, so gating it here made the SAME retail sale say
+              // different things depending on which printer route it took.
+              if (data.taxEnabled && _receiptIsInclusive(data))
                 pw.Text(
-                  'All prices include GST',
+                  'All prices include ${TaxLabelRule.name}',
                   style: pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
                 ),
               pw.Text(
@@ -1557,29 +1546,11 @@ class ReceiptPdfService {
   List<pw.Widget> _buildInvoiceTaxSummary(ReceiptData data, bool showTax) {
     if (!showTax) return [];
 
-    // Derive the tax mode from the order's own totals (same as thermal), since
-    // the stored flag can be stale and mismatch how THIS order was priced.
-    final bool fallbackInclusive = AppConfig.isRestaurant &&
-        (data.isTaxInclusive ?? AppSettings.isTaxInclusive);
-    // Per-rate base for the GST table — the same figure the Amount column
+    // Same detector as the thermal layouts — see [_receiptIsInclusive].
+    final bool inclusive = _receiptIsInclusive(data);
+    // Per-rate base for the tax table — the same figure the Amount column
     // prints, so rows and the tax table can never disagree.
     double lineGross(SaleItemModel it) => receiptLineGross(it);
-    // Prefer itemTotal, but fall back to the receipt's own line gross so the
-    // detector never has to rely on the stale inclusive flag.
-    final double itemsGross =
-        data.items.fold<double>(0, (s, it) => s + lineGross(it));
-    final double grossTotal = data.itemTotal ?? itemsGross;
-    final bool inclusive = grossTotal > 0
-        ? TaxBreakdown.isInclusiveFromTotals(
-            grossBeforeDiscount: grossTotal,
-            discount: data.sale.discountAmount,
-            taxAmount: data.sale.taxAmount,
-            grandTotal: data.sale.totalAmount,
-            serviceCharge: data.serviceCharge ?? 0,
-            loyaltyDiscount: (data.loyaltyPointsDiscount ?? 0).toDouble(),
-            fallback: fallbackInclusive,
-          )
-        : fallbackInclusive;
 
     // Same reasoning as the thermal path: a line discount stays in its own GST
     // bucket, and only the order-level remainder is spread proportionally.
@@ -1646,7 +1617,7 @@ class ReceiptPdfService {
               children: [
                 headerCell('Tax', align: pw.TextAlign.left),
                 headerCell('Taxable'),
-                headerCell('GST'),
+                headerCell(TaxLabelRule.name),
                 headerCell('Total'),
               ],
             ),
@@ -1887,13 +1858,14 @@ class ReceiptPdfService {
     ];
   }
 
-  /// Label for a GST rate, e.g. "GST1 (5%)". Uses the configured tax name when a
-  /// single tax matches the rate (restaurant); falls back to "GST (rate%)".
+  /// Label for a tax rate, e.g. "GST1 (5%)". Uses the configured tax name when
+  /// a single tax matches the rate (restaurant); otherwise the country's own
+  /// name for the tax — "VAT (20%)" in the UK, not "GST (20%)".
   String _taxLabel(double ratePercent) {
     final rateStr = ratePercent % 1 == 0
         ? ratePercent.toStringAsFixed(0)
         : ratePercent.toStringAsFixed(2);
-    String name = 'GST';
+    String name = TaxLabelRule.name;
     if (AppConfig.isRestaurant) {
       for (final t in taxStore.taxes) {
         if (((t.taxperecentage ?? 0) - ratePercent).abs() < 0.001 &&
@@ -1908,6 +1880,37 @@ class ReceiptPdfService {
 
   /// Header row for the per-rate GST table (Tax | Taxable | GST | Total).
   /// Small font so the whole block stays compact.
+  /// The tax mode to assume when the totals detector cannot run — a credit
+  /// note's gross is negative, so [TaxBreakdown.isInclusiveFromTotals] has
+  /// nothing to work from.
+  ///
+  /// Retail falls back to the mode STORED on the sale. Restaurant additionally
+  /// falls back to its own live setting. Gating the whole expression on
+  /// `isRestaurant` made it permanently false in retail, so an inclusive retail
+  /// bill printed exclusive labels.
+  static bool _fallbackInclusive(ReceiptData data) => AppConfig.isRestaurant
+      ? (data.isTaxInclusive ?? AppSettings.isTaxInclusive)
+      : (data.isTaxInclusive ?? false);
+
+  /// Whether THIS receipt was priced tax-inclusive. Derived from the order's
+  /// own totals so a later settings change cannot re-label an old invoice,
+  /// falling back to [_fallbackInclusive] when the totals cannot say.
+  static bool _receiptIsInclusive(ReceiptData data) {
+    final itemsGross =
+        data.items.fold<double>(0, (s, it) => s + receiptLineGross(it));
+    final grossTotal = data.itemTotal ?? itemsGross;
+    if (grossTotal <= 0) return _fallbackInclusive(data);
+    return TaxBreakdown.isInclusiveFromTotals(
+      grossBeforeDiscount: grossTotal,
+      discount: data.sale.discountAmount,
+      taxAmount: data.sale.taxAmount,
+      grandTotal: data.sale.totalAmount,
+      serviceCharge: data.serviceCharge ?? 0,
+      loyaltyDiscount: (data.loyaltyPointsDiscount ?? 0).toDouble(),
+      fallback: _fallbackInclusive(data),
+    );
+  }
+
   pw.Widget _buildTaxSummaryHeader() {
     const style = pw.TextStyle(fontSize: 8, color: PdfColors.grey700);
     pw.Widget cell(String t, int flex, {pw.TextAlign align = pw.TextAlign.right}) =>
@@ -1918,7 +1921,7 @@ class ReceiptPdfService {
         children: [
           cell('Tax', 6, align: pw.TextAlign.left),
           cell('Taxable', 5),
-          cell('GST', 4),
+          cell(TaxLabelRule.name, 4),
           cell('Total', 5),
         ],
       ),

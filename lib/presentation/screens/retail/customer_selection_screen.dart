@@ -30,9 +30,12 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
   @override
   void initState() {
     super.initState();
-    // Clear any previous selection, then hydrate the store — the shared
-    // CustomerStore doesn't self-load, so the filtered list would be empty.
-    customerStore.clearSelection();
+    // The selection is deliberately NOT cleared here. Opening the picker to
+    // check or change who is attached used to detach them silently, so backing
+    // out lost the customer. Removing is an explicit action on the banner.
+    // The shared CustomerStore doesn't self-load, so hydrate it or the filtered
+    // list would be empty.
+    customerStore.setSearchQuery('');
     customerStore.loadCustomers();
   }
 
@@ -54,17 +57,31 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
     Navigator.pop(context, customer);
   }
 
+  void _removeSelected() {
+    customerStore.selectCustomer(null);
+    Navigator.pop(context, null);
+  }
+
+  /// Enter on the search box commits when the query has narrowed to one
+  /// customer — the common case after typing a mobile number.
+  void _submitSearch(String _) {
+    final results = customerStore.filteredCustomers;
+    if (results.length == 1) _selectCustomer(results.first);
+  }
+
   Future<void> _showAddCustomerDialog() async {
-    final nameController = TextEditingController();
-    // Pre-fill the phone only when the typed query looks like a number.
+    // Seed from whatever was typed in the search box: a number is a phone,
+    // anything else is a name.
     final typed = _searchController.text.trim();
-    final phoneController = TextEditingController(
-      text: RegExp(r'^\d+$').hasMatch(typed) ? typed : '',
-    );
-    final nameSeed = RegExp(r'^\d+$').hasMatch(typed) ? '' : typed;
-    nameController.text = nameSeed;
+    final seededPhone = RegExp(r'^\d+$').hasMatch(typed);
+    final nameController = TextEditingController(text: seededPhone ? '' : typed);
+    final phoneController = TextEditingController(text: seededPhone ? typed : '');
     final emailController = TextEditingController();
     final addressController = TextEditingController();
+
+    // Email and address are rarely captured at the till and pushed the buttons
+    // off a phone screen. One tap away, and never cleared once shown.
+    bool showMoreFields = false;
 
     await showDialog<void>(
       context: context,
@@ -75,66 +92,93 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
           emailController,
           addressController,
         ],
-        child: AppDialogShell(
-          title: 'Add Customer',
-          accent: AppColors.primary,
-          icon: Icons.person_add_alt_1_rounded,
-          body: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AppTextField(
-                controller: nameController,
-                label: 'Name',
-                required: true,
-                icon: Icons.person_outline_rounded,
-                textCapitalization: TextCapitalization.words,
-                textInputAction: TextInputAction.next,
+        child: StatefulBuilder(
+          builder: (context, setDialogState) {
+            void submit() => _saveAndSelect(
+              dialogContext,
+              name: nameController.text,
+              phone: phoneController.text,
+              email: emailController.text,
+              address: addressController.text,
+            );
+
+            return AppDialogShell(
+              title: 'Add Customer',
+              accent: AppColors.primary,
+              icon: Icons.person_add_alt_1_rounded,
+              body: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AppTextField(
+                    controller: nameController,
+                    label: 'Name',
+                    required: true,
+                    icon: Icons.person_outline_rounded,
+                    autofocus: true,
+                    textCapitalization: TextCapitalization.words,
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: 12),
+                  AppTextField(
+                    controller: phoneController,
+                    label: 'Phone',
+                    hint: PhoneRule.hint,
+                    required: true,
+                    icon: Icons.phone_outlined,
+                    keyboardType: TextInputType.phone,
+                    maxLength: PhoneRule.maxLength,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    validator: PhoneRule.validate,
+                    // Both required fields are filled by this point, so the
+                    // keyboard's own action can finish the job.
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => submit(),
+                  ),
+                  if (showMoreFields) ...[
+                    const SizedBox(height: 12),
+                    AppTextField(
+                      controller: emailController,
+                      label: 'Email',
+                      icon: Icons.mail_outline_rounded,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                    ),
+                    const SizedBox(height: 12),
+                    AppTextField(
+                      controller: addressController,
+                      label: 'Address',
+                      icon: Icons.location_on_outlined,
+                      maxLines: 2,
+                    ),
+                  ] else
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () =>
+                            setDialogState(() => showMoreFields = true),
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: Text(
+                          'Email & address',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(height: 12),
-              AppTextField(
-                controller: phoneController,
-                label: 'Phone',
-                hint: PhoneRule.hint,
-                required: true,
-                icon: Icons.phone_outlined,
-                keyboardType: TextInputType.phone,
-                maxLength: PhoneRule.maxLength,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                validator: PhoneRule.validate,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 12),
-              AppTextField(
-                controller: emailController,
-                label: 'Email',
-                icon: Icons.mail_outline_rounded,
-                keyboardType: TextInputType.emailAddress,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 12),
-              AppTextField(
-                controller: addressController,
-                label: 'Address',
-                icon: Icons.location_on_outlined,
-                maxLines: 2,
-              ),
-            ],
-          ),
-          actions: [
-            appDialogCancelButton(dialogContext),
-            const SizedBox(width: 12),
-            appDialogPrimaryButton(
-              label: 'Add & Select',
-              onPressed: () => _saveAndSelect(
-                dialogContext,
-                name: nameController.text,
-                phone: phoneController.text,
-                email: emailController.text,
-                address: addressController.text,
-              ),
-            ),
-          ],
+              actions: [
+                appDialogCancelButton(dialogContext),
+                const SizedBox(width: 12),
+                appDialogPrimaryButton(
+                  label: 'Add & Select',
+                  onPressed: submit,
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -207,13 +251,18 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
       appBar: buildPrimaryAppBar(
         title: 'Select Customer',
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, null),
-            child: Text(
-              'Skip',
-              style: GoogleFonts.poppins(
-                color: AppColors.white,
-                fontWeight: FontWeight.w600,
+          // "Skip" only reads right while nothing is attached — with a customer
+          // on the bill this button closes without changing anything, and
+          // detaching is the banner's Remove.
+          Observer(
+            builder: (context) => TextButton(
+              onPressed: () => Navigator.pop(context, null),
+              child: Text(
+                customerStore.hasSelection ? 'Done' : 'Skip',
+                style: GoogleFonts.poppins(
+                  color: AppColors.white,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
@@ -227,16 +276,27 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
         child: MoneyScope(
           child: Column(
             children: [
+              Observer(
+                builder: (context) {
+                  final selected = customerStore.selectedCustomer;
+                  if (selected == null) return const SizedBox.shrink();
+                  return _buildSelectedBanner(selected);
+                },
+              ),
               Container(
                 color: AppColors.white,
                 padding: const EdgeInsets.all(16),
                 child: AppTextField(
                   controller: _searchController,
                   focusNode: _searchFocusNode,
-                  autofocus: true,
+                  // No autofocus: the keyboard opened over the Recent list, so
+                  // the two-tap path for a repeat customer was hidden behind it.
                   hint: 'Type name or mobile number...',
                   icon: Icons.search_rounded,
+                  keyboardType: TextInputType.text,
+                  textInputAction: TextInputAction.search,
                   onChanged: _onSearchChanged,
+                  onFieldSubmitted: _submitSearch,
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear, size: 20),
@@ -251,12 +311,32 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
               Expanded(
                 child: Observer(
                   builder: (context) {
+                    // Nothing typed: offer the customers most likely to be at
+                    // the counter. Demanding a search first made every repeat
+                    // customer cost a full name or number.
                     if (_searchController.text.isEmpty) {
-                      return const AppEmptyState(
-                        icon: Icons.person_search_rounded,
-                        title: 'Search for a customer',
-                        message:
-                            'Type a name or mobile number to find customers.',
+                      final recents = customerStore.recentCustomers;
+                      if (recents.isEmpty) {
+                        return AppEmptyState(
+                          icon: Icons.person_add_alt_1_outlined,
+                          title: 'No customers yet',
+                          message:
+                              'Add one to attach them to this bill and start '
+                              'tracking their points and dues.',
+                          action: appEmptyStateAction(
+                            label: 'Add New Customer',
+                            onPressed: _showAddCustomerDialog,
+                          ),
+                        );
+                      }
+                      return ListView.builder(
+                        // Bottom pad clears the FAB.
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+                        itemCount: recents.length + 1,
+                        itemBuilder: (context, index) {
+                          if (index == 0) return _buildListHeader('Recent');
+                          return _buildCustomerTile(recents[index - 1]);
+                        },
                       );
                     }
 
@@ -275,12 +355,10 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
                     }
 
                     return ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: results.length + 1,
-                      itemBuilder: (context, index) {
-                        if (index == 0) return _buildAddNewCustomerTile();
-                        return _buildCustomerTile(results[index - 1]);
-                      },
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+                      itemCount: results.length,
+                      itemBuilder: (context, index) =>
+                          _buildCustomerTile(results[index]),
                     );
                   },
                 ),
@@ -289,60 +367,84 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
           ),
         ),
       ),
+      // Same placement and shape as the Customers list screen's add action.
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddCustomerDialog,
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.white,
+        tooltip: 'Add Customer',
+        child: const Icon(Icons.person_add_alt_1_rounded),
+      ),
     );
   }
 
-  Widget _buildAddNewCustomerTile() {
+  /// Who is currently on the bill, with the only way to take them off.
+  Widget _buildSelectedBanner(Customer customer) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.primary),
-      ),
-      child: InkWell(
-        onTap: _showAddCustomerDialog,
-        borderRadius: BorderRadius.circular(10),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.add, color: AppColors.white, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Add New Customer',
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.bodyFontSize(context),
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    Text(
-                      'Create customer with "${_searchController.text}"',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.captionFontSize(context),
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+      color: AppColors.success.withValues(alpha: 0.08),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.check_circle_rounded,
+            size: 20,
+            color: AppColors.success,
           ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  customer.name ?? 'Unknown',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                Text(
+                  'On this bill${(customer.phone?.isNotEmpty ?? false) ? '  •  ${customer.phone}' : ''}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.captionFontSize(context),
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton.icon(
+            onPressed: _removeSelected,
+            icon: const Icon(Icons.close_rounded, size: 16),
+            label: Text(
+              'Remove',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListHeader(String label) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+      child: Text(
+        label.toUpperCase(),
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.captionFontSize(context),
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.6,
+          color: AppColors.textSecondary,
         ),
       ),
     );

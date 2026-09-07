@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../util/common/tax_split.dart';
 import '../../../data/models/retail/hive_model/product_model_200.dart';
 import '../../../data/models/retail/hive_model/variante_model_201.dart';
 
@@ -60,8 +61,9 @@ class GstService {
     final grossAmount = _round(unitPrice * quantity);
     final taxableAmount = _round(grossAmount - discountAmount);
     final gstAmount = _round(taxableAmount * (gstRate / 100));
-    final cgstAmount = _round(gstAmount / 2);
-    final sgstAmount = _round(gstAmount / 2);
+    final halves = TaxSplit.halves(gstAmount);
+    final cgstAmount = halves.cgst;
+    final sgstAmount = halves.sgst;
     final totalAmount = _round(taxableAmount + gstAmount);
 
     return GstCalculation(
@@ -140,8 +142,9 @@ class GstService {
     final totalInclusive = inclusivePrice * quantity;
     final taxableAmount = _round((totalInclusive - discountAmount) / (1 + gstRate / 100));
     final gstAmount = _round((totalInclusive - discountAmount) - taxableAmount);
-    final cgstAmount = _round(gstAmount / 2);
-    final sgstAmount = _round(gstAmount / 2);
+    final halves = TaxSplit.halves(gstAmount);
+    final cgstAmount = halves.cgst;
+    final sgstAmount = halves.sgst;
 
     return GstCalculation(
       grossAmount: totalInclusive,

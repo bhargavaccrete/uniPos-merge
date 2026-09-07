@@ -46,13 +46,24 @@ class PaymentEntry {
   /// For cash: the actual amount that goes into the drawer (received, or exact if split mode)
   double get cashInDrawer => isCash ? (cashReceived > 0 ? cashReceived : amount) : amount;
 
+  /// What this entry actually settled of the bill.
+  ///
+  /// [amount] is the bill ALLOCATION; cash can be tendered short of it when the
+  /// customer is paying only part now. Over-tender is change, never extra
+  /// settlement, so this can fall below [amount] but never rise above it.
+  double get settledAmount =>
+      isCash && cashReceived > 0 && cashReceived < amount ? cashReceived : amount;
+
   /// For cash: validate if sufficient amount received
   bool get isCashSufficient => !isCash || cashReceived >= amount;
 
   Map<String, dynamic> toMap() {
     final map = <String, dynamic>{
       'method': method.trim(),
-      'amount': amount,
+      // The money that actually changed hands, NOT the bill allocation. Every
+      // cash and collection surface sums this leg, so a short cash tender left
+      // here as the full allocation books money that never entered the till.
+      'amount': settledAmount,
     };
 
     if (referenceId != null && referenceId!.isNotEmpty) {
@@ -77,11 +88,19 @@ class SplitPaymentWidget extends StatefulWidget {
   final Function(List<PaymentEntry>, double totalPaid, double change) onPaymentChanged;
   final Function(bool isValid) onValidationChanged;
 
+  /// The caller is collecting only part of the bill; the balance goes on the
+  /// customer's account. Tendering less than [billTotal] is then the intent,
+  /// not a mistake, so the shortfall is stated rather than flagged red — and
+  /// the amount box is labelled as what is being taken NOW, since for a
+  /// non-cash method that box is the only place to say so.
+  final bool allowPartial;
+
   const SplitPaymentWidget({
     super.key,
     required this.billTotal,
     required this.onPaymentChanged,
     required this.onValidationChanged,
+    this.allowPartial = false,
   });
 
   @override
@@ -436,6 +455,19 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
           const SizedBox(height: 12),
 
           // Amount Input
+          if (widget.allowPartial) ...[
+            Text(
+              payment.isCash
+                  ? 'Bill amount for this method'
+                  : 'Amount collected now',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF6B6B6B),
+              ),
+            ),
+            const SizedBox(height: 6),
+          ],
           AppTextField(
             controller: payment.amountController,
             hint: '0.00',
@@ -656,7 +688,7 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
             ],
           ),
 
-          // Insufficient amount warning
+          // Short tender: an error normally, the whole point in partial mode.
           if (isInsufficient) ...[
             const SizedBox(height: 8),
             ValueListenableBuilder<int>(
@@ -664,16 +696,25 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
               builder: (context, precision, child) {
                 final symbol = CurrencyHelper.currentSymbol;
                 final shortage = (payment.amount - payment.cashReceived).toStringAsFixed(precision);
+                final partial = widget.allowPartial;
                 return Row(
                   children: [
-                    const Icon(Icons.warning_amber, size: 16, color: Colors.red),
+                    Icon(
+                      partial ? Icons.info_outline : Icons.warning_amber,
+                      size: 16,
+                      color: partial ? const Color(0xFFFF9800) : Colors.red,
+                    ),
                     const SizedBox(width: 4),
-                    Text(
-                      'Insufficient! Need $symbol$shortage more',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.red,
-                        fontWeight: FontWeight.w500,
+                    Expanded(
+                      child: Text(
+                        partial
+                            ? "$symbol$shortage goes on the customer's account"
+                            : 'Insufficient! Need $symbol$shortage more',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: partial ? const Color(0xFFFF9800) : Colors.red,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ],

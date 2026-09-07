@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:billberrylite/util/common/short_ref.dart';
 import 'package:billberrylite/domain/services/common/notification_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -129,7 +130,7 @@ class PrintService {
 
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat _) async => pdf.save(),
-      name: 'Receipt_${sale.saleId.length > 8 ? sale.saleId.substring(0, 8) : sale.saleId}',
+      name: 'Receipt_${saleRef(sale.saleId)}',
       format: pageFormat,
     );
   }
@@ -360,7 +361,7 @@ class PrintService {
             canChangePageFormat: false,
             canChangeOrientation: false,
             canDebug: false,
-            pdfFileName: 'Receipt_${sale.saleId.length > 8 ? sale.saleId.substring(0, 8) : sale.saleId}.pdf',
+            pdfFileName: 'Receipt_${saleRef(sale.saleId)}.pdf',
             initialPageFormat: format == ReceiptFormat.thermal
                 ? (paperWidth <= 58
                     ? const PdfPageFormat(58 * PdfPageFormat.mm, double.infinity, marginAll: 0)
@@ -436,14 +437,14 @@ class PrintService {
     if (kIsWeb) {
       await Printing.sharePdf(
         bytes: bytes,
-        filename: 'Receipt_${sale.saleId.length > 8 ? sale.saleId.substring(0, 8) : sale.saleId}.pdf',
+        filename: 'Receipt_${saleRef(sale.saleId)}.pdf',
       );
       return;
     }
 
     // Save to temp file
     final tempDir = await getTemporaryDirectory();
-    final safeId = sale.saleId.length > 8 ? sale.saleId.substring(0, 8) : sale.saleId;
+    final safeId = saleRef(sale.saleId);
     final fileName = 'Receipt_${safeId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
     final file = File('${tempDir.path}/$fileName');
     await file.writeAsBytes(bytes);
@@ -507,7 +508,7 @@ class PrintService {
         : await _receiptPdfService.generateInvoice(receiptData);
 
     final bytes = await pdf.save();
-    final safeId = sale.saleId.length > 8 ? sale.saleId.substring(0, 8) : sale.saleId;
+    final safeId = saleRef(sale.saleId);
     final fileName = 'Receipt_${safeId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
 
     if (kIsWeb) {

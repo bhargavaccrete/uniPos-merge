@@ -746,7 +746,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Sale #${shortRef(sale['saleId']?.toString(), ellipsis: true)}',
+                    saleRef(sale['saleId']?.toString(), ellipsis: true),
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: AppResponsive.bodyFontSize(context),

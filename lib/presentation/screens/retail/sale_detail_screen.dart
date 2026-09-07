@@ -47,6 +47,11 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
 
   bool get _hasBeenRefunded => _isFullyReturned || _isPartiallyReturned;
 
+  /// Money still owed on this bill — a partial payment or a pay-later sale.
+  /// A return's header is negative, so it is never "outstanding".
+  bool get _hasOutstanding =>
+      _sale != null && !(_sale!.isReturn ?? false) && _sale!.dueAmount > 0.009;
+
   /// This sale's exchange lost its replacement half — surfaced rather than
   /// auto-repaired, because a repair that guesses wrong about money is worse
   /// than a visible flag.
@@ -545,6 +550,62 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
             SizedBox(height: AppResponsive.mediumSpacing(context)),
           ],
 
+          // Unsettled bill. Sat only in `dueAmount`/`status` before, so a
+          // ₹200 bill with ₹50 collected read here as an ordinary paid sale.
+          if (_hasOutstanding) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.warning,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.schedule_rounded,
+                    color: Colors.white,
+                    size: AppResponsive.iconSize(context),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _sale!.statusDisplayText.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'Balance ${formatMoney(_sale!.dueAmount)}',
+                      maxLines: 1,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: AppResponsive.captionFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
+          ],
+
           // Refund Status Banner
           if (_hasBeenRefunded) ...[
             Container(
@@ -620,7 +681,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      shortRef(_sale!.saleId, length: 13),
+                      saleRef(_sale!.saleId),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -1005,6 +1066,46 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
               fontSize: AppResponsive.headingFontSize(context),
             ),
           ),
+          // What was actually collected against that total. Shown only when
+          // they differ — on a settled bill the Grand Total says it all.
+          if (_hasOutstanding) ...[
+            SizedBox(height: AppResponsive.largeSpacing(context)),
+            _buildPriceRow(
+              'Paid',
+              formatMoney(_sale!.paidAmount),
+              color: AppColors.success,
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.warning.withValues(alpha: 0.3),
+                  width: 1,
+                ),
+              ),
+              child: _buildPriceRow(
+                'Balance Due',
+                formatMoney(_sale!.dueAmount),
+                isBold: true,
+                fontSize: AppResponsive.subheadingFontSize(context),
+                color: AppColors.warning,
+              ),
+            ),
+            if (_customer != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                "On ${_customer!.name}'s account — collect from Receive Payment.",
+                style: TextStyle(
+                  fontSize: AppResponsive.captionFontSize(context),
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ],
+
           // Split Payment Breakdown
           _buildSplitPaymentBreakdown(),
         ],
