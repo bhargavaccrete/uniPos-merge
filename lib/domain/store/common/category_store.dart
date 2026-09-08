@@ -63,6 +63,23 @@ abstract class _CategoryStore with Store {
   Map<String, String> get categoryNameById =>
       {for (final c in categories) c.id: c.name};
 
+  /// What a product with no usable category is called on screen.
+  static const String uncategorisedName = 'Uncategorized';
+
+  /// Display name for a category id — the ONE place that decides what an
+  /// unusable id reads as.
+  ///
+  /// Deleting a category re-parents its products to `''` rather than deleting
+  /// them (see `CategoryRepository.deleteCategory`), so an empty id is a NORMAL
+  /// state, not corruption. Callers used to fall back to the raw id, which
+  /// rendered a blank chip for `''` — the product looked like it had lost its
+  /// category entirely — and a bare UUID for an id whose category is gone.
+  /// `category` always holds an id, never a name, so neither is worth showing.
+  String displayNameFor(String? categoryId) {
+    if (categoryId == null || categoryId.isEmpty) return uncategorisedName;
+    return categoryNameById[categoryId] ?? uncategorisedName;
+  }
+
   // ==================== ACTIONS ====================
 
   @action

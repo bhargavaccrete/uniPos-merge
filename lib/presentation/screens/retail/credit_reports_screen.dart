@@ -387,7 +387,7 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                saleRef(sale.saleId),
+                sale.displayNumber,
                 style: TextStyle(
                   fontSize: AppResponsive.bodyFontSize(context),
                   fontWeight: FontWeight.w600,

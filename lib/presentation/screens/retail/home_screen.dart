@@ -79,7 +79,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final staffId = RestaurantSession.isAdmin
         ? 'admin'
         : (RestaurantSession.staffName ?? 'staff');
-    final staffName = RestaurantSession.staffName ??
+    final staffName =
+        RestaurantSession.staffName ??
         (RestaurantSession.isAdmin ? 'Admin' : 'Staff');
 
     // Restore from Hive in case of hot-restart, so we never open a second
@@ -109,7 +110,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isTablet = !AppResponsive.isMobile(context);
     final isDesktop = AppResponsive.isDesktop(context);
 
     return Scaffold(
@@ -127,17 +127,19 @@ class _HomeScreenState extends State<HomeScreen> {
                   Text(
                     'Dashboard',
                     style: GoogleFonts.poppins(
-                      fontSize: isTablet ? 22 : 20,
+                      fontSize: AppResponsive.headingFontSize(context),
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
                     ),
                   ),
+                  // Secondary line under the title, so it snaps DOWN to
+                  // smallFontSize rather than up — see the snapping table.
                   Text(
                     _storeName.isNotEmpty ? _storeName : 'Bill Berry Lite',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.poppins(
-                      fontSize: isTablet ? 14 : 13,
+                      fontSize: AppResponsive.smallFontSize(context),
                       fontWeight: FontWeight.w500,
                       color: Colors.white70,
                     ),
@@ -159,47 +161,75 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ==================== SHARED GUTTER ====================
+  /// Horizontal gutter used by BOTH the desktop header and the card grid.
+  ///
+  /// These must stay equal. The header background is full-bleed while the
+  /// grid is capped at [AppResponsive.maxContentWidth] and centred, so if the
+  /// two gutters disagree the "Dashboard" title and the first card start at
+  /// different x positions — a 40 vs 28 mismatch put them ~108px apart at
+  /// 1920px.
+  double _gutter(BuildContext context) => AppResponsive.padding(context).left;
+
+  // ==================== GRID COLUMNS ====================
+  /// Target width of one dashboard card. Column count is derived from this, so
+  /// a card stays roughly the same size at every width instead of stretching.
+  ///
+  /// 155 is not arbitrary: it keeps a 1028px window on its existing 4 x 160
+  /// layout, and stops the 1024px breakpoint dipping to 3 columns as the
+  /// sidebar appears.
+  static const double _targetCardWidth = 155;
+  static const int _minColumns = 2;
+  static const int _maxColumns = 6;
+
+  /// How many cards fit across [availW] at about [_targetCardWidth] each.
+  ///
+  /// Takes the MEASURED pane width, never `AppResponsive.gridColumns` — that
+  /// reads `MediaQuery` (the whole screen), but this grid lives in an
+  /// `Expanded` beside a fixed 280px sidebar, so it was 280px optimistic on
+  /// desktop. The symptom: a 768px tablet got 232px cards while a *wider*
+  /// 1028px desktop got 160px ones, and a 1440px laptop stretched them to
+  /// 263px around an icon and label that never grew.
+  int _columnsFor(double availW, double spacing) {
+    final fit = ((availW + spacing) / (_targetCardWidth + spacing)).floor();
+    return fit.clamp(_minColumns, _maxColumns);
+  }
+
   // ==================== CARD GRID ====================
-  /// One self-adapting grid for every breakpoint (2/3/4 columns via
-  /// [AppResponsive.gridColumns]) — replaces the old three hardcoded layouts.
+  /// One self-adapting grid for every breakpoint — replaces the old three
+  /// hardcoded layouts. Columns come from [_columnsFor] against the measured
+  /// pane width, so card size stays flat as the window grows.
   /// Mirrors the restaurant dashboard: stretch the rows to fill the viewport
   /// when they fit, otherwise fall back to scrolling at the natural ratio.
   Widget _buildCardGrid(BuildContext context) {
-    final isTablet = !AppResponsive.isMobile(context);
-    final isDesktop = AppResponsive.isDesktop(context);
-
     final cards = _buildAllMenuCards(context);
-    final columns = AppResponsive.gridColumns(context);
-    final rows = (cards.length / columns).ceil();
 
-    final spacing = isDesktop
-        ? 20.0
-        : isTablet
-        ? 16.0
-        : 12.0;
-    final padH = isDesktop
-        ? 28.0
-        : isTablet
-        ? 24.0
-        : 16.0;
-    final padTop = isDesktop
-        ? 12.0
-        : isTablet
-        ? 8.0
-        : 4.0;
+    final spacing = AppResponsive.gridSpacing(context);
+    final padH = _gutter(context);
+    // Content sets its own top padding under the flat AppBar; 4px left the
+    // first card row jammed against it.
+    final padTop = AppResponsive.mediumSpacing(context);
     final pad = EdgeInsets.fromLTRB(padH, padTop, padH, padH);
 
-    // The densest the cards should ever be.
-    final naturalRatio = isDesktop
-        ? 1.4
-        : isTablet
-        ? 1.3
-        : 1.2;
+    // The densest the cards should ever be. A raw getValue is correct here:
+    // an aspect ratio is not a step on any AppResponsive ladder.
+    final naturalRatio = AppResponsive.getValue(
+      context,
+      mobile: 1.2,
+      tablet: 1.3,
+      desktop: 1.4,
+    );
 
     final grid = LayoutBuilder(
       builder: (context, constraints) {
         final availW = constraints.maxWidth - padH * 2;
         final availH = constraints.maxHeight - padTop - padH;
+
+        // Resolved HERE, from the measured pane — not hoisted out of the
+        // LayoutBuilder, which is what made this read the screen instead.
+        final columns = _columnsFor(availW, spacing);
+        final rows = (cards.length / columns).ceil();
+
         final cellW = (availW - (columns - 1) * spacing) / columns;
         final naturalGridH =
             (cellW / naturalRatio) * rows + (rows - 1) * spacing;
@@ -273,16 +303,19 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Widget> _buildDashboardAppBarActions(BuildContext context) {
     // Notification bell. White tint to read on the primary AppBar.
     return [
-      NotificationBell(
-        iconSize: AppResponsive.isMobile(context) ? 22 : 24,
-      ),
+      NotificationBell(iconSize: AppResponsive.iconSize(context)),
       const SizedBox(width: 8),
     ];
   }
 
   Widget _buildDesktopHeader(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+      // Vertical padding only. The white background and its shadow stay
+      // full-bleed; the CONTENT is capped and gutter-aligned with the card
+      // grid below, so the title sits directly above the first card.
+      padding: EdgeInsets.symmetric(
+        vertical: AppResponsive.largeSpacing(context),
+      ),
       decoration: BoxDecoration(
         color: AppColors.white,
         boxShadow: [
@@ -293,42 +326,54 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Dashboard',
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.getValue(
-                      context,
-                      mobile: 26.0,
-                      tablet: 30.0,
-                      desktop: 34.0,
+      child: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: _gutter(context)),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Dashboard',
+                      style: GoogleFonts.poppins(
+                        // Above the top of the font ladder (20), so a raw
+                        // getValue is the sanctioned form here.
+                        fontSize: AppResponsive.getValue(
+                          context,
+                          mobile: 26.0,
+                          tablet: 30.0,
+                          desktop: 34.0,
+                        ),
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Manage your business operations',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Manage your business operations',
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.bodyFontSize(context),
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
+              ),
+              // Desktop renders a sidebar + this header instead of an AppBar,
+              // so the bell has to be placed here too — same control, primary
+              // tint against the light header.
+              NotificationBell(
+                tint: AppColors.primary,
+                iconSize: AppResponsive.iconSize(context),
+              ),
+              const SizedBox(width: 8),
+            ],
           ),
-          // Desktop renders a sidebar + this header instead of an AppBar, so
-          // the bell has to be placed here too — same control, primary tint
-          // against the light header.
-          const NotificationBell(tint: AppColors.primary, iconSize: 24),
-          const SizedBox(width: 8),
-        ],
+        ),
       ),
     );
   }
@@ -401,73 +446,85 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const Divider(color: Colors.white24, height: 1),
 
-          // Quick Stats
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Quick Stats',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white70,
-                    fontSize: AppResponsive.smallFontSize(context),
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Observer(
-                  builder: (context) {
-                    final now = DateTime.now();
-                    final todayStart = DateTime(now.year, now.month, now.day);
-                    final todaySales = saleStore.sales.where((sale) {
-                      try {
-                        final saleDate = DateTime.parse(sale.createdAt);
-                        return saleDate.isAfter(todayStart) ||
-                            saleDate.isAtSameMomentAs(todayStart);
-                      } catch (_) {
-                        return false;
-                      }
-                    });
-                    final total = todaySales.fold(
-                      0.0,
-                      (sum, sale) =>
-                          sum + (sale.grandTotal ?? sale.totalAmount),
-                    );
-                    // MoneyScope so the figure re-renders if the store's
-                    // currency or decimal precision is changed in Settings —
-                    // this is the only money on the dashboard.
-                    return MoneyScope(
-                      child: _buildSidebarStat(
-                        Icons.receipt_long_rounded,
-                        'Today\'s Sales',
-                        formatMoney(total),
+          // Quick Stats.
+          //
+          // Expanded + scroll, NOT a bare `Spacer`: desktop guarantees WIDTH
+          // (>=1024) but says nothing about height, and a window resized
+          // shorter than ~500px overflowed this Column. Expanded still pushes
+          // the footer to the bottom whenever there is surplus height, so the
+          // normal-size layout is unchanged.
+          Expanded(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Quick Stats',
+                      style: GoogleFonts.poppins(
+                        color: Colors.white70,
+                        fontSize: AppResponsive.smallFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.2,
                       ),
-                    );
-                  },
+                    ),
+                    const SizedBox(height: 16),
+                    Observer(
+                      builder: (context) {
+                        final now = DateTime.now();
+                        final todayStart = DateTime(
+                          now.year,
+                          now.month,
+                          now.day,
+                        );
+                        final todaySales = saleStore.sales.where((sale) {
+                          try {
+                            final saleDate = DateTime.parse(sale.createdAt);
+                            return saleDate.isAfter(todayStart) ||
+                                saleDate.isAtSameMomentAs(todayStart);
+                          } catch (_) {
+                            return false;
+                          }
+                        });
+                        final total = todaySales.fold(
+                          0.0,
+                          (sum, sale) =>
+                              sum + (sale.grandTotal ?? sale.totalAmount),
+                        );
+                        // MoneyScope so the figure re-renders if the store's
+                        // currency or decimal precision is changed in Settings —
+                        // this is the only money on the dashboard.
+                        return MoneyScope(
+                          child: _buildSidebarStat(
+                            Icons.receipt_long_rounded,
+                            'Today\'s Sales',
+                            formatMoney(total),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Observer(
+                      builder: (context) => _buildSidebarStat(
+                        Icons.inventory_2_rounded,
+                        'Products',
+                        '${productStore.products.length}',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Observer(
+                      builder: (context) => _buildSidebarStat(
+                        Icons.people_rounded,
+                        'Customers',
+                        '${customerStore.customers.length}',
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                Observer(
-                  builder: (context) => _buildSidebarStat(
-                    Icons.inventory_2_rounded,
-                    'Products',
-                    '${productStore.products.length}',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Observer(
-                  builder: (context) => _buildSidebarStat(
-                    Icons.people_rounded,
-                    'Customers',
-                    '${customerStore.customers.length}',
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-
-          const Spacer(),
 
           // Footer
           Container(
@@ -543,8 +600,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-
-
   // ==================== MENU CARDS ====================
   /// Wrap a card's tap in its plan gate. DashboardMenuCard is deliberately
   /// presentational ("pass an already-guarded onTap"), so the guard lives here —
@@ -611,168 +666,176 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Widget> _buildAllMenuCards(BuildContext context) {
     return [
       if (RestaurantSession.canAccess('billing'))
-      DashboardMenuCard(
-        icon: Icons.point_of_sale_rounded,
-        title: 'Billing',
-        color: Colors.blue,
-        onTap: _gated(
-          context,
-          RetailEntKeys.billing,
-          'Billing',
-          () => Navigator.push(
+        DashboardMenuCard(
+          icon: Icons.point_of_sale_rounded,
+          title: 'Billing',
+          color: Colors.blue,
+          onTap: _gated(
             context,
-            MaterialPageRoute(builder: (context) => const RetailPosScreen()),
+            RetailEntKeys.billing,
+            'Billing',
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const RetailPosScreen()),
+            ),
           ),
         ),
-      ),
       // One card for the whole catalog — products, their categories and the
       // attributes that build variants all live behind the Products hub.
       if (RestaurantSession.canAccess('catalog'))
-      DashboardMenuCard(
-        icon: Icons.inventory_2_rounded,
-        title: 'Products',
-        color: Colors.amber,
-        onTap: _gated(
-          context,
-          RetailEntKeys.catalog,
-          'Products',
-          () => Navigator.push(
+        DashboardMenuCard(
+          icon: Icons.inventory_2_rounded,
+          title: 'Products',
+          color: Colors.amber,
+          onTap: _gated(
             context,
-            MaterialPageRoute(
-              builder: (context) => const ProductManagementScreen(),
+            RetailEntKeys.catalog,
+            'Products',
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ProductManagementScreen(),
+              ),
             ),
           ),
         ),
-      ),
       if (RestaurantSession.canAccess('customers'))
-      DashboardMenuCard(
-        icon: Icons.people_rounded,
-        title: 'Customers',
-        color: Colors.indigo,
-        onTap: _gated(
-          context,
-          RetailEntKeys.customers,
-          'Customers',
-          () => Navigator.push(
+        DashboardMenuCard(
+          icon: Icons.people_rounded,
+          title: 'Customers',
+          color: Colors.indigo,
+          onTap: _gated(
             context,
-            MaterialPageRoute(builder: (context) => const CustomerListScreen()),
-          ),
-        ),
-      ),
-      if (RestaurantSession.canAccess('suppliers'))
-      DashboardMenuCard(
-        icon: Icons.storefront_rounded,
-        title: 'Suppliers',
-        color: Colors.brown,
-        onTap: _gated(
-          context,
-          RetailEntKeys.suppliers,
-          'Suppliers',
-          () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const SupplierListScreen()),
-          ),
-        ),
-      ),
-      if (RestaurantSession.canAccess('purchase'))
-      DashboardMenuCard(
-        icon: Icons.assignment_rounded,
-        title: 'Purchase Orders',
-        color: Colors.cyan,
-        onTap: _gated(
-          context,
-          RetailEntKeys.purchase,
-          'Purchase Orders',
-          () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const PurchaseOrderListScreen(),
+            RetailEntKeys.customers,
+            'Customers',
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const CustomerListScreen(),
+              ),
             ),
           ),
         ),
-      ),
+      if (RestaurantSession.canAccess('suppliers'))
+        DashboardMenuCard(
+          icon: Icons.storefront_rounded,
+          title: 'Suppliers',
+          color: Colors.brown,
+          onTap: _gated(
+            context,
+            RetailEntKeys.suppliers,
+            'Suppliers',
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const SupplierListScreen(),
+              ),
+            ),
+          ),
+        ),
+      if (RestaurantSession.canAccess('purchase'))
+        DashboardMenuCard(
+          icon: Icons.assignment_rounded,
+          title: 'Purchase Orders',
+          color: Colors.cyan,
+          onTap: _gated(
+            context,
+            RetailEntKeys.purchase,
+            'Purchase Orders',
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const PurchaseOrderListScreen(),
+              ),
+            ),
+          ),
+        ),
       // Returns, claims and write-offs raised from damaged goods on a GRN.
       if (RestaurantSession.canAccess('purchase'))
-      DashboardMenuCard(
-        icon: Icons.assignment_return_rounded,
-        title: 'Returns & Claims',
-        color: Colors.deepPurple,
-        onTap: _gated(
-          context,
-          RetailEntKeys.purchaseDamaged,
-          'Returns & Claims',
-          () => Navigator.push(
+        DashboardMenuCard(
+          icon: Icons.assignment_return_rounded,
+          title: 'Returns & Claims',
+          color: Colors.deepPurple,
+          onTap: _gated(
             context,
-            MaterialPageRoute(
-              builder: (context) => const DamagedGoodsHubScreen(),
+            RetailEntKeys.purchaseDamaged,
+            'Returns & Claims',
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const DamagedGoodsHubScreen(),
+              ),
             ),
           ),
         ),
-      ),
       if (RestaurantSession.canAccess('billing'))
-      DashboardMenuCard(
-        icon: Icons.receipt_long_rounded,
-        title: 'Sales',
-        color: Colors.green,
-        onTap: _gated(
-          context,
-          RetailEntKeys.reports,
-          'Sales',
-          () => Navigator.push(
+        DashboardMenuCard(
+          icon: Icons.receipt_long_rounded,
+          title: 'Sales',
+          color: Colors.green,
+          onTap: _gated(
             context,
-            MaterialPageRoute(builder: (context) => const SalesHistoryScreen()),
+            RetailEntKeys.reports,
+            'Sales',
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const SalesHistoryScreen(),
+              ),
+            ),
           ),
         ),
-      ),
       if (RestaurantSession.canAccess('cashDrawer'))
-      DashboardMenuCard(
-        icon: Icons.account_balance_wallet_rounded,
-        title: 'Cash Drawer',
-        color: const Color(0xFF00897B),
-        onTap: _gated(
-          context,
-          RetailEntKeys.cashDrawer,
-          'Cash Drawer',
-          () => Navigator.push(
+        DashboardMenuCard(
+          icon: Icons.account_balance_wallet_rounded,
+          title: 'Cash Drawer',
+          color: const Color(0xFF00897B),
+          onTap: _gated(
             context,
-            MaterialPageRoute(builder: (context) => const CashDrawerScreen()),
+            RetailEntKeys.cashDrawer,
+            'Cash Drawer',
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const CashDrawerScreen()),
+            ),
           ),
         ),
-      ),
       if (RestaurantSession.canAccess('reports'))
-      DashboardMenuCard(
-        icon: Icons.bar_chart_rounded,
-        title: 'Reports',
-        color: Colors.orange,
-        onTap: _gated(
-          context,
-          RetailEntKeys.reports,
-          'Reports',
-          () => Navigator.push(
+        DashboardMenuCard(
+          icon: Icons.bar_chart_rounded,
+          title: 'Reports',
+          color: Colors.orange,
+          onTap: _gated(
             context,
-            MaterialPageRoute(builder: (context) => const ReportsScreen()),
+            RetailEntKeys.reports,
+            'Reports',
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const ReportsScreen()),
+            ),
           ),
         ),
-      ),
       if (RestaurantSession.canAccess('inventory'))
         _buildStockAlertCard(context),
       if (RestaurantSession.canAccess('inventory'))
         _buildExpiryAlertCard(context),
       if (RestaurantSession.canAccess('manageStaff'))
-      DashboardMenuCard(
-        icon: Icons.people_rounded,
-        title: 'Manage Staff',
-        color: Colors.teal,
-        onTap: _gated(
-          context,
-          RetailEntKeys.users,
-          'Manage Staff',
-          () => Navigator.push(
+        DashboardMenuCard(
+          icon: Icons.people_rounded,
+          title: 'Manage Staff',
+          color: Colors.teal,
+          onTap: _gated(
             context,
-            MaterialPageRoute(builder: (context) => const ManageStaffScreen()),
+            RetailEntKeys.users,
+            'Manage Staff',
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ManageStaffScreen(),
+              ),
+            ),
           ),
         ),
-      ),
       DashboardMenuCard(
         icon: Icons.access_time_rounded,
         title: 'Attendance',

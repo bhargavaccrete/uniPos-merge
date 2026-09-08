@@ -45,13 +45,14 @@ class EndOfDayReportAdapter extends TypeAdapter<EndOfDayReport> {
       grossProfit: fields[25] as double,
       customersWithDue: fields[26] as int,
       totalOutstanding: fields[27] as double,
+      cashWithdrawn: fields[28] == null ? 0.0 : fields[28] as double,
     );
   }
 
   @override
   void write(BinaryWriter writer, EndOfDayReport obj) {
     writer
-      ..writeByte(28)
+      ..writeByte(29)
       ..writeByte(0)
       ..write(obj.date)
       ..writeByte(1)
@@ -107,7 +108,9 @@ class EndOfDayReportAdapter extends TypeAdapter<EndOfDayReport> {
       ..writeByte(26)
       ..write(obj.customersWithDue)
       ..writeByte(27)
-      ..write(obj.totalOutstanding);
+      ..write(obj.totalOutstanding)
+      ..writeByte(28)
+      ..write(obj.cashWithdrawn);
   }
 
   @override

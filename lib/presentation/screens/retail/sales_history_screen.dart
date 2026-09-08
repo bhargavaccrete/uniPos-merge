@@ -694,7 +694,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                               children: [
                                 Flexible(
                                   child: Text(
-                                    saleRef(sale.saleId),
+                                    sale.displayNumber,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: GoogleFonts.poppins(

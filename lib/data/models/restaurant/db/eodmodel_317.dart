@@ -104,6 +104,24 @@ class EndOfDayReport extends HiveObject{
   @HiveField(27)
   final double totalOutstanding;
 
+  // ==================== SAFE DROP ====================
+
+  /// Cash physically removed from the drawer at close — the safe drop.
+  ///
+  /// Stored rather than left in a cash-movement note so the settlement slip can
+  /// be reprinted months later with the real figure, and so a report can say
+  /// where the day's cash went. Records written before this existed read back
+  /// 0, which correctly means "nothing was taken out".
+  @HiveField(28, defaultValue: 0.0)
+  final double cashWithdrawn;
+
+  /// What stayed in the drawer, and therefore the next day's opening float.
+  ///
+  /// Derived from the COUNTED cash, not [closingBalance] — the latter is the
+  /// system-expected figure, which differs from the count whenever there is a
+  /// variance.
+  double get cashKept => cashReconciliation.actualCash - cashWithdrawn;
+
   /// Credit repayments across every mode.
   ///
   /// Derived, not stored: persisting it alongside its own three components is
@@ -155,6 +173,7 @@ class EndOfDayReport extends HiveObject{
     this.grossProfit = 0,
     this.customersWithDue = 0,
     this.totalOutstanding = 0,
+    this.cashWithdrawn = 0,
   });
 
   Map<String, dynamic> toMap() {
@@ -187,6 +206,7 @@ class EndOfDayReport extends HiveObject{
       'grossProfit': grossProfit,
       'customersWithDue': customersWithDue,
       'totalOutstanding': totalOutstanding,
+      'cashWithdrawn': cashWithdrawn,
     };
   }
 
@@ -220,6 +240,7 @@ class EndOfDayReport extends HiveObject{
       grossProfit: (map['grossProfit'] ?? 0).toDouble(),
       customersWithDue: map['customersWithDue'] ?? 0,
       totalOutstanding: (map['totalOutstanding'] ?? 0).toDouble(),
+      cashWithdrawn: (map['cashWithdrawn'] ?? 0).toDouble(),
     );
   }
 

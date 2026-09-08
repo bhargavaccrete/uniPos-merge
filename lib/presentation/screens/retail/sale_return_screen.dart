@@ -377,7 +377,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
             ),
           ),
           SizedBox(height: AppResponsive.mediumSpacing(context)),
-          _buildInfoRow('Sale ID', saleRef(_sale!.saleId)),
+          _buildInfoRow('Invoice', _sale!.displayNumber),
           _buildInfoRow('Total Items', '${_sale!.totalItems}'),
           _buildInfoRow('Total Amount', formatMoney(_sale!.totalAmount)),
           _buildInfoRow('Payment Type', _sale!.paymentType.toUpperCase()),

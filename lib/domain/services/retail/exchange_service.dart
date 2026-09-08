@@ -454,12 +454,14 @@ class ExchangeService {
       );
 
       // ---- 4. the REPLACEMENT half ----------------------------------------
-      // The replacement is an ordinary sale, so it carries an ordinary invoice
-      // number rather than a bare UUID.
-      final replacementSaleId = await saleStore.nextInvoiceNumber();
+      // An ordinary sale, so it takes the next number in the ordinary invoice
+      // series. Its key stays a UUID like every other sale's.
+      final replacementSaleId = _uuid.v4();
+      final replacementNumber = await saleStore.nextInvoiceNumber();
       try {
         await _writeReplacement(
           saleId: replacementSaleId,
+          invoiceNumber: replacementNumber,
           groupId: groupId,
           quote: q,
           paymentMethod: paymentMethod,
@@ -544,6 +546,7 @@ class ExchangeService {
   /// checkout uses, so it lands in every report exactly like a walk-in sale.
   Future<void> _writeReplacement({
     required String saleId,
+    required String invoiceNumber,
     required String groupId,
     required ExchangeQuote quote,
     required String paymentMethod,
@@ -554,6 +557,7 @@ class ExchangeService {
 
     final sale = SaleModel.createWithSplitPayment(
       saleId: saleId,
+      invoiceNumber: invoiceNumber,
       customerId: quote.originalSale.customerId,
       totalItems: bill.totalItems,
       subtotal: bill.itemTotal,

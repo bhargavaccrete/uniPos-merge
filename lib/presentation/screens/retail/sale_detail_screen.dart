@@ -681,7 +681,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      saleRef(_sale!.saleId),
+                      _sale!.displayNumber,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

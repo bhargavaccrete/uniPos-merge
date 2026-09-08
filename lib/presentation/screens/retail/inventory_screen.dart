@@ -114,13 +114,17 @@ class _InventoryScreenState extends State<InventoryScreen>
   /// run outside the reaction, where store reads would neither track nor
   /// memoise.
   List<_ProductRow> _visibleRows() {
-    final names = categoryStore.categoryNameById;
     final index = productStore.variantsByProduct;
+    // Through the store's resolver so a product whose category was deleted
+    // reads as "Uncategorized" rather than as a blank chip — and is findable
+    // by that word in the search box.
+    String categoryLabel(ProductModel p) =>
+        categoryStore.displayNameFor(p.category);
 
     return productStore.products
         .where((product) {
           if (_searchQuery.isEmpty) return true;
-          final categoryName = (names[product.category] ?? '').toLowerCase();
+          final categoryName = categoryLabel(product).toLowerCase();
           if (product.productName.toLowerCase().contains(_searchQuery) ||
               categoryName.contains(_searchQuery)) {
             return true;
@@ -143,7 +147,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           return _ProductRow(
             product: product,
             variants: variants,
-            categoryName: names[product.category] ?? product.category,
+            categoryName: categoryLabel(product),
             totalStock: totalStock,
             status: productStore.stockStatusForQty(totalStock),
             expiryStatus:

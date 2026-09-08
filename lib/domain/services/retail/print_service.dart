@@ -130,7 +130,7 @@ class PrintService {
 
     await Printing.layoutPdf(
       onLayout: (PdfPageFormat _) async => pdf.save(),
-      name: 'Receipt_${saleRef(sale.saleId)}',
+      name: 'Receipt_${sale.displayNumber}',
       format: pageFormat,
     );
   }
@@ -361,7 +361,7 @@ class PrintService {
             canChangePageFormat: false,
             canChangeOrientation: false,
             canDebug: false,
-            pdfFileName: 'Receipt_${saleRef(sale.saleId)}.pdf',
+            pdfFileName: 'Receipt_${sale.displayNumber}.pdf',
             initialPageFormat: format == ReceiptFormat.thermal
                 ? (paperWidth <= 58
                     ? const PdfPageFormat(58 * PdfPageFormat.mm, double.infinity, marginAll: 0)
@@ -437,14 +437,14 @@ class PrintService {
     if (kIsWeb) {
       await Printing.sharePdf(
         bytes: bytes,
-        filename: 'Receipt_${saleRef(sale.saleId)}.pdf',
+        filename: 'Receipt_${sale.displayNumber}.pdf',
       );
       return;
     }
 
     // Save to temp file
     final tempDir = await getTemporaryDirectory();
-    final safeId = saleRef(sale.saleId);
+    final safeId = sale.displayNumber;
     final fileName = 'Receipt_${safeId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
     final file = File('${tempDir.path}/$fileName');
     await file.writeAsBytes(bytes);
@@ -508,7 +508,7 @@ class PrintService {
         : await _receiptPdfService.generateInvoice(receiptData);
 
     final bytes = await pdf.save();
-    final safeId = saleRef(sale.saleId);
+    final safeId = sale.displayNumber;
     final fileName = 'Receipt_${safeId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
 
     if (kIsWeb) {

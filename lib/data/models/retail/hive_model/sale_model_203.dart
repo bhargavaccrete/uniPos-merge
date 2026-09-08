@@ -3,6 +3,7 @@
 import 'dart:convert';
 import 'package:hive/hive.dart';
 import 'package:billberrylite/core/constants/hive_type_ids.dart';
+import 'package:billberrylite/util/common/short_ref.dart';
 import 'package:billberrylite/util/common/tax_split.dart';
 
 part 'sale_model_203.g.dart';
@@ -173,6 +174,16 @@ class SaleModel extends HiveObject {
   @HiveField(35)
   final String? returnNote;
 
+  /// The customer-facing document number — `INV-00001`, or `CRN-00001` on a
+  /// return. **Not an id:** [saleId] is the key every foreign key points at,
+  /// and this restarts at 1 each financial year, so it repeats across years by
+  /// design (CGST Rule 46(b) requires uniqueness only within a year).
+  ///
+  /// Null on every sale written before invoice numbering existed — read it
+  /// through [displayNumber], never directly.
+  @HiveField(36)
+  final String? invoiceNumber;
+
   SaleModel({
     required this.saleId,
     this.customerId,
@@ -210,6 +221,7 @@ class SaleModel extends HiveObject {
     this.shiftId,
     this.returnReason,
     this.returnNote,
+    this.invoiceNumber,
   })  : isReturn = isReturn ?? false,
         paidAmount = paidAmount ?? totalAmount,
         dueAmount = dueAmount ?? 0.0,
@@ -330,6 +342,9 @@ class SaleModel extends HiveObject {
     /// collected. The remainder is recorded as due and the sale is marked
     /// partially paid rather than paid.
     double? amountCollected,
+    /// The customer-facing number printed on the bill — `INV-00001`. Separate
+    /// from [saleId], which stays the internal key.
+    String? invoiceNumber,
   }) {
     final now = DateTime.now().toIso8601String();
     final halves = TaxSplit.halves(totalGstAmount);
@@ -382,6 +397,7 @@ class SaleModel extends HiveObject {
       lineDiscountTotal: lineDiscountTotal,
       exchangeGroupId: exchangeGroupId,
       shiftId: shiftId,
+      invoiceNumber: invoiceNumber,
       paidAmount: collected,
       dueAmount: isShort ? due : 0.0,
       status: isShort ? SaleStatus.partiallyPaid : SaleStatus.paid,
@@ -427,6 +443,8 @@ class SaleModel extends HiveObject {
     double? lineDiscountTotal,
     String? exchangeGroupId,
     String? shiftId,
+    /// The customer-facing number printed on the bill — `INV-00001`.
+    String? invoiceNumber,
   }) {
     final now = DateTime.now().toIso8601String();
     final halves = TaxSplit.halves(totalGstAmount);
@@ -435,6 +453,7 @@ class SaleModel extends HiveObject {
 
     return SaleModel(
       saleId: saleId,
+      invoiceNumber: invoiceNumber,
       customerId: customerId,
       totalItems: totalItems,
       subtotal: subtotal,
@@ -469,6 +488,16 @@ class SaleModel extends HiveObject {
       exchangeGroupId: exchangeGroupId,
       shiftId: shiftId,
     );
+  }
+
+  /// What to print or show anywhere a customer or a report names this sale.
+  ///
+  /// Falls back to a short reference over [saleId] for sales written before
+  /// invoice numbering — a UUID, or one of the transitional `INV-YYYYMMDD-NNN`
+  /// ids — so history never renders blank.
+  String get displayNumber {
+    final number = invoiceNumber?.trim();
+    return (number == null || number.isEmpty) ? saleRef(saleId) : number;
   }
 
   /// Check if this sale has any due amount
@@ -529,6 +558,7 @@ class SaleModel extends HiveObject {
     String? shiftId,
     String? returnReason,
     String? returnNote,
+    String? invoiceNumber,
   }) {
     return SaleModel(
       saleId: saleId ?? this.saleId,
@@ -576,6 +606,7 @@ class SaleModel extends HiveObject {
       // every exchange leg while leaving plain refunds correct.
       returnReason: returnReason ?? this.returnReason,
       returnNote: returnNote ?? this.returnNote,
+      invoiceNumber: invoiceNumber ?? this.invoiceNumber,
     );
   }
 
@@ -624,6 +655,7 @@ class SaleModel extends HiveObject {
       'shiftId': shiftId,
       'returnReason': returnReason,
       'returnNote': returnNote,
+      'invoiceNumber': invoiceNumber,
     };
   }
 
@@ -678,6 +710,7 @@ class SaleModel extends HiveObject {
       shiftId: map['shiftId'] as String?,
       returnReason: map['returnReason'] as String?,
       returnNote: map['returnNote'] as String?,
+      invoiceNumber: map['invoiceNumber'] as String?,
     );
   }
 }

@@ -30,9 +30,6 @@ class SaleRepository {
     return _saleBox.get(saleId);
   }
 
-  /// Whether an id is already in use. Synchronous because the invoice-number
-  /// generator needs it as a plain predicate while it walks the sequence.
-  bool exists(String saleId) => _saleBox.containsKey(saleId);
 
   /// Sales in a window: inclusive start, **exclusive** end, filtered on
   /// `createdAt`.

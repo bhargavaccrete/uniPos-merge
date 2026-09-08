@@ -21,10 +21,12 @@ void main() {
     double paid = 0,
     String? customerId = 'C-1',
     String? rawDate,
+    String? invoiceNumber,
   }) {
     final iso = rawDate ?? day.toIso8601String();
     return SaleModel(
       saleId: id,
+      invoiceNumber: invoiceNumber,
       totalItems: 1,
       subtotal: total,
       discountAmount: 0,
@@ -93,22 +95,25 @@ void main() {
       expect(export.rows.map((r) => r[1]), ['S-1', 'S-2', 'S-3']);
     });
 
-    test('carries both the short invoice and the full key', () async {
+    test('carries both the invoice number and the full key', () async {
       final export = CreditReportExport.creditSales(
-        sales: [sale('INV-20260907-001')],
+        sales: [
+          sale('abcdef-123456-7890-abcd', invoiceNumber: 'INV-00042'),
+        ],
         totalCreditSales: 500,
         period: 'All time',
       );
 
       final row = export.rows.single;
-      // One to match a row on screen — a sale's own invoice number now, not an
-      // 'INV-' glued onto a UUID.
-      expect(row[0], 'INV-20260907-001');
-      // …the other to trace it back to the record.
-      expect(row[1], 'INV-20260907-001');
+      // One to match what the customer was handed…
+      expect(row[0], 'INV-00042');
+      // …the other to trace it back to the record. The two are deliberately
+      // different: the number repeats each financial year, the key never does.
+      expect(row[1], 'abcdef-123456-7890-abcd');
     });
 
-    test('a legacy UUID sale exports a readable short reference', () async {
+    test('a sale predating invoice numbering falls back to a short reference',
+        () async {
       final export = CreditReportExport.creditSales(
         sales: [sale('abcdef-123456-7890-abcd')],
         totalCreditSales: 500,

@@ -421,8 +421,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   /// menu, so it is offered in exactly one place.
   Widget _buildInfoStrip() {
     final product = _product;
-    final categoryName =
-        categoryStore.categoryNameById[product.category] ?? product.category;
+    final categoryName = categoryStore.displayNameFor(product.category);
 
     final bits = <String>[
       if (categoryName.isNotEmpty) categoryName,

@@ -10,6 +10,7 @@ import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 import 'package:billberrylite/core/config/tax_feature.dart';
+import 'package:billberrylite/presentation/screens/retail/eod_screen.dart';
 import 'package:billberrylite/core/config/tax_label_rule.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/retail/expiry_date_field.dart';
@@ -48,6 +49,16 @@ const List<BoxShadow> _cardShadow = [
   BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2)),
 ];
 
+/// Why the POS is refusing to open billing. The blocking screen reads this to
+/// name the actual problem instead of always offering "Start Day".
+enum _BillingBlock {
+  /// A session from an earlier day is still open — settle it first.
+  eodPending,
+
+  /// No session at all yet.
+  dayNotStarted,
+}
+
 class RetailPosScreen extends StatefulWidget {
   const RetailPosScreen({super.key});
 
@@ -65,7 +76,6 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
   DateTime? _lastScanTime;
 
   MobileScannerController? _scannerController;
-  Map<String, String> _categoryNames = {};
 
   @override
   void initState() {
@@ -76,16 +86,18 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
 
   Future<void> _loadCategoryNames() async {
     await categoryStore.loadCategories();
-    final categories = categoryStore.categories;
     if (!mounted) return;
-    setState(() {
-      _categoryNames = {for (final c in categories) c.id: c.name};
-    });
+    setState(() {});
   }
 
   /// Resolve a product's category id to its display name.
+  ///
+  /// Delegates rather than keeping a local id→name map: that map fell back to
+  /// the raw id, so a product whose category had been deleted showed a blank
+  /// tile subtitle (its id is `''`), and it could go stale against the store.
+  /// `categoryNameById` is a memoised computed, so this is no slower.
   String _categoryName(String categoryId) =>
-      _categoryNames[categoryId] ?? categoryId;
+      categoryStore.displayNameFor(categoryId);
 
   /// Money string honouring the store's currency + decimal-precision settings.
   /// The whole body sits under [_moneyScope], so these stay live.
@@ -108,7 +120,19 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
   /// Shown when billing can't start and there's nowhere to go back to. No
   /// AppBar back arrow — there is no previous screen, and offering one here is
   /// what used to dump the user back into onboarding.
-  Widget _buildDayNotStarted(BuildContext context) {
+  ///
+  /// Says WHICH problem it is. A pending End of Day used to render the
+  /// "Start the day" copy, so a shop that had simply forgotten to close
+  /// yesterday was told to start a day the guard would refuse to start — and
+  /// the button re-ran the same failing check.
+  Widget _buildBillingBlocked(BuildContext context) {
+    final eodPending = _billingBlock == _BillingBlock.eodPending;
+
+    Future<void> retry() async {
+      setState(() => _billingBlock = null);
+      await _initializeStores();
+    }
+
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
@@ -120,11 +144,17 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
         child: Padding(
           padding: AppResponsive.padding(context),
           child: AppEmptyState(
-            icon: Icons.wb_sunny_outlined,
-            title: 'Start the day to begin billing',
-            message:
-                'Record your opening cash balance so the day\'s sales and '
-                'cash drawer reconcile at End of Day.',
+            icon: eodPending
+                ? Icons.nights_stay_outlined
+                : Icons.wb_sunny_outlined,
+            title: eodPending
+                ? 'Close the previous day first'
+                : 'Start the day to begin billing',
+            message: eodPending
+                ? 'A day is still open from earlier. Complete End of Day to '
+                    'settle its cash, then start today.'
+                : "Record your opening cash balance so the day's sales and "
+                    'cash drawer reconcile at End of Day.',
             action: Column(
               children: [
                 SizedBox(
@@ -132,12 +162,25 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                   height: AppResponsive.buttonHeight(context),
                   child: ElevatedButton.icon(
                     onPressed: () async {
-                      setState(() => _blockedOnDayStart = false);
-                      await _initializeStores();
+                      if (eodPending) {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const RetailEODScreen(),
+                          ),
+                        );
+                        // The day may now be closed — re-run the gates so the
+                        // start-day prompt follows immediately.
+                        if (mounted) await retry();
+                        return;
+                      }
+                      await retry();
                     },
-                    icon: const Icon(Icons.play_arrow),
+                    icon: Icon(
+                      eodPending ? Icons.nights_stay : Icons.play_arrow,
+                    ),
                     label: Text(
-                      'Start Day',
+                      eodPending ? 'Complete End of Day' : 'Start Day',
                       style: GoogleFonts.poppins(
                         fontSize: AppResponsive.buttonFontSize(context),
                         fontWeight: FontWeight.w600,
@@ -174,10 +217,15 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     );
   }
 
-  /// True when billing is unavailable and there is no screen to fall back to
-  /// (POS is the first screen after setup). Renders a blocking state with a
-  /// retry rather than exiting the app to onboarding.
-  bool _blockedOnDayStart = false;
+  /// Why billing is unavailable, when there is no screen to fall back to (POS
+  /// is the first screen after setup). Renders a blocking state with a retry
+  /// rather than exiting the app to onboarding.
+  ///
+  /// It carries the REASON, not just a flag: one shared "Start the day" screen
+  /// was shown for every gate failure, so a shop whose previous day was never
+  /// closed was told to start a day it could not start — and the button just
+  /// re-ran the same failing gate.
+  _BillingBlock? _billingBlock;
 
   /// Gates checked when ENTERING billing, not when leaving it.
   ///
@@ -190,6 +238,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
   /// then it's a no-op, so this is safe on an unlicensed retail device.
   Future<bool> _passesBillingGates() async {
     if (!mounted) return false;
+    // Cleared on every run so a reason can never outlive the condition that
+    // set it — a retry that now passes must not leave the blocking screen armed.
+    _billingBlock = null;
 
     // Plan gate — billing module must be included in the plan.
     if (!PlanEnforce.allows(RetailEntKeys.billing)) {
@@ -202,12 +253,22 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     }
 
     // End of Day pending → no new sales until it is completed.
-    if (await DayManagementService.isEodStrictlyPending()) {
+    //
+    // Both checks, because they answer different questions: `isEodStrictly-
+    // Pending` is a DURATION rule (session older than the auto-close window,
+    // and off entirely when that setting is disabled), while `hasPendingEOD` is
+    // a CALENDAR rule (the open session belongs to an earlier day). A shop that
+    // opened at 9 AM and returns at 8 AM the next morning trips the second but
+    // not the first, and used to be allowed to keep billing into yesterday's
+    // session.
+    if (await DayManagementService.isEodStrictlyPending() ||
+        await DayManagementService.hasPendingEOD()) {
       if (mounted) {
         NotificationService.instance.showError(
-          'Day has ended. Complete End of Day to unlock.',
+          'Complete End of Day for the previous day first.',
         );
       }
+      _billingBlock = _BillingBlock.eodPending;
       return false;
     }
 
@@ -223,6 +284,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
             'Start the day to begin billing',
           );
         }
+        _billingBlock = _BillingBlock.dayNotStarted;
         return false;
       }
     }
@@ -249,8 +311,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
           // Straight after setup the wizard pushReplacement's onto this screen,
           // so POS is the bottom of the stack. Popping would drop the user back
           // into onboarding (create store / restore backup). Show a blocking
-          // state instead.
-          setState(() => _blockedOnDayStart = true);
+          // state instead — whichever one the gate set.
+          setState(() =>
+              _billingBlock ??= _BillingBlock.dayNotStarted);
         }
         return;
       }
@@ -703,7 +766,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_blockedOnDayStart) return _buildDayNotStarted(context);
+    if (_billingBlock != null) return _buildBillingBlocked(context);
 
     if (!_isInitialized) {
       return Scaffold(

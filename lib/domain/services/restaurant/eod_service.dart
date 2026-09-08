@@ -402,8 +402,11 @@ class EODService {
   static Future<void> saveEODReport(EndOfDayReport report) async {
     // De-duplicate by SESSION, not date: a retry of the same close reuses the
     // same session, so replace only that session's report. Genuinely different
-    // sessions on the same date are each kept. Retail has no session
-    // (sessionId == null) so it keeps the original one-per-date replace.
+    // sessions on the same date are each kept.
+    //
+    // Both verticals stamp a sessionId now. The date fallback survives only for
+    // records written before retail did — without a session there is no way to
+    // tell a retry from a second close, and replacing is the safer of the two.
     final existing = report.sessionId != null
         ? await eodStore.getEODBySession(report.sessionId!)
         : await eodStore.getEODByDate(report.date);
@@ -435,7 +438,23 @@ class EODService {
     required double openingBalance,
     required double actualCash,
     String? remarks,
+    /// Safe drop — cash taken out of the drawer at close. Stored on the record
+    /// so the settlement slip can be reprinted with the real figure.
+    double cashWithdrawn = 0,
+    /// The session being closed. Defaults to the open one, exactly as
+    /// [generateEODReport] resolves it; passed explicitly only by tests.
+    String? sessionId,
   }) async {
+    // Retail DOES have sessions — it shares DayManagementService, and the EOD
+    // screen already gates itself on `getCurrentSession()`. This was simply
+    // never stamped, so every retail report carried a null sessionId and
+    // `saveEODReport` fell back to de-duplicating by DATE: closing a second
+    // session on the same calendar day DELETED the first day's report.
+    //
+    // Resolved before the session is closed — `_completeEndOfDay` generates and
+    // saves the report before calling `markDayEnded`, which clears the pointer.
+    final targetSessionId =
+        sessionId ?? await DayManagementService.getCurrentSessionId();
     // Get the day start timestamp - CRITICAL for filtering sales after "Start Day" was clicked
     final dayStartTimestamp = await DayManagementService.getDayStartTimestamp();
 
@@ -445,6 +464,17 @@ class EODService {
     final startTime = dayStartTimestamp ?? DateTime(date.year, date.month, date.day);
     // Use current time as end — handles midnight crossing (EOD run after midnight for yesterday's session)
     final endTime = DateTime.now();
+
+    // TRADING DAY: the report is dated when the session OPENED, not when the
+    // close was run — the same rule restaurant applies (endday.dart sets
+    // `selectedDate = currentSession.startTime`). A shop that opens 11 PM and
+    // closes at 2 AM belongs entirely to the day it opened, and its after-
+    // midnight sales are already inside [startTime]..[endTime]. Dating the
+    // record `DateTime.now()` filed those closes under the NEXT day, so the
+    // report's own date disagreed with the sales window it was built from.
+    //
+    // Falls back to the caller's [date] when there is no session.
+    final reportDate = dayStartTimestamp ?? date;
 
 
     // Get all sales for the day using SaleStore
@@ -569,7 +599,12 @@ class EODService {
     }
 
     final cashReconciliation = CashReconciliation(
-      systemExpectedCash: expectedCash,
+      // `closingBalance`, not `expectedCash`. The latter is CASH SALES ONLY,
+      // while `difference` is measured against the full expectation — so every
+      // screen and export showing both made `actual − expected` disagree with
+      // `difference` whenever there was a float, an expense, a refund or a
+      // manual movement. The EOD screen already reads `closingBalance`.
+      systemExpectedCash: closingBalance,
       actualCash: actualCash,
       difference: cashDifference,
       reconciliationStatus: reconciliationStatus,
@@ -602,7 +637,7 @@ class EODService {
 
     return EndOfDayReport(
       reportId: reportId,
-      date: date,
+      date: reportDate,
       openingBalance: openingBalance,
       orderSummaries: [], // Empty for retail - not applicable
       totalDiscount: totalDiscount,
@@ -625,6 +660,8 @@ class EODService {
       grossProfit: grossProfit,
       customersWithDue: customersWithCredit.length,
       totalOutstanding: totalOutstanding,
+      cashWithdrawn: cashWithdrawn,
+      sessionId: targetSessionId,
     );
   }
 

@@ -369,7 +369,7 @@ abstract class _CreditStore with Store {
             id: sale.saleId,
             date: sale.date,
             type: LedgerEntryType.creditSale,
-            description: 'Credit Sale (${saleRef(sale.saleId)})',
+            description: 'Credit Sale (${sale.displayNumber})',
             amount: sale.totalAmount,
             runningBalance: runningBalance,
             saleId: sale.saleId,

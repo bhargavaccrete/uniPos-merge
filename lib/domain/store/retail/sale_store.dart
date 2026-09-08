@@ -37,19 +37,26 @@ abstract class _SaleStore with Store {
 
   final DocumentNumberService _numbers = DocumentNumberService();
 
-  /// The next invoice number — `INV-20260907-001`.
+  /// The next customer-facing invoice number — `INV-00001`, restarting at 1
+  /// each financial year.
   ///
-  /// Sales used to be keyed by a raw UUID, which is unique but unusable: a
-  /// customer cannot quote `E7FE242F-1CB3` and staff cannot find it. Same
-  /// dated-counter service the PO, GRN and exchange documents already use, so
-  /// every document in the app reads alike.
+  /// **This is not an id.** `saleId` stays the UUID primary key that every
+  /// foreign key points at; this is the number printed on the bill and shown in
+  /// reports, stored alongside it as `SaleModel.invoiceNumber`. Because it is
+  /// display-only, a repeat across years cannot overwrite a record — which is
+  /// exactly what lets it reset.
   ///
-  /// Call at SUBMIT, never when the checkout screen opens — the counter never
-  /// goes backwards, so a number consumed by an abandoned form is a gap in the
-  /// sequence. `exists` covers the one case the counter cannot: `appCounters`
-  /// restored or wiped while the sales box was not.
+  /// Call at SUBMIT, never when the checkout screen opens: the counter never
+  /// goes backwards, so a number consumed by an abandoned form is a permanent
+  /// gap in the sequence.
   Future<String> nextInvoiceNumber() =>
-      _numbers.next('INV', isTaken: _saleRepository.exists);
+      _numbers.next(DocumentNumberService.invoice);
+
+  /// The next credit-note number — `CRN-00001`. A return is a credit note under
+  /// GST Rule 53(1A), which wants its own consecutive series rather than a
+  /// number borrowed from the invoice run.
+  Future<String> nextCreditNoteNumber() =>
+      _numbers.next(DocumentNumberService.creditNote);
 
   // ==================== SALE OPERATIONS ====================
 

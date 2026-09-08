@@ -585,6 +585,11 @@ class EscPosReceiptBuilder {
     required double drawerBalance,
     required double withdrawalCash,
     required double cashDifference,
+    /// Cash left in the till after the safe drop. Optional because
+    /// `drawerBalance` above is the system-EXPECTED figure, not what physically
+    /// stays — without this the slip never says how much is actually in the
+    /// drawer. Null hides the row, so existing callers are unchanged.
+    double? cashKept,
     required List<({String name, double amount})> paymentMethods,
     required int noOfBill,
     required int reprintBill,
@@ -649,6 +654,9 @@ class EscPosReceiptBuilder {
     b.addAll(_text(_formatTotalRow('TOTAL EXPENSE:', _fmt(totalExpense), cols)));
     b.addAll(_text(_formatTotalRow('DRAWER BALANCE:', _fmt(drawerBalance), cols)));
     b.addAll(_text(_formatTotalRow('WITHDRAWAL CASH:', _fmt(withdrawalCash), cols)));
+    if (cashKept != null) {
+      b.addAll(_text(_formatTotalRow('LEFT IN DRAWER:', _fmt(cashKept), cols)));
+    }
     b.addAll(_text(_formatTotalRow('CASH DIFFERENCE:', _fmt(cashDifference), cols)));
     b.addAll(_divider(cols));
 

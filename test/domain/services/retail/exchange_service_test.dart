@@ -274,7 +274,9 @@ void main() {
         paymentMethod: 'cash',
       );
 
-      expect(r.exchangeGroupId, matches(r'^EXC-\d{8}-\d{3}$'));
+      // A fiscal-year document number now, not a dated one: the series runs
+      // consecutively from 1 and restarts only when the financial year turns.
+      expect(r.exchangeGroupId, matches(r'^EXC-\d{5,}$'));
     });
 
     test('each half can find its counterpart', () async {

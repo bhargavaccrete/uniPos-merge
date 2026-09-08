@@ -73,15 +73,25 @@ abstract class _CashMovementStore with Store {
   ///
   /// The staffName is read automatically from [RestaurantSession] so the
   /// caller never has to pass it — prevents spoofing.
+  /// [systemClose] → set ONLY by the End-of-Day close itself.
+  ///
+  /// The pending-EOD guard below exists to stop a cashier editing the drawer
+  /// after the day has gone stale. The close is what RESOLVES that state, so
+  /// gating it too means a forced close silently fails to record its safe drop
+  /// — the money leaves the till with no ledger row. Gate the entrance, not the
+  /// recovery.
   @action
   Future<bool> addMovement({
     required String type,
     required double amount,
     required String reason,
     String? note,
+    bool systemClose = false,
   }) async {
     try {
-      final strictlyPending = await DayManagementService.isEodStrictlyPending();
+      final strictlyPending = systemClose
+          ? false
+          : await DayManagementService.isEodStrictlyPending();
       if (strictlyPending) {
         errorMessage = 'Day has ended. Complete End of Day to unlock.';
         return false;

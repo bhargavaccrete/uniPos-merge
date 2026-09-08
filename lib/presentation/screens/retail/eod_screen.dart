@@ -1,7 +1,9 @@
 import 'package:billberrylite/domain/services/retail/eod_report_service.dart';
+import 'package:billberrylite/domain/services/retail/eod_settlement_print.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:flutter/material.dart';
@@ -85,6 +87,11 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
         return;
       }
       _hasActiveSession = true;
+      // TRADING DAY, matching restaurant's `endday.dart`: a session that opens
+      // 11 PM and closes at 2 AM belongs to the day it OPENED. Dating from
+      // `DateTime.now()` filed such a close under the next day, and the refund
+      // window below then started from the wrong date.
+      selectedDate = currentSession.startTime;
 
       // Get opening balance with detailed error handling
       final currentOpeningBalance =
@@ -176,15 +183,25 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
       return;
     }
 
-    // Show confirmation dialog
-    final confirmed = await _showConfirmationDialog();
-    if (!confirmed) return;
-
     // Save the actual cash amount before clearing
     final actualCashAmount = double.parse(_actualCashController.text);
     final remarks = _remarksController.text.trim().isEmpty
         ? null
         : _remarksController.text.trim();
+
+    // Ask where the cash goes BEFORE anything is written.
+    //
+    // Restaurant closes the session first and only then shows this dialog,
+    // which deletes the session pointer — so its own EOD cash movements land
+    // with a null sessionId. Collecting the answer up front lets every write
+    // below happen while the session is still open.
+    final withdrawal = await _showSafeDropDialog(actualCashAmount);
+    if (withdrawal == null || !mounted) return;
+    final keptInDrawer =
+        (actualCashAmount - withdrawal).clamp(0.0, double.infinity);
+    final variance = actualCashAmount - _expectedTotalCash;
+    final closerName = RestaurantSession.staffName ??
+        (RestaurantSession.isAdmin ? 'Admin' : 'Staff');
 
     // Clear screen immediately and show loading
     setState(() {
@@ -202,10 +219,25 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
         openingBalance: openingBalance,
         actualCash: actualCashAmount,
         remarks: remarks,
+        cashWithdrawn: withdrawal,
       );
 
       // 2. Save EOD report
       await EODService.saveEODReport(report);
+
+      // 2b. Put the day's cash movements in the drawer ledger, while the
+      // session is still open so they carry its id and the closer's name.
+      //
+      // Without this the money simply vanished from the app's point of view:
+      // the till was emptied and the Cash Drawer history showed nothing.
+      // Non-fatal — a ledger failure must never strand a day half-closed.
+      await _recordDrawerMovements(
+        counted: actualCashAmount,
+        withdrawal: withdrawal,
+        kept: keptInDrawer,
+        variance: variance,
+        closerName: closerName,
+      );
 
       // 3. Mark day as completed
       await _markDayCompleted();
@@ -225,21 +257,23 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
       // can never block the day from closing.
       await _closeStaffHours();
 
-      // 5. Close the session, carrying the counted cash forward.
+      // 5. Close the session, carrying the KEPT cash forward.
       //
-      // This was `resetDay()`, which calls `endSession()` with no argument —
-      // so `closingCash` defaulted to 0 and the stored closing balance was
-      // wiped on every close. `getLastClosingBalance()` feeds the next day's
-      // opening-balance dialog, so tomorrow pre-filled 0.00 and never showed
-      // the "Yesterday closed with ₹X" hint; the archived session recorded
-      // zero cash too. Restaurant already passes the real amount
-      // (`endday.dart:759`).
-      await DayManagementService.markDayEnded(closingBalance: actualCashAmount);
+      // Not the full count: `getLastClosingBalance()` feeds the next day's
+      // opening-balance dialog, and pre-filling money that was physically taken
+      // to the safe would open tomorrow with a float that is not in the till.
+      // (This call also used to be `resetDay()`, which passed nothing at all and
+      // wiped the closing balance on every close.)
+      await DayManagementService.markDayEnded(closingBalance: keptInDrawer);
 
-      // Show success message
+      // 6. Settlement slip. Retail printed nothing at close — the only copy of
+      // this document came from the History reprint button, which a shop had no
+      // reason to know existed.
+      await _printSettlement(report, closerName);
+
       if (mounted) {
         NotificationService.instance.showSuccess(
-          'End of Day completed successfully!',
+          'Day closed. ${CurrencyHelper.currentSymbol}${keptInDrawer.toStringAsFixed(2)} left in drawer.',
         );
       }
 
@@ -261,6 +295,85 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
       }
 
       _showError(errorMessage);
+    }
+  }
+
+  /// Put the close on the cash-drawer ledger.
+  ///
+  /// Two rows, matching restaurant's `endday.dart`:
+  ///  * the variance as an `'adjustment'` — audit-only by design, so it explains
+  ///    the gap without moving the running balance;
+  ///  * the safe drop as a real `'out'`, which is what actually empties the till.
+  ///
+  /// `systemClose: true` on the withdrawal: `addMovement` refuses to write once
+  /// EOD is strictly pending, and a forced close of a stale session is exactly
+  /// when that is true — the guard is there to stop MANUAL edits, not the close
+  /// that resolves them.
+  ///
+  /// Non-fatal throughout: the day must still close if the ledger write fails.
+  Future<void> _recordDrawerMovements({
+    required double counted,
+    required double withdrawal,
+    required double kept,
+    required double variance,
+    required String closerName,
+  }) async {
+    final symbol = CurrencyHelper.currentSymbol;
+    String money(double v) => '$symbol${v.toStringAsFixed(2)}';
+
+    try {
+      if (variance.abs() > 0.01) {
+        await cashMovementStore.addAdjustment(
+          signedAmount: variance,
+          reason: variance < 0 ? 'EOD Shortage' : 'EOD Overage',
+          note: 'Expected: ${money(_expectedTotalCash)}, '
+              'Counted: ${money(counted)}',
+          staffName: closerName,
+        );
+      }
+
+      if (withdrawal > 0.005) {
+        await cashMovementStore.addMovement(
+          type: 'out',
+          amount: withdrawal,
+          reason: 'Safe drop - End of Day',
+          note: '$closerName ended day. Counted: ${money(counted)}, '
+              'Took to safe: ${money(withdrawal)}, '
+              'Left in drawer: ${money(kept)}',
+          systemClose: true,
+        );
+      }
+    } catch (e) {
+      debugPrint('EOD: cash movement recording failed (non-fatal): $e');
+    }
+  }
+
+  /// Print the settlement slip for a just-closed day.
+  ///
+  /// Thermal only — there is no PDF fallback on the retail side. A shop with no
+  /// printer paired must still be able to close, so a missing printer is said
+  /// once as information, never as an error.
+  Future<void> _printSettlement(EndOfDayReport report, String closerName) async {
+    try {
+      final outcome =
+          await EodSettlementPrint.reprint(report, shiftUser: closerName);
+      if (!mounted) return;
+      switch (outcome) {
+        case EodReprintOutcome.printed:
+          break;
+        case EodReprintOutcome.noPrinter:
+          NotificationService.instance.showInfo(
+            'Day closed. No thermal printer paired — reprint the settlement '
+            'from EOD History once one is set up.',
+          );
+        case EodReprintOutcome.sendFailed:
+          NotificationService.instance.showWarning(
+            'Day closed, but the settlement slip could not be printed. '
+            'Reprint it from EOD History.',
+          );
+      }
+    } catch (e) {
+      debugPrint('EOD: settlement print failed (non-fatal): $e');
     }
   }
 
@@ -296,29 +409,222 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
     ).pushNamedAndRemoveUntil(RouteNames.retailMenu, (route) => false);
   }
 
-  /// Closing the day is irreversible, so it goes through the shared confirm
-  /// dialog rather than a hand-rolled AlertDialog.
+  /// Safe Drop — the one place the cashier says where the counted cash goes.
   ///
-  /// The message now states the two things that actually carry consequences —
-  /// the variance is recorded as-is, and the counted cash becomes tomorrow's
-  /// opening float. The old copy said "Reset for next day", which described the
-  /// bug where the closing balance was zeroed rather than carried forward.
-  Future<bool> _showConfirmationDialog() {
-    final counted = double.tryParse(_actualCashController.text) ?? 0.0;
+  /// Returns the amount to TAKE OUT, or null if cancelled. This replaced a plain
+  /// yes/no confirm: the day closed without ever asking, so money left the till
+  /// with nothing recording it and the whole count carried to the next morning
+  /// as though it had stayed in the drawer.
+  ///
+  /// Mirrors restaurant's `endday.dart` dialog, including the pre-fill (the full
+  /// count, since taking everything is the common case) and the "Leave all in
+  /// drawer" escape.
+  Future<double?> _showSafeDropDialog(double counted) {
+    final withdrawalController = TextEditingController(
+      text: counted.toStringAsFixed(2),
+    );
+    final symbol = CurrencyHelper.currentSymbol;
     final variance = counted - _expectedTotalCash;
+    String money(double v) => '$symbol${v.toStringAsFixed(2)}';
 
-    return showAppConfirmDialog(
+    return showDialog<double>(
       context: context,
-      title: 'Complete End of Day?',
-      message:
-          'The day will be closed and the report saved.\n\n'
-          'Counted cash: ${CurrencyHelper.currentSymbol}${counted.toStringAsFixed(2)}\n'
-          'Variance: ${CurrencyHelper.currentSymbol}${variance.toStringAsFixed(2)}\n\n'
-          'This cash becomes tomorrow\'s opening balance. The day cannot be '
-          'reopened.',
-      confirmLabel: 'Complete',
-      accent: AppColors.primary,
-      icon: Icons.nights_stay_rounded,
+      barrierDismissible: false,
+      builder: (dialogContext) => DialogDisposeScope(
+        disposables: [withdrawalController],
+        child: PopScope(
+          canPop: false,
+          child: StatefulBuilder(
+            builder: (context, setDialogState) {
+              final withdrawal =
+                  double.tryParse(withdrawalController.text) ?? 0.0;
+              final kept = (counted - withdrawal).clamp(0.0, double.infinity);
+              final tooMuch = withdrawal > counted + 0.005;
+
+              void confirm(double amount) {
+                if (amount > counted + 0.005) {
+                  NotificationService.instance.showError(
+                    'Cannot take out more than the counted cash',
+                  );
+                  return;
+                }
+                Navigator.pop(dialogContext, amount);
+              }
+
+              return AppDialogShell(
+                title: 'End of Day — Safe Drop',
+                subtitle: 'Decide where the counted cash goes',
+                icon: Icons.nights_stay_rounded,
+                accent: AppColors.primary,
+                body: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Same terms the Cash Reconciliation card itemises, so the
+                    // dialog cannot show a different expectation to the screen.
+                    _buildCashRow('Opening Balance:', openingBalance),
+                    _buildCashRow('Cash Sales:', expectedCash),
+                    if (cashExpenses > 0)
+                      _buildCashRow(
+                        'Cash Expenses:',
+                        cashExpenses,
+                        isNegative: true,
+                      ),
+                    if (cashRefunds > 0)
+                      _buildCashRow(
+                        'Cash Refunds:',
+                        cashRefunds,
+                        isNegative: true,
+                      ),
+                    if (_netCashMovements.abs() > 0.005)
+                      _buildCashRow(
+                        _netCashMovements >= 0
+                            ? 'Cash In (net):'
+                            : 'Cash Out (net):',
+                        _netCashMovements.abs(),
+                        isNegative: _netCashMovements < 0,
+                      ),
+                    const Divider(height: 20, thickness: 0.5),
+                    _safeDropRow('Expected Cash', money(_expectedTotalCash)),
+                    _safeDropRow('You counted', money(counted), bold: true),
+                    if (variance.abs() > 0.005)
+                      _safeDropRow(
+                        variance < 0 ? 'Shortage' : 'Overage',
+                        money(variance.abs()),
+                        color: variance < 0
+                            ? AppColors.danger
+                            : AppColors.success,
+                      ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Amount to take to safe',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    AppTextField(
+                      controller: withdrawalController,
+                      hint: '0.00',
+                      icon: Icons.savings_outlined,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                          RegExp(r'^\d*\.?\d{0,2}'),
+                        ),
+                      ],
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                    if (tooMuch) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'More than you counted (${money(counted)})',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.captionFontSize(context),
+                          color: AppColors.danger,
+                        ),
+                      ),
+                    ],
+                    const Divider(height: 24, thickness: 0.5),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Stays in drawer',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          money(kept),
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.headingFontSize(context),
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      "This becomes tomorrow's opening float",
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.captionFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Second exit, matching restaurant: taking nothing out is a
+                    // real choice, not a reason to retype the field to 0.
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () => confirm(0),
+                        icon: const Icon(Icons.inbox_outlined, size: 18),
+                        label: Text(
+                          'Leave all in drawer',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  appDialogCancelButton(dialogContext),
+                  const SizedBox(width: 12),
+                  appDialogPrimaryButton(
+                    label: 'Complete',
+                    color: AppColors.primary,
+                    // Stays tappable when over-withdrawn: `confirm` refuses and
+                    // says why, rather than the button going dead with the
+                    // inline hint as the only clue.
+                    onPressed: () => confirm(withdrawal),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// One label/value line of the Safe Drop summary.
+  Widget _safeDropRow(
+    String label,
+    String value, {
+    bool bold = false,
+    Color? color,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              fontWeight: bold ? FontWeight.w600 : FontWeight.w400,
+              color: color,
+            ),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

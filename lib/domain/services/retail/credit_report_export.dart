@@ -53,7 +53,7 @@ class CreditReportExport {
         return <dynamic>[
           // The screen's short form AND the full key: one to match a row on
           // screen, the other to trace it back to the record.
-          saleRef(sale.saleId),
+          sale.displayNumber,
           sale.saleId,
           at == null ? sale.date : ReportExportService.formatDateTime(at),
           sale.customerId ?? '',

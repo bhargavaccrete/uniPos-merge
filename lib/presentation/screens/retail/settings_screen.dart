@@ -11,6 +11,7 @@ import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import '../../../core/di/service_locator.dart';
 import 'package:billberrylite/presentation/screens/retail/backup_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/settings/invoice_numbering_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/tax_settings_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/attributes_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/simple_product_fields_screen.dart';
@@ -54,6 +55,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   /// Read-only summary of the open session.
   ///
+  /// Day state for the Day Management cards, read in one pass so the two cards
+  /// can never disagree about whether the open session is overdue.
+  Future<({bool started, bool eodPending})> _dayState() async => (
+        started: await DayManagementService.isDayStarted(),
+        eodPending: await DayManagementService.isEodStrictlyPending() ||
+            await DayManagementService.hasPendingEOD(),
+      );
+
   /// Replaces re-opening the start-day dialog. Tapping "Start Day" while a
   /// session was live routed to `startSession`, which minted a second session,
   /// moved the day-start timestamp forward — dropping the day's earlier sales
@@ -202,11 +211,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
             // Day Management Section
             _sectionHeader(context, 'DAY MANAGEMENT'),
-            FutureBuilder<bool>(
+            FutureBuilder<({bool started, bool eodPending})>(
               key: ValueKey(_refreshKey), // Rebuild when _refreshKey changes
-              future: DayManagementService.isDayStarted(),
+              future: _dayState(),
               builder: (context, snapshot) {
-                final isDayStarted = snapshot.data ?? false;
+                final isDayStarted = snapshot.data?.started ?? false;
+                // A session left open from an earlier day reads as "in
+                // progress" too, which said nothing about the fact that it is
+                // OVERDUE and now blocks billing.
+                final eodPending = snapshot.data?.eodPending ?? false;
 
                 return Column(
                   children: [
@@ -215,11 +228,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       icon: isDayStarted
                           ? Icons.wb_sunny_outlined
                           : Icons.wb_sunny,
-                      title: isDayStarted ? 'Day In Progress' : 'Start Day',
-                      subtitle: isDayStarted
-                          ? 'View session start time and opening balance'
-                          : 'Set opening balance to begin operations',
-                      iconColor: AppColors.success,
+                      title: !isDayStarted
+                          ? 'Start Day'
+                          : eodPending
+                              ? 'Previous Day Still Open'
+                              : 'Day In Progress',
+                      subtitle: !isDayStarted
+                          ? 'Set opening balance to begin operations'
+                          : eodPending
+                              ? 'Complete End of Day below to settle it'
+                              : 'View session start time and opening balance',
+                      iconColor:
+                          eodPending ? AppColors.warning : AppColors.success,
                       onTap: () async {
                         if (isDayStarted) {
                           // Read-only. Re-running the start flow here used to
@@ -239,9 +259,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       _buildSettingsCard(
                         context,
                         icon: Icons.nights_stay,
-                        title: 'End of Day',
-                        subtitle: 'Close day and reconcile cash',
-                        iconColor: AppColors.info,
+                        title: eodPending
+                            ? 'End of Day — Pending'
+                            : 'End of Day',
+                        subtitle: eodPending
+                            ? 'Settle the previous day to resume billing'
+                            : 'Close day and reconcile cash',
+                        iconColor:
+                            eodPending ? AppColors.warning : AppColors.info,
                         onTap: () async {
                           await Navigator.push(
                             context,
@@ -415,6 +440,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
             // wizard uses to skip its Tax Setup step
             // (`setupWizardScreen.dart`), so a shop that never registered is not
             // offered tax configuration in either place.
+            // Document numbering is NOT inside the TaxFeature gate below: a shop
+            // that never registered for GST still issues numbered invoices.
+            if (RestaurantSession.canAccess('taxSettings')) ...[
+              _sectionHeader(context, 'INVOICE NUMBERING'),
+              _buildSettingsCard(
+                context,
+                icon: Icons.tag,
+                title: 'Invoice Numbering',
+                subtitle: 'Invoice prefix and the next number in the series',
+                iconColor: AppColors.info,
+                onTap: () {
+                  if (!PlanGuard.allowedOr(
+                    context,
+                    RetailEntKeys.settings,
+                    featureName: 'Invoice Numbering',
+                  )) {
+                    return;
+                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const InvoiceNumberingScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+
             if (TaxFeature.enabled) ...[
               // Tax rates are Manager-only, matching restaurant's 'taxSettings'.
               if (RestaurantSession.canAccess('taxSettings')) ...[

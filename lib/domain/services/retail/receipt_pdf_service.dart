@@ -603,7 +603,7 @@ class ReceiptPdfService {
                 pw.Text(
                   data.billNumber != null
                       ? 'INV${data.billNumber}'
-                      : saleRef(data.sale.saleId),
+                      : data.sale.displayNumber,
                   style: pw.TextStyle(fontSize: labelSize, fontWeight: pw.FontWeight.bold),
                 ),
               ],
@@ -1093,7 +1093,7 @@ class ReceiptPdfService {
                   pw.Text(
                     data.billNumber != null
                         ? '# INV${data.billNumber}'
-                        : '# ${saleRef(data.sale.saleId)}',
+                        : '# ${data.sale.displayNumber}',
                     style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
                   ),
                 if (showInvoiceNumber && showInvoiceDate) pw.SizedBox(height: 4),

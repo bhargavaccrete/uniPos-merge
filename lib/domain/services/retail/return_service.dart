@@ -290,7 +290,12 @@ class ReturnService {
     }
 
     // ---- write -------------------------------------------------------------
+    // The key is a UUID-based id like every other sale's. The customer-facing
+    // number is separate: GST Rule 53(1A) wants a credit note to carry its own
+    // consecutive series, unique for the financial year, so a return takes the
+    // next CRN number rather than borrowing the invoice series.
     final returnSaleId = 'RTN_${_uuid.v4()}';
+    final creditNoteNumber = await saleStore.nextCreditNoteNumber();
 
     // 1. The return document. Header amounts are NEGATED; lines stay positive.
     //    Built through the constructor rather than `SaleModel.create` so the
@@ -299,6 +304,7 @@ class ReturnService {
     await saleStore.addSaleWithItems(
       _buildReturnHeader(
         returnSaleId: returnSaleId,
+        creditNoteNumber: creditNoteNumber,
         original: originalSale,
         figures: figures,
         refundMethod: refundMethod,
@@ -356,6 +362,7 @@ class ReturnService {
 
   SaleModel _buildReturnHeader({
     required String returnSaleId,
+    required String creditNoteNumber,
     required SaleModel original,
     required ReturnFigures figures,
     required String refundMethod,
@@ -367,6 +374,7 @@ class ReturnService {
 
     return SaleModel(
       saleId: returnSaleId,
+      invoiceNumber: creditNoteNumber,
       customerId: original.customerId,
       totalItems: figures.totalItems,
       // Negated, per the retail convention: headers net by themselves when

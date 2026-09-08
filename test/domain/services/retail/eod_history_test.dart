@@ -219,6 +219,116 @@ void main() {
         actualCash: actualCash,
       );
 
+  // ── session attribution ──────────────────────────────────────────────────
+
+  group('the close is attributed to its session', () {
+    test('a generated retail report carries the open session id', () async {
+      // Retail shares DayManagementService but the generator never stamped the
+      // id, so every retail report was written with sessionId == null — and
+      // `saveEODReport` then fell back to de-duplicating by DATE, deleting the
+      // earlier close whenever a second session was closed the same day.
+      await Hive.box('dayManagementBox').put('currentSessionId', 'sess-A');
+
+      final report = await generate(actualCash: 500);
+
+      expect(report.sessionId, 'sess-A');
+    });
+
+    test('two same-date closes under different sessions both survive',
+        () async {
+      final box = Hive.box('dayManagementBox');
+
+      await box.put('currentSessionId', 'sess-morning');
+      await EODService.saveEODReport(await generate(actualCash: 1000));
+
+      await box.put('currentSessionId', 'sess-evening');
+      await EODService.saveEODReport(await generate(actualCash: 2000));
+
+      final stored = retailOnly(await eodRepo.getAllEODReports());
+      expect(stored, hasLength(2), reason: 'the morning close must survive');
+      expect(
+        stored.map((r) => r.sessionId).toSet(),
+        {'sess-morning', 'sess-evening'},
+      );
+      expect(
+        stored.map((r) => r.cashReconciliation.actualCash).toSet(),
+        {1000.0, 2000.0},
+      );
+    });
+
+    test('re-closing the SAME session replaces rather than duplicates',
+        () async {
+      await Hive.box('dayManagementBox').put('currentSessionId', 'sess-A');
+
+      await EODService.saveEODReport(await generate(actualCash: 1000));
+      await EODService.saveEODReport(await generate(actualCash: 1500));
+
+      final stored = retailOnly(await eodRepo.getAllEODReports());
+      expect(stored, hasLength(1));
+      expect(stored.single.cashReconciliation.actualCash, 1500);
+    });
+
+    test('with no open session it still writes, falling back to date',
+        () async {
+      // Nothing put in dayManagementBox — getCurrentSessionId returns null.
+      final report = await generate(actualCash: 500);
+      expect(report.sessionId, isNull);
+      expect(report.date, day, reason: 'falls back to the passed date');
+    });
+  });
+
+  // ── trading day ──────────────────────────────────────────────────────────
+
+  /// Opens a real session so `getDayStartTimestamp()` resolves.
+  Future<void> openSession(String id, DateTime startedAt) async {
+    await Hive.box<RestaurantSessionModel>(HiveBoxNames.restaurantSessions)
+        .put(
+      id,
+      RestaurantSessionModel(
+        sessionId: id,
+        startTime: startedAt,
+        openingCash: 0,
+      ),
+    );
+    await Hive.box('dayManagementBox').put('currentSessionId', id);
+  }
+
+  group('the report is dated by TRADING DAY, not by when EOD was run', () {
+    test('a close carries the time the session OPENED', () async {
+      final opened = DateTime(2026, 4, 15, 9, 15);
+      await openSession('sess-day', opened);
+
+      // `date:` is what the screen would pass — deliberately a different day.
+      final report = await generate(date: DateTime(2026, 4, 16, 2, 30));
+
+      expect(report.date, opened);
+    });
+
+    test('an after-midnight close still belongs to the day it opened',
+        () async {
+      // Opens 15 Apr 23:00, closed 16 Apr 02:00. The sales window already
+      // spans the boundary; dating the record from `now()` filed the close
+      // under the 16th, so the report disagreed with its own sales.
+      await openSession('sess-night', DateTime(2026, 4, 15, 23, 0));
+
+      final report = await generate(date: DateTime(2026, 4, 16, 2, 0));
+
+      expect(report.date.day, 15);
+      expect(report.date.hour, 23);
+    });
+
+    test('two sessions on one date keep their own open times', () async {
+      await openSession('sess-am', DateTime(2026, 4, 15, 8, 0));
+      await EODService.saveEODReport(await generate());
+      await openSession('sess-pm', DateTime(2026, 4, 15, 17, 0));
+      await EODService.saveEODReport(await generate());
+
+      final stored = retailOnly(await eodRepo.getAllEODReports());
+      expect(stored, hasLength(2));
+      expect(stored.map((r) => r.date.hour).toSet(), {8, 17});
+    });
+  });
+
   // ── EOD-a — retail-only selection ────────────────────────────────────────
 
   group('retail-only filtering', () {
@@ -276,11 +386,16 @@ void main() {
       expect(byId['R-2']!.sessionId, isNull);
     });
 
-    test('a generated retail close carries no sessionId', () async {
-      // The model documents null = retail/legacy; the card falls back to the
-      // TIME for these, which is why EOD-3 shows it.
+    test('a generated retail close is stamped with its session', () async {
+      // This used to assert the opposite — that retail closes carry no
+      // sessionId. That was not a property of retail, it was the defect: the
+      // generator never stamped the id, so `saveEODReport` de-duplicated by
+      // DATE and a second close on one day deleted the first. Retail shares
+      // DayManagementService and has had sessions all along.
+      await Hive.box('dayManagementBox').put('currentSessionId', 'sess-xyz');
+
       final report = await generate();
-      expect(report.sessionId, isNull);
+      expect(report.sessionId, 'sess-xyz');
     });
   });
 

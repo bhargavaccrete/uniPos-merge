@@ -2,6 +2,7 @@ import 'package:billberrylite/domain/services/retail/line_discount_service.dart'
 import 'package:flutter/material.dart';
 import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:billberrylite/util/common/short_ref.dart';
+import 'package:uuid/uuid.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:billberrylite/core/config/tax_label_rule.dart';
@@ -339,7 +340,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
 
     try {
-      final saleId = await saleStore.nextInvoiceNumber();
+      // The key is a UUID and stays one — every foreign key points at it. The
+      // invoice number is a separate, customer-facing label.
+      final saleId = const Uuid().v4();
+      final invoiceNumber = await saleStore.nextInvoiceNumber();
 
       // Same rule as the paid path: one bill snapshot drives the record, the
       // lines and the credit balance.
@@ -348,6 +352,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       // Create credit sale record
       final sale = SaleModel.createCreditSale(
         saleId: saleId,
+        invoiceNumber: invoiceNumber,
         customerId: customerId,
         totalItems: bill.totalItems,
         subtotal: bill.itemTotal,
@@ -534,10 +539,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
 
     try {
-      // A human invoice number, not a UUID — the customer quotes it and staff
-      // search by it. Minted here at submit, so an abandoned checkout never
-      // burns a number.
-      final saleId = await saleStore.nextInvoiceNumber();
+      // The key stays a UUID — sale lines, credit payments, returns and the
+      // cash drawer all point at it. The invoice number is the customer-facing
+      // label beside it, minted here at SUBMIT so an abandoned checkout never
+      // burns a number out of the series.
+      final saleId = const Uuid().v4();
+      final invoiceNumber = await saleStore.nextInvoiceNumber();
 
       // Snapshot the bill ONCE. Everything below — the sale record, the line
       // items and the receipt — must come from this same instance, or the
@@ -550,6 +557,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       // Create sale record with GST totals and split payment
       final sale = SaleModel.createWithSplitPayment(
         saleId: saleId,
+        invoiceNumber: invoiceNumber,
         customerId: customerStore.selectedCustomer?.customerId,
         totalItems: bill.totalItems,
         subtotal: bill.itemTotal,
@@ -1687,7 +1695,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       builder: (dialogContext) => AppDialogShell(
         // A partly-settled bill is not "paid" — title and accent both say so.
         title: isPartial ? 'Partial Payment Received' : 'Payment Successful!',
-        subtitle: 'Receipt ${saleRef(sale.saleId)}',
+        subtitle: 'Receipt ${sale.displayNumber}',
         accent: isPartial ? AppColors.warning : AppColors.success,
         icon: isPartial ? Icons.schedule_rounded : Icons.check_circle,
         body: Column(
@@ -1865,7 +1873,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       barrierDismissible: false,
       builder: (dialogContext) => AppDialogShell(
         title: 'Credit Sale Recorded!',
-        subtitle: 'Invoice ${saleRef(sale.saleId)}',
+        subtitle: 'Invoice ${sale.displayNumber}',
         accent: AppColors.warning,
         icon: Icons.schedule,
         body: Column(

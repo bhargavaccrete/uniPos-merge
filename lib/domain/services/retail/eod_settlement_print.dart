@@ -70,7 +70,13 @@ class EodSettlementPrint {
 
   /// Sends [report] to the paired receipt printer (KOT printer as fallback,
   /// matching the close flow's own preference order).
-  static Future<EodReprintOutcome> reprint(EndOfDayReport report) async {
+  ///
+  /// [shiftUser] names who closed the day. Omit it for a reprint from history,
+  /// where the record does not say — the ticket then labels itself honestly.
+  static Future<EodReprintOutcome> reprint(
+    EndOfDayReport report, {
+    String? shiftUser,
+  }) async {
     final printer =
         printerStore.defaultReceiptPrinter ?? printerStore.defaultKotPrinter;
     if (printer == null) return EodReprintOutcome.noPrinter;
@@ -85,9 +91,9 @@ class EodSettlementPrint {
       paperWidth: printer.paperSize,
       storeName: storeName,
       currencySymbol: symbol,
-      // The record does not store who closed the day, so the ticket says what
-      // it truthfully knows: this is a reprint of a stored close.
-      shiftUser: 'Reprint',
+      // Without a name the record cannot say who closed the day, so the ticket
+      // says what it truthfully knows: this is a reprint of a stored close.
+      shiftUser: shiftUser ?? 'Reprint',
       shiftStart: report.date,
       shiftEnd: report.date,
       orderTypes: figures.orderTypes,
@@ -103,9 +109,10 @@ class EodSettlementPrint {
       cashExpense: report.cashExpenses,
       totalExpense: report.totalExpenses,
       drawerBalance: report.closingBalance,
-      // Not stored on the record — the close flow computes it live from the
-      // safe-drop entry. Passed as 0 rather than guessed.
-      withdrawalCash: 0,
+      // Both come off the record now, so a reprint months later shows the real
+      // safe drop instead of the 0 it used to print.
+      withdrawalCash: report.cashWithdrawn,
+      cashKept: report.cashKept,
       cashDifference: recon.difference,
       paymentMethods: figures.paymentMethods,
       noOfBill: report.totalOrderCount,
