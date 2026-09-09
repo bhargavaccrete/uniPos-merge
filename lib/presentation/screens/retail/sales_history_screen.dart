@@ -251,22 +251,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
 
   // ==================== BUILD ====================
 
-  /// Caps content width on large screens. Backgrounds still span edge to edge —
-  /// only what you read is constrained.
-  Widget _capped(BuildContext context, Widget child) {
-    final maxWidth = AppResponsive.maxContentWidth(context);
-    if (maxWidth == double.infinity) return child;
-    return Align(
-      // topCenter, not Center: Center aligns on BOTH axes, so a
-      // shrink-wrapping child floats in the vertical middle.
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -297,9 +281,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                       AppResponsive.padding(context).left,
                       12,
                     ),
-                    child: _capped(
-                      context,
-                      Column(
+                    child: AppResponsive.constrainedContent(
+                      context: context,
+                      alignment: Alignment.topCenter,
+                      maxWidth: AppResponsive.maxContentWidth(context),
+                      child: Column(
                         children: [
                           AppTextField(
                             controller: _searchController,
@@ -337,9 +323,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   Expanded(
                     child: _visibleSales.isEmpty
                         ? _buildEmptyState()
-                        : _capped(
-                            context,
-                            ListView.builder(
+                        : AppResponsive.constrainedContent(
+                            context: context,
+                            alignment: Alignment.topCenter,
+                            maxWidth: AppResponsive.maxContentWidth(context),
+                            child: ListView.builder(
                               padding: AppResponsive.padding(context),
                               itemCount: _visibleSales.length,
                               itemBuilder: (context, index) =>
@@ -359,9 +347,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
 
     return Container(
       margin: EdgeInsets.fromLTRB(side, 12, side, 4),
-      child: _capped(
-        context,
-        Container(
+      child: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        child: Container(
           padding: AppResponsive.cardPadding(context),
           decoration: BoxDecoration(
             color: AppColors.primary,
@@ -461,9 +451,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
         side,
         0,
       ),
-      child: _capped(
-        context,
-        Container(
+      child: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        child: Container(
           padding: EdgeInsets.symmetric(
             horizontal: AppResponsive.mediumSpacing(context),
             vertical: AppResponsive.smallSpacing(context),
@@ -481,7 +473,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 size: AppResponsive.smallIconSize(context),
                 color: AppColors.info,
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Expanded(
                 child: Text(
                   '${DateFormat('dd MMM yyyy').format(_startDate!)} — ${DateFormat('dd MMM yyyy').format(_endDate!)}',
@@ -677,7 +669,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                         height: AppResponsive.smallAvatarSize(context),
                         decoration: BoxDecoration(
                           color: paymentColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(9),
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.smallBorderRadius(context),
+                          ),
                         ),
                         child: Icon(
                           _getPaymentIcon(sale.paymentType),
@@ -707,7 +701,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                                   ),
                                 ),
                                 if (isReturned) ...[
-                                  const SizedBox(width: 8),
+                                  SizedBox(
+                                    width: AppResponsive.smallSpacing(context),
+                                  ),
                                   const AppStatusPill(
                                     dense: true,
                                     label: 'RETURNED',
@@ -731,7 +727,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: AppResponsive.smallSpacing(context)),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [

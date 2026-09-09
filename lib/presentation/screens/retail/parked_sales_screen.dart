@@ -123,25 +123,24 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
               children: [
                 // Totals block — the two numbers that decide whether to restore
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
-                  ),
+                  padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
                   decoration: BoxDecoration(
                     color: AppColors.surfaceLight,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.borderRadius(context),
+                    ),
                     border: Border.all(color: AppColors.divider, width: 0.5),
                   ),
                   child: Column(
                     children: [
                       _buildDetailRow('Total Items', '${holdSale.totalItems}'),
-                      const SizedBox(height: 8),
+                      SizedBox(height: AppResponsive.smallSpacing(context)),
                       Divider(
                         height: 1,
                         thickness: 1,
                         color: AppColors.divider,
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: AppResponsive.smallSpacing(context)),
                       _buildDetailRow(
                         'Subtotal',
                         _money(holdSale.subtotal),
@@ -150,7 +149,7 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
                 Text(
                   'ITEMS (${items.length})',
                   style: GoogleFonts.poppins(
@@ -160,13 +159,13 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                     color: AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
                 ...items.map(_buildDetailItemRow),
               ],
             ),
             actions: [
               appDialogCancelButton(dialogContext, label: 'Close'),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               appDialogPrimaryButton(
                 label: 'Restore',
                 color: AppColors.success,
@@ -184,11 +183,16 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
 
   Widget _buildDetailItemRow(HoldSaleItemModel item) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.mediumSpacing(context),
+        vertical: AppResponsive.smallSpacing(context),
+      ),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider, width: 0.5),
         boxShadow: _cardShadow,
       ),
@@ -196,12 +200,14 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
         children: [
           // Qty badge — scanning "how many" is faster than reading "3 ×"
           Container(
-            width: 30,
-            height: 30,
+            width: AppResponsive.smallAvatarSize(context),
+            height: AppResponsive.smallAvatarSize(context),
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: AppColors.primary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
             ),
             child: Text(
               '${item.qty}',
@@ -212,7 +218,7 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -238,7 +244,7 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Text(
             _money(item.total),
             style: GoogleFonts.poppins(
@@ -267,7 +273,12 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
         Text(
           value,
           style: GoogleFonts.poppins(
-            fontSize: emphasis ? 16 : 13.5,
+            // 16 → subheading, 13.5 → body, per the snapping table. The
+            // ternary is why the standard `fontSize: [0-9]` grep read this
+            // file as clean.
+            fontSize: emphasis
+                ? AppResponsive.subheadingFontSize(context)
+                : AppResponsive.bodyFontSize(context),
             fontWeight: emphasis ? FontWeight.w700 : FontWeight.w600,
             color: emphasis ? AppColors.success : AppColors.textPrimary,
           ),
@@ -282,39 +293,46 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(title: 'Parked Sales'),
       // Currency/precision changes rebuild every money label on this screen.
-      body: AppResponsive.constrainedContent(
-        context: context,
-        alignment: Alignment.topCenter,
-        maxWidth: AppResponsive.maxContentWidth(context),
-        child: ValueListenableBuilder<String>(
-          valueListenable: CurrencyHelper.currencyNotifier,
-          builder: (context, _, _) => ValueListenableBuilder<int>(
-            valueListenable: DecimalSettings.precisionNotifier,
-            builder: (context, _, _) => Observer(
-              builder: (context) {
-                if (holdSaleStore.isLoading) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: AppColors.primary),
-                  );
-                }
-
-                if (holdSaleStore.holdSaleCount == 0) {
-                  return const AppEmptyState(
-                    icon: Icons.pause_circle_outline,
-                    title: 'No parked sales',
-                    message:
-                        'Sales you hold from the billing screen will appear here.',
-                  );
-                }
-
-                return Column(
-                  children: [
-                    _buildSummaryCard(context),
-                    Expanded(child: _buildHoldSalesList()),
-                  ],
+      body: ValueListenableBuilder<String>(
+        valueListenable: CurrencyHelper.currencyNotifier,
+        builder: (context, _, _) => ValueListenableBuilder<int>(
+          valueListenable: DecimalSettings.precisionNotifier,
+          builder: (context, _, _) => Observer(
+            builder: (context) {
+              if (holdSaleStore.isLoading) {
+                return const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
                 );
-              },
-            ),
+              }
+
+              if (holdSaleStore.holdSaleCount == 0) {
+                return const AppEmptyState(
+                  icon: Icons.pause_circle_outline,
+                  title: 'No parked sales',
+                  message:
+                      'Sales you hold from the billing screen will appear here.',
+                );
+              }
+
+              return Column(
+                children: [
+                  // NOT inside the cap: the band is a background element
+                  // continuing the AppBar, and the AppBar is full-bleed.
+                  // Capping it put ~260px of grey either side of it at 1920px,
+                  // so the primary band floated under a full-width AppBar. It
+                  // caps its own CONTENT instead — see _buildSummaryCard.
+                  _buildSummaryCard(context),
+                  Expanded(
+                    child: AppResponsive.constrainedContent(
+                      context: context,
+                      alignment: Alignment.topCenter,
+                      maxWidth: AppResponsive.maxContentWidth(context),
+                      child: _buildHoldSalesList(),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -330,63 +348,80 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
 
         return Container(
           width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: AppColors.primary,
-            borderRadius: BorderRadius.vertical(bottom: Radius.circular(18)),
+            borderRadius: BorderRadius.vertical(
+              bottom: Radius.circular(AppResponsive.largeBorderRadius(context)),
+            ),
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      count == 1 ? '1 Parked Sale' : '$count Parked Sales',
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.subheadingFontSize(context),
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Waiting to be settled',
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.captionFontSize(context),
-                        color: AppColors.white.withValues(alpha: 0.75),
-                      ),
-                    ),
-                  ],
-                ),
+          // Cap OUTSIDE the padding, so the band's content starts at the same
+          // x as the list's cards below. Padding inside the cap would offset
+          // this row by 16px against them.
+          child: AppResponsive.constrainedContent(
+            context: context,
+            alignment: Alignment.topCenter,
+            maxWidth: AppResponsive.maxContentWidth(context),
+            child: Padding(
+              // Horizontal gutter shared with the list below — see PS1: these
+              // two must stay equal or the band's content sits off the cards.
+              padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.padding(context).left,
+                vertical: AppResponsive.largeSpacing(context),
               ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
+              child: Row(
                 children: [
-                  Text(
-                    'TOTAL VALUE',
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.captionFontSize(context),
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.7,
-                      color: AppColors.white.withValues(alpha: 0.7),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          count == 1 ? '1 Parked Sale' : '$count Parked Sales',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.subheadingFontSize(context),
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Waiting to be settled',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.captionFontSize(context),
+                            color: AppColors.white.withValues(alpha: 0.75),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    _money(holdSaleStore.totalHoldSalesValue),
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.subheadingFontSize(context) + 1,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.white,
-                    ),
+                  SizedBox(width: AppResponsive.mediumSpacing(context)),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'TOTAL VALUE',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.captionFontSize(context),
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.7,
+                          color: AppColors.white.withValues(alpha: 0.7),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        _money(holdSaleStore.totalHoldSalesValue),
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.subheadingFontSize(context),
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.white,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
         );
       },
@@ -399,9 +434,15 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
         final holdSales = holdSaleStore.holdSales;
 
         return ListView.separated(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          padding: EdgeInsets.fromLTRB(
+            AppResponsive.padding(context).left,
+            AppResponsive.mediumSpacing(context),
+            AppResponsive.padding(context).left,
+            AppResponsive.extraLargeSpacing(context),
+          ),
           itemCount: holdSales.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 12),
+          separatorBuilder: (_, _) =>
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
           itemBuilder: (context, index) =>
               _buildHoldSaleCard(context, holdSales[index]),
         );
@@ -426,7 +467,15 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
           borderRadius: radius,
           onTap: () => _showHoldSaleDetails(holdSale),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 14, 8, 6),
+            // Right and bottom stay tight on purpose: the action row's own
+            // buttons carry padding, so matching the left/top here would
+            // double it. 6 is below the 8px spacing floor and stays static.
+            padding: EdgeInsets.fromLTRB(
+              AppResponsive.mediumSpacing(context),
+              AppResponsive.mediumSpacing(context),
+              AppResponsive.smallSpacing(context),
+              6,
+            ),
             child: Column(
               children: [
                 // Identity row — who/when on the left, money on the right
@@ -434,19 +483,21 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      width: 40,
-                      height: 40,
+                      width: AppResponsive.avatarSize(context),
+                      height: AppResponsive.avatarSize(context),
                       decoration: BoxDecoration(
                         color: AppColors.warning.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(11),
+                        borderRadius: BorderRadius.circular(
+                          AppResponsive.borderRadius(context),
+                        ),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.pause_circle_outline,
                         color: AppColors.warning,
-                        size: 21,
+                        size: AppResponsive.iconSize(context),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: AppResponsive.mediumSpacing(context)),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -474,13 +525,14 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
                     Padding(
                       padding: const EdgeInsets.only(top: 2, right: 6),
                       child: Text(
                         _money(holdSale.subtotal),
+                        maxLines: 1,
                         style: GoogleFonts.poppins(
-                          fontSize: AppResponsive.bodyFontSize(context) + 2,
+                          fontSize: AppResponsive.subheadingFontSize(context),
                           fontWeight: FontWeight.w700,
                           color: AppColors.textPrimary,
                         ),
@@ -488,7 +540,7 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
                 Divider(height: 1, thickness: 1, color: AppColors.divider),
                 // Action row — restore is the primary job of this screen, so it
                 // is visible; view/delete stay in the overflow.
@@ -496,7 +548,10 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                   children: [
                     TextButton.icon(
                       onPressed: () => _restoreHoldSale(holdSale),
-                      icon: const Icon(Icons.play_circle_outline, size: 18),
+                      icon: Icon(
+                        Icons.play_circle_outline,
+                        size: AppResponsive.smallIconSize(context),
+                      ),
                       label: Text(
                         'Restore to Cart',
                         style: GoogleFonts.poppins(
@@ -533,5 +588,4 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
       ),
     );
   }
-
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../core/routes/routes_name.dart';
 import '../util/color.dart';
 import '../util/common/app_responsive.dart';
@@ -124,14 +125,16 @@ class _UpgradeSheetBody extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(Icons.workspace_premium_rounded,
-                    color: AppColors.accent,
-                    size: AppResponsive.largeIconSize(context)),
+                Icon(
+                  Icons.workspace_premium_rounded,
+                  color: AppColors.accent,
+                  size: AppResponsive.largeIconSize(context),
+                ),
                 SizedBox(width: AppResponsive.smallSpacing(context)),
                 Expanded(
                   child: Text(
                     title,
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.subheadingFontSize(context),
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
@@ -144,7 +147,7 @@ class _UpgradeSheetBody extends StatelessWidget {
           SizedBox(height: AppResponsive.mediumSpacing(context)),
           Text(
             message,
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.bodyFontSize(context),
               color: AppColors.textSecondary,
               height: 1.4,
@@ -164,9 +167,12 @@ class _UpgradeSheetBody extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  child: Text('Close',
-                      style:
-                          TextStyle(fontSize: AppResponsive.buttonFontSize(context))),
+                  child: Text(
+                    'Close',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.buttonFontSize(context),
+                    ),
+                  ),
                 ),
               ),
               SizedBox(width: AppResponsive.smallSpacing(context)),
@@ -175,11 +181,14 @@ class _UpgradeSheetBody extends StatelessWidget {
                 child: ElevatedButton.icon(
                   onPressed: () {
                     Navigator.of(context).pop();
-                    Navigator.of(context)
-                        .pushNamed(RouteNames.restaurantNeedHelp);
+                    Navigator.of(
+                      context,
+                    ).pushNamed(RouteNames.restaurantNeedHelp);
                   },
-                  icon: Icon(Icons.support_agent_rounded,
-                      size: AppResponsive.iconSize(context)),
+                  icon: Icon(
+                    Icons.support_agent_rounded,
+                    size: AppResponsive.iconSize(context),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: AppColors.white,
@@ -189,10 +198,13 @@ class _UpgradeSheetBody extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  label: Text('Contact Bill Berry',
-                      style: TextStyle(
-                          fontSize: AppResponsive.buttonFontSize(context),
-                          fontWeight: FontWeight.bold)),
+                  label: Text(
+                    'Contact Bill Berry',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.buttonFontSize(context),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
             ],

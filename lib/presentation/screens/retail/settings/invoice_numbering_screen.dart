@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 
 import 'package:billberrylite/core/config/fiscal_year_rule.dart';
@@ -110,12 +111,12 @@ class _InvoiceNumberingScreenState extends State<InvoiceNumberingScreen> {
                 children: [
                   Text(
                     'Prefix',
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
                   AppTextField(
                     controller: _prefixController,
                     hint: 'INV',
@@ -128,7 +129,7 @@ class _InvoiceNumberingScreenState extends State<InvoiceNumberingScreen> {
                     'Up to ${DocumentNumberService.maxPrefixLength} letters or '
                     'numbers, so the whole invoice number stays within the 16 '
                     'characters the tax rules allow.',
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.captionFontSize(context),
                       color: AppColors.textSecondary,
                     ),
@@ -136,12 +137,12 @@ class _InvoiceNumberingScreenState extends State<InvoiceNumberingScreen> {
                   SizedBox(height: AppResponsive.largeSpacing(context)),
                   Text(
                     'Next number',
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
                   AppTextField(
                     controller: _nextController,
                     hint: '1',
@@ -152,7 +153,7 @@ class _InvoiceNumberingScreenState extends State<InvoiceNumberingScreen> {
                     'Set this to continue a series you already issue elsewhere. '
                     'It only moves the series forward from the next sale on — '
                     'invoices already recorded keep their numbers.',
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.captionFontSize(context),
                       color: AppColors.textSecondary,
                     ),
@@ -167,17 +168,13 @@ class _InvoiceNumberingScreenState extends State<InvoiceNumberingScreen> {
                 children: [
                   _row(context, 'Next invoice', _preview, emphasise: true),
                   const Divider(height: 24, thickness: 0.5),
-                  _row(
-                    context,
-                    'Restarts at 1 on',
-                    FiscalYearRule.resetLabel,
-                  ),
-                  const SizedBox(height: 8),
+                  _row(context, 'Restarts at 1 on', FiscalYearRule.resetLabel),
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
                   Text(
                     'The series restarts each financial year. Last year\'s '
                     '$_preview and this year\'s are different sales — each keeps '
                     'its own record.',
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.captionFontSize(context),
                       color: AppColors.textSecondary,
                     ),
@@ -200,7 +197,7 @@ class _InvoiceNumberingScreenState extends State<InvoiceNumberingScreen> {
                 ),
                 child: Text(
                   'Save',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w600,
                   ),
@@ -214,43 +211,40 @@ class _InvoiceNumberingScreenState extends State<InvoiceNumberingScreen> {
   }
 
   Widget _card({required Widget child}) => Container(
-        padding: AppResponsive.cardPadding(context),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(
-            AppResponsive.borderRadius(context),
-          ),
-          border: Border.all(color: AppColors.divider, width: 0.5),
-        ),
-        child: child,
-      );
+    padding: AppResponsive.cardPadding(context),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+      border: Border.all(color: AppColors.divider, width: 0.5),
+    ),
+    child: child,
+  );
 
   Widget _row(
     BuildContext context,
     String label,
     String value, {
     bool emphasise = false,
-  }) =>
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: AppResponsive.bodyFontSize(context),
-              color: AppColors.textSecondary,
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: emphasise
-                  ? AppResponsive.subheadingFontSize(context)
-                  : AppResponsive.bodyFontSize(context),
-              fontWeight: FontWeight.w700,
-              color: emphasise ? AppColors.primary : AppColors.textPrimary,
-            ),
-          ),
-        ],
-      );
+  }) => Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(
+        label,
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.bodyFontSize(context),
+          color: AppColors.textSecondary,
+        ),
+      ),
+      Text(
+        value,
+        style: GoogleFonts.poppins(
+          fontSize: emphasise
+              ? AppResponsive.subheadingFontSize(context)
+              : AppResponsive.bodyFontSize(context),
+          fontWeight: FontWeight.w700,
+          color: emphasise ? AppColors.primary : AppColors.textPrimary,
+        ),
+      ),
+    ],
+  );
 }

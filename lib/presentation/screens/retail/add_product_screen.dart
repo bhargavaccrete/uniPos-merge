@@ -77,7 +77,8 @@ Future<bool> _confirmLossIfSellingBelowCost({
   return await showAppConfirmDialog(
     context: context,
     title: 'Selling Below Cost Price?',
-    message: 'Selling Price ($sym${DecimalSettings.formatAmount(sellingPrice)}) '
+    message:
+        'Selling Price ($sym${DecimalSettings.formatAmount(sellingPrice)}) '
         'is lower than Cost Price ($sym${DecimalSettings.formatAmount(costPrice)}).\n\n'
         'You will incur a loss of $sym${DecimalSettings.formatAmount(loss)} (-$lossPct% margin) per unit.',
     confirmLabel: 'Continue & Save',
@@ -335,8 +336,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   /// `Items.allowOrderWhenOutOfStock`; the only escape from the cart's
   /// zero-stock refusal.
   bool _allowOrderWhenOutOfStock = false;
-  final Map<String, List<BundleComponentModel>> _bundleComponentsByVariant =
-      {};
+  final Map<String, List<BundleComponentModel>> _bundleComponentsByVariant = {};
 
   /// Existing bundle row id/createdAt per variant key, reused across saves
   /// so re-editing doesn't orphan the previous bundle row.
@@ -368,8 +368,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
       _allowOrderWhenOutOfStock = product.sellsWhenOutOfStock;
       // Unit of measure lives on the variants; they always agree, so the first
       // one speaks for the product. Absent/legacy variants read as pieces.
-      final firstVariant =
-          productStore.variantsFor(product.productId).firstOrNull;
+      final firstVariant = productStore
+          .variantsFor(product.productId)
+          .firstOrNull;
       if (firstVariant != null) {
         _isDecimalQuantity = firstVariant.isDecimalQuantity;
         _unit = firstVariant.isDecimalQuantity
@@ -384,14 +385,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
         // above for why staging is per-variant.
         final existingVariants = productStore.variantsFor(product.productId);
         for (final variant in existingVariants) {
-          final bundle =
-              bundleRepository.getBundleForVariant(variant.varianteId);
+          final bundle = bundleRepository.getBundleForVariant(
+            variant.varianteId,
+          );
           if (bundle != null) {
             _bundleRowIdByVariant[variant.varianteId] = bundle.id;
-            _bundleRowCreatedAtByVariant[variant.varianteId] =
-                bundle.createdAt;
-            _bundleComponentsByVariant[variant.varianteId] =
-                List.of(bundle.components);
+            _bundleRowCreatedAtByVariant[variant.varianteId] = bundle.createdAt;
+            _bundleComponentsByVariant[variant.varianteId] = List.of(
+              bundle.components,
+            );
           }
         }
       }
@@ -584,7 +586,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
     // save and change nothing. Only writes when it actually differs.
     final expiryIso = _expiryDate?.toIso8601String();
     for (final variant in existingVariants) {
-      final unitChanged = variant.isDecimalQuantity != _isDecimalQuantity ||
+      final unitChanged =
+          variant.isDecimalQuantity != _isDecimalQuantity ||
           (_isDecimalQuantity && variant.unit != _unit);
       // Expiry is product-level here but stored per variant, so a change has
       // to reach every one of them — including CLEARING it, which needs the
@@ -607,14 +610,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
       final components = _bundleComponentsByVariant[variantId] ?? const [];
       if (_stockMode != 'standard' && components.isNotEmpty) {
         final now = DateTime.now().toIso8601String();
-        await bundleRepository.saveBundle(RetailBundleModel(
-          id: _bundleRowIdByVariant[variantId] ?? _uuid.v4(),
-          productId: existing.productId,
-          variantId: variantId,
-          components: components,
-          createdAt: _bundleRowCreatedAtByVariant[variantId] ?? now,
-          updatedAt: now,
-        ));
+        await bundleRepository.saveBundle(
+          RetailBundleModel(
+            id: _bundleRowIdByVariant[variantId] ?? _uuid.v4(),
+            productId: existing.productId,
+            variantId: variantId,
+            components: components,
+            createdAt: _bundleRowCreatedAtByVariant[variantId] ?? now,
+            updatedAt: now,
+          ),
+        );
       } else {
         await bundleRepository.deleteBundleForVariant(variantId);
       }
@@ -876,7 +881,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
           costPrice: variantData.costPriceController.text.trim().isEmpty
               ? null
               : double.tryParse(variantData.costPriceController.text.trim()),
-          stockQty: double.tryParse(variantData.stockController.text.trim()) ?? 0,
+          stockQty:
+              double.tryParse(variantData.stockController.text.trim()) ?? 0,
           taxRate: taxRate,
           taxId: _selectedTaxId,
           isDecimalQuantity: _isDecimalQuantity,
@@ -916,14 +922,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final components = _bundleComponentsByVariant[stagingKey];
     if (components == null || components.isEmpty) return;
     final now = DateTime.now().toIso8601String();
-    await bundleRepository.saveBundle(RetailBundleModel(
-      id: _bundleRowIdByVariant[stagingKey] ?? _uuid.v4(),
-      productId: productId,
-      variantId: variantId,
-      components: components,
-      createdAt: now,
-      updatedAt: now,
-    ));
+    await bundleRepository.saveBundle(
+      RetailBundleModel(
+        id: _bundleRowIdByVariant[stagingKey] ?? _uuid.v4(),
+        productId: productId,
+        variantId: variantId,
+        components: components,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
   }
 
   /// Descriptor inputs for one variant, laid out two per row like the fields
@@ -941,7 +949,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         Row(
           children: [
             Expanded(child: _buildFieldInput(variant, left)),
-            const SizedBox(width: 12),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
             if (right != null)
               Expanded(child: _buildFieldInput(variant, right))
             else
@@ -949,7 +957,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           ],
         ),
       );
-      rows.add(const SizedBox(height: 12));
+      rows.add(SizedBox(height: AppResponsive.mediumSpacing(context)));
     }
     return rows;
   }
@@ -968,16 +976,18 @@ class _AddProductScreenState extends State<AddProductScreen> {
       suffixIcon: values.isEmpty
           ? null
           : PopupMenuButton<String>(
-              icon: const Icon(
+              icon: Icon(
                 Icons.keyboard_arrow_down_rounded,
-                size: 22,
+                size: AppResponsive.iconSize(context),
                 color: AppColors.textSecondary,
               ),
               tooltip: 'Choose ${attribute.name}',
               // M3 tints menu surfaces by default; keep them plain white.
               color: AppColors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.borderRadius(context),
+                ),
               ),
               onSelected: (value) => setState(() => controller.text = value),
               itemBuilder: (_) => values
@@ -1041,7 +1051,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               children: [
                 // Product Information Section
                 _buildSectionHeader('Product Information'),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 UniversalImageUploader(
                   imageBytes: _imageBytes,
                   height: 160,
@@ -1064,7 +1074,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           _imageCleared = true;
                         }),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
                 _buildTextField(
                   controller: _nameController,
                   label: 'Product Name',
@@ -1076,22 +1086,22 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 _buildTextField(
                   controller: _brandController,
                   label: 'Brand Name (Optional)',
                   hint: 'e.g., Puma, Nike',
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 _buildCategoryDropdown(),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 _buildTextField(
                   controller: _descriptionController,
                   label: 'Description (Optional)',
                   hint: 'Enter product description',
                   maxLines: 3,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 _buildTextField(
                   controller: _hsnCodeController,
                   label: '${TariffCodeRule.label} (Optional)',
@@ -1099,10 +1109,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   onChanged: _onHsnCodeChanged,
                 ),
                 if (TaxFeature.enabled) ...[
-                  const SizedBox(height: 12),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
                   _buildTaxDropdown(),
                 ],
-                const SizedBox(height: 16),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
 
                 // ── Stock Mode ────────────────────────────────────────────
                 // See docs/retail_inventory_system_plan.md §3.2. Shown for
@@ -1110,33 +1120,33 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 // below (variants are managed on the product's own screen)
                 // but a product's stock mode is still a product-level field.
                 _buildSectionHeader('Stock Mode'),
-                const SizedBox(height: 10),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
                 _buildStockModeSection(),
-                const SizedBox(height: 10),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
                 _buildAllowOutOfStockSection(),
-                const SizedBox(height: 16),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
 
                 // ── Unit of Measure ───────────────────────────────────────
                 // Product-level, because a shop sells potatoes by weight — not
                 // "this variant by weight, that one by piece".
                 _buildSectionHeader('Unit of Measure'),
-                const SizedBox(height: 10),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
                 _buildUnitOfMeasureSection(),
-                const SizedBox(height: 16),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
 
                 // ── Expiry ────────────────────────────────────────────────
                 // Optional for EVERY product — there is no perishable/food
                 // classification in retail, so non-expiring products simply
                 // leave it unset. NOT batch tracking: one date per variant.
                 _buildSectionHeader('Expiry'),
-                const SizedBox(height: 10),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
                 _buildExpirySection(),
-                const SizedBox(height: 16),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
 
                 // Editing touches product fields only — variants are managed on
                 // the product's own screen, which is where you came from.
                 if (!_isEditing) ...[
-                  const SizedBox(height: 8),
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
 
                   // ── One Variants section for every product ──────────────
                   // There is no Simple/Variable mode: a product simply has
@@ -1146,9 +1156,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   _buildSectionHeader(
                     'Variants ($_effectiveVariantCount)',
                     trailing: IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.tune,
-                        size: 20,
+                        size: AppResponsive.iconSize(context),
                         color: AppColors.primary,
                       ),
                       tooltip: 'Choose which detail fields appear',
@@ -1156,7 +1166,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       onPressed: _openSimpleFieldSettings,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
 
                   // Manually entered variants — hidden while Bulk add is open
                   // unless one is filled in. See [_showManualVariants].
@@ -1171,14 +1181,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     // (e.g. a "Combo Meal" in Small/Medium/Large) — "Add
                     // variant" and bulk-generate work exactly like a standard
                     // product; each variant gets its own component list below.
-                    const SizedBox(height: 12),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
                         onPressed: _addVariant,
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.add,
-                          size: 18,
+                          size: AppResponsive.smallIconSize(context),
                           color: AppColors.primary,
                         ),
                         label: Text(
@@ -1190,7 +1200,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.primary,
                           side: const BorderSide(color: AppColors.primary),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          padding: EdgeInsets.symmetric(
+                            vertical: AppResponsive.mediumSpacing(context),
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
@@ -1204,10 +1216,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: TextButton.icon(
-                        onPressed: () => setState(
-                          () => _showAttributeGenerator = false,
+                        onPressed: () =>
+                            setState(() => _showAttributeGenerator = false),
+                        icon: Icon(
+                          Icons.edit_outlined,
+                          size: AppResponsive.smallIconSize(context),
                         ),
-                        icon: const Icon(Icons.edit_outlined, size: 18),
                         label: Text(
                           'Type variants in manually instead',
                           style: GoogleFonts.poppins(
@@ -1221,28 +1235,28 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     ),
 
                   // ── Bulk add: many variants at once, from attributes ─────
-                  const SizedBox(height: 16),
+                  SizedBox(height: AppResponsive.largeSpacing(context)),
                   _buildBulkAddPanel(),
 
                   if (_generatedVariants.isNotEmpty) ...[
-                    const SizedBox(height: 24),
+                    SizedBox(height: AppResponsive.extraLargeSpacing(context)),
                     _buildSectionHeader(
                       'Generated Variants (${_generatedVariants.length})',
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
                     _buildBulkEditBar(),
-                    const SizedBox(height: 12),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
                     _buildGeneratedVariantsList(),
                   ],
                 ],
 
                 // ── Bundle / Repack components ───────────────────────────
                 if (_stockMode != 'standard') ...[
-                  const SizedBox(height: 8),
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
                   _buildBundleSection(),
                 ],
 
-                const SizedBox(height: 32),
+                SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
                 // Save Button
                 SizedBox(
@@ -1287,7 +1301,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(
           color: _showAttributeGenerator
               ? AppColors.info.withValues(alpha: 0.5)
@@ -1305,7 +1321,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           InkWell(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.borderRadius(context),
+            ),
             onTap: () => setState(() {
               _showAttributeGenerator = !_showAttributeGenerator;
               // Decide ONCE, on open, whether the manual rows step aside —
@@ -1315,22 +1333,26 @@ class _AddProductScreenState extends State<AddProductScreen> {
               }
             }),
             child: Padding(
-              padding: const EdgeInsets.all(14),
+              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: EdgeInsets.all(
+                      AppResponsive.smallSpacing(context),
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.info.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.smallBorderRadius(context),
+                      ),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.auto_awesome,
-                      size: 20,
+                      size: AppResponsive.iconSize(context),
                       color: AppColors.info,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: AppResponsive.mediumSpacing(context)),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1373,12 +1395,17 @@ class _AddProductScreenState extends State<AddProductScreen> {
             visible: _showAttributeGenerator,
             maintainState: true,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              padding: EdgeInsets.fromLTRB(
+                AppResponsive.mediumSpacing(context),
+                0,
+                AppResponsive.mediumSpacing(context),
+                AppResponsive.mediumSpacing(context),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Divider(height: 1, color: AppColors.divider),
-                  const SizedBox(height: 12),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
                   _buildAttributeSelector(),
                 ],
               ),
@@ -1391,11 +1418,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   Widget _buildVariantCard(VariantFormData variant, int index) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.only(bottom: AppResponsive.largeSpacing(context)),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
         // Same soft lift the POS and report cards use.
         boxShadow: const [
@@ -1413,7 +1442,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.smallSpacing(context),
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.info,
                   borderRadius: BorderRadius.circular(4),
@@ -1430,10 +1462,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
               const Spacer(),
               if (_variants.length > 1)
                 IconButton(
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.delete_outline,
                     color: AppColors.danger,
-                    size: 20,
+                    size: AppResponsive.iconSize(context),
                   ),
                   onPressed: () => _removeVariant(index),
                   padding: EdgeInsets.zero,
@@ -1444,7 +1476,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
 
           // Configurable descriptor fields (Settings → Simple Product Fields).
           ..._buildConfiguredFields(variant),
@@ -1456,15 +1488,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
             // internal code, so the field is only for a real one off the packet.
             hint: 'Scan, or leave blank to auto-generate',
             suffixIcon: IconButton(
-              icon: const Icon(
+              icon: Icon(
                 Icons.qr_code_scanner,
                 color: AppColors.primary,
-                size: 20,
+                size: AppResponsive.iconSize(context),
               ),
               onPressed: () => _scanBarcode(variant),
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
 
           Row(
             children: [
@@ -1480,7 +1512,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   inputFormatters: _moneyFormatters,
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               Expanded(
                 child: _buildTextField(
                   controller: variant.priceController,
@@ -1492,7 +1524,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
 
           Row(
             children: [
@@ -1505,7 +1537,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   inputFormatters: _moneyFormatters,
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               Expanded(
                 child: _buildTextField(
                   controller: variant.skuController,
@@ -1515,7 +1547,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
 
           Row(
             children: [
@@ -1528,13 +1560,13 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   inputFormatters: _activeQtyFormatters,
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               const Expanded(child: SizedBox()),
             ],
           ),
 
           // Custom Attributes Section
-          const SizedBox(height: 16),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
           Row(
             children: [
               Text(
@@ -1552,11 +1584,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     variant.addCustomAttribute();
                   });
                 },
-                icon: const Icon(Icons.add, size: 16),
+                icon: Icon(
+                  Icons.add,
+                  size: AppResponsive.smallIconSize(context),
+                ),
                 label: const Text('Add'),
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.smallSpacing(context),
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -1564,12 +1601,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
             ],
           ),
           if (variant.customAttributes.isNotEmpty) ...[
-            const SizedBox(height: 8),
+            SizedBox(height: AppResponsive.smallSpacing(context)),
             ...variant.customAttributes.asMap().entries.map((entry) {
               final attrIndex = entry.key;
               final attr = entry.value;
               return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: EdgeInsets.only(
+                  bottom: AppResponsive.smallSpacing(context),
+                ),
                 child: Row(
                   children: [
                     Expanded(
@@ -1602,7 +1641,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                             },
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
                     Expanded(
                       child: _buildTextField(
                         controller: attr.valueController,
@@ -1611,10 +1650,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.remove_circle_outline,
                         color: AppColors.danger,
-                        size: 20,
+                        size: AppResponsive.iconSize(context),
                       ),
                       onPressed: () {
                         setState(() {
@@ -1711,7 +1750,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           ),
         ),
         if (_expiryDate != null) ...[
-          const SizedBox(height: 10),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           ExpiryDateField(
             value: _expiryDate,
             onPick: (picked) => setState(() => _expiryDate = picked),
@@ -1731,8 +1770,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
           onChanged: (v) => setState(() {
             _isDecimalQuantity = v;
             // Collapsing back to pieces must not leave a stale 'kg' behind.
-            if (!v) _unit = 'piece';
-            else if (_unit == 'piece') _unit = 'kg';
+            if (!v)
+              _unit = 'piece';
+            else if (_unit == 'piece')
+              _unit = 'kg';
           }),
           contentPadding: EdgeInsets.zero,
           dense: true,
@@ -1755,7 +1796,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           ),
         ),
         if (_isDecimalQuantity) ...[
-          const SizedBox(height: 10),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           DropdownButtonFormField<String>(
             initialValue: kItemUnits.contains(_unit) ? _unit : 'kg',
             decoration: InputDecoration(
@@ -1818,7 +1859,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           title: 'Standard',
           subtitle: "This product's own variant stock is what's sold",
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: AppResponsive.smallSpacing(context)),
         _buildStockModeCard(
           value: 'bundle',
           icon: Icons.widgets_rounded,
@@ -1826,7 +1867,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           subtitle:
               "No stock of its own — selling it deducts each component's stock",
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: AppResponsive.smallSpacing(context)),
         _buildStockModeCard(
           value: 'repack',
           icon: Icons.build_circle_outlined,
@@ -1846,14 +1887,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final isSelected = _stockMode == value;
     return InkWell(
       onTap: () => setState(() => _stockMode = value),
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.primary.withValues(alpha: 0.06)
               : AppColors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.borderRadius(context),
+          ),
           border: Border.all(
             color: isSelected ? AppColors.primary : AppColors.divider,
             width: isSelected ? 1.5 : 1,
@@ -1862,19 +1905,22 @@ class _AddProductScreenState extends State<AddProductScreen> {
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
               decoration: BoxDecoration(
-                color: (isSelected ? AppColors.primary : AppColors.textSecondary)
-                    .withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                color:
+                    (isSelected ? AppColors.primary : AppColors.textSecondary)
+                        .withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
               ),
               child: Icon(
                 icon,
-                size: 18,
+                size: AppResponsive.smallIconSize(context),
                 color: isSelected ? AppColors.primary : AppColors.textSecondary,
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1884,10 +1930,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     style: GoogleFonts.poppins(
                       fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
-                      color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                      color: isSelected
+                          ? AppColors.primary
+                          : AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  SizedBox(height: 2),
                   Text(
                     subtitle,
                     style: GoogleFonts.poppins(
@@ -1903,7 +1951,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   ? Icons.radio_button_checked
                   : Icons.radio_button_unchecked,
               color: isSelected ? AppColors.primary : AppColors.textSecondary,
-              size: 20,
+              size: AppResponsive.iconSize(context),
             ),
           ],
         ),
@@ -1948,7 +1996,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       children: [
         if (options.length > 1) ...[
           _buildBundleVariantSelector(options, selectedKey),
-          const SizedBox(height: 10),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
         ],
         // Keyed by the selected variant so switching remounts the builder
         // with THAT variant's components — its own `initialComponents`,
@@ -1958,10 +2006,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
         // continuously up to date rather than only "on switch".
         BundleBuilderWidget(
           key: ValueKey('bundle_variant_$selectedKey'),
-          currentProductId:
-              _isEditing ? widget.product!.productId : _draftProductId,
+          currentProductId: _isEditing
+              ? widget.product!.productId
+              : _draftProductId,
           stockMode: _stockMode,
-          initialComponents: _bundleComponentsByVariant[selectedKey] ?? const [],
+          initialComponents:
+              _bundleComponentsByVariant[selectedKey] ?? const [],
           sellingPrice: selected.sellingPrice,
           onChanged: (components) =>
               _bundleComponentsByVariant[selectedKey!] = components,
@@ -1980,7 +2030,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: options.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, __) =>
+            SizedBox(width: AppResponsive.smallSpacing(context)),
         itemBuilder: (context, index) {
           final option = options[index];
           final isSelected = option.key == selectedKey;
@@ -1990,7 +2041,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
             onSelected: (_) =>
                 setState(() => _selectedBundleVariantKey = option.key),
             labelStyle: GoogleFonts.poppins(
-              fontSize: 12.5,
+              fontSize: AppResponsive.smallFontSize(context),
               fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
               color: isSelected ? AppColors.primary : AppColors.textPrimary,
             ),
@@ -2019,8 +2070,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
         _BundleVariantOption(
           key: _variants[i].id,
           label: _manualVariantLabel(_variants[i], i),
-          sellingPrice:
-              double.tryParse(_variants[i].priceController.text.trim()),
+          sellingPrice: double.tryParse(
+            _variants[i].priceController.text.trim(),
+          ),
         ),
       for (final v in _generatedVariants)
         _BundleVariantOption(
@@ -2048,23 +2100,25 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   Widget _bundleNoVariantWarning() {
     return Container(
-      padding: const EdgeInsets.all(14),
-      margin: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
+      margin: EdgeInsets.only(bottom: AppResponsive.largeSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.warning.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.warning_amber_rounded, color: AppColors.warning),
-          const SizedBox(width: 10),
+          Icon(Icons.warning_amber_rounded, color: AppColors.warning),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Expanded(
             child: Text(
               'Add a variant to this product before configuring it as a Bundle or Repack/Kit.',
               style: GoogleFonts.poppins(
-                fontSize: 12.5,
+                fontSize: AppResponsive.smallFontSize(context),
                 color: AppColors.textPrimary,
               ),
             ),
@@ -2114,17 +2168,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
     ),
     filled: true,
     fillColor: AppColors.surfaceLight,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    contentPadding: EdgeInsets.symmetric(
+      horizontal: AppResponsive.cardPadding(context).left,
+      vertical: AppResponsive.mediumSpacing(context),
+    ),
     border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
       borderSide: const BorderSide(color: AppColors.divider),
     ),
     enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
       borderSide: const BorderSide(color: AppColors.divider),
     ),
     focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
       borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
     ),
   );
@@ -2152,7 +2209,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 await _showCategoryPicker();
                 state.didChange(_selectedCategoryModel?.id);
               },
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.borderRadius(context),
+              ),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 14,
@@ -2160,7 +2219,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 ),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceLight,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.borderRadius(context),
+                  ),
                   border: Border.all(
                     color: hasError ? AppColors.danger : AppColors.divider,
                   ),
@@ -2169,12 +2230,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   children: [
                     Icon(
                       Icons.folder_outlined,
-                      size: 20,
+                      size: AppResponsive.iconSize(context),
                       color: selected == null
                           ? AppColors.textSecondary
                           : AppColors.primary,
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: AppResponsive.mediumSpacing(context)),
                     Expanded(
                       child: Text(
                         selected?.name ?? 'Select category',
@@ -2200,7 +2261,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
             ),
             if (hasError)
               Padding(
-                padding: const EdgeInsets.only(left: 14, top: 6),
+                padding: EdgeInsets.only(
+                  left: AppResponsive.mediumSpacing(context),
+                  top: 6,
+                ),
                 child: Text(
                   state.errorText!,
                   style: GoogleFonts.poppins(
@@ -2228,8 +2292,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
       context: context,
       backgroundColor: AppColors.white,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppResponsive.largeBorderRadius(context)),
+        ),
       ),
       builder: (sheetContext) => StatefulBuilder(
         builder: (sheetContext, setSheetState) {
@@ -2266,7 +2332,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 18, 8, 10),
+                    padding: EdgeInsets.fromLTRB(
+                      AppResponsive.padding(context).left,
+                      AppResponsive.largeSpacing(context),
+                      AppResponsive.smallSpacing(context),
+                      AppResponsive.smallSpacing(context),
+                    ),
                     child: Row(
                       children: [
                         Text(
@@ -2283,7 +2354,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                             await showAddCategoryDialog(sheetContext);
                             await refresh();
                           },
-                          icon: const Icon(Icons.add_rounded, size: 18),
+                          icon: Icon(
+                            Icons.add_rounded,
+                            size: AppResponsive.smallIconSize(context),
+                          ),
                           label: Text(
                             'Add',
                             style: GoogleFonts.poppins(
@@ -2309,7 +2383,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   Flexible(
                     child: _categories.isEmpty
                         ? Padding(
-                            padding: const EdgeInsets.all(24),
+                            padding: AppResponsive.padding(context),
                             child: Text(
                               'No categories yet. Tap Add to create one.',
                               style: GoogleFonts.poppins(
@@ -2336,13 +2410,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                   color: isSelected
                                       ? AppColors.primary
                                       : AppColors.textSecondary,
-                                  size: 20,
+                                  size: AppResponsive.iconSize(context),
                                 ),
                                 title: Text(
                                   category.name,
                                   style: GoogleFonts.poppins(
-                                    fontSize:
-                                        AppResponsive.bodyFontSize(context),
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
                                     fontWeight: isSelected
                                         ? FontWeight.w600
                                         : FontWeight.w400,
@@ -2355,8 +2430,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                                   '$productCount product'
                                   '${productCount == 1 ? '' : 's'}',
                                   style: GoogleFonts.poppins(
-                                    fontSize:
-                                        AppResponsive.smallFontSize(context),
+                                    fontSize: AppResponsive.smallFontSize(
+                                      context,
+                                    ),
                                     color: AppColors.textSecondary,
                                   ),
                                 ),
@@ -2402,10 +2478,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   ),
                   const Divider(height: 1, color: AppColors.divider),
                   ListTile(
-                    leading: const Icon(
+                    leading: Icon(
                       Icons.tune_rounded,
                       color: AppColors.primary,
-                      size: 20,
+                      size: AppResponsive.iconSize(context),
                     ),
                     title: Text(
                       'Manage Categories',
@@ -2435,7 +2511,6 @@ class _AddProductScreenState extends State<AddProductScreen> {
     );
   }
 
-
   Widget _buildTaxDropdown() {
     final taxes = taxStore.taxes;
     return DropdownButtonFormField<String>(
@@ -2443,7 +2518,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       isExpanded: true,
       decoration: _pickerDecoration('Tax Rate (Optional)'),
       dropdownColor: AppColors.white,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
       menuMaxHeight: 320,
       elevation: 3,
       icon: const Icon(
@@ -2512,10 +2587,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final selectedCount = _selectedVariantsForBulk.length;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: AppColors.warning.withOpacity(0.10),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
         border: Border.all(color: AppColors.warning.withOpacity(0.35)),
       ),
       child: Column(
@@ -2524,8 +2601,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
           // Header with Select All / Unselect All
           Row(
             children: [
-              const Icon(Icons.edit_note, color: AppColors.warning, size: 20),
-              const SizedBox(width: 8),
+              Icon(
+                Icons.edit_note,
+                color: AppColors.warning,
+                size: AppResponsive.iconSize(context),
+              ),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Expanded(
                 child: Text(
                   'Bulk Edit - $selectedCount / ${_generatedVariants.length} selected',
@@ -2549,7 +2630,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         });
                       },
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.smallSpacing(context),
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -2577,7 +2660,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         });
                       },
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.smallSpacing(context),
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -2593,7 +2678,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
 
           // First Row: Cost Price, Selling Price
           Row(
@@ -2607,7 +2692,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   inputFormatters: _moneyFormatters,
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Expanded(
                 child: _buildTextField(
                   controller: _defaultPriceController,
@@ -2620,7 +2705,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
             ],
           ),
 
-          const SizedBox(height: 8),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           // Second Row: MRP, Stock
           Row(
             children: [
@@ -2633,7 +2718,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   inputFormatters: _moneyFormatters,
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Expanded(
                 child: _buildTextField(
                   controller: _defaultStockController,
@@ -2645,7 +2730,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -2654,7 +2739,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 backgroundColor: AppColors.warning,
                 foregroundColor: AppColors.white,
                 elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 13),
+                padding: EdgeInsets.symmetric(
+                  vertical: AppResponsive.mediumSpacing(context),
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -2666,7 +2753,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
             ),
           ),
 
-          const SizedBox(height: 8),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           Text(
             'Enter values and click Apply to update all variants at once',
             style: GoogleFonts.poppins(
@@ -2748,13 +2835,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
       key: ValueKey(
         '${variant.varianteId}_${variant.costPrice}_${variant.sellingPrice}_${variant.mrp}_${variant.stockQty}_$isSelected',
       ),
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
+      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: isSelected
             ? AppColors.warning.withOpacity(0.10)
             : AppColors.white,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
         border: Border.all(
           color: isSelected ? AppColors.warning : AppColors.divider,
           width: isSelected ? 2 : 1,
@@ -2789,17 +2878,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     ),
                   ),
                   child: isSelected
-                      ? const Icon(
+                      ? Icon(
                           Icons.check,
-                          size: 16,
+                          size: AppResponsive.smallIconSize(context),
                           color: AppColors.white,
                         )
                       : null,
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.smallSpacing(context),
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.primary,
                   borderRadius: BorderRadius.circular(4),
@@ -2814,7 +2906,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 ),
               ),
               if (variant.isDefault) ...[
-                const SizedBox(width: 8),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 6,
@@ -2844,7 +2936,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
 
           // Editable fields - using key to force rebuild on value change
           Row(
@@ -2862,7 +2954,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   },
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Expanded(
                 child: _buildVariantTextField(
                   key: 'sell_$index',
@@ -2876,7 +2968,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   },
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Expanded(
                 child: _buildVariantTextField(
                   key: 'stock_$index',
@@ -2893,7 +2985,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           Row(
             children: [
               Expanded(
@@ -2902,10 +2994,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   initialValue: variant.barcode ?? '',
                   label: 'Barcode',
                   suffixIcon: IconButton(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.qr_code_scanner,
                       color: AppColors.primary,
-                      size: 20,
+                      size: AppResponsive.iconSize(context),
                     ),
                     onPressed: () async {
                       final barcode = await Navigator.push<String>(
@@ -2924,7 +3016,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   },
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Expanded(
                 child: _buildVariantTextField(
                   key: 'mrp_$index',

@@ -87,7 +87,8 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
               title: 'Categories',
               actions: [
                 Observer(
-                  builder: (_) => categoryStore.categories.isEmpty ||
+                  builder: (_) =>
+                      categoryStore.categories.isEmpty ||
                           !CatalogPermission.canEdit
                       ? const SizedBox.shrink()
                       : IconButton(
@@ -124,7 +125,12 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
         // Phones read better as a list; wider screens fit a card grid.
         if (AppResponsive.isMobile(context)) {
           return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
+            padding: EdgeInsets.fromLTRB(
+              _gutter,
+              AppResponsive.mediumSpacing(context),
+              _gutter,
+              88,
+            ),
             itemCount: categories.length,
             itemBuilder: (context, index) =>
                 _buildCategoryCard(categories[index]),
@@ -144,17 +150,22 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
           desktop: 24.0,
         );
         return GridView.builder(
-          padding: AppResponsive.getValue(
-            context,
-            mobile: const EdgeInsets.fromLTRB(20, 20, 20, 88),
-            tablet: const EdgeInsets.fromLTRB(20, 20, 20, 88),
-            desktop: const EdgeInsets.fromLTRB(32, 20, 32, 88),
+          padding: EdgeInsets.fromLTRB(
+            _gutter,
+            AppResponsive.mediumSpacing(context),
+            _gutter,
+            88,
           ),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
             crossAxisSpacing: spacing,
             mainAxisSpacing: spacing,
-            childAspectRatio: 2.4,
+            childAspectRatio: AppResponsive.getValue(
+              context,
+              mobile: 2.4,
+              tablet: 2.4,
+              desktop: 2.2,
+            ),
           ),
           itemCount: categories.length,
           itemBuilder: (context, index) =>
@@ -187,10 +198,22 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
     );
   }
 
+  /// Horizontal gutter shared by the search bar, the list and the grid.
+  ///
+  /// Must match the Products tab's `_gutter`, which reads the same helper —
+  /// the two tabs sit under one TabBar, so a difference shows as the content
+  /// shifting sideways when you swipe between them.
+  double get _gutter => AppResponsive.padding(context).left;
+
   Widget _buildSearchBar() {
     return Container(
       color: AppColors.white,
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+      padding: EdgeInsets.fromLTRB(
+        _gutter,
+        AppResponsive.mediumSpacing(context),
+        _gutter,
+        AppResponsive.largeSpacing(context),
+      ),
       child: AppTextField(
         controller: _searchController,
         hint: 'Search categories...',
@@ -199,10 +222,10 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
         suffixIcon: _searchQuery.isEmpty
             ? null
             : IconButton(
-                icon: const Icon(
+                icon: Icon(
                   Icons.close_rounded,
                   color: AppColors.textSecondary,
-                  size: 20,
+                  size: AppResponsive.iconSize(context),
                 ),
                 tooltip: 'Clear search',
                 visualDensity: VisualDensity.compact,
@@ -220,10 +243,12 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
     final productCount = categoryStore.getItemCountForCategory(category.id);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
         boxShadow: const [
           BoxShadow(
@@ -237,25 +262,29 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
         onTap: CatalogPermission.canEdit
             ? () => _showEditCategoryDialog(category)
             : null,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: AppResponsive.cardPadding(context),
           child: Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: AppResponsive.avatarSize(context),
+                height: AppResponsive.avatarSize(context),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.smallBorderRadius(context),
+                  ),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.category_rounded,
                   color: AppColors.primary,
-                  size: 22,
+                  size: AppResponsive.iconSize(context),
                 ),
               ),
-              const SizedBox(width: 14),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -291,7 +320,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
                   tooltip: 'Rename',
                   onTap: () => _showEditCategoryDialog(category),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 RowActionButton(
                   icon: Icons.delete_outline_rounded,
                   color: AppColors.danger,
@@ -455,7 +484,7 @@ Future<String?> _promptCategoryName({
         ),
         actions: [
           appDialogCancelButton(dialogContext),
-          const SizedBox(width: 12),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           appDialogPrimaryButton(
             label: confirmLabel,
             onPressed: () =>

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/core/config/tax_feature.dart';
 import 'package:billberrylite/core/config/tax_label_rule.dart';
@@ -136,7 +137,7 @@ class _GstReportScreenState extends State<GstReportScreen>
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(primary: Color(0xFF4CAF50)),
+            colorScheme: const ColorScheme.light(primary: AppColors.success),
           ),
           child: child!,
         );
@@ -180,21 +181,21 @@ class _GstReportScreenState extends State<GstReportScreen>
             if (!TaxFeature.enabled)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
                 color: const Color(0xFFFFF8E1),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.info_outline,
-                      size: 18,
+                      size: AppResponsive.smallIconSize(context),
                       color: Color(0xFFB28900),
                     ),
-                    SizedBox(width: 8),
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
                     Expanded(
                       child: Text(
                         'Tax is currently disabled for new sales. This report reflects '
                         'historical data collected while tax was active.',
-                        style: TextStyle(
+                        style: GoogleFonts.poppins(
                           fontSize: AppResponsive.captionFontSize(context),
                           color: Color(0xFF7A5C00),
                         ),
@@ -206,7 +207,7 @@ class _GstReportScreenState extends State<GstReportScreen>
             // Date Range Selector
             Container(
               color: Colors.white,
-              padding: const EdgeInsets.all(16),
+              padding: AppResponsive.cardPadding(context),
               child: Row(
                 children: [
                   Expanded(
@@ -218,20 +219,24 @@ class _GstReportScreenState extends State<GstReportScreen>
                           vertical: 12,
                         ),
                         decoration: BoxDecoration(
-                          border: Border.all(color: const Color(0xFFE8E8E8)),
-                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.divider),
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.smallBorderRadius(context),
+                          ),
                         ),
                         child: Row(
                           children: [
                             Icon(
                               Icons.calendar_today,
-                              size: 18,
-                              color: Color(0xFF4CAF50),
+                              size: AppResponsive.smallIconSize(context),
+                              color: AppColors.success,
                             ),
-                            const SizedBox(width: 12),
+                            SizedBox(
+                              width: AppResponsive.mediumSpacing(context),
+                            ),
                             Text(
                               '${dateFormat.format(_dateRange.start)} - ${dateFormat.format(_dateRange.end)}',
-                              style: TextStyle(
+                              style: GoogleFonts.poppins(
                                 fontSize: AppResponsive.bodyFontSize(context),
                                 fontWeight: FontWeight.w500,
                               ),
@@ -239,7 +244,7 @@ class _GstReportScreenState extends State<GstReportScreen>
                             const Spacer(),
                             Icon(
                               Icons.arrow_drop_down,
-                              color: Color(0xFF6B6B6B),
+                              color: AppColors.textSecondary,
                             ),
                           ],
                         ),
@@ -251,9 +256,15 @@ class _GstReportScreenState extends State<GstReportScreen>
             ),
             if (_skippedRows > 0)
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                padding: EdgeInsets.fromLTRB(
+                  AppResponsive.cardPadding(context).left,
+                  0,
+                  AppResponsive.cardPadding(context).left,
+                  AppResponsive.largeSpacing(context),
+                ),
                 child: ReportNotice(
-                  message: '$_skippedRows sale${_skippedRows == 1 ? '' : 's'} '
+                  message:
+                      '$_skippedRows sale${_skippedRows == 1 ? '' : 's'} '
                       'could not be dated and ${_skippedRows == 1 ? 'is' : 'are'} '
                       'excluded from every figure below.',
                 ),
@@ -282,21 +293,23 @@ class _GstReportScreenState extends State<GstReportScreen>
 
   Widget _buildSummaryTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Total Summary Card
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: AppResponsive.padding(context),
             decoration: BoxDecoration(
-              color: const Color(0xFF4CAF50).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+              color: AppColors.success.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.borderRadius(context),
+              ),
             ),
             child: Column(
               children: [
                 _buildSummaryRow('Total Sales', '$_saleCount'),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 _buildSummaryRow('Total Units Sold', formatQty(_totalQuantity)),
                 const Divider(height: 24),
                 _buildSummaryRow(
@@ -306,12 +319,12 @@ class _GstReportScreenState extends State<GstReportScreen>
                 // Outside India there are no components — VAT and US sales tax
                 // are one figure, and the stored halves mean nothing.
                 if (_splitsTax && _taxComponents != null) ...[
-                  const SizedBox(height: 12),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
                   _buildSummaryRow(
                     'Total ${_taxComponents.first}',
                     '${CurrencyHelper.currentSymbol}${_totalCgstAmount.toStringAsFixed(2)}',
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
                   _buildSummaryRow(
                     'Total ${_taxComponents.second}',
                     '${CurrencyHelper.currentSymbol}${_totalSgstAmount.toStringAsFixed(2)}',
@@ -327,62 +340,66 @@ class _GstReportScreenState extends State<GstReportScreen>
               ],
             ),
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
           // GST Rate Distribution
           Text(
             '$_taxName Distribution by Rate',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.subheadingFontSize(context),
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: AppResponsive.cardPadding(context),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFE8E8E8)),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
+              border: Border.all(color: AppColors.divider),
             ),
             child: Column(
               children: _gstByRate.entries.map((entry) {
                 final summary = entry.value;
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
+                  padding: EdgeInsets.only(
+                    bottom: AppResponsive.mediumSpacing(context),
+                  ),
                   child: Row(
                     children: [
                       Container(
                         width: 48,
-                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        padding: EdgeInsets.symmetric(vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF4CAF50).withOpacity(0.1),
+                          color: AppColors.success.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           GstService.formatGstRate(entry.key),
                           textAlign: TextAlign.center,
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             fontSize: AppResponsive.smallFontSize(context),
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF4CAF50),
+                            color: AppColors.success,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: AppResponsive.mediumSpacing(context)),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               '${CurrencyHelper.currentSymbol}${summary.totalGst.toStringAsFixed(2)}',
-                              style: const TextStyle(
+                              style: GoogleFonts.poppins(
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                             Text(
                               '${summary.itemCount} lines',
-                              style: TextStyle(
+                              style: GoogleFonts.poppins(
                                 fontSize: AppResponsive.captionFontSize(
                                   context,
                                 ),
@@ -409,18 +426,20 @@ class _GstReportScreenState extends State<GstReportScreen>
     final sortedRates = _gstByRate.entries.toList();
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       itemCount: sortedRates.length,
       itemBuilder: (context, index) {
         final entry = sortedRates[index];
         final summary = entry.value;
         return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
+          margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
+          padding: AppResponsive.cardPadding(context),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFE8E8E8)),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.smallBorderRadius(context),
+            ),
+            border: Border.all(color: AppColors.divider),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -433,15 +452,15 @@ class _GstReportScreenState extends State<GstReportScreen>
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF4CAF50).withOpacity(0.1),
+                      color: AppColors.success.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       '$_taxName ${GstService.formatGstRate(entry.key)}',
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.subheadingFontSize(context),
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF4CAF50),
+                        color: AppColors.success,
                       ),
                     ),
                   ),
@@ -449,7 +468,7 @@ class _GstReportScreenState extends State<GstReportScreen>
                   Text(
                     // LINES, not units: this counts sale rows, netted by sign.
                     '${summary.itemCount} lines',
-                    style: TextStyle(color: Colors.grey[600]),
+                    style: GoogleFonts.poppins(color: Colors.grey[600]),
                   ),
                 ],
               ),
@@ -459,12 +478,12 @@ class _GstReportScreenState extends State<GstReportScreen>
                 '${CurrencyHelper.currentSymbol}${summary.taxableAmount.toStringAsFixed(2)}',
               ),
               if (_splitsTax && _taxComponents != null) ...[
-                const SizedBox(height: 8),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
                 _buildDetailRow(
                   '${_taxComponents.first} (${(entry.key / 2).toStringAsFixed(1)}%)',
                   '${CurrencyHelper.currentSymbol}${summary.cgst.toStringAsFixed(2)}',
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
                 _buildDetailRow(
                   '${_taxComponents.second} (${(entry.key / 2).toStringAsFixed(1)}%)',
                   '${CurrencyHelper.currentSymbol}${summary.sgst.toStringAsFixed(2)}',
@@ -488,17 +507,19 @@ class _GstReportScreenState extends State<GstReportScreen>
     final sortedProducts = _gstByProduct.values.toList();
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       itemCount: sortedProducts.length,
       itemBuilder: (context, index) {
         final summary = sortedProducts[index];
         return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
+          margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
+          padding: AppResponsive.cardPadding(context),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFE8E8E8)),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.smallBorderRadius(context),
+            ),
+            border: Border.all(color: AppColors.divider),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -508,7 +529,7 @@ class _GstReportScreenState extends State<GstReportScreen>
                   Expanded(
                     child: Text(
                       summary.productName,
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                       ),
@@ -519,11 +540,11 @@ class _GstReportScreenState extends State<GstReportScreen>
                     // truncated to "2", and a product sold only in half-kilos
                     // read "Qty: 0".
                     'Qty: ${formatQty(summary.quantity)}',
-                    style: TextStyle(color: Colors.grey[600]),
+                    style: GoogleFonts.poppins(color: Colors.grey[600]),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -532,15 +553,15 @@ class _GstReportScreenState extends State<GstReportScreen>
                     children: [
                       Text(
                         'Taxable: ${CurrencyHelper.currentSymbol}${summary.taxableAmount.toStringAsFixed(2)}',
-                        style: TextStyle(
+                        style: GoogleFonts.poppins(
                           fontSize: AppResponsive.smallFontSize(context),
                           color: Colors.grey[600],
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: 4),
                       Text(
                         '$_taxName Rate: ${summary.avgGstRate.toStringAsFixed(1)}%',
-                        style: TextStyle(
+                        style: GoogleFonts.poppins(
                           fontSize: AppResponsive.smallFontSize(context),
                           color: Colors.grey[600],
                         ),
@@ -553,14 +574,14 @@ class _GstReportScreenState extends State<GstReportScreen>
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF4CAF50).withOpacity(0.1),
+                      color: AppColors.success.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       '$_taxName: ${CurrencyHelper.currentSymbol}${summary.totalGst.toStringAsFixed(2)}',
-                      style: const TextStyle(
+                      style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF4CAF50),
+                        color: AppColors.success,
                       ),
                     ),
                   ),
@@ -578,17 +599,19 @@ class _GstReportScreenState extends State<GstReportScreen>
     final sortedCategories = _gstByCategory.values.toList();
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       itemCount: sortedCategories.length,
       itemBuilder: (context, index) {
         final summary = sortedCategories[index];
         return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
+          margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
+          padding: AppResponsive.cardPadding(context),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFE8E8E8)),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.smallBorderRadius(context),
+            ),
+            border: Border.all(color: AppColors.divider),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -598,7 +621,7 @@ class _GstReportScreenState extends State<GstReportScreen>
                   Expanded(
                     child: Text(
                       summary.categoryName,
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                       ),
@@ -610,15 +633,15 @@ class _GstReportScreenState extends State<GstReportScreen>
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF4CAF50).withOpacity(0.1),
+                      color: AppColors.success.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       GstService.formatGstRate(summary.gstRate),
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.captionFontSize(context),
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF4CAF50),
+                        color: AppColors.success,
                       ),
                     ),
                   ),
@@ -626,18 +649,22 @@ class _GstReportScreenState extends State<GstReportScreen>
               ),
               const Divider(height: 20),
               _buildDetailRow('Sale Lines', '${summary.itemCount}'),
-              const SizedBox(height: 8),
+              SizedBox(height: AppResponsive.smallSpacing(context)),
               _buildDetailRow(
                 'Taxable Amount',
                 '${CurrencyHelper.currentSymbol}${summary.taxableAmount.toStringAsFixed(2)}',
               ),
               if (_splitsTax && _taxComponents != null) ...[
-                const SizedBox(height: 8),
-                _buildDetailRow(_taxComponents.first,
-                    '${CurrencyHelper.currentSymbol}${summary.cgst.toStringAsFixed(2)}'),
-                const SizedBox(height: 8),
-                _buildDetailRow(_taxComponents.second,
-                    '${CurrencyHelper.currentSymbol}${summary.sgst.toStringAsFixed(2)}'),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
+                _buildDetailRow(
+                  _taxComponents.first,
+                  '${CurrencyHelper.currentSymbol}${summary.cgst.toStringAsFixed(2)}',
+                ),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
+                _buildDetailRow(
+                  _taxComponents.second,
+                  '${CurrencyHelper.currentSymbol}${summary.sgst.toStringAsFixed(2)}',
+                ),
               ],
               const Divider(height: 16),
               _buildDetailRow(
@@ -663,18 +690,18 @@ class _GstReportScreenState extends State<GstReportScreen>
       children: [
         Text(
           label,
-          style: TextStyle(
-            fontSize: fontSize ?? 14,
+          style: GoogleFonts.poppins(
+            fontSize: fontSize ?? AppResponsive.bodyFontSize(context),
             fontWeight: isBold ? FontWeight.w600 : FontWeight.w400,
-            color: const Color(0xFF1A1A1A),
+            color: AppColors.textPrimary,
           ),
         ),
         Text(
           value,
-          style: TextStyle(
-            fontSize: fontSize ?? 14,
+          style: GoogleFonts.poppins(
+            fontSize: fontSize ?? AppResponsive.bodyFontSize(context),
             fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
-            color: const Color(0xFF1A1A1A),
+            color: AppColors.textPrimary,
           ),
         ),
       ],
@@ -687,18 +714,18 @@ class _GstReportScreenState extends State<GstReportScreen>
       children: [
         Text(
           label,
-          style: TextStyle(
+          style: GoogleFonts.poppins(
             fontSize: AppResponsive.smallFontSize(context),
-            color: isBold ? const Color(0xFF1A1A1A) : Colors.grey[600],
+            color: isBold ? AppColors.textPrimary : Colors.grey[600],
             fontWeight: isBold ? FontWeight.w600 : FontWeight.w400,
           ),
         ),
         Text(
           value,
-          style: TextStyle(
+          style: GoogleFonts.poppins(
             fontSize: AppResponsive.smallFontSize(context),
             fontWeight: isBold ? FontWeight.w600 : FontWeight.w500,
-            color: isBold ? const Color(0xFF4CAF50) : const Color(0xFF1A1A1A),
+            color: isBold ? AppColors.success : AppColors.textPrimary,
           ),
         ),
       ],

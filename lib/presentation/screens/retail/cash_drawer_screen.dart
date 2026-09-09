@@ -343,7 +343,10 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                     ),
                   ],
                   prefixWidget: Padding(
-                    padding: const EdgeInsets.only(left: 14, right: 8),
+                    padding: EdgeInsets.only(
+                      left: AppResponsive.mediumSpacing(context),
+                      right: AppResponsive.smallSpacing(context),
+                    ),
                     child: Text(
                       CurrencyHelper.currentSymbol,
                       style: GoogleFonts.poppins(
@@ -364,8 +367,10 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                   // the open list grey-lavender instead of white. Same override
                   // the supplier popup menu uses.
                   dropdownColor: AppColors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  icon: const Icon(
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.borderRadius(context),
+                  ),
+                  icon: Icon(
                     Icons.arrow_drop_down_rounded,
                     color: AppColors.textSecondary,
                   ),
@@ -391,15 +396,21 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                       vertical: 14,
                     ),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.borderRadius(context),
+                      ),
                       borderSide: const BorderSide(color: AppColors.divider),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.borderRadius(context),
+                      ),
                       borderSide: const BorderSide(color: AppColors.divider),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.borderRadius(context),
+                      ),
                       borderSide: const BorderSide(
                         color: AppColors.primary,
                         width: 1.5,
@@ -435,7 +446,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
             ),
             actions: [
               appDialogCancelButton(ctx),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               appDialogPrimaryButton(
                 label: isCashIn ? 'Add Cash In' : 'Add Cash Out',
                 color: accent,
@@ -499,26 +510,12 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     );
   }
 
-  /// Caps content width on large screens so the drawer cards don't stretch
-  /// across a laptop.
-  Widget _capped(BuildContext context, Widget child) {
-    final maxWidth = AppResponsive.maxContentWidth(context);
-    if (maxWidth == double.infinity) return child;
-    return Align(
-      // topCenter, not Center: Center aligns on BOTH axes, so a
-      // shrink-wrapping child floats in the vertical middle.
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
-      ),
-    );
-  }
-
   Widget _buildBody(BuildContext context, String currency) {
-    return _capped(
-      context,
-      ListView(
+    return AppResponsive.constrainedContent(
+      context: context,
+      alignment: Alignment.topCenter,
+      maxWidth: AppResponsive.maxContentWidth(context),
+      child: ListView(
         padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
         children: [
           _buildBalanceCard(context, currency),
@@ -704,7 +701,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
               AppColors.danger,
               false,
             ),
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
             child: Divider(height: 1),
           ),
@@ -760,7 +757,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Expanded(
                   child: Text(
                     label,
@@ -775,7 +772,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Text(
             '${isPositive ? '+' : '−'} $currency ${amount.toStringAsFixed(DecimalSettings.precision)}',
             maxLines: 1,
@@ -824,7 +821,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                 size: AppResponsive.smallIconSize(context),
                 color: AppColors.primary,
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Text(
                 'Sales Summary',
                 style: GoogleFonts.poppins(
@@ -871,7 +868,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
               true,
             ),
 
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
             child: Divider(height: 1),
           ),
@@ -1000,10 +997,12 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(6),
+            padding: EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: dotColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
             ),
             child: Icon(
               dotIcon,
@@ -1037,7 +1036,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [

@@ -144,7 +144,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                 textCapitalization: TextCapitalization.words,
                 textInputAction: TextInputAction.next,
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               AppTextField(
                 controller: phoneController,
                 label: 'Phone',
@@ -157,7 +157,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                 validator: PhoneRule.validate,
                 textInputAction: TextInputAction.next,
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               AppTextField(
                 controller: emailController,
                 label: 'Email',
@@ -165,21 +165,21 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               AppTextField(
                 controller: addressController,
                 label: 'Address',
                 icon: Icons.location_on_outlined,
                 maxLines: 2,
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               AppTextField(
                 controller: gstController,
                 label: 'GST Number',
                 icon: Icons.badge_outlined,
                 textCapitalization: TextCapitalization.characters,
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               AppTextField(
                 controller: creditLimitController,
                 label: 'Credit Limit',
@@ -192,7 +192,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               AppTextField(
                 controller: notesController,
                 label: 'Notes',
@@ -203,7 +203,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
           ),
           actions: [
             appDialogCancelButton(dialogContext),
-            const SizedBox(width: 12),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
             appDialogPrimaryButton(
               label: 'Save',
               onPressed: () => _saveEditedCustomer(
@@ -322,7 +322,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
           ),
           actions: [
             appDialogCancelButton(dialogContext),
-            const SizedBox(width: 12),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
             appDialogPrimaryButton(
               label: 'Redeem',
               color: AppColors.warning,
@@ -403,22 +403,6 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
     );
   }
 
-  /// Caps content width on large screens so the detail cards don't stretch
-  /// across a laptop.
-  Widget _capped(BuildContext context, Widget child) {
-    final maxWidth = AppResponsive.maxCardWidth(context);
-    if (maxWidth == double.infinity) return child;
-    return Align(
-      // topCenter, not Center: Center aligns on BOTH axes, so a
-      // shrink-wrapping child floats in the vertical middle.
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
-      ),
-    );
-  }
-
   Widget _buildDetailsTab() {
     return RefreshIndicator(
       color: AppColors.primary,
@@ -431,13 +415,15 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
           AppResponsive.padding(context).left,
           AppResponsive.largeSpacing(context),
         ),
-        child: _capped(
-          context,
-          Column(
+        child: AppResponsive.constrainedContent(
+          context: context,
+          alignment: Alignment.topCenter,
+          maxWidth: AppResponsive.maxCardWidth(context),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildHeaderCard(),
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
 
               _buildSectionCard(
                 title: 'Contact Information',
@@ -452,7 +438,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                     _buildInfoRow('GST Number', _customer.gstNumber!),
                 ],
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
 
               _buildSectionCard(
                 title: 'Purchase Summary',
@@ -478,7 +464,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
 
               _buildSectionCard(
                 title: 'Loyalty Points',
@@ -514,12 +500,12 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
 
               _buildCreditCard(),
 
               if (_customer.notes?.isNotEmpty ?? false) ...[
-                const SizedBox(height: 16),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
                 _buildSectionCard(
                   title: 'Notes',
                   icon: Icons.sticky_note_2_outlined,
@@ -536,7 +522,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                 ),
               ],
 
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
               _buildSectionCard(
                 title: 'Account Info',
                 icon: Icons.info_outline_rounded,
@@ -573,10 +559,12 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
 
   Widget _buildHeaderCard() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: AppResponsive.padding(context),
       decoration: BoxDecoration(
         color: AppColors.primary,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
       ),
       child: Row(
         children: [
@@ -599,7 +587,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
               ),
             ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: AppResponsive.largeSpacing(context)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -614,7 +602,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                     color: AppColors.white,
                   ),
                 ),
-                const SizedBox(height: 2),
+                SizedBox(height: 2),
                 Text(
                   _customer.phone ?? '—',
                   style: GoogleFonts.poppins(
@@ -622,14 +610,14 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                     color: AppColors.white.withValues(alpha: 0.85),
                   ),
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
                 Row(
                   children: [
                     _buildHeaderBadge(
                       Icons.shopping_bag_outlined,
                       formatMoney(_customer.totalPurchaseAmount),
                     ),
-                    const SizedBox(width: 10),
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
                     _buildHeaderBadge(
                       Icons.stars_rounded,
                       '${_customer.loyaltyPoints} pts',
@@ -646,16 +634,25 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
 
   Widget _buildHeaderBadge(IconData icon, String text) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.smallSpacing(context),
+        vertical: 5,
+      ),
       decoration: BoxDecoration(
         color: AppColors.white.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: AppColors.white),
-          const SizedBox(width: 5),
+          Icon(
+            icon,
+            size: AppResponsive.smallIconSize(context),
+            color: AppColors.white,
+          ),
+          SizedBox(width: 5),
           Text(
             text,
             style: GoogleFonts.poppins(
@@ -679,33 +676,51 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
     return Container(
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            padding: EdgeInsets.symmetric(
+              horizontal: AppResponsive.cardPadding(context).left,
+              vertical: AppResponsive.mediumSpacing(context),
+            ),
             child: Row(
               children: [
-                Icon(icon, size: 20, color: iconColor ?? AppColors.primary),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.subheadingFontSize(context),
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                Icon(
+                  icon,
+                  size: AppResponsive.iconSize(context),
+                  color: iconColor ?? AppColors.primary,
+                ),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.subheadingFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                 ),
-                if (trailing != null) ...[const Spacer(), trailing],
+                if (trailing != null) trailing,
               ],
             ),
           ),
           const Divider(height: 1, color: AppColors.divider),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+            padding: EdgeInsets.fromLTRB(
+              AppResponsive.cardPadding(context).left,
+              AppResponsive.mediumSpacing(context),
+              AppResponsive.cardPadding(context).left,
+              4,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: children,
@@ -723,7 +738,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
     TextStyle? valueStyle,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -767,7 +782,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
     return Container(
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(
           color: hasCredit
               ? AppColors.danger.withValues(alpha: 0.3)
@@ -778,15 +795,18 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            padding: EdgeInsets.symmetric(
+              horizontal: AppResponsive.cardPadding(context).left,
+              vertical: AppResponsive.mediumSpacing(context),
+            ),
             child: Row(
               children: [
                 Icon(
                   Icons.credit_card_outlined,
-                  size: 20,
+                  size: AppResponsive.iconSize(context),
                   color: hasCredit ? AppColors.danger : AppColors.primary,
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Text(
                   'Credit Information',
                   style: GoogleFonts.poppins(
@@ -800,13 +820,13 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
           ),
           const Divider(height: 1, color: AppColors.divider),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: AppResponsive.cardPadding(context),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Outstanding balance — the headline number
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: AppResponsive.cardPadding(context),
                   decoration: BoxDecoration(
                     color: (hasCredit ? AppColors.danger : AppColors.success)
                         .withValues(alpha: 0.07),
@@ -853,7 +873,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: AppResponsive.smallSpacing(context)),
                       if (hasCredit)
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -876,7 +896,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
 
                 _buildInfoRow(
                   'Credit Limit',
@@ -913,7 +933,10 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                                 await _refreshCustomer();
                               }
                             : null,
-                        icon: const Icon(Icons.payments_outlined, size: 18),
+                        icon: Icon(
+                          Icons.payments_outlined,
+                          size: AppResponsive.smallIconSize(context),
+                        ),
                         label: Text(
                           'Receive Payment',
                           style: GoogleFonts.poppins(
@@ -928,14 +951,16 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                           disabledBackgroundColor: AppColors.divider.withValues(
                             alpha: 0.6,
                           ),
-                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          padding: EdgeInsets.symmetric(
+                            vertical: AppResponsive.mediumSpacing(context),
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: AppResponsive.mediumSpacing(context)),
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () {
@@ -947,7 +972,10 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                             ),
                           );
                         },
-                        icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                        icon: Icon(
+                          Icons.receipt_long_outlined,
+                          size: AppResponsive.smallIconSize(context),
+                        ),
                         label: Text(
                           'View Ledger',
                           style: GoogleFonts.poppins(
@@ -958,7 +986,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.primary,
                           side: const BorderSide(color: AppColors.primary),
-                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          padding: EdgeInsets.symmetric(
+                            vertical: AppResponsive.mediumSpacing(context),
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
@@ -998,7 +1028,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 14),
+            padding: EdgeInsets.symmetric(
+              vertical: AppResponsive.mediumSpacing(context),
+            ),
             color: AppColors.white,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -1019,7 +1051,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
           const Divider(height: 1, color: AppColors.divider),
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: AppResponsive.cardPadding(context),
               itemCount: _customerSales.length,
               itemBuilder: (context, index) =>
                   _buildBillCard(_customerSales[index]),
@@ -1033,8 +1065,12 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
   Widget _buildSummaryItem(String label, String value, IconData icon) {
     return Column(
       children: [
-        Icon(icon, size: 22, color: AppColors.primary),
-        const SizedBox(height: 4),
+        Icon(
+          icon,
+          size: AppResponsive.iconSize(context),
+          color: AppColors.primary,
+        ),
+        SizedBox(height: 4),
         Text(
           value,
           style: GoogleFonts.poppins(
@@ -1059,7 +1095,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
     final accent = isReturn ? AppColors.danger : AppColors.primary;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(10),
@@ -1080,32 +1116,34 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
           );
         },
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        isReturn
-                            ? Icons.assignment_return_outlined
-                            : Icons.receipt_outlined,
-                        size: 18,
-                        color: accent,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        isReturn ? 'Return' : 'Sale',
-                        style: GoogleFonts.poppins(
-                          fontSize: AppResponsive.smallFontSize(context),
-                          fontWeight: FontWeight.w600,
+                  Flexible(
+                    child: Row(
+                      children: [
+                        Icon(
+                          isReturn
+                              ? Icons.assignment_return_outlined
+                              : Icons.receipt_outlined,
+                          size: AppResponsive.smallIconSize(context),
                           color: accent,
                         ),
-                      ),
-                    ],
+                        SizedBox(width: 6),
+                        Text(
+                          isReturn ? 'Return' : 'Sale',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            fontWeight: FontWeight.w600,
+                            color: accent,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -1129,30 +1167,32 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        sale.displayNumber,
-                        style: GoogleFonts.poppins(
-                          fontSize: AppResponsive.bodyFontSize(context),
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          sale.displayNumber,
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _formatDate(sale.date),
-                        style: GoogleFonts.poppins(
-                          fontSize: AppResponsive.smallFontSize(context),
-                          color: AppColors.textSecondary,
+                        SizedBox(height: 2),
+                        Text(
+                          _formatDate(sale.date),
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            color: AppColors.textSecondary,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,

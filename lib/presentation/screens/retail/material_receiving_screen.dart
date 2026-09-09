@@ -182,7 +182,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                       ],
                       onChanged: (_) => setDialogState(() {}),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
                     AppTextField(
                       controller: damagedController,
                       label: 'Damaged Quantity',
@@ -207,7 +207,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                           : null,
                     ),
                     if (damaged > 0) ...[
-                      const SizedBox(height: 14),
+                      SizedBox(height: AppResponsive.mediumSpacing(context)),
                       Text(
                         'WHAT HAPPENS TO THE DAMAGED UNITS',
                         style: GoogleFonts.poppins(
@@ -217,7 +217,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                           color: AppColors.textSecondary,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: AppResponsive.smallSpacing(context)),
                       // Radio-style tiles instead of a dropdown: each option
                       // creates a different document, so the consequence is
                       // worth spelling out rather than hiding in a menu.
@@ -251,7 +251,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                             setDialogState(() => selectedHandling = v),
                       ),
                     ],
-                    const SizedBox(height: 14),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
                     AppTextField(
                       controller: priceController,
                       label: 'Cost Price per Unit',
@@ -266,7 +266,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                       ],
                       onChanged: (_) => setDialogState(() {}),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: AppResponsive.largeSpacing(context)),
                     _editSummary(
                       accepted: accepted,
                       damaged: damaged,
@@ -277,7 +277,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                 ),
                 actions: [
                   appDialogCancelButton(dialogContext),
-                  const SizedBox(width: 12),
+                  SizedBox(width: AppResponsive.mediumSpacing(context)),
                   appDialogPrimaryButton(
                     label: 'Save',
                     onPressed: () {
@@ -325,14 +325,21 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
 
     return InkWell(
       onTap: () => onTap(handling),
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(
+        AppResponsive.smallBorderRadius(context),
+      ),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.mediumSpacing(context),
+          vertical: AppResponsive.smallSpacing(context),
+        ),
         decoration: BoxDecoration(
           color: isSelected
               ? color.withValues(alpha: 0.07)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.smallBorderRadius(context),
+          ),
           border: Border.all(
             color: isSelected ? color : AppColors.divider,
             width: isSelected ? 1.5 : 1,
@@ -344,10 +351,10 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
               isSelected
                   ? Icons.radio_button_checked_rounded
                   : Icons.radio_button_unchecked_rounded,
-              size: 19,
+              size: AppResponsive.iconSize(context),
               color: isSelected ? color : AppColors.textSecondary,
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -383,12 +390,14 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
     required bool overDamaged,
   }) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: overDamaged
             ? AppColors.danger.withValues(alpha: 0.06)
             : AppColors.surfaceMedium,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
         border: overDamaged
             ? Border.all(color: AppColors.danger.withValues(alpha: 0.4))
             : null,
@@ -404,7 +413,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
               color: overDamaged ? AppColors.danger : AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           _summaryLine(
             'Accepted (to stock)',
             '${formatQty(accepted)} items',
@@ -441,7 +450,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Flexible(
             child: Text(
               value,
@@ -642,7 +651,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                 if (_notesController.text.trim().isNotEmpty)
                   _metaLine('Notes', _notesController.text.trim()),
               ]),
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
               _confirmSection(
                 'Goes into stock',
                 Icons.inventory_2_rounded,
@@ -655,7 +664,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                 'Stock value ${formatMoney(totalAcceptedAmount)}',
               ),
 
-              const SizedBox(height: 14),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               _confirmSection(
                 'Supplier is billed',
                 Icons.request_quote_outlined,
@@ -671,7 +680,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                 ),
 
               if (totalDamaged > 0) ...[
-                const SizedBox(height: 14),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 _confirmSection(
                   'Damaged — never enters stock',
                   Icons.report_gmailerrorred_rounded,
@@ -699,7 +708,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
               ],
 
               if (totalReceived < totalOrdered) ...[
-                const SizedBox(height: 14),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 _confirmSection(
                   'Still outstanding',
                   Icons.hourglass_top_rounded,
@@ -711,13 +720,15 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                 ),
               ],
 
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(10),
+                padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
                 decoration: BoxDecoration(
                   color: AppColors.warning.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.smallBorderRadius(context),
+                  ),
                 ),
                 child: Text(
                   'Confirming moves stock and updates the supplier balance. This cannot be undone.',
@@ -732,7 +743,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
           ),
           actions: [
             appDialogCancelButton(dialogContext),
-            const SizedBox(width: 12),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
             appDialogPrimaryButton(
               // Short label on purpose: the actions row splits the dialog in
               // half, and the old "Confirm & Update Stock" wrapped to three
@@ -818,10 +829,15 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
   Widget _confirmMetaCard(List<Widget> lines) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.mediumSpacing(context),
+        vertical: AppResponsive.smallSpacing(context),
+      ),
       decoration: BoxDecoration(
         color: AppColors.surfaceMedium,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -837,8 +853,10 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 108,
+          // Proportional, not a fixed 108: on a narrow phone that label column
+          // was a fixed share of a shrinking row, squeezing the value beside it.
+          Expanded(
+            flex: 2,
             child: Text(
               label,
               style: GoogleFonts.poppins(
@@ -848,6 +866,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
             ),
           ),
           Expanded(
+            flex: 3,
             child: Text(
               value,
               style: GoogleFonts.poppins(
@@ -866,7 +885,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
   /// Heading above a group of confirmation lines.
   Widget _confirmSection(String label, IconData icon, Color color) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
       child: Row(
         children: [
           Icon(icon, size: AppResponsive.smallIconSize(context), color: color),
@@ -901,7 +920,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Expanded(
             child: Text(
               text,
@@ -919,22 +938,6 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
 
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
-  }
-
-  /// Caps content width on large screens. Backgrounds still span edge to edge —
-  /// only what you read is constrained.
-  Widget _capped(BuildContext context, Widget child) {
-    final maxWidth = AppResponsive.maxContentWidth(context);
-    if (maxWidth == double.infinity) return child;
-    return Align(
-      // topCenter, not Center: Center aligns on BOTH axes, so a
-      // shrink-wrapping child floats in the vertical middle.
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
-      ),
-    );
   }
 
   @override
@@ -1016,7 +1019,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                     Text(
                       'All items received!',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.subheadingFontSize(context),
                         fontWeight: FontWeight.w600,
                       ),
@@ -1025,7 +1028,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                     Text(
                       'No pending items to receive for this PO',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.bodyFontSize(context),
                         color: AppColors.textSecondary,
                       ),
@@ -1048,9 +1051,11 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                 Container(
                   color: Colors.white,
                   padding: AppResponsive.padding(context),
-                  child: _capped(
-                    context,
-                    Column(
+                  child: AppResponsive.constrainedContent(
+                    context: context,
+                    alignment: Alignment.topCenter,
+                    maxWidth: AppResponsive.maxContentWidth(context),
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
@@ -1063,7 +1068,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                                     _grnNumber,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
+                                    style: GoogleFonts.poppins(
                                       fontSize:
                                           AppResponsive.subheadingFontSize(
                                             context,
@@ -1076,7 +1081,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                                     'PO: ${widget.purchaseOrder.poNumber}',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
+                                    style: GoogleFonts.poppins(
                                       fontSize: AppResponsive.smallFontSize(
                                         context,
                                       ),
@@ -1086,7 +1091,9 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: AppResponsive.smallSpacing(context),
+                            ),
                             InkWell(
                               onTap: _selectReceivedDate,
                               child: Container(
@@ -1110,11 +1117,15 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                                       ),
                                       color: AppColors.textSecondary,
                                     ),
-                                    const SizedBox(width: 8),
+                                    SizedBox(
+                                      width: AppResponsive.smallSpacing(
+                                        context,
+                                      ),
+                                    ),
                                     Text(
                                       _formatDate(_receivedDate),
                                       maxLines: 1,
-                                      style: TextStyle(
+                                      style: GoogleFonts.poppins(
                                         fontSize: AppResponsive.smallFontSize(
                                           context,
                                         ),
@@ -1134,14 +1145,16 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                               size: AppResponsive.smallIconSize(context),
                               color: AppColors.textSecondary,
                             ),
-                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: AppResponsive.smallSpacing(context),
+                            ),
                             Expanded(
                               child: Text(
                                 widget.purchaseOrder.supplierName ??
                                     'Unknown Supplier',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
+                                style: GoogleFonts.poppins(
                                   fontSize: AppResponsive.bodyFontSize(context),
                                 ),
                               ),
@@ -1168,9 +1181,11 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                     top: AppResponsive.smallSpacing(context),
                   ),
                   padding: AppResponsive.padding(context),
-                  child: _capped(
-                    context,
-                    Column(
+                  child: AppResponsive.constrainedContent(
+                    context: context,
+                    alignment: Alignment.topCenter,
+                    maxWidth: AppResponsive.maxContentWidth(context),
+                    child: Column(
                       children: [
                         Row(
                           children: [
@@ -1227,7 +1242,9 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                                   size: AppResponsive.smallIconSize(context),
                                   color: AppColors.warning,
                                 ),
-                                const SizedBox(width: 8),
+                                SizedBox(
+                                  width: AppResponsive.smallSpacing(context),
+                                ),
                                 Expanded(
                                   child: Text(
                                     totalDamaged > 0 && shortage > 0
@@ -1235,7 +1252,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                                         : totalDamaged > 0
                                         ? '${formatQty(totalDamaged)} items damaged'
                                         : '${formatQty(shortage)} items not received',
-                                    style: TextStyle(
+                                    style: GoogleFonts.poppins(
                                       fontSize: AppResponsive.smallFontSize(
                                         context,
                                       ),
@@ -1243,11 +1260,13 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 8),
+                                SizedBox(
+                                  width: AppResponsive.smallSpacing(context),
+                                ),
                                 Text(
                                   formatMoney(totalAcceptedAmount),
                                   maxLines: 1,
-                                  style: TextStyle(
+                                  style: GoogleFonts.poppins(
                                     fontSize: AppResponsive.bodyFontSize(
                                       context,
                                     ),
@@ -1269,7 +1288,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                                   'Stock Value: ${formatMoney(totalAcceptedAmount)}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
+                                  style: GoogleFonts.poppins(
                                     fontSize: AppResponsive.bodyFontSize(
                                       context,
                                     ),
@@ -1292,13 +1311,15 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                     horizontal: AppResponsive.padding(context).left,
                     vertical: AppResponsive.mediumSpacing(context),
                   ),
-                  child: _capped(
-                    context,
-                    Row(
+                  child: AppResponsive.constrainedContent(
+                    context: context,
+                    alignment: Alignment.topCenter,
+                    maxWidth: AppResponsive.maxContentWidth(context),
+                    child: Row(
                       children: [
                         Text(
                           'Items',
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             fontSize: AppResponsive.subheadingFontSize(context),
                             fontWeight: FontWeight.w600,
                           ),
@@ -1306,7 +1327,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                         const Spacer(),
                         Text(
                           'Tap item to edit',
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             fontSize: AppResponsive.smallFontSize(context),
                             color: Colors.grey[500],
                           ),
@@ -1321,9 +1342,11 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                 // summary and the notes/action block, so a cut-off card is the
                 // only other hint there is more below).
                 Expanded(
-                  child: _capped(
-                    context,
-                    Scrollbar(
+                  child: AppResponsive.constrainedContent(
+                    context: context,
+                    alignment: Alignment.topCenter,
+                    maxWidth: AppResponsive.maxContentWidth(context),
+                    child: Scrollbar(
                       controller: _itemsScrollController,
                       thumbVisibility: true,
                       thickness: 5,
@@ -1348,9 +1371,11 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                 Container(
                   color: Colors.white,
                   padding: AppResponsive.padding(context),
-                  child: _capped(
-                    context,
-                    AppTextField(
+                  child: AppResponsive.constrainedContent(
+                    context: context,
+                    alignment: Alignment.topCenter,
+                    maxWidth: AppResponsive.maxContentWidth(context),
+                    child: AppTextField(
                       controller: _notesController,
                       label: 'Notes (Optional)',
                       hint: 'e.g., 5 shirts damaged during shipping',
@@ -1365,9 +1390,11 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                 Container(
                   color: Colors.white,
                   padding: AppResponsive.padding(context),
-                  child: _capped(
-                    context,
-                    SizedBox(
+                  child: AppResponsive.constrainedContent(
+                    context: context,
+                    alignment: Alignment.topCenter,
+                    maxWidth: AppResponsive.maxContentWidth(context),
+                    child: SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         onPressed: _saveAndConfirmGRN,
@@ -1384,9 +1411,11 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                             vertical: AppResponsive.largeSpacing(context),
                           ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(
+                              AppResponsive.smallBorderRadius(context),
+                            ),
                           ),
-                          textStyle: TextStyle(
+                          textStyle: GoogleFonts.poppins(
                             fontSize: AppResponsive.subheadingFontSize(context),
                             fontWeight: FontWeight.w600,
                           ),
@@ -1406,7 +1435,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
         Text(
           value,
           maxLines: 1,
-          style: TextStyle(
+          style: GoogleFonts.poppins(
             fontSize: AppResponsive.subheadingFontSize(context),
             fontWeight: FontWeight.w600,
             color: color,
@@ -1415,7 +1444,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
         Text(
           label,
           maxLines: 1,
-          style: TextStyle(
+          style: GoogleFonts.poppins(
             fontSize: AppResponsive.captionFontSize(context),
             color: AppColors.textSecondary,
           ),
@@ -1461,7 +1490,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                           item.productName,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             fontSize: AppResponsive.bodyFontSize(context),
                             fontWeight: FontWeight.w600,
                           ),
@@ -1471,7 +1500,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                             item.variantInfo!,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
+                            style: GoogleFonts.poppins(
                               fontSize: AppResponsive.smallFontSize(context),
                               color: AppColors.textSecondary,
                             ),
@@ -1479,7 +1508,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
                   Icon(
                     Icons.edit,
                     size: AppResponsive.smallIconSize(context),
@@ -1512,7 +1541,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                   Text(
                     formatMoney(item.receivedQty * item.costPrice),
                     maxLines: 1,
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: AppColors.success,
@@ -1532,7 +1561,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                       if (isShortage)
                         Text(
                           'Shortage: ${formatQty(item.orderedQty - item.receivedQty)}',
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             fontSize: AppResponsive.smallFontSize(context),
                             color: AppColors.warning,
                             fontWeight: FontWeight.w500,
@@ -1542,7 +1571,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                           item.damagedHandling != DamagedHandling.none)
                         Text(
                           _getDamagedHandlingText(item.damagedHandling),
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             fontSize: AppResponsive.smallFontSize(context),
                             color: _getDamagedHandlingColor(
                               item.damagedHandling,
@@ -1562,7 +1591,10 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
 
   Widget _buildQtyChip(String label, double qty, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.smallSpacing(context),
+        vertical: 4,
+      ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4),
@@ -1570,7 +1602,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
       child: Text(
         '$label: ${formatQty(qty)}',
         maxLines: 1,
-        style: TextStyle(
+        style: GoogleFonts.poppins(
           fontSize: AppResponsive.captionFontSize(context),
           fontWeight: FontWeight.w500,
           color: color,

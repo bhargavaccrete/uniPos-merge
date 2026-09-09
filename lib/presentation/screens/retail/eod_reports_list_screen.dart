@@ -204,14 +204,19 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          padding: EdgeInsets.fromLTRB(
+            AppResponsive.cardPadding(context).left,
+            AppResponsive.largeSpacing(context),
+            AppResponsive.cardPadding(context).left,
+            0,
+          ),
           child: ReportExportButton(onPressed: _export),
         ),
         Expanded(
           child: RefreshIndicator(
             onRefresh: _loadReports,
             child: ListView.builder(
-              padding: const EdgeInsets.all(16),
+              padding: AppResponsive.cardPadding(context),
               itemCount: reports.length,
               itemBuilder: (context, index) {
                 return _buildReportCard(reports[index]);
@@ -232,12 +237,12 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
   }) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: AppResponsive.padding(context),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, size: 80, color: iconColor),
-            const SizedBox(height: 16),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
             Text(
               title,
               textAlign: TextAlign.center,
@@ -247,7 +252,7 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                 color: Colors.grey[600],
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: AppResponsive.smallSpacing(context)),
             Text(
               message,
               textAlign: TextAlign.center,
@@ -256,7 +261,10 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                 color: Colors.grey[500],
               ),
             ),
-            if (action != null) ...[const SizedBox(height: 12), action],
+            if (action != null) ...[
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
+              action,
+            ],
           ],
         ),
       ),
@@ -274,9 +282,13 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
         report.cashReconciliation.reconciliationStatus == 'Overage';
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+      ),
       child: InkWell(
         onTap: () {
           Navigator.push(
@@ -286,9 +298,11 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
             ),
           );
         },
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: AppResponsive.cardPadding(context),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -300,10 +314,10 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                     children: [
                       Icon(
                         Icons.calendar_today,
-                        size: 16,
+                        size: AppResponsive.smallIconSize(context),
                         color: Colors.grey[600],
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: AppResponsive.smallSpacing(context)),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -343,7 +357,9 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                           : isOverage
                           ? Colors.blue[50]
                           : Colors.orange[50],
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.borderRadius(context),
+                      ),
                     ),
                     child: Text(
                       report.cashReconciliation.reconciliationStatus,
@@ -361,9 +377,9 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                 ],
               ),
 
-              const SizedBox(height: 12),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               const Divider(height: 1),
-              const SizedBox(height: 12),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
 
               // Sales Summary
               Row(
@@ -382,7 +398,7 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                 ],
               ),
 
-              const SizedBox(height: 12),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
 
               // Cash Reconciliation
               Row(
@@ -406,23 +422,25 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
               // 1e-13.
               if (report.cashReconciliation.difference.abs() >=
                   kCashReconciliationTolerance) ...[
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
                   decoration: BoxDecoration(
                     color: isBalanced
                         ? Colors.green[50]
                         : isOverage
                         ? Colors.blue[50]
                         : Colors.orange[50],
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.smallBorderRadius(context),
+                    ),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
                         isOverage ? Icons.arrow_upward : Icons.arrow_downward,
-                        size: 16,
+                        size: AppResponsive.smallIconSize(context),
                         color: isOverage
                             ? Colors.blue[700]
                             : Colors.orange[700],
@@ -443,7 +461,7 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
                 ),
               ],
 
-              const SizedBox(height: 12),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
 
               // View Details Button
               Row(

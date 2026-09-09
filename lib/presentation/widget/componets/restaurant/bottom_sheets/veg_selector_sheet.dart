@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/util/color.dart';
 
@@ -13,8 +14,10 @@ class VegSelectorSheet extends StatelessWidget {
     required this.onSelected,
   });
 
-  static Future<String?> show(BuildContext context,
-      {required String currentSelection}) async {
+  static Future<String?> show(
+    BuildContext context, {
+    required String currentSelection,
+  }) async {
     String? result;
     await showModalBottomSheet(
       context: context,
@@ -65,20 +68,31 @@ class VegSelectorSheet extends StatelessWidget {
                   color: Colors.green.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.eco_outlined,
-                    color: Colors.green, size: 20),
+                child: const Icon(
+                  Icons.eco_outlined,
+                  color: Colors.green,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Food Type',
-                        style: GoogleFonts.poppins(
-                            fontSize: 16, fontWeight: FontWeight.w600)),
-                    Text('Select the dietary classification',
-                        style: GoogleFonts.poppins(
-                            fontSize: 12, color: Colors.grey.shade500)),
+                    Text(
+                      'Food Type',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.subheadingFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      'Select the dietary classification',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -152,15 +166,21 @@ class VegSelectorSheet extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label,
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: isSelected ? color : Colors.black87,
-                      )),
-                  Text(subtitle,
-                      style: GoogleFonts.poppins(
-                          fontSize: 12, color: Colors.grey.shade500)),
+                  Text(
+                    label,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? color : Colors.black87,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -169,8 +189,11 @@ class VegSelectorSheet extends StatelessWidget {
                 width: 24,
                 height: 24,
                 decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-                child: const Icon(Icons.check_rounded,
-                    size: 14, color: Colors.white),
+                child: const Icon(
+                  Icons.check_rounded,
+                  size: 14,
+                  color: Colors.white,
+                ),
               )
             else
               Container(
@@ -209,9 +232,9 @@ class VegSelectorButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC), // AppColors.surfaceLight
+          color: AppColors.surfaceLight, // AppColors.surfaceLight
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE5E7EB)), // AppColors.divider
+          border: Border.all(color: AppColors.divider), // AppColors.divider
         ),
         child: Row(
           children: [
@@ -220,9 +243,9 @@ class VegSelectorButton extends StatelessWidget {
             Expanded(
               child: Text(
                 selectedCategory,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF111827), // textPrimary
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  color: AppColors.textPrimary, // textPrimary
                 ),
               ),
             ),
@@ -239,8 +262,8 @@ class VegSelectorButton extends StatelessWidget {
                   const SizedBox(width: 4),
                   Text(
                     selectedCategory,
-                    style: TextStyle(
-                      fontSize: 11,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.captionFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: dotColor,
                     ),
@@ -249,8 +272,11 @@ class VegSelectorButton extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 6),
-            const Icon(Icons.keyboard_arrow_down_rounded,
-                size: 22, color: Color(0xFF6B7280)),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 22,
+              color: AppColors.textSecondary,
+            ),
           ],
         ),
       ),

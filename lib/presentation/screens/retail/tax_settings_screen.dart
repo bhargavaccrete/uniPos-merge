@@ -100,17 +100,17 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildSectionTitle('General Settings'),
-                    const SizedBox(height: 12),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
                     _buildGeneralSettingsCard(),
-                    const SizedBox(height: 24),
+                    SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
                     // Note: GST/HSN is set per product (and can be overridden per
                     // variant) — not per category, since one category can hold
                     // items with different tax classes.
                     _buildSectionTitle('Tax Rates'),
-                    const SizedBox(height: 12),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
                     _buildTaxRatesCard(),
-                    const SizedBox(height: 24),
+                    SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
                     // India-only reference: these are Indian GST slabs and the
                     // thresholds are stated in rupees, so the card is meaningless
@@ -118,7 +118,7 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                     // tax step gates its presets the same way.
                     if (_isIndia) ...[
                       _buildSectionTitle('Common GST Rates (India)'),
-                      const SizedBox(height: 12),
+                      SizedBox(height: AppResponsive.mediumSpacing(context)),
                       _buildGstRateReferenceCard(),
                     ],
                   ],
@@ -140,7 +140,7 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
             borderRadius: BorderRadius.circular(2),
           ),
         ),
-        const SizedBox(width: 10),
+        SizedBox(width: AppResponsive.smallSpacing(context)),
         Text(
           title,
           style: GoogleFonts.poppins(
@@ -156,16 +156,20 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
 
   Widget _buildTaxDisabledNotice(String message) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       color: AppColors.warning.withValues(alpha: 0.08),
       child: Row(
         children: [
-          const Icon(Icons.info_outline, size: 20, color: AppColors.warning),
-          const SizedBox(width: 10),
+          Icon(
+            Icons.info_outline,
+            size: AppResponsive.iconSize(context),
+            color: AppColors.warning,
+          ),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Expanded(
             child: Text(
               message,
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: AppResponsive.smallFontSize(context),
                 color: AppColors.warning,
               ),
@@ -181,7 +185,9 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider, width: 0.5),
       ),
       child: Column(
@@ -191,7 +197,7 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
               'Tax is currently disabled. This business is marked as not registered for tax during setup.',
             ),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: AppResponsive.cardPadding(context),
             child: Column(
               children: [
                 // Tax Inclusive Mode Toggle
@@ -203,16 +209,16 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                         children: [
                           Text(
                             'Tax Inclusive Pricing',
-                            style: TextStyle(
+                            style: GoogleFonts.poppins(
                               fontSize: AppResponsive.bodyFontSize(context),
                               fontWeight: FontWeight.w500,
                               color: AppColors.textPrimary,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          SizedBox(height: 4),
                           Text(
                             'Product prices include tax',
-                            style: TextStyle(
+                            style: GoogleFonts.poppins(
                               fontSize: AppResponsive.captionFontSize(context),
                               color: AppColors.textSecondary,
                             ),
@@ -238,16 +244,16 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                         children: [
                           Text(
                             'Default Tax Rate',
-                            style: TextStyle(
+                            style: GoogleFonts.poppins(
                               fontSize: AppResponsive.bodyFontSize(context),
                               fontWeight: FontWeight.w500,
                               color: AppColors.textPrimary,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          SizedBox(height: 4),
                           Text(
                             'Applied when no product/variant tax is set',
-                            style: TextStyle(
+                            style: GoogleFonts.poppins(
                               fontSize: AppResponsive.captionFontSize(context),
                               color: AppColors.textSecondary,
                             ),
@@ -259,9 +265,13 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                       color: enabled
                           ? AppColors.primary.withValues(alpha: 0.08)
                           : AppColors.surfaceLight,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.smallBorderRadius(context),
+                      ),
                       child: InkWell(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(
+                          AppResponsive.smallBorderRadius(context),
+                        ),
                         onTap: enabled ? _showDefaultGstRateDialog : null,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
@@ -273,7 +283,7 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                             children: [
                               Text(
                                 '${_defaultGstRate.toInt()}%',
-                                style: TextStyle(
+                                style: GoogleFonts.poppins(
                                   fontSize: AppResponsive.subheadingFontSize(
                                     context,
                                   ),
@@ -283,7 +293,7 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                                       : AppColors.textSecondary,
                                 ),
                               ),
-                              const SizedBox(width: 6),
+                              SizedBox(width: 6),
                               Icon(
                                 Icons.expand_more_rounded,
                                 size: AppResponsive.smallIconSize(context),
@@ -311,7 +321,9 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
       return Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.smallBorderRadius(context),
+          ),
           border: Border.all(color: AppColors.divider, width: 0.5),
         ),
         child: _buildTaxDisabledNotice(
@@ -325,7 +337,9 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
         return Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.smallBorderRadius(context),
+            ),
             border: Border.all(color: AppColors.divider, width: 0.5),
           ),
           child: Column(
@@ -335,7 +349,7 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                   padding: AppResponsive.cardPadding(context),
                   child: Text(
                     'No named tax rates yet. Add one to pick it on products/variants.',
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.smallFontSize(context),
                       color: AppColors.textSecondary,
                     ),
@@ -356,14 +370,14 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                             children: [
                               Text(
                                 tax.taxname,
-                                style: TextStyle(
+                                style: GoogleFonts.poppins(
                                   fontSize: AppResponsive.bodyFontSize(context),
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
                               Text(
                                 '${tax.taxperecentage ?? 0}%',
-                                style: TextStyle(
+                                style: GoogleFonts.poppins(
                                   fontSize: AppResponsive.captionFontSize(
                                     context,
                                   ),
@@ -375,12 +389,18 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                         ),
                         IconButton(
                           onPressed: () => _showTaxDialog(existingTax: tax),
-                          icon: const Icon(Icons.edit_outlined, size: 20),
+                          icon: Icon(
+                            Icons.edit_outlined,
+                            size: AppResponsive.iconSize(context),
+                          ),
                           color: AppColors.success,
                         ),
                         IconButton(
                           onPressed: () => _confirmDeleteTax(tax),
-                          icon: const Icon(Icons.delete_outline, size: 20),
+                          icon: Icon(
+                            Icons.delete_outline,
+                            size: AppResponsive.iconSize(context),
+                          ),
                           color: AppColors.danger,
                         ),
                       ],
@@ -389,7 +409,7 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                 ),
               const Divider(height: 1),
               Padding(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
                 child: SizedBox(
                   width: double.infinity,
                   child: TextButton.icon(
@@ -397,7 +417,7 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                     icon: const Icon(Icons.add, color: AppColors.success),
                     label: Text(
                       'Add Tax Rate',
-                      style: TextStyle(color: AppColors.success),
+                      style: GoogleFonts.poppins(color: AppColors.success),
                     ),
                   ),
                 ),
@@ -456,7 +476,7 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                 icon: Icons.label_outline_rounded,
                 textInputAction: TextInputAction.next,
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               AppTextField(
                 controller: rateController,
                 label: 'Rate %',
@@ -474,7 +494,7 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
           ),
           actions: [
             appDialogCancelButton(dialogContext),
-            const SizedBox(width: 12),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
             appDialogPrimaryButton(
               label: isEdit ? 'Update' : 'Add',
               color: AppColors.primary,
@@ -523,16 +543,20 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
     ];
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider, width: 0.5),
       ),
       child: Column(
         children: rates.map((rate) {
           return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+            padding: EdgeInsets.only(
+              bottom: AppResponsive.mediumSpacing(context),
+            ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -546,18 +570,18 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                   child: Text(
                     rate['rate']!,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.smallFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: AppColors.success,
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: AppResponsive.mediumSpacing(context)),
                 Expanded(
                   child: Text(
                     rate['items']!,
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.smallFontSize(context),
                       color: AppColors.textSecondary,
                     ),
@@ -589,7 +613,9 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
           children: rates.map((rate) {
             final selected = rate == _defaultGstRate;
             return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: EdgeInsets.only(
+                bottom: AppResponsive.smallSpacing(context),
+              ),
               child: Material(
                 color: selected
                     ? AppColors.primary.withValues(alpha: 0.08)
@@ -614,7 +640,7 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                               ? AppColors.primary
                               : AppColors.textSecondary,
                         ),
-                        const SizedBox(width: 12),
+                        SizedBox(width: AppResponsive.mediumSpacing(context)),
                         Text(
                           '${rate.toInt()}%',
                           style: GoogleFonts.poppins(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/util/common/quantity_format.dart';
 import 'package:billberrylite/util/common/short_ref.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
@@ -44,7 +45,8 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
   bool _isProcessing = false;
 
   // For partial return
-  final Map<String, double> _selectedItems = {}; // variantId -> quantity to return
+  final Map<String, double> _selectedItems =
+      {}; // variantId -> quantity to return
 
   String _refundMethod = 'cash';
   String _returnType = 'full'; // full or partial
@@ -88,8 +90,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
     }
   }
 
-  double _remainingFor(SaleItemModel item) =>
-      _remaining[item.varianteId] ?? 0;
+  double _remainingFor(SaleItemModel item) => _remaining[item.varianteId] ?? 0;
 
   /// The catalogue variant behind a sale line, looked up synchronously for
   /// build-time decisions.
@@ -120,8 +121,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
       _saleItems.where((i) => _remainingFor(i) > 0).toList();
 
   /// True once an earlier return already took some of this sale.
-  bool get _hasEarlierReturn =>
-      _saleItems.any((i) => _remainingFor(i) < i.qty);
+  bool get _hasEarlierReturn => _saleItems.any((i) => _remainingFor(i) < i.qty);
 
   /// What the current selection actually returns.
   ///
@@ -197,7 +197,9 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
     }
 
     if (!AppSettings.refundsEnabled) {
-      NotificationService.instance.showError('Refunds are disabled in Settings');
+      NotificationService.instance.showError(
+        'Refunds are disabled in Settings',
+      );
       return;
     }
 
@@ -207,7 +209,9 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
       if (saleDate != null) {
         final elapsed = DateTime.now().difference(saleDate).inMinutes;
         if (elapsed > windowMinutes) {
-          NotificationService.instance.showError('Refund window has passed for this sale');
+          NotificationService.instance.showError(
+            'Refund window has passed for this sale',
+          );
           return;
         }
       }
@@ -288,9 +292,11 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
           : _sale == null
           ? _buildErrorView()
           : SingleChildScrollView(
-              child: _capped(
-                context,
-                Column(
+              child: AppResponsive.constrainedContent(
+                context: context,
+                alignment: Alignment.topCenter,
+                maxWidth: AppResponsive.maxCardWidth(context),
+                child: Column(
                   children: [
                     _buildOriginalSaleCard(),
                     _buildReturnTypeSelector(),
@@ -306,23 +312,6 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
       bottomNavigationBar: _sale != null && !_isLoading
           ? _buildProcessButton()
           : null,
-    );
-  }
-
-  /// Caps content width on large screens so this form doesn't stretch across a
-  /// laptop. Applied once around the scrolling column.
-  Widget _capped(BuildContext context, Widget child) {
-    final maxWidth = AppResponsive.maxCardWidth(context);
-    if (maxWidth == double.infinity) return child;
-    return Align(
-      // topCenter + heightFactor: without both, Align fills its constraints —
-      // which made this eat the whole screen when used as a bottom bar.
-      alignment: Alignment.topCenter,
-      heightFactor: 1,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
-      ),
     );
   }
 
@@ -347,7 +336,9 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
             Text(
               'Sale not found or cannot be returned',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: AppResponsive.bodyFontSize(context)),
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+              ),
             ),
           ],
         ),
@@ -371,7 +362,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
         children: [
           Text(
             'Original Sale',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.subheadingFontSize(context),
               fontWeight: FontWeight.w600,
             ),
@@ -394,19 +385,19 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
         children: [
           Text(
             label,
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               color: AppColors.textSecondary,
               fontSize: AppResponsive.bodyFontSize(context),
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Flexible(
             child: Text(
               value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.right,
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontWeight: FontWeight.w600,
                 fontSize: AppResponsive.bodyFontSize(context),
               ),
@@ -435,7 +426,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
         children: [
           Text(
             'Return Type',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.w600,
             ),
@@ -457,7 +448,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                       : 'Return all items',
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Expanded(
                 child: _returnTypeTile(
                   value: 'partial',
@@ -486,14 +477,21 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
         // refund total can't be computed from a stale selection.
         if (value == 'full') _selectedItems.clear();
       }),
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(
+        AppResponsive.smallBorderRadius(context),
+      ),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.mediumSpacing(context),
+          vertical: AppResponsive.smallSpacing(context),
+        ),
         decoration: BoxDecoration(
           color: selected
               ? AppColors.primary.withValues(alpha: 0.07)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.smallBorderRadius(context),
+          ),
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.divider,
             width: selected ? 1.5 : 1,
@@ -505,10 +503,10 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
               selected
                   ? Icons.radio_button_checked_rounded
                   : Icons.radio_button_unchecked_rounded,
-              size: 18,
+              size: AppResponsive.smallIconSize(context),
               color: selected ? AppColors.primary : AppColors.textSecondary,
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -517,7 +515,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                     label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: selected
@@ -529,7 +527,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                     caption,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.captionFontSize(context),
                       color: AppColors.textSecondary,
                     ),
@@ -559,7 +557,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
         children: [
           Text(
             'Refund Method',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.w600,
             ),
@@ -570,7 +568,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
             children: [
               ChoiceChip(
                 label: const Text('💵 Cash'),
-                labelStyle: TextStyle(
+                labelStyle: GoogleFonts.poppins(
                   fontSize: AppResponsive.bodyFontSize(context),
                 ),
                 selected: _refundMethod == 'cash',
@@ -579,7 +577,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
               ),
               ChoiceChip(
                 label: const Text('💳 Card'),
-                labelStyle: TextStyle(
+                labelStyle: GoogleFonts.poppins(
                   fontSize: AppResponsive.bodyFontSize(context),
                 ),
                 selected: _refundMethod == 'card',
@@ -588,7 +586,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
               ),
               ChoiceChip(
                 label: const Text('📱 UPI'),
-                labelStyle: TextStyle(
+                labelStyle: GoogleFonts.poppins(
                   fontSize: AppResponsive.bodyFontSize(context),
                 ),
                 selected: _refundMethod == 'upi',
@@ -624,7 +622,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
         children: [
           Text(
             'Return Reason',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.w600,
             ),
@@ -637,7 +635,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
               for (final reason in SaleReturnReason.all)
                 ChoiceChip(
                   label: Text(reason.label),
-                  labelStyle: TextStyle(
+                  labelStyle: GoogleFonts.poppins(
                     fontSize: AppResponsive.bodyFontSize(context),
                   ),
                   selected: _returnReason?.code == reason.code,
@@ -676,7 +674,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
         children: [
           Text(
             'Select Items to Return',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.w600,
             ),
@@ -712,7 +710,9 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
         color: isSelected
             ? AppColors.warning.withValues(alpha: 0.1)
             : AppColors.surfaceMedium,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
         border: Border.all(
           color: isSelected ? Colors.orange : AppColors.divider,
           width: isSelected ? 2 : 1,
@@ -743,7 +743,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                       item.productName ?? 'Unknown',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                       ),
@@ -765,7 +765,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
+                        style: GoogleFonts.poppins(
                           fontSize: AppResponsive.smallFontSize(context),
                           color: AppColors.textSecondary,
                         ),
@@ -778,7 +778,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                         '${formatQty(item.qty)} already returned',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
+                        style: GoogleFonts.poppins(
                           fontSize: AppResponsive.captionFontSize(context),
                           color: AppColors.warning,
                           fontWeight: FontWeight.w600,
@@ -789,7 +789,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
               ),
               Text(
                 formatMoney(item.total),
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   fontSize: AppResponsive.bodyFontSize(context),
                   fontWeight: FontWeight.w600,
                 ),
@@ -802,7 +802,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
               children: [
                 Text(
                   'Quantity: ',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: AppResponsive.bodyFontSize(context),
                   ),
                 ),
@@ -833,10 +833,10 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                       return true;
                     },
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
                   Text(
                     'of ${formatQty(remaining)}',
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
                     ),
@@ -858,7 +858,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                   ),
                   Text(
                     '${formatQty(returnQty)} / ${formatQty(remaining)}',
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
                     ),
@@ -911,7 +911,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
         children: [
           Text(
             split.appliedToDue > 0 ? 'Cash Back to Customer' : 'Refund Amount',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               color: Colors.white70,
               fontSize: AppResponsive.bodyFontSize(context),
             ),
@@ -923,7 +923,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
             child: Text(
               formatMoney(returnAmount),
               maxLines: 1,
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 color: Colors.white,
                 fontSize: AppResponsive.getValue(
                   context,
@@ -941,7 +941,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
               '${formatMoney(_figures.totalAmount)} returned · '
               '${formatMoney(split.appliedToDue)} off the outstanding due',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 color: Colors.white70,
                 fontSize: AppResponsive.smallFontSize(context),
               ),
@@ -952,7 +952,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
             Text(
               '${formatQty(_effectiveSelection.values.fold(0.0, (sum, qty) => sum + qty))} items selected',
               maxLines: 1,
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 color: Colors.white70,
                 fontSize: AppResponsive.smallFontSize(context),
               ),
@@ -976,9 +976,12 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
           ),
         ],
       ),
-      child: _capped(
-        context,
-        ElevatedButton(
+      child: AppResponsive.constrainedContent(
+        heightFactor: 1,
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxCardWidth(context),
+        child: ElevatedButton(
           onPressed: _isProcessing ? null : _processReturn,
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.red,
@@ -1002,7 +1005,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                 )
               : Text(
                   'Process Return',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: AppResponsive.subheadingFontSize(context),
                     fontWeight: FontWeight.w600,
                   ),

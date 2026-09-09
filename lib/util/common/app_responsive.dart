@@ -346,14 +346,22 @@ class AppResponsive {
   /// constraints, so a `SingleChildScrollView` or shrink-wrapping `Column`
   /// sizes to its content and then floats in the vertical middle of the
   /// viewport, leaving a large gap above and below.
+  /// [heightFactor] must be 1 whenever the parent bounds the height — a
+  /// `bottomNavigationBar`, a fixed-height container, anything that is not a
+  /// scroll view. Without it `Align` FILLS the height it is given, so a capped
+  /// bottom bar expands to eat the whole screen and the body renders blank.
+  /// In a scroll view the height is unbounded and Align shrink-wraps anyway,
+  /// so leaving it null there is harmless.
   static Widget constrainedContent({
     required BuildContext context,
     required Widget child,
     double? maxWidth,
     AlignmentGeometry alignment = Alignment.center,
+    double? heightFactor,
   }) {
     return Align(
       alignment: alignment,
+      heightFactor: heightFactor,
       child: Container(
         constraints: BoxConstraints(
           maxWidth: maxWidth ?? maxContentWidth(context),

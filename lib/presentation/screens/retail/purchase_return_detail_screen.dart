@@ -97,7 +97,7 @@ class _PurchaseReturnDetailScreenState
                   textCapitalization: TextCapitalization.characters,
                   autofocus: true,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 AppTextField(
                   controller: amountController,
                   label: 'Credit Amount',
@@ -111,15 +111,15 @@ class _PurchaseReturnDetailScreenState
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 Text(
                   _model.isCreditApplied
                       ? 'This return was already credited. Saving again updates '
-                        'the note details only — the supplier balance will not '
-                        'move a second time.'
+                            'the note details only — the supplier balance will not '
+                            'move a second time.'
                       : 'Recording a credit note closes the return and reduces '
-                        'the supplier balance by the credit amount. The receipt '
-                        'billed these units, so this is what claws that back.',
+                            'the supplier balance by the credit amount. The receipt '
+                            'billed these units, so this is what claws that back.',
                   style: GoogleFonts.poppins(
                     fontSize: AppResponsive.captionFontSize(context),
                     height: 1.4,
@@ -130,7 +130,7 @@ class _PurchaseReturnDetailScreenState
             ),
             actions: [
               appDialogCancelButton(dialogContext),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               appDialogPrimaryButton(
                 label: 'Save',
                 color: AppColors.success,
@@ -220,9 +220,11 @@ class _PurchaseReturnDetailScreenState
                   AppResponsive.padding(context).left,
                   AppResponsive.largeSpacing(context),
                 ),
-                child: _capped(
-                  context,
-                  Column(
+                child: AppResponsive.constrainedContent(
+                  context: context,
+                  alignment: Alignment.topCenter,
+                  maxWidth: AppResponsive.maxCardWidth(context),
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildHeaderCard(),
@@ -242,22 +244,6 @@ class _PurchaseReturnDetailScreenState
                   ),
                 ),
               ),
-      ),
-    );
-  }
-
-  /// Caps content width on large screens so a stack of detail cards doesn't
-  /// stretch across a laptop.
-  Widget _capped(BuildContext context, Widget child) {
-    final maxWidth = AppResponsive.maxCardWidth(context);
-    if (maxWidth == double.infinity) return child;
-    return Align(
-      // topCenter, not Center: Center aligns on BOTH axes, so a
-      // shrink-wrapping child floats in the vertical middle.
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
       ),
     );
   }
@@ -290,7 +276,7 @@ class _PurchaseReturnDetailScreenState
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -423,7 +409,7 @@ class _PurchaseReturnDetailScreenState
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -591,7 +577,7 @@ class _PurchaseReturnDetailScreenState
                   size: AppResponsive.iconSize(context),
                   color: iconColor ?? AppColors.primary,
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Expanded(
                   child: Text(
                     title,

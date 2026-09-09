@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/restaurant/license_model.dart';
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
@@ -75,13 +76,20 @@ class _LicenseActivationStepState extends State<LicenseActivationStep> {
   @override
   Widget build(BuildContext context) {
     final alreadyActivated = _store.licenseInfo?.isActive == true;
-    final hasPendingKey =
-        _pendingKey != null && _pendingKey!.trim().isNotEmpty;
+    final hasPendingKey = _pendingKey != null && _pendingKey!.trim().isNotEmpty;
 
     final iconSize = AppResponsive.getValue(
-        context, mobile: 40.0, tablet: 48.0, desktop: 56.0);
+      context,
+      mobile: 40.0,
+      tablet: 48.0,
+      desktop: 56.0,
+    );
     final containerSize = AppResponsive.getValue(
-        context, mobile: 80.0, tablet: 96.0, desktop: 110.0);
+      context,
+      mobile: 80.0,
+      tablet: 96.0,
+      desktop: 110.0,
+    );
 
     Color iconColor;
     IconData iconData;
@@ -129,9 +137,13 @@ class _LicenseActivationStepState extends State<LicenseActivationStep> {
                 SizedBox(height: AppResponsive.largeSpacing(context)),
                 Text(
                   title,
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: AppResponsive.getValue(
-                        context, mobile: 20.0, tablet: 24.0, desktop: 28.0),
+                      context,
+                      mobile: 20.0,
+                      tablet: 24.0,
+                      desktop: 28.0,
+                    ),
                     fontWeight: FontWeight.bold,
                     color: AppColors.darkNeutral,
                   ),
@@ -140,9 +152,9 @@ class _LicenseActivationStepState extends State<LicenseActivationStep> {
                 SizedBox(height: AppResponsive.smallSpacing(context)),
                 Text(
                   subtitle,
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: AppResponsive.bodyFontSize(context),
-                    color: Colors.grey[600],
+                    color: AppColors.textSecondary,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -170,7 +182,11 @@ class _LicenseActivationStepState extends State<LicenseActivationStep> {
                       alignment: Alignment.centerLeft,
                       child: Text(
                         _errorMsg!,
-                        style: TextStyle(fontSize: 12, color: AppColors.danger),
+                        // 12 stays: matches AppTextField's own errorStyle.
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: AppColors.danger,
+                        ),
                       ),
                     ),
                   ],
@@ -184,18 +200,21 @@ class _LicenseActivationStepState extends State<LicenseActivationStep> {
                         backgroundColor: AppColors.primary,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                       child: _loading
                           ? const SizedBox(
                               width: 22,
                               height: 22,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             )
                           : Text(
                               'Activate & Continue',
-                              style: TextStyle(
+                              style: GoogleFonts.poppins(
                                 fontSize: AppResponsive.buttonFontSize(context),
                                 fontWeight: FontWeight.w600,
                                 color: Colors.white,
@@ -221,11 +240,13 @@ class _LicenseActivationStepState extends State<LicenseActivationStep> {
         style: ElevatedButton.styleFrom(
           backgroundColor: color,
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
         child: Text(
           'Continue',
-          style: TextStyle(
+          style: GoogleFonts.poppins(
             fontSize: AppResponsive.buttonFontSize(context),
             fontWeight: FontWeight.w600,
             color: Colors.white,
@@ -241,21 +262,27 @@ class _LicenseActivationStepState extends State<LicenseActivationStep> {
     final masked = segs.length >= 4
         ? '${segs[0]}-••••-••••-${segs.last}'
         : key.length > 8
-            ? '${key.substring(0, 4)}••••${key.substring(key.length - 4)}'
-            : key;
+        ? '${key.substring(0, 4)}••••${key.substring(key.length - 4)}'
+        : key;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: AppColors.primary.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
           _summaryRow(Icons.key_rounded, 'Key', masked, AppColors.primary),
-          _summaryRow(Icons.schedule_rounded, 'Status',
-              'Activates after setup', AppColors.info),
+          _summaryRow(
+            Icons.schedule_rounded,
+            'Status',
+            'Activates after setup',
+            AppColors.info,
+          ),
         ],
       ),
     );
@@ -264,20 +291,35 @@ class _LicenseActivationStepState extends State<LicenseActivationStep> {
   Widget _activatedSummary() {
     final info = _store.licenseInfo!;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: AppColors.success.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
-          _summaryRow(Icons.verified_rounded, 'Status', info.status.label,
-              AppColors.success),
+          _summaryRow(
+            Icons.verified_rounded,
+            'Status',
+            info.status.label,
+            AppColors.success,
+          ),
           if (info.planName.isNotEmpty)
-            _summaryRow(Icons.workspace_premium_rounded, 'Plan', info.planName,
-                AppColors.primary),
-          _summaryRow(Icons.key_rounded, 'Key', info.maskedKey, Colors.grey),
+            _summaryRow(
+              Icons.workspace_premium_rounded,
+              'Plan',
+              info.planName,
+              AppColors.primary,
+            ),
+          _summaryRow(
+            Icons.key_rounded,
+            'Key',
+            info.maskedKey,
+            AppColors.textSecondary,
+          ),
         ],
       ),
     );
@@ -288,17 +330,25 @@ class _LicenseActivationStepState extends State<LicenseActivationStep> {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: color),
+          Icon(icon, size: AppResponsive.smallIconSize(context), color: color),
           const SizedBox(width: 10),
-          Text('$label: ',
-              style: TextStyle(fontSize: 13, color: Colors.grey[600])),
+          Text(
+            '$label: ',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+            ),
+          ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.darkNeutral),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: AppColors.darkNeutral,
+              ),
             ),
           ),
         ],

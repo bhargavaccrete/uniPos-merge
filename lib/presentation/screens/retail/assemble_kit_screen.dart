@@ -150,8 +150,7 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
             return const AppEmptyState(
               icon: Icons.inventory_rounded,
               title: 'No repack/kit products yet',
-              message:
-                  'Mark a product Repack/Kit to assemble it here.',
+              message: 'Mark a product Repack/Kit to assemble it here.',
             );
           }
 
@@ -161,12 +160,12 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildModeToggle(context),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 _buildProductPicker(context),
                 if (_selectedProduct != null) ...[
-                  const SizedBox(height: 16),
+                  SizedBox(height: AppResponsive.largeSpacing(context)),
                   _buildBundleCard(context),
-                  const SizedBox(height: 20),
+                  SizedBox(height: AppResponsive.largeSpacing(context)),
                   _buildRecentAssemblies(context),
                 ],
               ],
@@ -208,8 +207,9 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
           selectedBackgroundColor:
               (_isDisassemble ? AppColors.orange : AppColors.secondary)
                   .withValues(alpha: 0.12),
-          selectedForegroundColor:
-              _isDisassemble ? AppColors.orange : AppColors.secondary,
+          selectedForegroundColor: _isDisassemble
+              ? AppColors.orange
+              : AppColors.secondary,
         ),
       ),
     );
@@ -220,30 +220,36 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
       onTap: _pickProduct,
       borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.borderRadius(context),
+          ),
           border: Border.all(
-            color: _selectedProduct != null ? AppColors.primary : AppColors.divider,
+            color: _selectedProduct != null
+                ? AppColors.primary
+                : AppColors.divider,
             width: _selectedProduct != null ? 1.5 : 1,
           ),
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
               decoration: BoxDecoration(
                 color: AppColors.secondary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.inventory_rounded,
                 color: AppColors.secondary,
-                size: 22,
+                size: AppResponsive.iconSize(context),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -251,17 +257,18 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
                   Text(
                     'Repack/Kit product',
                     style: GoogleFonts.poppins(
-                      fontSize: 11,
+                      fontSize: AppResponsive.captionFontSize(context),
                       color: AppColors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    _selectedProduct?.productName ?? 'Select a product to assemble',
+                    _selectedProduct?.productName ??
+                        'Select a product to assemble',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.poppins(
-                      fontSize: 15,
+                      fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: _selectedProduct != null
                           ? AppColors.textPrimary
@@ -287,22 +294,27 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
 
     if (bundle == null || !bundle.hasComponents) {
       return Container(
-        padding: const EdgeInsets.all(16),
+        padding: AppResponsive.cardPadding(context),
         decoration: BoxDecoration(
           color: AppColors.danger.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.borderRadius(context),
+          ),
           border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [
-            const Icon(Icons.error_outline_rounded, color: AppColors.danger),
-            const SizedBox(width: 12),
+            Icon(Icons.error_outline_rounded, color: AppColors.danger),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
             Expanded(
               child: Text(
                 '${product.productName} has no components configured. Add them '
                 'from the Bundles screen before '
                 '${isDisassemble ? 'disassembling' : 'assembling'} a batch.',
-                style: GoogleFonts.poppins(fontSize: 13, color: AppColors.danger),
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  color: AppColors.danger,
+                ),
               ),
             ),
           ],
@@ -326,47 +338,55 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
           onChanged: (_) => setState(() {}),
         ),
         if (_batchQty > 0) ...[
-          const SizedBox(height: 10),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: EdgeInsets.symmetric(
+              horizontal: AppResponsive.mediumSpacing(context),
+              vertical: AppResponsive.smallSpacing(context),
+            ),
             decoration: BoxDecoration(
               color: modeColor.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
             ),
             child: Row(
               children: [
                 Icon(
                   isDisassemble ? Icons.undo_rounded : Icons.inventory_rounded,
-                  size: 16,
+                  size: AppResponsive.smallIconSize(context),
                   color: modeColor,
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Expanded(
                   child: Text(
                     isDisassemble
                         ? '$_batchQty pcs will be removed from ${product.productName} '
-                          'stock; components restored.'
+                              'stock; components restored.'
                         : '$_batchQty pcs will be added to ${product.productName} '
-                          'stock; components consumed.',
-                    style: GoogleFonts.poppins(fontSize: 11.5, color: modeColor),
+                              'stock; components consumed.',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: modeColor,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
         ],
-        const SizedBox(height: 16),
+        SizedBox(height: AppResponsive.largeSpacing(context)),
         if (isDisassemble) ...[
           Text(
             'Available To Disassemble',
             style: GoogleFonts.poppins(
-              fontSize: 14,
+              fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           _buildStockStatusRow(
             context,
             name: product.productName,
@@ -374,16 +394,16 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
             available: variant.stockQty,
             exists: true,
           ),
-          const SizedBox(height: 18),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
           Text(
             'Components To Be Restored',
             style: GoogleFonts.poppins(
-              fontSize: 14,
+              fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           ...bundle.components.map(
             (line) => _buildRestoreRow(context, line, _batchQty),
           ),
@@ -391,17 +411,17 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
           Text(
             'Components Required',
             style: GoogleFonts.poppins(
-              fontSize: 14,
+              fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           ...bundle.components.map(
             (line) => _buildComponentRow(context, line, _batchQty),
           ),
         ],
-        const SizedBox(height: 18),
+        SizedBox(height: AppResponsive.largeSpacing(context)),
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
@@ -415,7 +435,11 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
                       valueColor: AlwaysStoppedAnimation(Colors.white),
                     ),
                   )
-                : Icon(isDisassemble ? Icons.undo_rounded : Icons.inventory_rounded),
+                : Icon(
+                    isDisassemble
+                        ? Icons.undo_rounded
+                        : Icons.inventory_rounded,
+                  ),
             label: Text(
               _submitting
                   ? (isDisassemble ? 'Disassembling...' : 'Assembling...')
@@ -426,7 +450,9 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
               backgroundColor: modeColor,
               foregroundColor: Colors.white,
               disabledBackgroundColor: AppColors.divider,
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              padding: EdgeInsets.symmetric(
+                vertical: AppResponsive.mediumSpacing(context),
+              ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -443,7 +469,10 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
     int batchQty,
   ) {
     final componentVariant = _componentVariant(line.componentVariantId);
-    final componentName = _componentName(line.componentVariantId, componentVariant);
+    final componentName = _componentName(
+      line.componentVariantId,
+      componentVariant,
+    );
     final required = (line.quantity * batchQty).toDouble();
     final available = componentVariant?.stockQty ?? 0;
 
@@ -467,17 +496,22 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
     int batchQty,
   ) {
     final componentVariant = _componentVariant(line.componentVariantId);
-    final componentName = _componentName(line.componentVariantId, componentVariant);
+    final componentName = _componentName(
+      line.componentVariantId,
+      componentVariant,
+    );
     final restoreQty = line.quantity * batchQty;
     final available = componentVariant?.stockQty ?? 0;
     final projected = available + restoreQty;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
+      margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
+      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
       ),
       child: Row(
@@ -491,16 +525,16 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
-                    fontSize: 13.5,
+                    fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 3),
+                SizedBox(height: 3),
                 Text(
                   'Restores $restoreQty pcs  ·  Have $available pcs  ·  Will be $projected pcs',
                   style: GoogleFonts.poppins(
-                    fontSize: 11.5,
+                    fontSize: AppResponsive.captionFontSize(context),
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -508,20 +542,29 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: EdgeInsets.symmetric(
+              horizontal: AppResponsive.smallSpacing(context),
+              vertical: 6,
+            ),
             decoration: BoxDecoration(
               color: AppColors.info.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.add_circle_outline_rounded, size: 13, color: AppColors.info),
-                const SizedBox(width: 5),
+                const Icon(
+                  Icons.add_circle_outline_rounded,
+                  size: 13,
+                  color: AppColors.info,
+                ),
+                SizedBox(width: 5),
                 Text(
                   'Restored',
                   style: GoogleFonts.poppins(
-                    fontSize: 11,
+                    fontSize: AppResponsive.captionFontSize(context),
                     fontWeight: FontWeight.w700,
                     color: AppColors.info,
                   ),
@@ -551,11 +594,13 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
         : (hasEnough ? AppColors.success : AppColors.danger);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
+      margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
+      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
@@ -569,16 +614,16 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
-                    fontSize: 13.5,
+                    fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 3),
+                SizedBox(height: 3),
                 Text(
                   'Need $required pcs  ·  Have $available pcs',
                   style: GoogleFonts.poppins(
-                    fontSize: 11.5,
+                    fontSize: AppResponsive.captionFontSize(context),
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -586,10 +631,15 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: EdgeInsets.symmetric(
+              horizontal: AppResponsive.smallSpacing(context),
+              vertical: 6,
+            ),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -597,15 +647,17 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
                 Icon(
                   !exists
                       ? Icons.help_outline_rounded
-                      : (hasEnough ? Icons.check_circle_rounded : Icons.warning_rounded),
+                      : (hasEnough
+                            ? Icons.check_circle_rounded
+                            : Icons.warning_rounded),
                   size: 13,
                   color: color,
                 ),
-                const SizedBox(width: 5),
+                SizedBox(width: 5),
                 Text(
                   !exists ? 'Missing' : (hasEnough ? 'Sufficient' : 'Short'),
                   style: GoogleFonts.poppins(
-                    fontSize: 11,
+                    fontSize: AppResponsive.captionFontSize(context),
                     fontWeight: FontWeight.w700,
                     color: color,
                   ),
@@ -620,19 +672,24 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
 
   VarianteModel? _componentVariant(String componentVariantId) {
     try {
-      return productStore.variants
-          .firstWhere((v) => v.varianteId == componentVariantId);
+      return productStore.variants.firstWhere(
+        (v) => v.varianteId == componentVariantId,
+      );
     } catch (_) {
       return null;
     }
   }
 
-  String _componentName(String componentVariantId, VarianteModel? componentVariant) {
+  String _componentName(
+    String componentVariantId,
+    VarianteModel? componentVariant,
+  ) {
     String componentName = componentVariant?.sku ?? componentVariantId;
     if (componentVariant != null) {
       try {
-        final componentProduct = productStore.products
-            .firstWhere((p) => p.productId == componentVariant.productId);
+        final componentProduct = productStore.products.firstWhere(
+          (p) => p.productId == componentVariant.productId,
+        );
         componentName = componentVariant.hasAttributes
             ? '${componentProduct.productName} (${componentVariant.variantDescription})'
             : componentProduct.productName;
@@ -648,8 +705,9 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
   /// point; [_buildAssemblyTile] distinguishes the two via [_KitMode]-style
   /// badges instead of separate lists.
   Widget _buildRecentAssemblies(BuildContext context) {
-    final assemblies =
-        kitAssemblyRepository.getAssembliesForVariant(_selectedVariant!.varianteId);
+    final assemblies = kitAssemblyRepository.getAssembliesForVariant(
+      _selectedVariant!.varianteId,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -657,25 +715,27 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
         Text(
           'Recent Activity',
           style: GoogleFonts.poppins(
-            fontSize: 14,
+            fontSize: AppResponsive.bodyFontSize(context),
             fontWeight: FontWeight.w600,
             color: AppColors.textPrimary,
           ),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: AppResponsive.smallSpacing(context)),
         if (assemblies.isEmpty)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
+            padding: AppResponsive.cardPadding(context),
             decoration: BoxDecoration(
               color: AppColors.white,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.borderRadius(context),
+              ),
               border: Border.all(color: AppColors.divider),
             ),
             child: Text(
               'No batches assembled or disassembled yet.',
               style: GoogleFonts.poppins(
-                fontSize: 12.5,
+                fontSize: AppResponsive.smallFontSize(context),
                 color: AppColors.textSecondary,
               ),
             ),
@@ -689,30 +749,39 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
   Widget _buildAssemblyTile(BuildContext context, RetailKitAssemblyModel a) {
     final isReversal = a.isReversal;
     final Color color = isReversal ? AppColors.orange : AppColors.success;
-    final IconData icon =
-        isReversal ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded;
+    final IconData icon = isReversal
+        ? Icons.arrow_downward_rounded
+        : Icons.arrow_upward_rounded;
     final String sign = isReversal ? '-' : '+';
     final String badgeLabel = isReversal ? 'Disassembled' : 'Assembled';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
+      margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
+      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
             ),
-            child: Icon(icon, size: 16, color: color),
+            child: Icon(
+              icon,
+              size: AppResponsive.smallIconSize(context),
+              color: color,
+            ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -722,14 +791,17 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
                     Text(
                       '$sign${a.batchQty} pcs',
                       style: GoogleFonts.poppins(
-                        fontSize: 13.5,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w700,
                         color: color,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: color.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(6),
@@ -737,7 +809,7 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
                       child: Text(
                         badgeLabel,
                         style: GoogleFonts.poppins(
-                          fontSize: 10,
+                          fontSize: AppResponsive.captionFontSize(context),
                           fontWeight: FontWeight.w700,
                           color: color,
                         ),
@@ -745,11 +817,11 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 2),
+                SizedBox(height: 2),
                 Text(
                   DateFormat('dd MMM yyyy · hh:mm a').format(a.assembledTime),
                   style: GoogleFonts.poppins(
-                    fontSize: 11.5,
+                    fontSize: AppResponsive.captionFontSize(context),
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -760,7 +832,7 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
             Text(
               a.assembledBy!,
               style: GoogleFonts.poppins(
-                fontSize: 11.5,
+                fontSize: AppResponsive.captionFontSize(context),
                 fontWeight: FontWeight.w500,
                 color: AppColors.textSecondary,
               ),
@@ -797,8 +869,11 @@ class _RepackPickerDialogState extends State<_RepackPickerDialog> {
     final filtered = _query.isEmpty
         ? widget.products
         : widget.products
-            .where((p) => p.productName.toLowerCase().contains(_query.toLowerCase()))
-            .toList();
+              .where(
+                (p) =>
+                    p.productName.toLowerCase().contains(_query.toLowerCase()),
+              )
+              .toList();
 
     return AppDialogShell(
       title: 'Select Repack/Kit Product',
@@ -816,7 +891,7 @@ class _RepackPickerDialogState extends State<_RepackPickerDialog> {
               autofocus: true,
               onChanged: (v) => setState(() => _query = v),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             Expanded(
               child: filtered.isEmpty
                   ? const AppEmptyState(
@@ -829,8 +904,9 @@ class _RepackPickerDialogState extends State<_RepackPickerDialog> {
                       separatorBuilder: (_, _) => const Divider(height: 1),
                       itemBuilder: (context, index) {
                         final product = filtered[index];
-                        final variant =
-                            productStore.primaryVariantFor(product.productId);
+                        final variant = productStore.primaryVariantFor(
+                          product.productId,
+                        );
                         return ListTile(
                           contentPadding: EdgeInsets.zero,
                           title: Text(
@@ -839,13 +915,13 @@ class _RepackPickerDialogState extends State<_RepackPickerDialog> {
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.poppins(
                               fontWeight: FontWeight.w600,
-                              fontSize: 14,
+                              fontSize: AppResponsive.bodyFontSize(context),
                             ),
                           ),
                           subtitle: Text(
                             'Stock: ${variant?.stockQty ?? 0} pcs',
                             style: GoogleFonts.poppins(
-                              fontSize: 12,
+                              fontSize: AppResponsive.smallFontSize(context),
                               color: AppColors.textSecondary,
                             ),
                           ),

@@ -242,10 +242,10 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                           )
                         : null,
                     trailing: isSelected
-                        ? const Icon(
+                        ? Icon(
                             Icons.check_circle_rounded,
                             color: AppColors.primary,
-                            size: 20,
+                            size: AppResponsive.iconSize(context),
                           )
                         : null,
                     onTap: () {
@@ -260,7 +260,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
         ),
         actions: [
           appDialogCancelButton(dialogContext, label: 'Close'),
-          const SizedBox(width: 12),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           appDialogPrimaryButton(
             label: 'Add New',
             onPressed: () {
@@ -309,7 +309,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                   autofocus: true,
                   textInputAction: TextInputAction.next,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 AppTextField(
                   controller: phoneController,
                   label: 'Phone',
@@ -321,14 +321,14 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                   validator: (v) => PhoneRule.validate(v, required: false),
                   textInputAction: TextInputAction.next,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 AppTextField(
                   controller: addressController,
                   label: 'Address',
                   icon: Icons.location_on_outlined,
                   maxLines: 2,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 AppTextField(
                   controller: gstController,
                   label: 'GST Number',
@@ -336,7 +336,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                   icon: Icons.badge_outlined,
                   textCapitalization: TextCapitalization.characters,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 AppTextField(
                   controller: openingBalanceController,
                   label: 'Opening Balance',
@@ -355,7 +355,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
             ),
             actions: [
               appDialogCancelButton(dialogContext),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               appDialogPrimaryButton(
                 label: 'Add Supplier',
                 onPressed: () async {
@@ -439,8 +439,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
   void _editItemQty(int index) {
     final item = _orderItems[index];
     final allowDecimal = item.variant.isDecimalQuantity;
-    final controller =
-        TextEditingController(text: formatQty(item.orderedQty));
+    final controller = TextEditingController(text: formatQty(item.orderedQty));
 
     showDialog<void>(
       context: context,
@@ -473,11 +472,12 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
           ),
           actions: [
             appDialogCancelButton(dialogContext),
-            const SizedBox(width: 12),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
             appDialogPrimaryButton(
               label: 'Save',
               onPressed: () {
-                final newQty = (allowDecimal
+                final newQty =
+                    (allowDecimal
                         ? double.tryParse(controller.text.trim())
                         : int.tryParse(controller.text.trim())?.toDouble()) ??
                     0;
@@ -507,23 +507,6 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
 
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
-  }
-
-  /// Caps content width on large screens. Backgrounds still span edge to edge —
-  /// only what you read is constrained, so this form doesn't stretch a single
-  /// column of fields across a whole laptop.
-  Widget _capped(BuildContext context, Widget child) {
-    final maxWidth = AppResponsive.maxCardWidth(context);
-    if (maxWidth == double.infinity) return child;
-    return Align(
-      // topCenter, not Center: Center aligns on BOTH axes, so a
-      // shrink-wrapping child floats in the vertical middle.
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
-      ),
-    );
   }
 
   @override
@@ -580,7 +563,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 4),
+          SizedBox(width: 4),
         ],
       ),
       body: CustomScrollView(
@@ -590,9 +573,11 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
             child: Container(
               color: Colors.white,
               padding: AppResponsive.padding(context),
-              child: _capped(
-                context,
-                Column(
+              child: AppResponsive.constrainedContent(
+                context: context,
+                alignment: Alignment.topCenter,
+                maxWidth: AppResponsive.maxCardWidth(context),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // PO Number
@@ -603,13 +588,13 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                           color: AppColors.textSecondary,
                           size: AppResponsive.iconSize(context),
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: AppResponsive.smallSpacing(context)),
                         Expanded(
                           child: Text(
                             _poNumber,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
+                            style: GoogleFonts.poppins(
                               fontSize: AppResponsive.subheadingFontSize(
                                 context,
                               ),
@@ -653,7 +638,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                                 _selectedSupplier?.name ?? 'Select Supplier *',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
+                                style: GoogleFonts.poppins(
                                   fontSize: AppResponsive.bodyFontSize(context),
                                   color: _selectedSupplier == null
                                       ? AppColors.textSecondary
@@ -699,7 +684,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                                 'Expected: ${_formatDate(_expectedDeliveryDate)}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
+                                style: GoogleFonts.poppins(
                                   fontSize: AppResponsive.bodyFontSize(context),
                                 ),
                               ),
@@ -733,9 +718,11 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
               color: Colors.white,
               margin: EdgeInsets.only(top: AppResponsive.smallSpacing(context)),
               padding: AppResponsive.padding(context),
-              child: _capped(
-                context,
-                Row(
+              child: AppResponsive.constrainedContent(
+                context: context,
+                alignment: Alignment.topCenter,
+                maxWidth: AppResponsive.maxCardWidth(context),
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Column(
@@ -743,7 +730,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                       children: [
                         Text(
                           'Total Items',
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             fontSize: AppResponsive.smallFontSize(context),
                             color: AppColors.textSecondary,
                           ),
@@ -751,21 +738,21 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                         Text(
                           totalItems.toString(),
                           maxLines: 1,
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             fontSize: AppResponsive.subheadingFontSize(context),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: AppResponsive.mediumSpacing(context)),
                     Flexible(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
                             'Estimated Total',
-                            style: TextStyle(
+                            style: GoogleFonts.poppins(
                               fontSize: AppResponsive.smallFontSize(context),
                               color: AppColors.textSecondary,
                             ),
@@ -778,7 +765,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                                   ? formatMoney(estimatedTotal)
                                   : '--',
                               maxLines: 1,
-                              style: TextStyle(
+                              style: GoogleFonts.poppins(
                                 fontSize: AppResponsive.subheadingFontSize(
                                   context,
                                 ),
@@ -805,21 +792,23 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                 horizontal: AppResponsive.padding(context).left,
                 vertical: AppResponsive.mediumSpacing(context),
               ),
-              child: _capped(
-                context,
-                Row(
+              child: AppResponsive.constrainedContent(
+                context: context,
+                alignment: Alignment.topCenter,
+                maxWidth: AppResponsive.maxCardWidth(context),
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       'Order Items',
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.subheadingFontSize(context),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     Text(
                       '${_orderItems.length} products',
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.bodyFontSize(context),
                         color: AppColors.textSecondary,
                       ),
@@ -854,7 +843,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                           Text(
                             'No items added',
                             textAlign: TextAlign.center,
-                            style: TextStyle(
+                            style: GoogleFonts.poppins(
                               fontSize: AppResponsive.subheadingFontSize(
                                 context,
                               ),
@@ -865,7 +854,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                           Text(
                             'Tap + button to add items',
                             textAlign: TextAlign.center,
-                            style: TextStyle(
+                            style: GoogleFonts.poppins(
                               fontSize: AppResponsive.bodyFontSize(context),
                               color: AppColors.textSecondary,
                             ),
@@ -880,7 +869,12 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate((context, index) {
                       final item = _orderItems[index];
-                      return _capped(context, _buildItemCard(item, index));
+                      return AppResponsive.constrainedContent(
+                        context: context,
+                        alignment: Alignment.topCenter,
+                        maxWidth: AppResponsive.maxCardWidth(context),
+                        child: _buildItemCard(item, index),
+                      );
                     }, childCount: _orderItems.length),
                   ),
                 ),
@@ -918,7 +912,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                     product?.productName ?? 'Unknown Product',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
                     ),
@@ -928,7 +922,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                     _getVariantDescription(item.variant),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.smallFontSize(context),
                       color: AppColors.textSecondary,
                     ),
@@ -955,7 +949,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                           child: Text(
                             'Qty: ${item.orderedQty}',
                             maxLines: 1,
-                            style: TextStyle(
+                            style: GoogleFonts.poppins(
                               fontSize: AppResponsive.smallFontSize(context),
                               fontWeight: FontWeight.w600,
                               color: AppColors.info,
@@ -967,7 +961,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                         Text(
                           '@ ${formatMoney(item.estimatedPrice!)}',
                           maxLines: 1,
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             fontSize: AppResponsive.smallFontSize(context),
                             color: AppColors.textSecondary,
                           ),
@@ -977,14 +971,14 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                 ],
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
             Column(
               children: [
                 if (item.estimatedPrice != null)
                   Text(
                     formatMoney(item.orderedQty * item.estimatedPrice!),
                     maxLines: 1,
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: AppColors.success,
@@ -1130,7 +1124,9 @@ class _AddPOItemDialogState extends State<_AddPOItemDialog> {
             // a different kind of control from the fields under it.
             InkWell(
               onTap: _showVariantSelection,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.borderRadius(context),
+              ),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -1142,18 +1138,20 @@ class _AddPOItemDialogState extends State<_AddPOItemDialog> {
                     color: hasVariant ? AppColors.primary : AppColors.divider,
                     width: hasVariant ? 1.5 : 1,
                   ),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.borderRadius(context),
+                  ),
                 ),
                 child: Row(
                   children: [
                     Icon(
                       Icons.inventory_2_outlined,
-                      size: 20,
+                      size: AppResponsive.iconSize(context),
                       color: hasVariant
                           ? AppColors.primary
                           : AppColors.textSecondary,
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: AppResponsive.mediumSpacing(context)),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1195,15 +1193,12 @@ class _AddPOItemDialogState extends State<_AddPOItemDialog> {
                         ],
                       ),
                     ),
-                    const Icon(
-                      Icons.arrow_drop_down,
-                      color: AppColors.textSecondary,
-                    ),
+                    Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             AppTextField(
               controller: _quantityController,
               label: 'Quantity',
@@ -1220,7 +1215,7 @@ class _AddPOItemDialogState extends State<_AddPOItemDialog> {
               ],
               onChanged: (_) => setState(() {}),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             AppTextField(
               controller: _priceController,
               label: 'Estimated Price',
@@ -1235,10 +1230,10 @@ class _AddPOItemDialogState extends State<_AddPOItemDialog> {
               onChanged: (_) => setState(() {}),
             ),
             if (_lineTotal > 0) ...[
-              const SizedBox(height: 14),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceMedium,
                   borderRadius: BorderRadius.circular(10),
@@ -1274,7 +1269,7 @@ class _AddPOItemDialogState extends State<_AddPOItemDialog> {
         ),
         actions: [
           appDialogCancelButton(context),
-          const SizedBox(width: 12),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           appDialogPrimaryButton(
             label: 'Add',
             onPressed: () {
@@ -1285,10 +1280,12 @@ class _AddPOItemDialogState extends State<_AddPOItemDialog> {
                 return;
               }
 
-              final quantity = (_allowDecimal
+              final quantity =
+                  (_allowDecimal
                       ? double.tryParse(_quantityController.text.trim())
-                      : int.tryParse(_quantityController.text.trim())
-                          ?.toDouble()) ??
+                      : int.tryParse(
+                          _quantityController.text.trim(),
+                        )?.toDouble()) ??
                   0;
               if (quantity <= 0) {
                 NotificationService.instance.showError(
@@ -1438,7 +1435,7 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
                       )
                     : null,
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
 
               // Selection controls and results count
               Row(
@@ -1450,7 +1447,7 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
                                 ? '${_filteredVariants.length} result${_filteredVariants.length != 1 ? 's' : ''} found'
                                 : '${_filteredVariants.length} product${_filteredVariants.length != 1 ? 's' : ''}')
                           : '${_selectedVariantIds.length} selected',
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.smallFontSize(context),
                         color: _selectedVariantIds.isEmpty
                             ? AppColors.textSecondary
@@ -1477,7 +1474,9 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
                         });
                       },
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppResponsive.smallSpacing(context),
+                        ),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
@@ -1485,7 +1484,7 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
                         _selectedVariantIds.length == _filteredVariants.length
                             ? 'Clear All'
                             : 'Select All',
-                        style: TextStyle(
+                        style: GoogleFonts.poppins(
                           fontSize: AppResponsive.smallFontSize(context),
                         ),
                       ),
@@ -1493,7 +1492,7 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
                   ],
                 ],
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: AppResponsive.smallSpacing(context)),
 
               // Product List
               Expanded(
@@ -1523,7 +1522,7 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
                               _searchController.text.isEmpty
                                   ? 'No products found.\nPlease add products first.'
                                   : 'No products match your search',
-                              style: TextStyle(
+                              style: GoogleFonts.poppins(
                                 fontSize: AppResponsive.bodyFontSize(context),
                                 color: AppColors.textSecondary,
                               ),
@@ -1569,7 +1568,7 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
                               product?.productName ?? 'Unknown',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
+                              style: GoogleFonts.poppins(
                                 fontSize: AppResponsive.bodyFontSize(context),
                                 fontWeight: FontWeight.w600,
                               ),
@@ -1581,7 +1580,7 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
                                   _getVariantDescription(variant),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
+                                  style: GoogleFonts.poppins(
                                     fontSize: AppResponsive.smallFontSize(
                                       context,
                                     ),
@@ -1606,7 +1605,7 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
                                       child: Text(
                                         'Stock: ${variant.stockQty}',
                                         maxLines: 1,
-                                        style: TextStyle(
+                                        style: GoogleFonts.poppins(
                                           fontSize:
                                               AppResponsive.captionFontSize(
                                                 context,
@@ -1619,11 +1618,15 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
                                       ),
                                     ),
                                     if (variant.costPrice != null) ...[
-                                      const SizedBox(width: 8),
+                                      SizedBox(
+                                        width: AppResponsive.smallSpacing(
+                                          context,
+                                        ),
+                                      ),
                                       Text(
                                         formatMoney(variant.costPrice!),
                                         maxLines: 1,
-                                        style: TextStyle(
+                                        style: GoogleFonts.poppins(
                                           fontSize: AppResponsive.smallFontSize(
                                             context,
                                           ),
@@ -1657,7 +1660,7 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
         actions: [
           appDialogCancelButton(context),
           if (_selectedVariantIds.isNotEmpty) ...[
-            const SizedBox(width: 12),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
             appDialogPrimaryButton(
               label: 'Add Selected (${_selectedVariantIds.length})',
               onPressed: () {
@@ -1758,7 +1761,9 @@ class _QuantityConfirmationDialogState
               final product = productStore.getProductById(variant.productId);
 
               return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: EdgeInsets.symmetric(
+                  vertical: AppResponsive.smallSpacing(context),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1767,7 +1772,7 @@ class _QuantityConfirmationDialogState
                       product?.productName ?? 'Unknown',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                       ),
@@ -1777,7 +1782,7 @@ class _QuantityConfirmationDialogState
                       _getVariantDescription(variant),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.smallFontSize(context),
                         color: AppColors.textSecondary,
                       ),
@@ -1797,14 +1802,16 @@ class _QuantityConfirmationDialogState
                             label: 'Qty',
                             keyboardType: variant.isDecimalQuantity
                                 ? const TextInputType.numberWithOptions(
-                                    decimal: true)
+                                    decimal: true,
+                                  )
                                 : TextInputType.number,
                             // keyboardType alone doesn't block letters from a
                             // paste or a hardware keyboard.
                             inputFormatters: [
                               if (variant.isDecimalQuantity)
                                 FilteringTextInputFormatter.allow(
-                                    RegExp(r'^\d*\.?\d{0,2}'))
+                                  RegExp(r'^\d*\.?\d{0,2}'),
+                                )
                               else
                                 FilteringTextInputFormatter.digitsOnly,
                             ],
@@ -1845,7 +1852,7 @@ class _QuantityConfirmationDialogState
         ),
         actions: [
           appDialogCancelButton(context),
-          const SizedBox(width: 12),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           appDialogPrimaryButton(
             label: 'Add to Order',
             onPressed: () {
@@ -1853,7 +1860,8 @@ class _QuantityConfirmationDialogState
               final result = <VarianteModel, _QuantityPriceData>{};
 
               for (var variant in widget.variants) {
-                final qty = (variant.isDecimalQuantity
+                final qty =
+                    (variant.isDecimalQuantity
                         ? double.tryParse(
                             _quantityControllers[variant.varianteId]!.text,
                           )

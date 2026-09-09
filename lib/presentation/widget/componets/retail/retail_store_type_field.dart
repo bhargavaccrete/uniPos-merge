@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/constants/retail_store_types.dart';
 import '../../../../util/color.dart';
+import '../../../../util/common/app_responsive.dart';
 
 /// Icon for a [RetailStoreType.iconName].
 ///
@@ -69,9 +70,8 @@ class RetailStoreTypeField extends StatelessWidget {
     return FormField<String>(
       // Holds no value of its own — it validates the store's value, so a reset
       // elsewhere can never desync an internal copy.
-      validator: (_) => required && selected == null
-          ? 'Please choose what you sell'
-          : null,
+      validator: (_) =>
+          required && selected == null ? 'Please choose what you sell' : null,
       builder: (field) {
         // Only flag an error while the value is ACTUALLY still empty, so a stale
         // error from a previous Continue clears the moment a type is picked.
@@ -127,8 +127,10 @@ class RetailStoreTypeField extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Icon(Icons.arrow_drop_down_rounded,
-                        color: AppColors.textSecondary),
+                    Icon(
+                      Icons.arrow_drop_down_rounded,
+                      color: AppColors.textSecondary,
+                    ),
                   ],
                 ),
               ),
@@ -170,14 +172,22 @@ class _StoreTypePickerDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maxH = (MediaQuery.of(context).size.height * 0.72).clamp(320.0, 560.0);
+    final maxH = (MediaQuery.of(context).size.height * 0.72).clamp(
+      320.0,
+      560.0,
+    );
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       backgroundColor: AppColors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 440, maxHeight: maxH),
+        constraints: BoxConstraints(
+          // Same width as every other dialog in the app (∞ / 500 / 600) — a
+          // fixed 440 left this picker narrower than its neighbours on desktop.
+          maxWidth: AppResponsive.dialogWidth(context),
+          maxHeight: maxH,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -187,8 +197,9 @@ class _StoreTypePickerDialog extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.06),
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
+                ),
               ),
               child: Row(
                 children: [
@@ -198,8 +209,11 @@ class _StoreTypePickerDialog extends StatelessWidget {
                       color: AppColors.primary.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.storefront_rounded,
-                        color: AppColors.primary, size: 22),
+                    child: Icon(
+                      Icons.storefront_rounded,
+                      color: AppColors.primary,
+                      size: 22,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -209,7 +223,12 @@ class _StoreTypePickerDialog extends StatelessWidget {
                         Text(
                           'What do you sell?',
                           style: GoogleFonts.poppins(
-                            fontSize: 17,
+                            fontSize: AppResponsive.getValue(
+                              context,
+                              mobile: 17.0,
+                              tablet: 18.0,
+                              desktop: 20.0,
+                            ),
                             fontWeight: FontWeight.w600,
                             color: AppColors.textPrimary,
                           ),
@@ -218,7 +237,7 @@ class _StoreTypePickerDialog extends StatelessWidget {
                         Text(
                           'Sets the product fields you start with',
                           style: GoogleFonts.poppins(
-                            fontSize: 12,
+                            fontSize: AppResponsive.smallFontSize(context),
                             color: AppColors.textSecondary,
                           ),
                         ),
@@ -226,8 +245,10 @@ class _StoreTypePickerDialog extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.close_rounded,
-                        color: AppColors.textSecondary),
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: AppColors.textSecondary,
+                    ),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -255,8 +276,10 @@ class _StoreTypePickerDialog extends StatelessWidget {
                       color: isSel
                           ? AppColors.primary.withValues(alpha: 0.06)
                           : Colors.transparent,
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       child: Row(
                         children: [
                           Container(
@@ -283,7 +306,9 @@ class _StoreTypePickerDialog extends StatelessWidget {
                                 Text(
                                   type.name,
                                   style: GoogleFonts.poppins(
-                                    fontSize: 14.5,
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
                                     fontWeight: isSel
                                         ? FontWeight.w600
                                         : FontWeight.w500,
@@ -296,7 +321,9 @@ class _StoreTypePickerDialog extends StatelessWidget {
                                 Text(
                                   type.description,
                                   style: GoogleFonts.poppins(
-                                    fontSize: 12,
+                                    fontSize: AppResponsive.smallFontSize(
+                                      context,
+                                    ),
                                     color: AppColors.textSecondary,
                                     height: 1.35,
                                   ),
@@ -306,8 +333,11 @@ class _StoreTypePickerDialog extends StatelessWidget {
                           ),
                           if (isSel) ...[
                             const SizedBox(width: 8),
-                            Icon(Icons.check_circle_rounded,
-                                color: AppColors.primary, size: 20),
+                            Icon(
+                              Icons.check_circle_rounded,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
                           ],
                         ],
                       ),

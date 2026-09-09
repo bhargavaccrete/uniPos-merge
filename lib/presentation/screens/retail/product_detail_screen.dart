@@ -73,7 +73,8 @@ Future<bool> confirmLossIfSellingBelowCost({
   return await showAppConfirmDialog(
     context: context,
     title: 'Selling Below Cost Price?',
-    message: 'Selling Price ($sym${DecimalSettings.formatAmount(sellingPrice)}) '
+    message:
+        'Selling Price ($sym${DecimalSettings.formatAmount(sellingPrice)}) '
         'is lower than Cost Price ($sym${DecimalSettings.formatAmount(costPrice)}).\n\n'
         'You will incur a loss of $sym${DecimalSettings.formatAmount(loss)} (-$lossPct% margin) per unit.',
     confirmLabel: 'Continue & Save',
@@ -305,7 +306,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: GoogleFonts.poppins(
-              fontSize: isTablet ? 20 : 18,
+              fontSize: AppResponsive.subheadingFontSize(context),
               fontWeight: FontWeight.w600,
               color: Colors.white,
             ),
@@ -320,7 +321,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             // M3 tints menu surfaces by default; keep them plain white.
             color: AppColors.white,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.borderRadius(context),
+              ),
             ),
             onSelected: (value) {
               switch (value) {
@@ -359,7 +362,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 _menuItem('labels', Icons.qr_code_2_rounded, 'Print Labels'),
             ],
           ),
-          const SizedBox(width: 4),
+          SizedBox(width: 4),
         ],
       ),
       body: SafeArea(
@@ -402,8 +405,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       value: value,
       child: Row(
         children: [
-          Icon(icon, size: 20, color: color ?? AppColors.textSecondary),
-          const SizedBox(width: 12),
+          Icon(
+            icon,
+            size: AppResponsive.iconSize(context),
+            color: color ?? AppColors.textSecondary,
+          ),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           Text(
             label,
             style: GoogleFonts.poppins(
@@ -438,20 +445,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         AppResponsive.screenPadding(context).right,
         0,
       ),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.mediumSpacing(context),
+        vertical: AppResponsive.mediumSpacing(context),
+      ),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.sell_outlined,
-            size: 18,
+            size: AppResponsive.smallIconSize(context),
             color: AppColors.textSecondary,
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Expanded(
             child: Text(
               bits.isEmpty ? 'No details set' : bits.join('  ·  '),
@@ -536,7 +548,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
         boxShadow: const [
           BoxShadow(
@@ -576,8 +590,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Expanded(
       child: Column(
         children: [
-          Icon(icon, color: AppColors.primary, size: 20),
-          const SizedBox(height: 4),
+          Icon(
+            icon,
+            color: AppColors.primary,
+            size: AppResponsive.iconSize(context),
+          ),
+          SizedBox(height: 4),
           Text(
             value,
             maxLines: 1,
@@ -605,17 +623,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final isUngrouped = groupKey == _ungroupedKey;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: EdgeInsets.only(bottom: AppResponsive.largeSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: EdgeInsets.symmetric(
+              horizontal: AppResponsive.mediumSpacing(context),
+              vertical: AppResponsive.mediumSpacing(context),
+            ),
             decoration: const BoxDecoration(
               border: Border(bottom: BorderSide(color: AppColors.divider)),
             ),
@@ -631,7 +654,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       border: Border.all(color: AppColors.divider),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
                 ],
                 Expanded(
                   child: Text(
@@ -675,7 +698,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return InkWell(
       onTap: () => _openEditVariant(variant),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+        padding: EdgeInsets.fromLTRB(
+          AppResponsive.mediumSpacing(context),
+          AppResponsive.mediumSpacing(context),
+          6,
+          AppResponsive.mediumSpacing(context),
+        ),
         decoration: const BoxDecoration(
           border: Border(bottom: BorderSide(color: AppColors.surfaceMedium)),
         ),
@@ -728,7 +756,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ],
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: 4),
                   Row(
                     children: [
                       Text(
@@ -769,7 +797,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         ExpiryStatusPill(
                           status: productStore.expiryStatusForVariant(variant),
                         ),
-                        const SizedBox(width: 6),
+                        SizedBox(width: 6),
                         Text(
                           kExpiryDateFormat.format(variant.expiryDateTime!),
                           style: GoogleFonts.poppins(
@@ -783,7 +811,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ],
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
             // Capped: a Column sizes to its widest child, and the text column
             // beside it is Expanded — so without a ceiling a long "MRP:"/"Cost:"
             // string would keep taking width from the variant description
@@ -862,14 +890,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (!canAdjust && !canPrint) return const SizedBox.shrink();
 
     return PopupMenuButton<String>(
-      icon: const Icon(
+      icon: Icon(
         Icons.more_vert,
         color: AppColors.textSecondary,
-        size: 20,
+        size: AppResponsive.iconSize(context),
       ),
       // M3 tints menu surfaces by default; keep them plain white.
       color: AppColors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+      ),
       onSelected: (value) {
         if (value == 'adjust') {
           _openAdjustStock(variant);
@@ -883,12 +915,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             value: 'adjust',
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.tune_rounded,
-                  size: 20,
+                  size: AppResponsive.iconSize(context),
                   color: AppColors.textSecondary,
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: AppResponsive.mediumSpacing(context)),
                 Text(
                   'Adjust Stock',
                   style: GoogleFonts.poppins(
@@ -904,12 +936,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             value: 'label',
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.qr_code_2_rounded,
-                  size: 20,
+                  size: AppResponsive.iconSize(context),
                   color: AppColors.textSecondary,
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: AppResponsive.mediumSpacing(context)),
                 Text(
                   'Print Label',
                   style: GoogleFonts.poppins(
@@ -1061,7 +1093,8 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
       return;
     }
 
-    final sellingPrice = double.tryParse(_sellingPriceController.text.trim()) ?? 0.0;
+    final sellingPrice =
+        double.tryParse(_sellingPriceController.text.trim()) ?? 0.0;
     final costPrice = _costPriceController.text.trim().isEmpty
         ? null
         : double.tryParse(_costPriceController.text.trim());
@@ -1146,7 +1179,7 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
               rows: _attrRows,
               onChanged: () => setState(() {}),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: AppResponsive.smallSpacing(context)),
             AppTextField(
               controller: _sellingPriceController,
               label: 'Selling Price',
@@ -1158,7 +1191,7 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Required' : null,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             AppTextField(
               controller: _costPriceController,
               label: 'Cost Price',
@@ -1167,7 +1200,7 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
               keyboardType: TextInputType.number,
               inputFormatters: _moneyFormatters,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             AppTextField(
               controller: _mrpController,
               label: 'MRP',
@@ -1176,7 +1209,7 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
               keyboardType: TextInputType.number,
               inputFormatters: _moneyFormatters,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             AppTextField(
               controller: _stockController,
               label: _allowDecimal
@@ -1194,7 +1227,7 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Required' : null,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             AppTextField(
               controller: _barcodeController,
               label: 'Barcode',
@@ -1208,11 +1241,14 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
               // dialog made you type a barcode by hand.
               suffixIcon: IconButton(
                 tooltip: 'Scan barcode',
-                icon: const Icon(Icons.qr_code_scanner, size: 20),
+                icon: Icon(
+                  Icons.qr_code_scanner,
+                  size: AppResponsive.iconSize(context),
+                ),
                 onPressed: _scanBarcode,
               ),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             AppTextField(
               controller: _skuController,
               label: 'SKU',
@@ -1249,7 +1285,7 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
       ),
       actions: [
         appDialogCancelButton(context),
-        const SizedBox(width: 12),
+        SizedBox(width: AppResponsive.mediumSpacing(context)),
         appDialogPrimaryButton(label: 'Add', onPressed: _save),
       ],
     );
@@ -1422,7 +1458,8 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
       return;
     }
 
-    final sellingPrice = double.tryParse(_sellingPriceController.text.trim()) ?? 0.0;
+    final sellingPrice =
+        double.tryParse(_sellingPriceController.text.trim()) ?? 0.0;
     final costPrice = _costPriceController.text.trim().isEmpty
         ? null
         : double.tryParse(_costPriceController.text.trim());
@@ -1492,7 +1529,7 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
               rows: _attrRows,
               onChanged: () => setState(() {}),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: AppResponsive.smallSpacing(context)),
             // The ONLY place a variant's barcode can be corrected. Without this
             // a duplicate or a typo was permanent short of deleting the variant.
             AppTextField(
@@ -1502,11 +1539,14 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
               icon: Icons.qr_code_2_rounded,
               suffixIcon: IconButton(
                 tooltip: 'Scan barcode',
-                icon: const Icon(Icons.qr_code_scanner, size: 20),
+                icon: Icon(
+                  Icons.qr_code_scanner,
+                  size: AppResponsive.iconSize(context),
+                ),
                 onPressed: _scanBarcode,
               ),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             AppTextField(
               controller: _sellingPriceController,
               label: 'Selling Price',
@@ -1518,7 +1558,7 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Required' : null,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             AppTextField(
               controller: _costPriceController,
               label: 'Cost Price',
@@ -1527,7 +1567,7 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
               keyboardType: TextInputType.number,
               inputFormatters: _moneyFormatters,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             AppTextField(
               controller: _mrpController,
               label: 'MRP',
@@ -1536,7 +1576,7 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
               keyboardType: TextInputType.number,
               inputFormatters: _moneyFormatters,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             // Stock is deliberately NOT editable here. Typing over it left no
             // reason, no audit row and no before/after, which is exactly what
             // made stock discrepancies unexplainable. Changes go through
@@ -1547,7 +1587,7 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
                   ? widget.variant.effectiveUnit
                   : null,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             AppTextField(
               controller: _minStockController,
               label: 'Min Stock',
@@ -1560,7 +1600,7 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
                   ? _decimalQtyFormatters
                   : _qtyFormatters,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             // Per-variant: a 500ml and a 1L of the same product are stocked
             // separately, so they expire separately.
             ExpiryDateField(
@@ -1598,7 +1638,7 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
       ),
       actions: [
         appDialogCancelButton(context),
-        const SizedBox(width: 12),
+        SizedBox(width: AppResponsive.mediumSpacing(context)),
         appDialogPrimaryButton(label: 'Update', onPressed: _save),
       ],
     );
@@ -1824,9 +1864,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
   /// handling stay in one place. That function returns void, so the newcomer is
   /// found by diffing the store rather than by return value.
   Future<void> _createAttribute() async {
-    final before = attributeStore.attributes
-        .map((a) => a.attributeId)
-        .toSet();
+    final before = attributeStore.attributes.map((a) => a.attributeId).toSet();
 
     await showAddAttributeDialog(context);
     if (!mounted) return;
@@ -2049,7 +2087,9 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
       accent: AppColors.info,
       icon: Icons.bolt_rounded,
       body: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: EdgeInsets.symmetric(
+          vertical: AppResponsive.mediumSpacing(context),
+        ),
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : Column(
@@ -2081,7 +2121,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
           ? [appDialogCancelButton(context, label: 'Close')]
           : [
               appDialogCancelButton(context),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               appDialogPrimaryButton(
                 label: 'Set up attributes',
                 color: AppColors.info,
@@ -2138,13 +2178,13 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
 
             // ── 2. Live preview ───────────────────────────────────────────
             if (combos.isNotEmpty) ...[
-              const SizedBox(height: 12),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               _buildPreviewBanner(context, combos),
             ],
 
             // ── 3. Per-variant price and stock ────────────────────────────
             if (combos.isNotEmpty) ...[
-              const SizedBox(height: 12),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               const Divider(color: AppColors.divider),
               Row(
                 children: [
@@ -2159,7 +2199,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
                   if (combos.length > 1)
                     TextButton.icon(
                       onPressed: _fillDown,
-                      icon: const Icon(Icons.south_rounded, size: 15),
+                      icon: Icon(Icons.south_rounded, size: 15),
                       label: Text(
                         'Fill down',
                         style: GoogleFonts.poppins(
@@ -2169,7 +2209,9 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
                       ),
                       style: TextButton.styleFrom(
                         foregroundColor: AppColors.info,
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppResponsive.smallSpacing(context),
+                        ),
                       ),
                     ),
                 ],
@@ -2178,7 +2220,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
             ],
 
             // ── 4. Everything shared ──────────────────────────────────────
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             const Divider(color: AppColors.divider),
             _sectionLabel(
               context,
@@ -2187,7 +2229,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
                   : 'Applies to all ${active.length} variant'
                         '${active.length == 1 ? '' : 's'}',
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             for (final attribute in _fields)
               if (!_axes.any(
                 (a) => a.attributeId == attribute.attributeId,
@@ -2198,7 +2240,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
                   hint: 'Same for all variants',
                   icon: Icons.label_outline_rounded,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
               ],
             AppTextField(
               controller: _costPriceController,
@@ -2208,7 +2250,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
               keyboardType: TextInputType.number,
               inputFormatters: _moneyFormatters,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             AppTextField(
               controller: _mrpController,
               label: 'MRP',
@@ -2217,7 +2259,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
               keyboardType: TextInputType.number,
               inputFormatters: _moneyFormatters,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             AppTextField(
               controller: _minStockController,
               label: 'Min Stock',
@@ -2230,7 +2272,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
                   ? _decimalQtyFormatters
                   : _qtyFormatters,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             AppTextField(
               controller: _baseBarcodeController,
               label: 'Base Barcode',
@@ -2240,7 +2282,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
               helperText: '789456 → 789456001, 789456002 …',
               icon: Icons.qr_code_rounded,
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: AppResponsive.smallSpacing(context)),
             Text(
               'Cost, MRP and Min Stock are the same for every variant here. '
               'Need one to differ? Add them, then open that variant and edit it.',
@@ -2255,7 +2297,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
       ),
       actions: [
         appDialogCancelButton(context),
-        const SizedBox(width: 12),
+        SizedBox(width: AppResponsive.mediumSpacing(context)),
         appDialogPrimaryButton(
           label: active.isEmpty ? 'Add' : 'Add ${active.length}',
           onPressed: _save,
@@ -2274,7 +2316,11 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
       tooltip: 'Add attribute',
       color: AppColors.white,
       position: PopupMenuPosition.under,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+      ),
       constraints: const BoxConstraints(maxHeight: 320, minWidth: 220),
       onSelected: (picked) {
         if (picked is AttributeModel) {
@@ -2289,12 +2335,12 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
             value: attribute,
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.label_outline_rounded,
-                  size: 18,
+                  size: AppResponsive.smallIconSize(context),
                   color: AppColors.info,
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Text(
                   attribute.name,
                   style: GoogleFonts.poppins(
@@ -2310,12 +2356,12 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
           value: 'new',
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.add_circle_outline_rounded,
-                size: 18,
+                size: AppResponsive.smallIconSize(context),
                 color: AppColors.textSecondary,
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Text(
                 'New attribute…',
                 style: GoogleFonts.poppins(
@@ -2328,12 +2374,19 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
         ),
       ],
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.smallSpacing(context),
+          vertical: 6,
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.add, size: 16, color: AppColors.info),
-            const SizedBox(width: 4),
+            Icon(
+              Icons.add,
+              size: AppResponsive.smallIconSize(context),
+              color: AppColors.info,
+            ),
+            SizedBox(width: 4),
             Text(
               'Add',
               style: GoogleFonts.poppins(
@@ -2355,7 +2408,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
 
     return Padding(
       key: ValueKey('bulk_axis_${axis.attributeId}'),
-      padding: const EdgeInsets.only(top: 10),
+      padding: EdgeInsets.only(top: AppResponsive.smallSpacing(context)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2376,7 +2429,9 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
                   onPressed: () => _toggleAllValues(axis, values),
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.info,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppResponsive.smallSpacing(context),
+                    ),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
@@ -2395,7 +2450,10 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
               if (_axes.length > 1)
                 IconButton(
                   tooltip: 'Remove ${axis.name}',
-                  icon: const Icon(Icons.close_rounded, size: 18),
+                  icon: Icon(
+                    Icons.close_rounded,
+                    size: AppResponsive.smallIconSize(context),
+                  ),
                   color: AppColors.textSecondary,
                   visualDensity: VisualDensity.compact,
                   onPressed: () => _removeAxis(axis),
@@ -2438,7 +2496,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
                 );
               }).toList(),
             ),
-          const SizedBox(height: 8),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           Row(
             children: [
               Expanded(
@@ -2451,7 +2509,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
                   onFieldSubmitted: (_) => _addValue(axis),
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               IconButton(
                 tooltip: 'Add this value to ${axis.name}',
                 icon: const Icon(Icons.add_circle, color: AppColors.info),
@@ -2476,7 +2534,10 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.mediumSpacing(context),
+        vertical: AppResponsive.smallSpacing(context),
+      ),
       decoration: BoxDecoration(
         color: AppColors.info.withOpacity(0.08),
         borderRadius: BorderRadius.circular(10),
@@ -2485,12 +2546,12 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
+          Icon(
             Icons.playlist_add_check_rounded,
-            size: 18,
+            size: AppResponsive.smallIconSize(context),
             color: AppColors.info,
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Expanded(
             child: Text(
               '${combos.length} variant${combos.length == 1 ? '' : 's'} '
@@ -2517,7 +2578,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
       // Keyed by the combination so unticking a middle value never shifts
       // another row's state onto the wrong controller.
       key: ValueKey('bulk_row_$key'),
-      padding: const EdgeInsets.only(top: 8),
+      padding: EdgeInsets.only(top: AppResponsive.smallSpacing(context)),
       child: Row(
         children: [
           // Skip a single combination without losing the value that produced
@@ -2546,7 +2607,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Expanded(
             flex: 3,
             child: AppTextField(
@@ -2566,7 +2627,7 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
               },
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Expanded(
             flex: 2,
             child: AppTextField(
@@ -2628,22 +2689,26 @@ class _MoreOptions extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 4),
+        SizedBox(height: 4),
         InkWell(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.smallBorderRadius(context),
+          ),
           onTap: onToggle,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: EdgeInsets.symmetric(
+              vertical: AppResponsive.smallSpacing(context),
+            ),
             child: Row(
               children: [
                 Icon(
                   expanded
                       ? Icons.expand_less_rounded
                       : Icons.expand_more_rounded,
-                  size: 20,
+                  size: AppResponsive.iconSize(context),
                   color: AppColors.primary,
                 ),
-                const SizedBox(width: 4),
+                SizedBox(width: 4),
                 Text(
                   'More options',
                   style: GoogleFonts.poppins(
@@ -2783,7 +2848,11 @@ class _AttributesSection extends StatelessWidget {
       tooltip: 'Add attribute',
       color: AppColors.white,
       position: PopupMenuPosition.under,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+      ),
       // A shop with a long catalogue gets a scrolling menu rather than one that
       // runs off the dialog.
       constraints: const BoxConstraints(maxHeight: 320, minWidth: 200),
@@ -2799,12 +2868,12 @@ class _AttributesSection extends StatelessWidget {
             value: attribute,
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.label_outline_rounded,
-                  size: 18,
+                  size: AppResponsive.smallIconSize(context),
                   color: AppColors.primary,
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Text(
                   attribute.name,
                   style: GoogleFonts.poppins(
@@ -2820,12 +2889,12 @@ class _AttributesSection extends StatelessWidget {
           value: 'custom',
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.add_circle_outline_rounded,
-                size: 18,
+                size: AppResponsive.smallIconSize(context),
                 color: AppColors.textSecondary,
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Text(
                 'Custom detail',
                 style: GoogleFonts.poppins(
@@ -2838,12 +2907,19 @@ class _AttributesSection extends StatelessWidget {
         ),
       ],
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.smallSpacing(context),
+          vertical: 6,
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.add, size: 16, color: AppColors.primary),
-            const SizedBox(width: 4),
+            Icon(
+              Icons.add,
+              size: AppResponsive.smallIconSize(context),
+              color: AppColors.primary,
+            ),
+            SizedBox(width: 4),
             Text(
               'Add',
               style: GoogleFonts.poppins(
@@ -2878,10 +2954,10 @@ class _AttributesSection extends StatelessWidget {
             ),
           ),
         for (final row in rows) ...[
-          const SizedBox(height: 8),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           _buildRow(context, row),
         ],
-        const SizedBox(height: 12),
+        SizedBox(height: AppResponsive.mediumSpacing(context)),
         const Divider(color: AppColors.divider),
         const SizedBox(height: 4),
       ],
@@ -2891,7 +2967,10 @@ class _AttributesSection extends StatelessWidget {
   Widget _buildRow(BuildContext context, _AttrRow row) {
     final remove = IconButton(
       tooltip: 'Remove',
-      icon: const Icon(Icons.close_rounded, size: 18),
+      icon: Icon(
+        Icons.close_rounded,
+        size: AppResponsive.smallIconSize(context),
+      ),
       color: AppColors.textSecondary,
       onPressed: () {
         rows.remove(row);
@@ -2912,7 +2991,7 @@ class _AttributesSection extends StatelessWidget {
               icon: Icons.label_outline_rounded,
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Expanded(
             child: AppTextField(
               controller: row.valueController,
@@ -2942,15 +3021,17 @@ class _AttributesSection extends StatelessWidget {
             suffixIcon: values.isEmpty
                 ? null
                 : PopupMenuButton<String>(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.keyboard_arrow_down_rounded,
-                      size: 22,
+                      size: AppResponsive.iconSize(context),
                       color: AppColors.textSecondary,
                     ),
                     tooltip: 'Choose ${row.attribute!.name}',
                     color: AppColors.white,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.borderRadius(context),
+                      ),
                     ),
                     onSelected: (value) {
                       row.valueController.text = value;

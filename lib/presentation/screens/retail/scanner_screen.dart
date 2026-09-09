@@ -3,6 +3,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 /// Full-screen barcode scanner that returns the scanned code to its caller.
 ///
@@ -57,11 +58,11 @@ class _ScannerScreenState extends State<ScannerScreen> {
         title: 'Scan Barcode',
         actions: [
           IconButton(
-            icon: const Icon(Icons.flash_on, color: Colors.white),
+            icon: Icon(Icons.flash_on, color: Colors.white),
             tooltip: 'Toggle torch',
             onPressed: () => _controller.toggleTorch(),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
         ],
       ),
       // The scan window is a Rect in the scanner's own layout space, so it has
@@ -70,8 +71,10 @@ class _ScannerScreenState extends State<ScannerScreen> {
       body: LayoutBuilder(
         builder: (context, constraints) {
           final Size previewSize = constraints.biggest;
-          final double windowWidth =
-              (previewSize.width * 0.75).clamp(200.0, 320.0);
+          final double windowWidth = (previewSize.width * 0.75).clamp(
+            200.0,
+            320.0,
+          );
           final Rect scanWindow = Rect.fromCenter(
             center: previewSize.center(Offset.zero),
             width: windowWidth,
@@ -99,7 +102,9 @@ class _ScannerScreenState extends State<ScannerScreen> {
                   scanWindow: scanWindow,
                   borderColor: AppColors.success,
                   borderWidth: 3,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.borderRadius(context),
+                  ),
                 ),
               ),
             ],

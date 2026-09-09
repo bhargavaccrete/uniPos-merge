@@ -55,7 +55,9 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
           children: options.map((value) {
             final selected = value == current;
             return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: EdgeInsets.only(
+                bottom: AppResponsive.smallSpacing(context),
+              ),
               child: Material(
                 color: selected
                     ? AppColors.primary.withValues(alpha: 0.08)
@@ -65,9 +67,9 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
                   borderRadius: BorderRadius.circular(10),
                   onTap: () => Navigator.pop(dialogContext, value),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppResponsive.mediumSpacing(context),
+                      vertical: AppResponsive.mediumSpacing(context),
                     ),
                     child: Row(
                       children: [
@@ -80,7 +82,7 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
                               ? AppColors.primary
                               : AppColors.textSecondary,
                         ),
-                        const SizedBox(width: 12),
+                        SizedBox(width: AppResponsive.mediumSpacing(context)),
                         Text(
                           '$value units or fewer',
                           style: GoogleFonts.poppins(
@@ -127,7 +129,7 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
                       size: AppResponsive.smallIconSize(context),
                       color: Colors.white,
                     ),
-                    const SizedBox(width: 4),
+                    SizedBox(width: 4),
                     Text(
                       '≤${_alertStore.threshold}',
                       style: GoogleFonts.poppins(
@@ -258,10 +260,12 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
     final variantInfo = _buildVariantDescription(item);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(
           color: alertColor,
           width: isOutOfStock || isCritical ? 2 : 1,
@@ -275,19 +279,21 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: AppResponsive.cardPadding(context),
         child: Row(
           children: [
             // Alert Icon
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
               decoration: BoxDecoration(
                 color: alertColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
               ),
               child: Icon(alertIcon, color: alertColor, size: 28),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: AppResponsive.largeSpacing(context)),
             // Product Info
             Expanded(
               child: Column(
@@ -295,7 +301,7 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
                 children: [
                   Text(
                     item['productName'] ?? 'Unknown Product',
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
                     ),
@@ -303,10 +309,10 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (variantInfo.isNotEmpty) ...[
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4),
                     Text(
                       variantInfo,
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.captionFontSize(context),
                         color: AppColors.textSecondary,
                       ),
@@ -334,21 +340,23 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
                   ),
                   decoration: BoxDecoration(
                     color: alertColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.smallBorderRadius(context),
+                    ),
                   ),
                   child: Text(
                     formatQty(stock),
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.headingFontSize(context),
                       fontWeight: FontWeight.bold,
                       color: alertColor,
                     ),
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                   'in stock',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: AppResponsive.captionFontSize(context),
                     color: alertColor.withValues(alpha: 0.7),
                   ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 /// A dropdown field styled to match [AppTextField], used for Country / State /
 /// City on the registration screen. Tapping it opens a searchable dialog.
@@ -101,8 +102,10 @@ class LocationDropdownField extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Icon(Icons.arrow_drop_down_rounded,
-                        color: AppColors.textSecondary),
+                    Icon(
+                      Icons.arrow_drop_down_rounded,
+                      color: AppColors.textSecondary,
+                    ),
                   ],
                 ),
               ),
@@ -178,7 +181,9 @@ class _LocationPickerDialogState extends State<_LocationPickerDialog> {
   bool get _showCustomRow =>
       widget.allowCustom &&
       _query.trim().isNotEmpty &&
-      !widget.options.any((o) => o.toLowerCase() == _query.trim().toLowerCase());
+      !widget.options.any(
+        (o) => o.toLowerCase() == _query.trim().toLowerCase(),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -189,13 +194,16 @@ class _LocationPickerDialogState extends State<_LocationPickerDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: 440,
+          // Same width as every other dialog in the app (∞ / 500 / 600) — a
+          // fixed 440 left this picker narrower than its neighbours on desktop.
+          maxWidth: AppResponsive.dialogWidth(context),
           // Shorter dialog: ~55% of the visible area (screen minus keyboard),
           // capped at 440 so it never dominates the screen.
-          maxHeight: ((MediaQuery.of(context).size.height -
-                      MediaQuery.of(context).viewInsets.bottom) *
-                  0.55)
-              .clamp(280.0, 440.0),
+          maxHeight:
+              ((MediaQuery.of(context).size.height -
+                          MediaQuery.of(context).viewInsets.bottom) *
+                      0.55)
+                  .clamp(280.0, 440.0),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -206,8 +214,9 @@ class _LocationPickerDialogState extends State<_LocationPickerDialog> {
               padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.06),
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
+                ),
               ),
               child: Row(
                 children: [
@@ -217,21 +226,33 @@ class _LocationPickerDialogState extends State<_LocationPickerDialog> {
                       color: AppColors.primary.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(widget.icon, color: AppColors.primary, size: 22),
+                    child: Icon(
+                      widget.icon,
+                      color: AppColors.primary,
+                      size: 22,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'Select ${widget.title}',
                       style: GoogleFonts.poppins(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary),
+                        fontSize: AppResponsive.getValue(
+                          context,
+                          mobile: 17.0,
+                          tablet: 18.0,
+                          desktop: 20.0,
+                        ),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.close_rounded,
-                        color: AppColors.textSecondary),
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: AppColors.textSecondary,
+                    ),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -244,18 +265,26 @@ class _LocationPickerDialogState extends State<_LocationPickerDialog> {
                 controller: _searchController,
                 autofocus: true,
                 onChanged: (v) => setState(() => _query = v),
-                style: GoogleFonts.poppins(fontSize: 14),
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                ),
                 decoration: InputDecoration(
                   hintText: 'Search ${widget.title.toLowerCase()}',
                   hintStyle: GoogleFonts.poppins(
-                      fontSize: 14, color: AppColors.textSecondary),
-                  prefixIcon:
-                      Icon(Icons.search_rounded, color: AppColors.textSecondary),
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    color: AppColors.textSecondary,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    color: AppColors.textSecondary,
+                  ),
                   isDense: true,
                   filled: true,
                   fillColor: AppColors.surfaceLight,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: const BorderSide(color: AppColors.divider),
@@ -266,8 +295,10 @@ class _LocationPickerDialogState extends State<_LocationPickerDialog> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                        const BorderSide(color: AppColors.primary, width: 1.5),
+                    borderSide: const BorderSide(
+                      color: AppColors.primary,
+                      width: 1.5,
+                    ),
                   ),
                 ),
               ),
@@ -279,7 +310,9 @@ class _LocationPickerDialogState extends State<_LocationPickerDialog> {
                       child: Text(
                         'No matches',
                         style: GoogleFonts.poppins(
-                            fontSize: 14, color: AppColors.textSecondary),
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     )
                   : ListView(
@@ -288,14 +321,17 @@ class _LocationPickerDialogState extends State<_LocationPickerDialog> {
                       children: [
                         if (_showCustomRow)
                           ListTile(
-                            leading: Icon(Icons.add_circle_outline_rounded,
-                                color: AppColors.primary),
+                            leading: Icon(
+                              Icons.add_circle_outline_rounded,
+                              color: AppColors.primary,
+                            ),
                             title: Text(
                               'Use "${_query.trim()}"',
                               style: GoogleFonts.poppins(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.primary),
+                                fontSize: AppResponsive.bodyFontSize(context),
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.primary,
+                              ),
                             ),
                             onTap: () => Navigator.pop(context, _query.trim()),
                           ),
@@ -303,22 +339,27 @@ class _LocationPickerDialogState extends State<_LocationPickerDialog> {
                           final isSel = o == widget.selected;
                           return ListTile(
                             selected: isSel,
-                            selectedTileColor:
-                                AppColors.primary.withValues(alpha: 0.08),
+                            selectedTileColor: AppColors.primary.withValues(
+                              alpha: 0.08,
+                            ),
                             title: Text(
                               o,
                               style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                fontWeight:
-                                    isSel ? FontWeight.w600 : FontWeight.w400,
+                                fontSize: AppResponsive.bodyFontSize(context),
+                                fontWeight: isSel
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
                                 color: isSel
                                     ? AppColors.primary
                                     : AppColors.textPrimary,
                               ),
                             ),
                             trailing: isSel
-                                ? Icon(Icons.check_rounded,
-                                    color: AppColors.primary, size: 20)
+                                ? Icon(
+                                    Icons.check_rounded,
+                                    color: AppColors.primary,
+                                    size: 20,
+                                  )
                                 : null,
                             onTap: () => Navigator.pop(context, o),
                           );

@@ -101,7 +101,7 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                   textCapitalization: TextCapitalization.words,
                   textInputAction: TextInputAction.next,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 AppTextField(
                   controller: phoneController,
                   label: 'Phone',
@@ -114,14 +114,14 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                   validator: (v) => PhoneRule.validate(v, required: false),
                   textInputAction: TextInputAction.next,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 AppTextField(
                   controller: addressController,
                   label: 'Address',
                   icon: Icons.location_on_outlined,
                   maxLines: 2,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 AppTextField(
                   controller: gstController,
                   label: 'GST Number',
@@ -130,7 +130,7 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                   textCapitalization: TextCapitalization.characters,
                 ),
                 if (!isEdit) ...[
-                  const SizedBox(height: 12),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
                   AppTextField(
                     controller: openingBalanceController,
                     label: 'Opening Balance',
@@ -150,7 +150,7 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
             ),
             actions: [
               appDialogCancelButton(dialogContext),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               appDialogPrimaryButton(
                 label: isEdit ? 'Save' : 'Add Supplier',
                 onPressed: () => _saveSupplier(
@@ -303,39 +303,22 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
 
   // ==================== BUILD ====================
 
-  /// Caps content width on large screens. Backgrounds still span edge to edge —
-  /// only what you read is constrained, so a laptop doesn't stretch a one-line
-  /// supplier row across the whole window.
-  Widget _capped(BuildContext context, Widget child) {
-    final maxWidth = AppResponsive.maxContentWidth(context);
-    if (maxWidth == double.infinity) return child;
-    return Align(
-      // topCenter, not Center: Center aligns on BOTH axes, so a
-      // shrink-wrapping child floats in the vertical middle.
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: buildPrimaryAppBar(
-        title: 'Suppliers',
-      ),
+      appBar: buildPrimaryAppBar(title: 'Suppliers'),
       body: MoneyScope(
         child: Column(
           children: [
             Container(
               color: AppColors.white,
               padding: AppResponsive.padding(context),
-              child: _capped(
-                context,
-                AppTextField(
+              child: AppResponsive.constrainedContent(
+                context: context,
+                alignment: Alignment.topCenter,
+                maxWidth: AppResponsive.maxContentWidth(context),
+                child: AppTextField(
                   controller: _searchController,
                   hint: 'Search by name, phone, or GST...',
                   icon: Icons.search_rounded,
@@ -377,10 +360,14 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                           );
                   }
 
-                  return _capped(
-                    context,
-                    ListView.builder(
-                      padding: AppResponsive.padding(context).copyWith(bottom: 88),
+                  return AppResponsive.constrainedContent(
+                    context: context,
+                    alignment: Alignment.topCenter,
+                    maxWidth: AppResponsive.maxContentWidth(context),
+                    child: ListView.builder(
+                      padding: AppResponsive.padding(
+                        context,
+                      ).copyWith(bottom: 88),
                       itemCount: suppliers.length,
                       itemBuilder: (context, index) =>
                           _buildSupplierCard(context, suppliers[index]),
@@ -412,9 +399,11 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
             horizontal: AppResponsive.padding(context).left,
             vertical: AppResponsive.smallSpacing(context),
           ),
-          child: _capped(
-            context,
-            Row(
+          child: AppResponsive.constrainedContent(
+            context: context,
+            alignment: Alignment.topCenter,
+            maxWidth: AppResponsive.maxContentWidth(context),
+            child: Row(
               children: [
                 _buildStatChip(
                   context,

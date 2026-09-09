@@ -219,21 +219,6 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen>
     );
   }
 
-  /// Caps content width on large screens so the cards don't stretch across a
-  /// laptop. topCenter, not Center — Center aligns on BOTH axes, so a
-  /// shrink-wrapping child would float in the vertical middle.
-  Widget _capped(Widget child) {
-    final maxWidth = AppResponsive.maxCardWidth(context);
-    if (maxWidth == double.infinity) return child;
-    return Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
-      ),
-    );
-  }
-
   EdgeInsets get _pagePad => EdgeInsets.fromLTRB(
     AppResponsive.padding(context).left,
     AppResponsive.mediumSpacing(context),
@@ -250,8 +235,11 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen>
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: _pagePad,
-        child: _capped(
-          Column(
+        child: AppResponsive.constrainedContent(
+          context: context,
+          alignment: Alignment.topCenter,
+          maxWidth: AppResponsive.maxCardWidth(context),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildContactCard(),
@@ -583,7 +571,12 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen>
                     padding: _pagePad,
                     itemCount: entries.length,
                     itemBuilder: (context, index) =>
-                        _capped(_card(child: _ledgerRow(entries[index]))),
+                        AppResponsive.constrainedContent(
+                          context: context,
+                          alignment: Alignment.topCenter,
+                          maxWidth: AppResponsive.maxCardWidth(context),
+                          child: _card(child: _ledgerRow(entries[index])),
+                        ),
                   ),
                 ),
         ),
@@ -598,8 +591,11 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen>
         horizontal: AppResponsive.padding(context).left,
         vertical: AppResponsive.smallSpacing(context),
       ),
-      child: _capped(
-        Row(
+      child: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxCardWidth(context),
+        child: Row(
           children: [
             Expanded(
               child: Text(
@@ -732,8 +728,11 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen>
         itemCount: _purchases.length + 1,
         itemBuilder: (context, index) {
           if (index == _purchases.length) {
-            return _capped(
-              Padding(
+            return AppResponsive.constrainedContent(
+              context: context,
+              alignment: Alignment.topCenter,
+              maxWidth: AppResponsive.maxCardWidth(context),
+              child: Padding(
                 padding: EdgeInsets.only(
                   top: AppResponsive.mediumSpacing(context),
                 ),
@@ -762,7 +761,12 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen>
               ),
             );
           }
-          return _capped(_purchaseGroupCard(_purchases[index]));
+          return AppResponsive.constrainedContent(
+            context: context,
+            alignment: Alignment.topCenter,
+            maxWidth: AppResponsive.maxCardWidth(context),
+            child: _purchaseGroupCard(_purchases[index]),
+          );
         },
       ),
     );
@@ -843,7 +847,10 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen>
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          padding: EdgeInsets.symmetric(
+            horizontal: AppResponsive.smallSpacing(context),
+            vertical: 3,
+          ),
           decoration: BoxDecoration(
             color: accent.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(6),
@@ -924,7 +931,7 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen>
           Container(
             width: 2,
             height: 30,
-            margin: const EdgeInsets.only(right: 10),
+            margin: EdgeInsets.only(right: AppResponsive.smallSpacing(context)),
             color: AppColors.divider,
           ),
           Expanded(

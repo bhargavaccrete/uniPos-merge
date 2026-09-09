@@ -120,14 +120,15 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isTablet = !AppResponsive.isMobile(context);
+    // True on desktop too — it means "not a phone", not "tablet".
+    final isWide = !AppResponsive.isMobile(context);
     final isDesktop = AppResponsive.isDesktop(context);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Products',
-        titleFontSize: isTablet ? 22 : 20,
+        titleFontSize: AppResponsive.headingFontSize(context),
         actions: [
           // Products tab only, admin only. Shares the tab-tracking builder
           // below because its visibility depends on the same animation value.
@@ -167,7 +168,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
       body: SafeArea(
         child: Column(
           children: [
-            _buildTabBar(isTablet, isDesktop),
+            _buildTabBar(isWide, isDesktop),
             Expanded(
               child: isDesktop
                   ? Center(
@@ -206,10 +207,14 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
   }
 
   // ==================== TAB BAR ====================
-  Widget _buildTabBar(bool isTablet, bool isDesktop) {
+  Widget _buildTabBar(bool isWide, bool isDesktop) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(isTablet ? 16 : 12),
+      padding: EdgeInsets.all(
+        isWide
+            ? AppResponsive.cardPadding(context).left
+            : AppResponsive.mediumSpacing(context),
+      ),
       decoration: const BoxDecoration(
         color: AppColors.white,
         border: Border(bottom: BorderSide(color: AppColors.divider)),
@@ -226,7 +231,8 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
             final row = Row(
               children: [
                 for (var i = 0; i < _titles.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 8),
+                  if (i > 0)
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
                   Expanded(child: _buildTabButton(i, _titles[i], _countFor(i))),
                 ],
               ],
@@ -254,7 +260,10 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.mediumSpacing(context),
+          vertical: AppResponsive.smallSpacing(context),
+        ),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary : AppColors.white,
           borderRadius: BorderRadius.circular(10),

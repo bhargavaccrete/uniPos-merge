@@ -72,6 +72,15 @@ class _InventoryScreenState extends State<InventoryScreen>
     super.dispose();
   }
 
+  /// Horizontal gutter shared by the search bar, the mobile list, the grid and
+  /// the desktop header.
+  ///
+  /// They MUST agree. The search row used 20 while the list used 16 and the
+  /// desktop header/grid used 32 — and on desktop the row was additionally
+  /// wrapped in `EdgeInsets.all(24)`, putting the field at 44 against cards at
+  /// 32. The Categories tab carried the same mismatch, so both now read this.
+  double get _gutter => AppResponsive.padding(context).left;
+
   void _clearSearch() {
     if (_searchController.text.isEmpty && _searchQuery.isEmpty) return;
     _searchController.clear();
@@ -150,8 +159,9 @@ class _InventoryScreenState extends State<InventoryScreen>
             categoryName: categoryLabel(product),
             totalStock: totalStock,
             status: productStore.stockStatusForQty(totalStock),
-            expiryStatus:
-                productStore.expiryStatusForProduct(product.productId),
+            expiryStatus: productStore.expiryStatusForProduct(
+              product.productId,
+            ),
             price: productStore.costPriceFor(product.productId),
           );
         })
@@ -371,7 +381,10 @@ class _InventoryScreenState extends State<InventoryScreen>
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+          padding: EdgeInsets.symmetric(
+            horizontal: _gutter,
+            vertical: AppResponsive.largeSpacing(context),
+          ),
           decoration: const BoxDecoration(
             color: AppColors.white,
             border: Border(
@@ -388,7 +401,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                   color: AppColors.textPrimary,
                 ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: AppResponsive.largeSpacing(context)),
               Observer(
                 builder: (context) => Container(
                   padding: const EdgeInsets.symmetric(
@@ -397,7 +410,9 @@ class _InventoryScreenState extends State<InventoryScreen>
                   ),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.borderRadius(context),
+                    ),
                   ),
                   child: Text(
                     '${productStore.products.length} products',
@@ -412,7 +427,10 @@ class _InventoryScreenState extends State<InventoryScreen>
             ],
           ),
         ),
-        Padding(padding: const EdgeInsets.all(24), child: _buildSearchBarRow()),
+        // No wrapping Padding: the row supplies its own gutter, and an extra
+        // 24 here is what pushed the field 12px right of the cards below.
+        // Full-bleed white also matches the header band directly above it.
+        _buildSearchBarRow(),
         Expanded(child: _buildProductGrid(context)),
       ],
     );
@@ -449,11 +467,14 @@ class _InventoryScreenState extends State<InventoryScreen>
       tablet: 196.0,
       desktop: 222.0,
     );
-    final padding = AppResponsive.getValue(
-      context,
-      mobile: const EdgeInsets.fromLTRB(20, 20, 20, 88),
-      tablet: const EdgeInsets.fromLTRB(20, 20, 20, 88),
-      desktop: const EdgeInsets.fromLTRB(32, 8, 32, 88),
+    // Same gutter as the search bar above — see _gutter. Bottom clears the
+    // host's FAB and stays static: it is coupled to that button, not a
+    // breakpoint.
+    final padding = EdgeInsets.fromLTRB(
+      _gutter,
+      AppResponsive.mediumSpacing(context),
+      _gutter,
+      88,
     );
 
     return Observer(
@@ -561,7 +582,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                     ),
                   ),
                   if (row.product.hasVariants) ...[
-                    const SizedBox(width: 8),
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
                     _buildVariantCountChip(row.variants.length),
                   ],
                 ],
@@ -594,7 +615,12 @@ class _InventoryScreenState extends State<InventoryScreen>
         return ListView.builder(
           // Bottom pad clears the host's FAB, matching the Categories tab —
           // without it the last product card sits under the + button.
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
+          padding: EdgeInsets.fromLTRB(
+            _gutter,
+            AppResponsive.mediumSpacing(context),
+            _gutter,
+            88,
+          ),
           itemCount: rows.length,
           itemBuilder: (context, index) => _buildProductCard(rows[index]),
         );
@@ -605,20 +631,24 @@ class _InventoryScreenState extends State<InventoryScreen>
   Widget _buildProductCard(_ProductRow row) {
     return InkWell(
       onTap: () => _openProduct(row.product),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(
+        AppResponsive.smallBorderRadius(context),
+      ),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
+        margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.smallBorderRadius(context),
+          ),
           border: Border.all(color: AppColors.divider, width: 0.5),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
           child: Row(
             children: [
-              _buildThumbnail(row.product, 44),
-              const SizedBox(width: 12),
+              _buildThumbnail(row.product, AppResponsive.avatarSize(context)),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -641,7 +671,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: AppResponsive.smallSpacing(context)),
                         _buildPriceText(
                           row.price,
                           fontSize: AppResponsive.bodyFontSize(context),
@@ -698,7 +728,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               _buildProductMenu(row.product),
             ],
           ),
@@ -712,7 +742,9 @@ class _InventoryScreenState extends State<InventoryScreen>
   Widget _buildThumbnail(ProductModel product, double size) {
     final bytes = product.imageBytes;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(
+        AppResponsive.smallBorderRadius(context),
+      ),
       child: Container(
         width: size,
         height: size,
@@ -750,7 +782,12 @@ class _InventoryScreenState extends State<InventoryScreen>
   Widget _buildSearchBarRow() {
     return Container(
       color: AppColors.white,
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+      padding: EdgeInsets.fromLTRB(
+        _gutter,
+        AppResponsive.mediumSpacing(context),
+        _gutter,
+        AppResponsive.largeSpacing(context),
+      ),
       child: AppTextField(
         controller: _searchController,
         hint: 'Search by name or scan barcode...',
@@ -761,20 +798,20 @@ class _InventoryScreenState extends State<InventoryScreen>
             // Only offered once there is something to clear.
             if (_searchQuery.isNotEmpty)
               IconButton(
-                icon: const Icon(
+                icon: Icon(
                   Icons.close_rounded,
                   color: AppColors.textSecondary,
-                  size: 20,
+                  size: AppResponsive.iconSize(context),
                 ),
                 tooltip: 'Clear search',
                 visualDensity: VisualDensity.compact,
                 onPressed: _clearSearch,
               ),
             IconButton(
-              icon: const Icon(
+              icon: Icon(
                 Icons.qr_code_scanner,
                 color: AppColors.primary,
-                size: 20,
+                size: AppResponsive.iconSize(context),
               ),
               tooltip: 'Scan barcode',
               visualDensity: VisualDensity.compact,

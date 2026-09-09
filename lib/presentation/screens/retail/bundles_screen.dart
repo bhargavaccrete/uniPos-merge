@@ -48,10 +48,11 @@ class _BundlesScreenState extends State<BundlesScreen> {
       appBar: buildPrimaryAppBar(title: 'Bundles'),
       body: Observer(
         builder: (context) {
-          final bundleProducts = productStore.products
-              .where((p) => p.needsBundleComponents)
-              .toList()
-            ..sort((a, b) => a.productName.compareTo(b.productName));
+          final bundleProducts =
+              productStore.products
+                  .where((p) => p.needsBundleComponents)
+                  .toList()
+                ..sort((a, b) => a.productName.compareTo(b.productName));
 
           if (bundleProducts.isEmpty) {
             return AppEmptyState(
@@ -72,7 +73,9 @@ class _BundlesScreenState extends State<BundlesScreen> {
               if (productStore.variantsFor(product.productId).isEmpty)
                 _BundleCardEntry(product: product, variant: null)
               else
-                for (final variant in productStore.variantsFor(product.productId))
+                for (final variant in productStore.variantsFor(
+                  product.productId,
+                ))
                   _BundleCardEntry(product: product, variant: variant),
           ];
 
@@ -85,7 +88,12 @@ class _BundlesScreenState extends State<BundlesScreen> {
                 crossAxisCount: AppResponsive.gridColumns(context),
                 crossAxisSpacing: AppResponsive.gridSpacing(context),
                 mainAxisSpacing: AppResponsive.gridSpacing(context),
-                childAspectRatio: 0.92,
+                childAspectRatio: AppResponsive.getValue(
+                  context,
+                  mobile: 0.80,
+                  tablet: 0.78,
+                  desktop: 0.76,
+                ),
               ),
               itemCount: cardEntries.length,
               itemBuilder: (context, index) {
@@ -121,6 +129,13 @@ class _BundleCardEntry {
   const _BundleCardEntry({required this.product, required this.variant});
 }
 
+// Everything INSIDE a _BundleCard keeps static padding, gaps and icon sizes.
+// The grid gives each cell a FIXED height via childAspectRatio, so growing the
+// interior is what re-triggers BOTTOM OVERFLOWED. The fonts and the aspect
+// ratio scale instead: the ratio drops on wider breakpoints (0.80/0.78/0.76)
+// precisely to buy the height the larger fonts need, and the card's Spacer()
+// absorbs whatever slack is left.
+
 class _BundleCard extends StatelessWidget {
   final ProductModel product;
   final VarianteModel? variant;
@@ -144,14 +159,18 @@ class _BundleCard extends StatelessWidget {
 
     return Material(
       color: AppColors.white,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.borderRadius(context),
+            ),
             border: Border.all(color: AppColors.divider),
             boxShadow: [
               BoxShadow(
@@ -171,7 +190,7 @@ class _BundleCard extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.poppins(
-                  fontSize: 14.5,
+                  fontSize: AppResponsive.bodyFontSize(context),
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
                 ),
@@ -185,7 +204,7 @@ class _BundleCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
-                    fontSize: 11,
+                    fontSize: AppResponsive.captionFontSize(context),
                     fontWeight: FontWeight.w500,
                     color: AppColors.textSecondary,
                   ),
@@ -194,7 +213,8 @@ class _BundleCard extends StatelessWidget {
               const Spacer(),
               _InfoRow(
                 icon: Icons.inventory_2_outlined,
-                label: '$componentCount component${componentCount == 1 ? '' : 's'}',
+                label:
+                    '$componentCount component${componentCount == 1 ? '' : 's'}',
               ),
               const SizedBox(height: 6),
               _InfoRow(
@@ -207,7 +227,7 @@ class _BundleCard extends StatelessWidget {
                 Text(
                   'No variant configured',
                   style: GoogleFonts.poppins(
-                    fontSize: 11,
+                    fontSize: AppResponsive.captionFontSize(context),
                     color: AppColors.danger,
                     fontWeight: FontWeight.w600,
                   ),
@@ -259,7 +279,7 @@ class _StockModeBadge extends StatelessWidget {
           Text(
             isRepack ? 'Repack / Kit' : 'Bundle',
             style: GoogleFonts.poppins(
-              fontSize: 10.5,
+              fontSize: AppResponsive.captionFontSize(context),
               fontWeight: FontWeight.w700,
               color: color,
             ),
@@ -288,7 +308,7 @@ class _InfoRow extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: GoogleFonts.poppins(
-              fontSize: 11.5,
+              fontSize: AppResponsive.captionFontSize(context),
               color: AppColors.textSecondary,
             ),
           ),
@@ -323,14 +343,16 @@ class _AvailabilityPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         available <= 0 ? 'Out of stock' : '$available can be sold',
         textAlign: TextAlign.center,
         style: GoogleFonts.poppins(
-          fontSize: 12,
+          fontSize: AppResponsive.smallFontSize(context),
           fontWeight: FontWeight.w700,
           color: color,
         ),

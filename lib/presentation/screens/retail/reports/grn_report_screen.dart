@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
@@ -145,7 +146,7 @@ class GRNReportScreen extends StatelessWidget {
             DataCell(
               Text(
                 formatQty(damaged),
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   color: damaged > 0 ? AppColors.danger : null,
                   fontWeight: damaged > 0 ? FontWeight.w600 : null,
                 ),

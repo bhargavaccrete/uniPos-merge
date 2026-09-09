@@ -35,40 +35,47 @@ class ExpiryAlertsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(title: 'Expiry Alerts'),
+      // Capped to match the sibling Stock Alerts screen — without it this list
+      // of alert cards stretched edge to edge on a laptop.
       body: SafeArea(
-        child: Observer(
-          builder: (_) {
-            // Touch the observable collections so MobX re-runs this builder
-            // when a product or variant changes.
-            productStore.products.length;
-            productStore.variants.length;
+        child: AppResponsive.constrainedContent(
+          context: context,
+          alignment: Alignment.topCenter,
+          maxWidth: AppResponsive.maxContentWidth(context),
+          child: Observer(
+            builder: (_) {
+              // Touch the observable collections so MobX re-runs this builder
+              // when a product or variant changes.
+              productStore.products.length;
+              productStore.variants.length;
 
-            final summary = ExpiryAlertService.getExpirySummary();
-            final items = summary['items'] as List<Map<String, dynamic>>;
+              final summary = ExpiryAlertService.getExpirySummary();
+              final items = summary['items'] as List<Map<String, dynamic>>;
 
-            if (items.isEmpty) {
-              return const AppEmptyState(
-                icon: Icons.check_circle,
-                title: 'Nothing expiring',
-                message:
-                    'No product is expired or expiring within $kExpiryWarningDays days.',
-              );
-            }
+              if (items.isEmpty) {
+                return const AppEmptyState(
+                  icon: Icons.check_circle,
+                  title: 'Nothing expiring',
+                  message:
+                      'No product is expired or expiring within $kExpiryWarningDays days.',
+                );
+              }
 
-            return Column(
-              children: [
-                _buildSummarySection(context, summary),
-                Expanded(
-                  child: ListView.builder(
-                    padding: AppResponsive.padding(context),
-                    itemCount: items.length,
-                    itemBuilder: (context, index) =>
-                        _buildAlertCard(context, items[index]),
+              return Column(
+                children: [
+                  _buildSummarySection(context, summary),
+                  Expanded(
+                    child: ListView.builder(
+                      padding: AppResponsive.padding(context),
+                      itemCount: items.length,
+                      itemBuilder: (context, index) =>
+                          _buildAlertCard(context, items[index]),
+                    ),
                   ),
-                ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -143,7 +150,7 @@ class ExpiryAlertsScreen extends StatelessWidget {
                     ),
                   ),
                   if (_variantDescription(item).isNotEmpty) ...[
-                    const SizedBox(height: 2),
+                    SizedBox(height: 2),
                     Text(
                       _variantDescription(item),
                       style: GoogleFonts.poppins(
@@ -152,16 +159,12 @@ class ExpiryAlertsScreen extends StatelessWidget {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 6),
-                  AppStatusPill(
-                    label: status.label,
-                    color: color,
-                    dense: true,
-                  ),
+                  SizedBox(height: 6),
+                  AppStatusPill(label: status.label, color: color, dense: true),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -174,7 +177,7 @@ class ExpiryAlertsScreen extends StatelessWidget {
                       color: color,
                     ),
                   ),
-                const SizedBox(height: 2),
+                SizedBox(height: 2),
                 Text(
                   _relativeLabel(daysUntil),
                   style: GoogleFonts.poppins(
@@ -182,7 +185,7 @@ class ExpiryAlertsScreen extends StatelessWidget {
                     color: color.withValues(alpha: 0.8),
                   ),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: 6),
                 Text(
                   '${formatQty(stock)}${unit == null ? '' : ' $unit'} in stock',
                   style: GoogleFonts.poppins(

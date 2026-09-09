@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/core/init/hive_init.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 
@@ -38,10 +39,10 @@ class _FixAttributesScreenState extends State<FixAttributesScreen> {
           context: context,
           barrierDismissible: false,
           builder: (context) => AlertDialog(
-            title: const Row(
+            title: Row(
               children: [
                 Icon(Icons.check_circle, color: Colors.green),
-                SizedBox(width: 8),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Text('Success!'),
               ],
             ),
@@ -78,7 +79,7 @@ class _FixAttributesScreenState extends State<FixAttributesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Fix Attribute Errors'),
+        title: Text('Fix Attribute Errors'),
         backgroundColor: Colors.orange,
       ),
       body: AppResponsive.constrainedContent(
@@ -90,15 +91,11 @@ class _FixAttributesScreenState extends State<FixAttributesScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(
-                Icons.warning_amber_rounded,
-                size: 64,
-                color: Colors.orange,
-              ),
-              const SizedBox(height: 24),
+              Icon(Icons.warning_amber_rounded, size: 64, color: Colors.orange),
+              SizedBox(height: AppResponsive.extraLargeSpacing(context)),
               Text(
                 'Fix "Bad Element" Error',
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   fontSize: AppResponsive.getValue(
                     context,
                     mobile: 24.0,
@@ -108,20 +105,22 @@ class _FixAttributesScreenState extends State<FixAttributesScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
               Text(
                 'If you\'re seeing "bad state bad element" errors when creating or viewing attributes, use this tool to reset the attribute database.',
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   fontSize: AppResponsive.subheadingFontSize(context),
                 ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: AppResponsive.extraLargeSpacing(context)),
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: AppResponsive.cardPadding(context),
                 decoration: BoxDecoration(
                   color: Colors.red.shade50,
                   border: Border.all(color: Colors.red.shade200),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.smallBorderRadius(context),
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,17 +128,17 @@ class _FixAttributesScreenState extends State<FixAttributesScreen> {
                     Row(
                       children: [
                         Icon(Icons.warning, color: Colors.red, size: 20),
-                        SizedBox(width: 8),
+                        SizedBox(width: AppResponsive.smallSpacing(context)),
                         Text(
                           'WARNING',
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             fontWeight: FontWeight.bold,
                             color: Colors.red,
                           ),
                         ),
                       ],
                     ),
-                    SizedBox(height: 8),
+                    SizedBox(height: AppResponsive.smallSpacing(context)),
                     Text(
                       'This will delete ALL attribute data including:\n'
                       '• All global attributes (Size, Color, etc.)\n'
@@ -147,17 +146,17 @@ class _FixAttributesScreenState extends State<FixAttributesScreen> {
                       '• Product-attribute assignments\n\n'
                       'Your products and variants will NOT be deleted,\n'
                       'but you will need to re-import or recreate attributes.',
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.bodyFontSize(context),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 32),
+              SizedBox(height: 32),
               if (_message != null) ...[
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: AppResponsive.cardPadding(context),
                   decoration: BoxDecoration(
                     color: _success ? Colors.green.shade50 : Colors.red.shade50,
                     border: Border.all(
@@ -165,7 +164,9 @@ class _FixAttributesScreenState extends State<FixAttributesScreen> {
                           ? Colors.green.shade200
                           : Colors.red.shade200,
                     ),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.smallBorderRadius(context),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -173,11 +174,11 @@ class _FixAttributesScreenState extends State<FixAttributesScreen> {
                         _success ? Icons.check_circle : Icons.error,
                         color: _success ? Colors.green : Colors.red,
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: AppResponsive.mediumSpacing(context)),
                       Expanded(
                         child: Text(
                           _message!,
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             fontSize: AppResponsive.bodyFontSize(context),
                           ),
                         ),
@@ -185,7 +186,7 @@ class _FixAttributesScreenState extends State<FixAttributesScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
               ],
               ElevatedButton(
                 onPressed: _isResetting ? null : _resetAttributes,
@@ -199,7 +200,7 @@ class _FixAttributesScreenState extends State<FixAttributesScreen> {
                   minimumSize: const Size(double.infinity, 50),
                 ),
                 child: _isResetting
-                    ? const Row(
+                    ? Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           SizedBox(
@@ -212,25 +213,25 @@ class _FixAttributesScreenState extends State<FixAttributesScreen> {
                               ),
                             ),
                           ),
-                          SizedBox(width: 16),
+                          SizedBox(width: AppResponsive.largeSpacing(context)),
                           Text('Resetting...'),
                         ],
                       )
                     : Text(
                         'Reset Attribute Boxes',
-                        style: TextStyle(
+                        style: GoogleFonts.poppins(
                           fontSize: AppResponsive.subheadingFontSize(context),
                           fontWeight: FontWeight.bold,
                         ),
                       ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
               Text(
                 'After resetting:\n'
                 '1. Restart the app completely\n'
                 '2. Re-import your product Excel file\n'
                 '3. Attributes will be recreated automatically',
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   fontSize: AppResponsive.bodyFontSize(context),
                   color: Colors.grey,
                   fontStyle: FontStyle.italic,

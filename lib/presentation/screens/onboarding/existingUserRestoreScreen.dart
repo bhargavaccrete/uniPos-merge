@@ -13,7 +13,6 @@ import 'package:billberrylite/presentation/widget/componets/common/app_text_fiel
 import 'package:billberrylite/presentation/screens/retail/login_screen.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import '../../../util/color.dart';
-import '../../../util/responsive.dart';
 import '../../../domain/services/common/unified_backup_service.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/init/hive_init.dart';
@@ -21,13 +20,12 @@ import '../../../core/di/service_locator.dart';
 
 // Retail stores
 
-
-
 class ExistingUserRestoreScreen extends StatefulWidget {
   const ExistingUserRestoreScreen({Key? key}) : super(key: key);
 
   @override
-  State<ExistingUserRestoreScreen> createState() => _ExistingUserRestoreScreenState();
+  State<ExistingUserRestoreScreen> createState() =>
+      _ExistingUserRestoreScreenState();
 }
 
 class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
@@ -71,21 +69,17 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeIn,
-    ));
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+    );
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0.1, 0),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutCubic,
-    ));
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0.1, 0), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _animationController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
 
     _animationController.forward();
   }
@@ -125,8 +119,7 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
 
         _validateFile();
       }
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   Future<void> _validateFile() async {
@@ -266,8 +259,14 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
       // Import using bytes on web, file path on mobile/desktop
       final success = kIsWeb
           ? await UnifiedBackupService.importFromBytes(
-              context, _selectedFileBytes!, _selectedFileName ?? 'backup.zip')
-          : await UnifiedBackupService.importFromFilePath(context, _selectedFilePath!);
+              context,
+              _selectedFileBytes!,
+              _selectedFileName ?? 'backup.zip',
+            )
+          : await UnifiedBackupService.importFromFilePath(
+              context,
+              _selectedFilePath!,
+            );
 
       if (!success) {
         throw Exception('Import failed - please check the backup file format');
@@ -275,15 +274,21 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
 
       // Reload AppConfig to get the restored business mode
       await AppConfig.init();
-      debugPrint("📦 AppConfig reloaded after restore: ${AppConfig.businessMode.name}");
+      debugPrint(
+        "📦 AppConfig reloaded after restore: ${AppConfig.businessMode.name}",
+      );
 
       // Initialize business-specific Hive boxes for the restored business mode
       await HiveInit.initializeBusinessBoxes();
-      debugPrint("📦 Business boxes initialized for: ${AppConfig.businessMode.name}");
+      debugPrint(
+        "📦 Business boxes initialized for: ${AppConfig.businessMode.name}",
+      );
 
       // Register business-specific GetIt dependencies
       await registerBusinessDependencies(AppConfig.businessMode);
-      debugPrint("📦 Business dependencies registered for: ${AppConfig.businessMode.name}");
+      debugPrint(
+        "📦 Business dependencies registered for: ${AppConfig.businessMode.name}",
+      );
 
       // ✅ CRITICAL: Force reload stores from Hive after restore
       if (AppConfig.isRetail) {
@@ -328,7 +333,9 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
       if (locator.isRegistered<ProductStore>()) {
         final productStore = locator<ProductStore>();
         await productStore.loadProducts();
-        debugPrint("📦 ProductStore reloaded: ${productStore.products.length} products");
+        debugPrint(
+          "📦 ProductStore reloaded: ${productStore.products.length} products",
+        );
       }
 
       // Force reload SaleStore
@@ -342,14 +349,18 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
       if (locator.isRegistered<CustomerStore>()) {
         final customerStore = locator<CustomerStore>();
         await customerStore.loadCustomers();
-        debugPrint("📦 CustomerStore reloaded: ${customerStore.customers.length} customers");
+        debugPrint(
+          "📦 CustomerStore reloaded: ${customerStore.customers.length} customers",
+        );
       }
 
       // Force reload SupplierStore
       if (locator.isRegistered<SupplierStore>()) {
         final supplierStore = locator<SupplierStore>();
         await supplierStore.loadSuppliers();
-        debugPrint("📦 SupplierStore reloaded: ${supplierStore.suppliers.length} suppliers");
+        debugPrint(
+          "📦 SupplierStore reloaded: ${supplierStore.suppliers.length} suppliers",
+        );
       }
 
       debugPrint("✅ All retail stores reloaded successfully");
@@ -376,7 +387,9 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
       _goToDashboard();
     } else {
       setState(
-          () => _licenseErrorMsg = _licenseStore.errorMessage ?? 'Activation failed');
+        () => _licenseErrorMsg =
+            _licenseStore.errorMessage ?? 'Activation failed',
+      );
     }
   }
 
@@ -426,11 +439,15 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
         ),
       ),
       body: SafeArea(
-        child: Responsive(
-          mobile: _buildMobileLayout(),
-          tablet: _buildTabletLayout(),
-          desktop: _buildDesktopLayout(),
-        ),
+        // AppResponsive (600/1024), not the legacy Responsive widget
+        // (850/1100): the steps inside size themselves off AppResponsive, so a
+        // different set of breakpoints out here left 600–849 showing the mobile
+        // tree with tablet-sized contents.
+        child: AppResponsive.isDesktop(context)
+            ? _buildDesktopLayout()
+            : AppResponsive.isTablet(context)
+            ? _buildTabletLayout()
+            : _buildMobileLayout(),
       ),
     );
   }
@@ -443,10 +460,7 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
           child: PageView(
             controller: _pageController,
             physics: const NeverScrollableScrollPhysics(),
-            children: [
-              _buildFileUploadStep(),
-              _buildLicenseActivationStep(),
-            ],
+            children: [_buildFileUploadStep(), _buildLicenseActivationStep()],
           ),
         ),
       ],
@@ -456,7 +470,9 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
   Widget _buildTabletLayout() {
     return Center(
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 600),
+        constraints: BoxConstraints(
+          maxWidth: AppResponsive.maxFormWidth(context),
+        ),
         child: Column(
           children: [
             _buildProgressIndicator(),
@@ -479,7 +495,9 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
   Widget _buildDesktopLayout() {
     return Center(
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 800),
+        constraints: BoxConstraints(
+          maxWidth: AppResponsive.maxFormWidth(context),
+        ),
         child: Row(
           children: [
             // Side panel
@@ -547,12 +565,12 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
             child: isCompleted
                 ? const Icon(Icons.check, color: Colors.white, size: 20)
                 : Text(
-              '${step + 1}',
-              style: TextStyle(
-                color: isActive ? Colors.white : Colors.grey[600],
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+                    '${step + 1}',
+                    style: TextStyle(
+                      color: isActive ? Colors.white : Colors.grey[600],
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
           ),
         ),
         const SizedBox(height: 8),
@@ -592,19 +610,17 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
             width: 50,
             height: 50,
             decoration: BoxDecoration(
-              color: isActive
-                  ? AppColors.primary
-                  : Colors.grey[300],
+              color: isActive ? AppColors.primary : Colors.grey[300],
               shape: BoxShape.circle,
             ),
             child: Center(
               child: isCompleted
                   ? const Icon(Icons.check, color: Colors.white)
                   : Icon(
-                icon,
-                color: isActive ? Colors.white : Colors.grey[600],
-                size: 24,
-              ),
+                      icon,
+                      color: isActive ? Colors.white : Colors.grey[600],
+                      size: 24,
+                    ),
             ),
           ),
           const SizedBox(width: 15),
@@ -653,10 +669,7 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
               const SizedBox(height: 10),
               Text(
                 'Select the backup file from your device',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
               ),
               const SizedBox(height: 40),
 
@@ -704,10 +717,7 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                       const SizedBox(height: 10),
                       Text(
                         'Supported formats: .zip, .json',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[500],
-                        ),
+                        style: TextStyle(fontSize: 14, color: Colors.grey[500]),
                       ),
                     ],
                   ),
@@ -722,9 +732,7 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                   decoration: BoxDecoration(
                     color: AppColors.info.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.info.withOpacity(0.3),
-                    ),
+                    border: Border.all(color: AppColors.info.withOpacity(0.3)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -739,10 +747,16 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                       ),
                       const SizedBox(height: 15),
                       _buildDetailRow('Store:', _fileMetadata!['storeName']),
-                      _buildDetailRow('Backup Date:', _fileMetadata!['backupDate']),
+                      _buildDetailRow(
+                        'Backup Date:',
+                        _fileMetadata!['backupDate'],
+                      ),
                       _buildDetailRow('Size:', _fileMetadata!['dataSize']),
                       _buildDetailRow('Version:', _fileMetadata!['version']),
-                      _buildDetailRow('Records:', _fileMetadata!['recordCount']),
+                      _buildDetailRow(
+                        'Records:',
+                        _fileMetadata!['recordCount'],
+                      ),
                     ],
                   ),
                 ),
@@ -790,7 +804,8 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                       // Continue now performs the restore directly (the separate
                       // Confirm step was removed); the password prompt is the
                       // safety gate before this destructive action runs.
-                      onPressed: (_fileValidated && !_isLoading && !_isRestoring)
+                      onPressed:
+                          (_fileValidated && !_isLoading && !_isRestoring)
                           ? _restoreData
                           : null,
                       style: ElevatedButton.styleFrom(
@@ -807,7 +822,9 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                               width: 22,
                               height: 22,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             )
                           : const Text(
                               'Continue',
@@ -850,8 +867,11 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.check_circle_rounded,
-                        color: AppColors.success, size: 22),
+                    Icon(
+                      Icons.check_circle_rounded,
+                      color: AppColors.success,
+                      size: 22,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -870,7 +890,9 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
               const SizedBox(height: 30),
 
               Text(
-                alreadyActive ? 'License Already Active' : 'Activate Your License',
+                alreadyActive
+                    ? 'License Already Active'
+                    : 'Activate Your License',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -893,13 +915,17 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                   decoration: BoxDecoration(
                     color: AppColors.success.withOpacity(0.07),
                     borderRadius: BorderRadius.circular(12),
-                    border:
-                        Border.all(color: AppColors.success.withOpacity(0.3)),
+                    border: Border.all(
+                      color: AppColors.success.withOpacity(0.3),
+                    ),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.verified_rounded,
-                          color: AppColors.success, size: 20),
+                      Icon(
+                        Icons.verified_rounded,
+                        color: AppColors.success,
+                        size: 20,
+                      ),
                       const SizedBox(width: 10),
                       Text(
                         _licenseStore.licenseInfo!.planName.isNotEmpty
@@ -924,7 +950,8 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                       backgroundColor: AppColors.success,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                     child: Text(
                       'Go to Dashboard',
@@ -949,14 +976,19 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      Icon(Icons.error_outline_rounded,
-                          size: 14, color: AppColors.danger),
+                      Icon(
+                        Icons.error_outline_rounded,
+                        size: 14,
+                        color: AppColors.danger,
+                      ),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           _licenseErrorMsg!,
                           style: TextStyle(
-                              fontSize: 12, color: AppColors.danger),
+                            fontSize: 12,
+                            color: AppColors.danger,
+                          ),
                         ),
                       ),
                     ],
@@ -972,14 +1004,17 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
                       backgroundColor: AppColors.primary,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                     child: _licenseLoading
                         ? const SizedBox(
                             width: 22,
                             height: 22,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : Text(
                             'Activate & Continue',
@@ -1009,10 +1044,7 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
             width: 100,
             child: Text(
               label,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),
           ),
           Expanded(
@@ -1029,5 +1061,4 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
       ),
     );
   }
-
 }

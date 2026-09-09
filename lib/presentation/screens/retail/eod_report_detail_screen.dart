@@ -48,13 +48,13 @@ class EODReportDetailScreen extends StatelessWidget {
           alignment: Alignment.topCenter,
           maxWidth: AppResponsive.maxCardWidth(context),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: AppResponsive.cardPadding(context),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Date Header
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: AppResponsive.cardPadding(context),
                   width: double.infinity,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
@@ -62,7 +62,9 @@ class EODReportDetailScreen extends StatelessWidget {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.borderRadius(context),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -75,7 +77,7 @@ class EODReportDetailScreen extends StatelessWidget {
                           color: Colors.white70,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: 4),
                       Text(
                         dateFormat.format(report.date),
                         style: GoogleFonts.poppins(
@@ -88,7 +90,7 @@ class EODReportDetailScreen extends StatelessWidget {
                   ),
                 ),
 
-                const SizedBox(height: 20),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
 
                 // Opening/Closing Balance
                 _buildSection(
@@ -110,7 +112,7 @@ class EODReportDetailScreen extends StatelessWidget {
                   ],
                 ),
 
-                const SizedBox(height: 16),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
 
                 // Sales Summary
                 _buildSection(
@@ -147,7 +149,7 @@ class EODReportDetailScreen extends StatelessWidget {
                   ],
                 ),
 
-                const SizedBox(height: 16),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
 
                 // Payment Breakdown
                 if (report.paymentSummaries.isNotEmpty) ...[
@@ -164,7 +166,7 @@ class EODReportDetailScreen extends StatelessWidget {
                       );
                     }).toList(),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: AppResponsive.largeSpacing(context)),
                 ],
 
                 // Tax Summary
@@ -191,7 +193,7 @@ class EODReportDetailScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: AppResponsive.largeSpacing(context)),
                 ],
 
                 // Expenses
@@ -224,7 +226,7 @@ class EODReportDetailScreen extends StatelessWidget {
                         ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: AppResponsive.largeSpacing(context)),
                 ],
 
                 // Credit Collections — repayments against credit sold on EARLIER
@@ -264,7 +266,7 @@ class EODReportDetailScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: AppResponsive.largeSpacing(context)),
                 ],
 
                 // Profit — revenue here is EX-TAX, so the margin is real margin and
@@ -303,7 +305,7 @@ class EODReportDetailScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: AppResponsive.largeSpacing(context)),
                 ],
 
                 // Customer Outstanding — a position at close, not a movement during
@@ -329,13 +331,13 @@ class EODReportDetailScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: AppResponsive.largeSpacing(context)),
                 ],
 
                 // Cash Reconciliation
                 _buildCashReconciliation(context),
 
-                const SizedBox(height: 32),
+                SizedBox(height: AppResponsive.extraLargeSpacing(context)),
               ],
             ),
           ),
@@ -359,11 +361,13 @@ class EODReportDetailScreen extends StatelessWidget {
       case EodReprintOutcome.printed:
         NotificationService.instance.showSuccess('Settlement printed');
       case EodReprintOutcome.noPrinter:
-        NotificationService.instance
-            .showError('No printer paired. Add one in Printer Settings.');
+        NotificationService.instance.showError(
+          'No printer paired. Add one in Printer Settings.',
+        );
       case EodReprintOutcome.sendFailed:
-        NotificationService.instance
-            .showError('Could not reach the printer. Check it and try again.');
+        NotificationService.instance.showError(
+          'Could not reach the printer. Check it and try again.',
+        );
     }
   }
 
@@ -389,18 +393,20 @@ class EODReportDetailScreen extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: Colors.grey.shade200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: AppResponsive.cardPadding(context),
             child: Row(
               children: [
-                Icon(icon, color: color, size: 20),
-                const SizedBox(width: 8),
+                Icon(icon, color: color, size: AppResponsive.iconSize(context)),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Text(
                   title,
                   style: GoogleFonts.poppins(
@@ -413,7 +419,7 @@ class EODReportDetailScreen extends StatelessWidget {
           ),
           const Divider(height: 1),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: AppResponsive.cardPadding(context),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: children,
@@ -432,7 +438,7 @@ class EODReportDetailScreen extends StatelessWidget {
     Color? color,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -491,14 +497,16 @@ class EODReportDetailScreen extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: AppResponsive.cardPadding(context),
             decoration: BoxDecoration(
               color: bgColor,
               borderRadius: const BorderRadius.only(
@@ -511,8 +519,12 @@ class EODReportDetailScreen extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.account_balance, color: statusColor, size: 20),
-                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.account_balance,
+                      color: statusColor,
+                      size: AppResponsive.iconSize(context),
+                    ),
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
                     Text(
                       'Cash Reconciliation',
                       style: GoogleFonts.poppins(
@@ -529,7 +541,9 @@ class EODReportDetailScreen extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: badgeBgColor,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.borderRadius(context),
+                    ),
                   ),
                   child: Text(
                     reconciliation.reconciliationStatus,
@@ -544,7 +558,7 @@ class EODReportDetailScreen extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: AppResponsive.cardPadding(context),
             child: Column(
               children: [
                 _buildRow(
@@ -571,13 +585,17 @@ class EODReportDetailScreen extends StatelessWidget {
                 ),
                 if (reconciliation.remarks != null &&
                     reconciliation.remarks!.isNotEmpty) ...[
-                  const SizedBox(height: 12),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(12),
+                    padding: EdgeInsets.all(
+                      AppResponsive.mediumSpacing(context),
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.smallBorderRadius(context),
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -590,7 +608,7 @@ class EODReportDetailScreen extends StatelessWidget {
                             color: Colors.grey[700],
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        SizedBox(height: 4),
                         Text(
                           reconciliation.remarks!,
                           style: GoogleFonts.poppins(

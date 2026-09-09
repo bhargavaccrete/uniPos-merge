@@ -22,7 +22,6 @@ import 'package:billberrylite/presentation/widget/componets/common/app_dialog.da
 import '../../../util/restaurant/restaurant_session.dart';
 import '../../../util/color.dart';
 import '../../../util/common/app_responsive.dart';
-import '../../../util/responsive.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/routes/routes_name.dart';
 import '../restaurant/welcome_Admin.dart';
@@ -40,7 +39,8 @@ class SetupWizardScreen extends StatefulWidget {
   State<SetupWizardScreen> createState() => _SetupWizardScreenState();
 }
 
-class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProviderStateMixin {
+class _SetupWizardScreenState extends State<SetupWizardScreen>
+    with TickerProviderStateMixin {
   // Get store from GetIt
   final SetupWizardStore _store = locator<SetupWizardStore>();
 
@@ -69,10 +69,12 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
   void initState() {
     super.initState();
 
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-    ));
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+      ),
+    );
 
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 600),
@@ -83,10 +85,13 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
       CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
     );
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0.1, 0),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _animationController, curve: Curves.easeOutCubic));
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0.1, 0), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _animationController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
 
     _animationController.forward();
 
@@ -173,8 +178,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
       // permanent and remembered via LicenseStore.isLicensed.
       if (locator<LicenseStore>().isLicensed) {
         final steps = SetupStep.getSteps();
-        final emailIndex =
-            steps.indexWhere((s) => s.title == 'Verify Email');
+        final emailIndex = steps.indexWhere((s) => s.title == 'Verify Email');
         if (emailIndex >= 0 && _store.currentStep - 1 <= emailIndex) {
           return; // don't step back onto (or before) the activated license step
         }
@@ -291,8 +295,9 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
     if (Navigator.canPop(context)) {
       Navigator.pop(context); // exit setup
     }
-    NotificationService.instance
-        .showSuccess('Progress saved ($progress% complete)');
+    NotificationService.instance.showSuccess(
+      'Progress saved ($progress% complete)',
+    );
   }
 
   @override
@@ -308,11 +313,16 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
           child: Observer(
             builder: (_) => Stack(
               children: [
-                Responsive(
-                  mobile: _buildMobileLayout(),
-                  tablet: _buildTabletLayout(),
-                  desktop: _buildDesktopLayout(),
-                ),
+                // AppResponsive (600/1024), not the legacy Responsive widget
+                // (850/1100): the steps inside size themselves off AppResponsive,
+                // so a different set of breakpoints out here left 600–849 showing
+                // the mobile tree with tablet-sized contents.
+                if (AppResponsive.isDesktop(context))
+                  _buildDesktopLayout()
+                else if (AppResponsive.isTablet(context))
+                  _buildTabletLayout()
+                else
+                  _buildMobileLayout(),
                 if (_store.isLoading)
                   Positioned.fill(
                     child: AbsorbPointer(
@@ -321,7 +331,9 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
                         color: Colors.black.withOpacity(0.18),
                         child: Center(
                           child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppColors.primary,
+                            ),
                             strokeWidth: 4,
                           ),
                         ),
@@ -360,7 +372,9 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
         Expanded(
           child: Center(
             child: Container(
-              constraints: const BoxConstraints(maxWidth: 600),
+              constraints: BoxConstraints(
+                maxWidth: AppResponsive.maxFormWidth(context),
+              ),
               child: PageView(
                 controller: _pageController,
                 physics: const NeverScrollableScrollPhysics(),
@@ -392,7 +406,9 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
               Expanded(
                 child: Center(
                   child: Container(
-                    constraints: BoxConstraints(maxWidth: AppResponsive.maxFormWidth(context)),
+                    constraints: BoxConstraints(
+                      maxWidth: AppResponsive.maxFormWidth(context),
+                    ),
                     child: PageView(
                       controller: _pageController,
                       physics: const NeverScrollableScrollPhysics(),
@@ -441,7 +457,10 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
                 const SizedBox(height: 4),
                 Text(
                   currentStepInfo.description,
-                  style: GoogleFonts.poppins(fontSize: 15, color: AppColors.textSecondary),
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -477,7 +496,12 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: AppResponsive.mediumSpacing(context),
-        vertical: AppResponsive.getValue(context, mobile: 8.0, tablet: 12.0, desktop: 16.0),
+        vertical: AppResponsive.getValue(
+          context,
+          mobile: 8.0,
+          tablet: 12.0,
+          desktop: 16.0,
+        ),
       ),
       child: Row(
         children: [
@@ -501,7 +525,10 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
                 ),
                 Text(
                   'Step ${_store.currentStep + 1} of $_totalSteps · ~${currentStepInfo.estimatedTime}',
-                  style: GoogleFonts.poppins(fontSize: AppResponsive.smallFontSize(context), color: AppColors.textSecondary),
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -518,7 +545,9 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
   Widget _buildProgressBar() {
     return Container(
       height: 5,
-      margin: EdgeInsets.symmetric(horizontal: AppResponsive.mediumSpacing(context)),
+      margin: EdgeInsets.symmetric(
+        horizontal: AppResponsive.mediumSpacing(context),
+      ),
       decoration: BoxDecoration(
         color: AppColors.divider,
         borderRadius: BorderRadius.circular(2),
@@ -529,7 +558,9 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
             children: [
               AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
-                width: constraints.maxWidth * ((_store.currentStep + 1) / _totalSteps),
+                width:
+                    constraints.maxWidth *
+                    ((_store.currentStep + 1) / _totalSteps),
                 decoration: BoxDecoration(
                   color: AppColors.primary,
                   borderRadius: BorderRadius.circular(2),
@@ -585,16 +616,16 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
       // now activates the same way, so a signed manifest can reach it at all.
       // Runs before Product/Staff setup so those steps can enforce item/user caps.
       SlideTransition(
-          position: _slideAnimation,
-          child: FadeTransition(
-            opacity: _fadeAnimation,
-            child: EmailVerificationStep(
-              store: _store,
-              onNext: _nextStep,
-              onPrevious: _previousStep,
-            ),
+        position: _slideAnimation,
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: EmailVerificationStep(
+            store: _store,
+            onNext: _nextStep,
+            onPrevious: _previousStep,
           ),
         ),
+      ),
 
       // Tax Setup — settings module; hidden when the plan excludes it, or when the
       // business answered "Not Registered" on Store Details (taxEnabled == false).
@@ -687,7 +718,6 @@ class _SetupWizardScreenState extends State<SetupWizardScreen> with TickerProvid
       ),
     ];
   }
-
 }
 
 // ==================== SUPPORTING WIDGETS ====================
@@ -747,7 +777,10 @@ class SetupSidebar extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.2),
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.3),
+                width: 2,
+              ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.1),
@@ -756,7 +789,9 @@ class SetupSidebar extends StatelessWidget {
                 ),
               ],
             ),
-            child: const Center(child: Icon(Icons.store, size: 40, color: Colors.white)),
+            child: const Center(
+              child: Icon(Icons.store, size: 40, color: Colors.white),
+            ),
           ),
           const SizedBox(height: 15),
           Text(
@@ -805,7 +840,10 @@ class SetupSidebar extends StatelessWidget {
             children: [
               Text(
                 'Progress',
-                style: GoogleFonts.poppins(color: Colors.white.withOpacity(0.8), fontSize: 13),
+                style: GoogleFonts.poppins(
+                  color: Colors.white.withOpacity(0.8),
+                  fontSize: 13,
+                ),
               ),
               Text(
                 '${((currentStep + 1) / totalSteps * 100).round()}%',
@@ -847,13 +885,18 @@ class SetupSidebar extends StatelessWidget {
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
           child: MouseRegion(
-            cursor: isCompleted ? SystemMouseCursors.click : SystemMouseCursors.basic,
+            cursor: isCompleted
+                ? SystemMouseCursors.click
+                : SystemMouseCursors.basic,
             child: InkWell(
               onTap: isCompleted ? () => onStepTap(index) : null,
               borderRadius: BorderRadius.circular(12),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 15,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: isActive
                       ? Colors.white.withOpacity(0.2)
@@ -862,7 +905,9 @@ class SetupSidebar extends StatelessWidget {
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: isActive ? Colors.white.withOpacity(0.3) : Colors.transparent,
+                    color: isActive
+                        ? Colors.white.withOpacity(0.3)
+                        : Colors.transparent,
                     width: isActive ? 2 : 1,
                   ),
                 ),
@@ -889,12 +934,18 @@ class SetupSidebar extends StatelessWidget {
                       ),
                       child: Center(
                         child: isCompleted
-                            ? const Icon(Icons.check, color: AppColors.success, size: 18)
+                            ? const Icon(
+                                Icons.check,
+                                color: AppColors.success,
+                                size: 18,
+                              )
                             : Icon(
-                          step.icon,
-                          color: isActive ? Colors.white : Colors.white.withOpacity(0.7),
-                          size: 18,
-                        ),
+                                step.icon,
+                                color: isActive
+                                    ? Colors.white
+                                    : Colors.white.withOpacity(0.7),
+                                size: 18,
+                              ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -906,10 +957,14 @@ class SetupSidebar extends StatelessWidget {
                             step.title,
                             style: GoogleFonts.poppins(
                               fontSize: 14,
-                              fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                              fontWeight: isActive
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
                               color: isActive
                                   ? Colors.white
-                                  : Colors.white.withOpacity(isUpcoming ? 0.5 : 0.8),
+                                  : Colors.white.withOpacity(
+                                      isUpcoming ? 0.5 : 0.8,
+                                    ),
                             ),
                           ),
                           if (isCompleted)
@@ -929,7 +984,10 @@ class SetupSidebar extends StatelessWidget {
                     ),
                     if (isActive)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(10),
@@ -961,20 +1019,28 @@ class SetupSidebar extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: onGetHelp,
             icon: const Icon(Icons.help_outline, size: 18),
-            label: Text('Get Help', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+            label: Text(
+              'Get Help',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+            ),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.white,
               side: BorderSide(color: Colors.white.withOpacity(0.3)),
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
               minimumSize: const Size(double.infinity, 44),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ),
           const SizedBox(height: 10),
           TextButton.icon(
             onPressed: onExit,
             icon: const Icon(Icons.exit_to_app, size: 18),
-            label: Text('Save & Exit', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+            label: Text(
+              'Save & Exit',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+            ),
             style: TextButton.styleFrom(
               foregroundColor: Colors.white.withOpacity(0.8),
             ),
@@ -1127,7 +1193,12 @@ class WelcomeStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final iconSize = AppResponsive.getValue(context, mobile: 88.0, tablet: 104.0, desktop: 120.0);
+    final iconSize = AppResponsive.getValue(
+      context,
+      mobile: 88.0,
+      tablet: 104.0,
+      desktop: 120.0,
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1150,7 +1221,11 @@ class WelcomeStep extends StatelessWidget {
                       color: AppColors.primary.withOpacity(0.1),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.rocket_launch, size: iconSize * 0.5, color: AppColors.primary),
+                    child: Icon(
+                      Icons.rocket_launch,
+                      size: iconSize * 0.5,
+                      color: AppColors.primary,
+                    ),
                   ),
                   SizedBox(height: AppResponsive.largeSpacing(context)),
 
@@ -1158,7 +1233,12 @@ class WelcomeStep extends StatelessWidget {
                   Text(
                     'Welcome to Bill Berry Lite Setup',
                     style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.getValue(context, mobile: 22.0, tablet: 26.0, desktop: 30.0),
+                      fontSize: AppResponsive.getValue(
+                        context,
+                        mobile: 22.0,
+                        tablet: 26.0,
+                        desktop: 30.0,
+                      ),
                       fontWeight: FontWeight.bold,
                       color: AppColors.darkNeutral,
                     ),
@@ -1167,7 +1247,10 @@ class WelcomeStep extends StatelessWidget {
                   SizedBox(height: AppResponsive.smallSpacing(context)),
                   Text(
                     "Let's get your store up and running in just a few minutes",
-                    style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), color: AppColors.textSecondary),
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   SizedBox(height: AppResponsive.largeSpacing(context)),
@@ -1195,7 +1278,9 @@ class WelcomeStep extends StatelessWidget {
                         backgroundColor: AppColors.primary,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.borderRadius(context),
+                          ),
                         ),
                       ),
                       child: Text(
@@ -1260,7 +1345,12 @@ class ReviewStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final iconSize = AppResponsive.getValue(context, mobile: 72.0, tablet: 90.0, desktop: 100.0);
+    final iconSize = AppResponsive.getValue(
+      context,
+      mobile: 72.0,
+      tablet: 90.0,
+      desktop: 100.0,
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) => SingleChildScrollView(
@@ -1269,97 +1359,164 @@ class ReviewStep extends StatelessWidget {
           child: Center(
             child: Container(
               constraints: BoxConstraints(
-                maxWidth: AppResponsive.getValue(context, mobile: 460.0, tablet: 540.0, desktop: 620.0),
+                maxWidth: AppResponsive.getValue(
+                  context,
+                  mobile: 460.0,
+                  tablet: 540.0,
+                  desktop: 620.0,
+                ),
               ),
               padding: AppResponsive.padding(context),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-              Container(
-                width: iconSize,
-              height: iconSize,
-              decoration: BoxDecoration(
-                color: AppColors.success.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.check_circle, size: iconSize * 0.6, color: AppColors.success),
-            ),
-            SizedBox(height: AppResponsive.mediumSpacing(context)),
-            Text(
-              'Setup Complete!',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.getValue(context, mobile: 22.0, tablet: 26.0, desktop: 28.0),
-                fontWeight: FontWeight.bold,
-                color: AppColors.darkNeutral,
-              ),
-            ),
-            SizedBox(height: AppResponsive.smallSpacing(context)),
-            Text(
-              'Your store is ready to use',
-              style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), color: AppColors.textSecondary),
-            ),
-            SizedBox(height: AppResponsive.largeSpacing(context)),
-            Container(
-              padding: AppResponsive.cardPadding(context),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
+                  Container(
+                    width: iconSize,
+                    height: iconSize,
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.check_circle,
+                      size: iconSize * 0.6,
+                      color: AppColors.success,
+                    ),
+                  ),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
+                  Text(
+                    'Setup Complete!',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.getValue(
+                        context,
+                        mobile: 22.0,
+                        tablet: 26.0,
+                        desktop: 28.0,
+                      ),
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.darkNeutral,
+                    ),
+                  ),
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
+                  Text(
+                    'Your store is ready to use',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  SizedBox(height: AppResponsive.largeSpacing(context)),
+                  Container(
+                    padding: AppResponsive.cardPadding(context),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.borderRadius(context),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        _buildSummaryItem(
+                          context,
+                          'Store Name',
+                          storeName.isEmpty ? 'Not Set' : storeName,
+                        ),
+                        _buildSummaryItem(
+                          context,
+                          'Owner',
+                          ownerName.isEmpty ? 'Not Set' : ownerName,
+                        ),
+                        _buildSummaryItem(
+                          context,
+                          'Phone',
+                          phone.isEmpty ? 'Not Set' : phone,
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: AppResponsive.largeSpacing(context)),
+                  ElevatedButton(
+                    onPressed: onComplete,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.success,
+                      elevation: 0,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppResponsive.getValue(
+                          context,
+                          mobile: 32.0,
+                          tablet: 44.0,
+                          desktop: 50.0,
+                        ),
+                        vertical: AppResponsive.getValue(
+                          context,
+                          mobile: 12.0,
+                          tablet: 14.0,
+                          desktop: 15.0,
+                        ),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text(
+                      'Go to Dashboard',
+                      style: GoogleFonts.poppins(
+                        color: AppColors.white,
+                        fontSize: AppResponsive.buttonFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ],
               ),
-              child: Column(
-                children: [
-                  _buildSummaryItem(context, 'Store Name', storeName.isEmpty ? 'Not Set' : storeName),
-                  _buildSummaryItem(context, 'Owner', ownerName.isEmpty ? 'Not Set' : ownerName),
-                  _buildSummaryItem(context, 'Phone', phone.isEmpty ? 'Not Set' : phone),
-                ],
-              ),
             ),
-            SizedBox(height: AppResponsive.largeSpacing(context)),
-            ElevatedButton(
-              onPressed: onComplete,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.success,
-                elevation: 0,
-                padding: EdgeInsets.symmetric(
-                  horizontal: AppResponsive.getValue(context, mobile: 32.0, tablet: 44.0, desktop: 50.0),
-                  vertical: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 15.0),
-                ),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              child: Text(
-                'Go to Dashboard',
-                style: GoogleFonts.poppins(color: AppColors.white, fontSize: AppResponsive.buttonFontSize(context), fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
-    ),
-      ),
-    ),
-  );
+    );
   }
 
   Widget _buildSummaryItem(BuildContext context, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: EdgeInsets.symmetric(
+        vertical: AppResponsive.smallSpacing(context),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: GoogleFonts.poppins(fontSize: AppResponsive.smallFontSize(context), color: AppColors.textSecondary)),
           Text(
-            value,
+            label,
             style: GoogleFonts.poppins(
               fontSize: AppResponsive.smallFontSize(context),
-              fontWeight: FontWeight.w600,
-              color: AppColors.darkNeutral,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          // Flexible: the value is user-entered (store name, owner name), so an
+          // unbounded Text here overflows the row on the first long one.
+          Flexible(
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: AppResponsive.mediumSpacing(context),
+              ),
+              child: Text(
+                value,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.end,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.darkNeutral,
+                ),
+              ),
             ),
           ),
         ],

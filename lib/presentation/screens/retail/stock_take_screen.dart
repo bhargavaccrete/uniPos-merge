@@ -68,22 +68,24 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
     final query = _searchController.text.trim().toLowerCase();
     if (query.isEmpty) return const [];
 
-    final counted =
-        stockTakeStore.currentItems.map((i) => i.variantId).toSet();
+    final counted = stockTakeStore.currentItems.map((i) => i.variantId).toSet();
 
-    return productStore.variants.where((v) {
-      if (counted.contains(v.varianteId)) return false;
-      final product = productStore.products
-          .where((p) => p.productId == v.productId)
-          .firstOrNull;
-      if (product?.isBundle ?? false) return false;
-      final name = (product?.productName ?? '').toLowerCase();
-      final sku = (v.sku ?? '').toLowerCase();
-      final barcode = (v.barcode ?? '').toLowerCase();
-      return name.contains(query) ||
-          sku.contains(query) ||
-          barcode.contains(query);
-    }).take(20).toList();
+    return productStore.variants
+        .where((v) {
+          if (counted.contains(v.varianteId)) return false;
+          final product = productStore.products
+              .where((p) => p.productId == v.productId)
+              .firstOrNull;
+          if (product?.isBundle ?? false) return false;
+          final name = (product?.productName ?? '').toLowerCase();
+          final sku = (v.sku ?? '').toLowerCase();
+          final barcode = (v.barcode ?? '').toLowerCase();
+          return name.contains(query) ||
+              sku.contains(query) ||
+              barcode.contains(query);
+        })
+        .take(20)
+        .toList();
   }
 
   Future<void> _scanAndCount() async {
@@ -131,8 +133,7 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
       context: context,
       builder: (_) => _CountEntryDialog(
         productName: product?.productName ?? 'Product',
-        variantInfo:
-            variant.hasAttributes ? variant.variantDescription : null,
+        variantInfo: variant.hasAttributes ? variant.variantDescription : null,
         systemQty: variant.stockQty,
         initialCount: existing?.countedQty,
         allowDecimal: variant.isDecimalQuantity,
@@ -151,8 +152,9 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
       _searchController.clear();
       setState(() {});
     } else {
-      NotificationService.instance
-          .showError(stockTakeStore.errorMessage ?? 'Count failed.');
+      NotificationService.instance.showError(
+        stockTakeStore.errorMessage ?? 'Count failed.',
+      );
     }
   }
 
@@ -160,7 +162,8 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
     final confirmed = await showAppConfirmDialog(
       context: context,
       title: 'Remove line?',
-      message: '${line.productName ?? 'This line'} will be dropped from the '
+      message:
+          '${line.productName ?? 'This line'} will be dropped from the '
           'count. Stock is not affected.',
       confirmLabel: 'Remove',
       accent: AppColors.danger,
@@ -170,8 +173,9 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
     final ok = await stockTakeStore.removeLine(line.takeItemId);
     if (!mounted) return;
     if (!ok) {
-      NotificationService.instance
-          .showError(stockTakeStore.errorMessage ?? 'Could not remove line.');
+      NotificationService.instance.showError(
+        stockTakeStore.errorMessage ?? 'Could not remove line.',
+      );
     }
   }
 
@@ -202,15 +206,15 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
     if (!mounted) return;
 
     if (!result.success) {
-      NotificationService.instance
-          .showError(result.errorMessage ?? 'Apply failed.');
+      NotificationService.instance.showError(
+        result.errorMessage ?? 'Apply failed.',
+      );
       return;
     }
 
     final net = result.netQty;
     final sign = net > 0 ? '+' : '';
-    var message =
-        '${result.appliedLines} lines applied ($sign$net units)';
+    var message = '${result.appliedLines} lines applied ($sign$net units)';
     if (result.isPartial) {
       message += ' - ${result.failedLines.length} could not be applied';
     }
@@ -226,7 +230,8 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
       context: context,
       title: 'Some lines were not applied',
       errors: failed,
-      message: 'Their stock moved after they were counted, or the product no '
+      message:
+          'Their stock moved after they were counted, or the product no '
           'longer exists. Recount these in a new stock take.',
     );
   }
@@ -256,15 +261,16 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
             child: MoneyScope(
               child: stockTakeStore.isLoading && take == null
                   ? const Center(
-                      child:
-                          CircularProgressIndicator(color: AppColors.primary),
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
+                      ),
                     )
                   : take == null
-                      ? const AppEmptyState(
-                          icon: Icons.error_outline_rounded,
-                          title: 'Stock take not found',
-                        )
-                      : _buildBody(context),
+                  ? const AppEmptyState(
+                      icon: Icons.error_outline_rounded,
+                      title: 'Stock take not found',
+                    )
+                  : _buildBody(context),
             ),
           ),
           bottomNavigationBar: _isEditable ? _buildApplyBar(context) : null,
@@ -329,10 +335,18 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
           SizedBox(height: AppResponsive.smallSpacing(context)),
           Row(
             children: [
-              _metric(context, 'Counted',
-                  '${stockTakeStore.countedLineCount}', AppColors.textPrimary),
-              _metric(context, 'Variances',
-                  '${stockTakeStore.varianceLineCount}', AppColors.warning),
+              _metric(
+                context,
+                'Counted',
+                '${stockTakeStore.countedLineCount}',
+                AppColors.textPrimary,
+              ),
+              _metric(
+                context,
+                'Variances',
+                '${stockTakeStore.varianceLineCount}',
+                AppColors.warning,
+              ),
               _metric(
                 context,
                 'Net Units',
@@ -356,10 +370,16 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
     );
   }
 
+  /// Status pill. `circular(10)` stays static: a pill's radius is paired to
+  /// its own height (~22px here), not to a breakpoint — laddering it to 8 on a
+  /// phone stops it reading as a pill.
   Widget _statusChip(BuildContext context, String label, bool completed) {
     final color = completed ? AppColors.success : AppColors.warning;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.smallSpacing(context),
+        vertical: 4,
+      ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(10),
@@ -376,7 +396,11 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
   }
 
   Widget _metric(
-      BuildContext context, String label, String value, Color color) {
+    BuildContext context,
+    String label,
+    String value,
+    Color color,
+  ) {
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -407,7 +431,12 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
     final side = AppResponsive.padding(context).left;
     return Container(
       color: AppColors.white,
-      padding: EdgeInsets.fromLTRB(side, 0, side, 12),
+      padding: EdgeInsets.fromLTRB(
+        side,
+        0,
+        side,
+        AppResponsive.mediumSpacing(context),
+      ),
       child: AppTextField(
         controller: _searchController,
         hint: 'Search product, SKU or barcode to count...',
@@ -474,8 +503,10 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
                 color: AppColors.textSecondary,
               ),
             ),
-            trailing: const Icon(Icons.add_circle_outline_rounded,
-                color: AppColors.primary),
+            trailing: const Icon(
+              Icons.add_circle_outline_rounded,
+              color: AppColors.primary,
+            ),
             onTap: () => _promptCount(variant),
           );
         },
@@ -492,7 +523,7 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
         title: 'Nothing counted yet',
         message: _isEditable
             ? 'Search or scan a product above to record what you counted. '
-                'Stock does not move until you apply.'
+                  'Stock does not move until you apply.'
             : 'This stock take has no lines.',
       );
     }
@@ -519,10 +550,13 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
       padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius:
-            BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
         border: Border.all(
-          color: variance == 0 ? AppColors.divider : color.withValues(alpha: 0.4),
+          color: variance == 0
+              ? AppColors.divider
+              : color.withValues(alpha: 0.4),
         ),
       ),
       child: Column(
@@ -594,10 +628,18 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
           SizedBox(height: AppResponsive.smallSpacing(context)),
           Row(
             children: [
-              _lineStat(context, 'System', '${line.systemQty}',
-                  AppColors.textSecondary),
-              _lineStat(context, 'Counted', '${line.countedQty}',
-                  AppColors.textPrimary),
+              _lineStat(
+                context,
+                'System',
+                '${line.systemQty}',
+                AppColors.textSecondary,
+              ),
+              _lineStat(
+                context,
+                'Counted',
+                '${line.countedQty}',
+                AppColors.textPrimary,
+              ),
               _lineStat(
                 context,
                 'Variance',
@@ -622,7 +664,11 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
   }
 
   Widget _lineStat(
-      BuildContext context, String label, String value, Color color) {
+    BuildContext context,
+    String label,
+    String value,
+    Color color,
+  ) {
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -670,14 +716,14 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
                     variances == 0
                         ? 'No variances to apply'
                         : '$variances line${variances == 1 ? '' : 's'} will '
-                            'adjust stock',
+                              'adjust stock',
                     style: GoogleFonts.poppins(
                       fontSize: AppResponsive.smallFontSize(context),
                       color: AppColors.textSecondary,
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: AppResponsive.mediumSpacing(context)),
                 ElevatedButton(
                   onPressed: (variances == 0 || committing) ? null : _apply,
                   style: ElevatedButton.styleFrom(
@@ -686,9 +732,12 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
                     disabledBackgroundColor: AppColors.divider,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 13),
+                      horizontal: 20,
+                      vertical: 13,
+                    ),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                   child: Text(
                     committing ? 'Applying...' : 'Apply Count',
@@ -744,9 +793,7 @@ class _CountEntryDialogState extends State<_CountEntryDialog> {
   void initState() {
     super.initState();
     _controller = TextEditingController(
-      text: widget.initialCount == null
-          ? ''
-          : formatQty(widget.initialCount!),
+      text: widget.initialCount == null ? '' : formatQty(widget.initialCount!),
     );
   }
 
@@ -826,7 +873,7 @@ class _CountEntryDialogState extends State<_CountEntryDialog> {
                 variance > 0
                     ? '$variance more than the system expects'
                     : '${variance.abs()} missing'
-                        ' against the system',
+                          ' against the system',
                 style: GoogleFonts.poppins(
                   fontSize: AppResponsive.captionFontSize(context),
                   fontWeight: FontWeight.w600,
@@ -839,7 +886,7 @@ class _CountEntryDialogState extends State<_CountEntryDialog> {
       ),
       actions: [
         appDialogCancelButton(context),
-        const SizedBox(width: 12),
+        SizedBox(width: AppResponsive.mediumSpacing(context)),
         appDialogPrimaryButton(label: 'Save Count', onPressed: _submit),
       ],
     );
@@ -856,7 +903,10 @@ class _KitBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.smallSpacing(context),
+        vertical: 4,
+      ),
       decoration: BoxDecoration(
         color: AppColors.info.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(6),
@@ -866,6 +916,8 @@ class _KitBadge extends StatelessWidget {
         children: [
           const Icon(
             Icons.build_circle_outlined,
+            // Paired to the badge's 10.5→captionFontSize label, not to a
+            // breakpoint; smallIconSize would be 23% larger and unbalance it.
             size: 13,
             color: AppColors.info,
           ),
@@ -873,7 +925,7 @@ class _KitBadge extends StatelessWidget {
           Text(
             'Kit',
             style: GoogleFonts.poppins(
-              fontSize: 10.5,
+              fontSize: AppResponsive.captionFontSize(context),
               fontWeight: FontWeight.w700,
               color: AppColors.info,
             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/util/common/short_ref.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
@@ -10,7 +11,10 @@ import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart'
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/domain/services/retail/receipt_pdf_service.dart'
-    show receiptLineDiscount, receiptLineDiscountTotal, receiptBillDiscountRemainder;
+    show
+        receiptLineDiscount,
+        receiptLineDiscountTotal,
+        receiptBillDiscountRemainder;
 import 'package:billberrylite/presentation/screens/retail/sale_return_screen.dart';
 import 'package:billberrylite/domain/services/retail/return_service.dart';
 import 'package:billberrylite/domain/services/retail/exchange_service.dart';
@@ -89,15 +93,17 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
       if (sale != null && !(sale.isReturn ?? false)) {
         fullyReturned = await _returnService.isFullyReturned(widget.saleId);
         partiallyReturned =
-            !fullyReturned && await _returnService.isPartiallyReturned(widget.saleId);
+            !fullyReturned &&
+            await _returnService.isPartiallyReturned(widget.saleId);
       }
 
       // A return stamped with an exchange group whose replacement never landed.
       var exchangeIncomplete = false;
       if (sale?.exchangeGroupId != null) {
         final orphans = await _exchangeService.findIncomplete();
-        exchangeIncomplete =
-            orphans.any((o) => o.exchangeGroupId == sale!.exchangeGroupId);
+        exchangeIncomplete = orphans.any(
+          (o) => o.exchangeGroupId == sale!.exchangeGroupId,
+        );
       }
 
       setState(() {
@@ -262,7 +268,13 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
             ),
           ],
         ),
-        child: _capped(context, _exchangeButton()),
+        child: AppResponsive.constrainedContent(
+          context: context,
+          alignment: Alignment.topCenter,
+          maxWidth: AppResponsive.maxCardWidth(context),
+          heightFactor: 1,
+          child: _exchangeButton(),
+        ),
       );
     }
 
@@ -278,12 +290,15 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
           ),
         ],
       ),
-      child: _capped(
-        context,
-        Row(
+      child: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxCardWidth(context),
+        heightFactor: 1,
+        child: Row(
           children: [
             Expanded(child: _exchangeButton()),
-            const SizedBox(width: 10),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
             Expanded(child: _returnAction(compact: true)),
           ],
         ),
@@ -302,20 +317,22 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
         );
         if (result == true && mounted) Navigator.pop(context, true);
       },
-      icon: Icon(Icons.swap_horiz_rounded,
-          size: AppResponsive.iconSize(context)),
+      icon: Icon(
+        Icons.swap_horiz_rounded,
+        size: AppResponsive.iconSize(context),
+      ),
       label: Text(
         'Exchange',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(fontSize: AppResponsive.bodyFontSize(context)),
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.bodyFontSize(context),
+        ),
       ),
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         padding: EdgeInsets.symmetric(
           vertical: AppResponsive.largeSpacing(context),
         ),
@@ -337,7 +354,13 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
           ),
         ],
       ),
-      child: _capped(context, _returnAction()),
+      child: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxCardWidth(context),
+        heightFactor: 1,
+        child: _returnAction(),
+      ),
     );
   }
 
@@ -355,8 +378,8 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
     final tooltipMsg = !AppSettings.refundsEnabled
         ? 'Refunds are disabled in Settings'
         : windowExpired
-            ? 'Refund window has passed ($windowLabel limit)'
-            : '';
+        ? 'Refund window has passed ($windowLabel limit)'
+        : '';
 
     return Tooltip(
       message: tooltipMsg,
@@ -366,7 +389,8 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                 final result = await Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => SaleReturnScreen(saleId: widget.saleId),
+                    builder: (context) =>
+                        SaleReturnScreen(saleId: widget.saleId),
                   ),
                 );
 
@@ -383,11 +407,11 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
           !AppSettings.refundsEnabled
               ? 'Refunds Disabled'
               : windowExpired
-                  ? (compact ? 'Window Expired' : 'Refund Window Expired')
-                  : (compact ? 'Return' : 'Process Return/Refund'),
+              ? (compact ? 'Window Expired' : 'Refund Window Expired')
+              : (compact ? 'Return' : 'Process Return/Refund'),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
+          style: GoogleFonts.poppins(
             fontSize: compact
                 ? AppResponsive.bodyFontSize(context)
                 : AppResponsive.subheadingFontSize(context),
@@ -432,7 +456,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
             Text(
               'Sale not found',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: AppResponsive.subheadingFontSize(context),
                 color: AppColors.textSecondary,
               ),
@@ -451,29 +475,13 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
     );
   }
 
-  /// Caps content width on large screens so a stack of detail cards doesn't
-  /// stretch across a laptop. Applied once here, which covers the header,
-  /// items and summary cards below.
-  Widget _capped(BuildContext context, Widget child) {
-    final maxWidth = AppResponsive.maxCardWidth(context);
-    if (maxWidth == double.infinity) return child;
-    return Align(
-      // topCenter + heightFactor: without both, Align fills its constraints —
-      // which made this eat the whole screen when used as a bottom bar.
-      alignment: Alignment.topCenter,
-      heightFactor: 1,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
-      ),
-    );
-  }
-
   Widget _buildSaleDetail() {
     return SingleChildScrollView(
-      child: _capped(
-        context,
-        Column(
+      child: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxCardWidth(context),
+        child: Column(
           children: [
             // Sale Header Card
             _buildSaleHeaderCard(),
@@ -504,7 +512,9 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         boxShadow: [
           BoxShadow(
             color: _getPaymentColor(_sale!.paymentType).withValues(alpha: 0.3),
@@ -521,10 +531,15 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
           // guessing at the missing sale would invent money.
           if (_exchangeIncomplete) ...[
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.mediumSpacing(context),
+                vertical: AppResponsive.smallSpacing(context),
+              ),
               decoration: BoxDecoration(
                 color: AppColors.warning,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
               ),
               child: Row(
                 children: [
@@ -533,11 +548,11 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                     color: Colors.white,
                     size: AppResponsive.iconSize(context),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
                   Expanded(
                     child: Text(
                       'Exchange incomplete — the replacement was never created',
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         color: Colors.white,
                         fontSize: AppResponsive.smallFontSize(context),
                         fontWeight: FontWeight.w600,
@@ -554,10 +569,15 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
           // ₹200 bill with ₹50 collected read here as an ordinary paid sale.
           if (_hasOutstanding) ...[
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.mediumSpacing(context),
+                vertical: AppResponsive.smallSpacing(context),
+              ),
               decoration: BoxDecoration(
                 color: AppColors.warning,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
               ),
               child: Row(
                 children: [
@@ -566,13 +586,13 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                     color: Colors.white,
                     size: AppResponsive.iconSize(context),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
                   Expanded(
                     child: Text(
                       _sale!.statusDisplayText.toUpperCase(),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         color: Colors.white,
                         fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w700,
@@ -580,7 +600,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -593,7 +613,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                     child: Text(
                       'Balance ${formatMoney(_sale!.dueAmount)}',
                       maxLines: 1,
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         color: Colors.white,
                         fontSize: AppResponsive.captionFontSize(context),
                         fontWeight: FontWeight.w600,
@@ -609,14 +629,19 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
           // Refund Status Banner
           if (_hasBeenRefunded) ...[
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.mediumSpacing(context),
+                vertical: AppResponsive.smallSpacing(context),
+              ),
               decoration: BoxDecoration(
                 // Amber for a partial return: the sale is not closed and more
                 // can still come back, so it must not read as final.
                 color: _isFullyReturned
                     ? Colors.red.shade600
                     : AppColors.warning,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
               ),
               child: Row(
                 children: [
@@ -625,13 +650,13 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                     color: Colors.white,
                     size: AppResponsive.iconSize(context),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
                   Expanded(
                     child: Text(
                       _isFullyReturned ? 'REFUNDED' : 'PARTIALLY RETURNED',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         color: Colors.white,
                         fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w700,
@@ -639,7 +664,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -650,9 +675,11 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      _isFullyReturned ? 'Full Return' : 'Items still returnable',
+                      _isFullyReturned
+                          ? 'Full Return'
+                          : 'Items still returnable',
                       maxLines: 1,
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         color: Colors.white,
                         fontSize: AppResponsive.captionFontSize(context),
                         fontWeight: FontWeight.w600,
@@ -662,7 +689,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
           ],
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -673,7 +700,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                   children: [
                     Text(
                       'Sale ID',
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         color: Colors.white70,
                         fontSize: AppResponsive.smallFontSize(context),
                         fontWeight: FontWeight.w400,
@@ -684,7 +711,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                       _sale!.displayNumber,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         color: Colors.white,
                         fontSize: AppResponsive.subheadingFontSize(context),
                         fontWeight: FontWeight.w600,
@@ -694,7 +721,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Container(
                 padding: EdgeInsets.symmetric(
                   horizontal: AppResponsive.largeSpacing(context),
@@ -709,19 +736,20 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                   children: [
                     Text(
                       _getPaymentIcon(_sale!.paymentType),
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.iconSize(context),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
                     Text(
                       // Via the shared label so an exchange reads "Exchange"
                       // or "Exchange + UPI" rather than a bare payment method
                       // the customer never actually tendered.
-                      RetailPaymentModeSummary.methodLabel(_sale!)
-                          .toUpperCase(),
+                      RetailPaymentModeSummary.methodLabel(
+                        _sale!,
+                      ).toUpperCase(),
                       maxLines: 1,
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         color: Colors.white,
                         fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
@@ -760,13 +788,13 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
           color: Colors.white70,
           size: AppResponsive.smallIconSize(context),
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: AppResponsive.smallSpacing(context)),
         Expanded(
           child: Text(
             text,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               color: Colors.white,
               fontSize: AppResponsive.bodyFontSize(context),
             ),
@@ -797,7 +825,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
               children: [
                 Text(
                   'Items Sold',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: AppResponsive.subheadingFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
@@ -811,12 +839,14 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                   ),
                   decoration: BoxDecoration(
                     color: AppColors.success.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.borderRadius(context),
+                    ),
                   ),
                   child: Text(
                     '${_saleItems.length} products',
                     maxLines: 1,
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.smallFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: AppColors.success,
@@ -850,7 +880,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
 
   Widget _buildSaleItemTile(SaleItemModel item, int itemNumber) {
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -870,7 +900,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                 child: Center(
                   child: Text(
                     '$itemNumber',
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: AppColors.success,
@@ -888,7 +918,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                       item.productName ?? 'Unknown Product',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
@@ -917,13 +947,15 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
           // Price Breakdown
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: AppColors.surfaceLight,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
             ),
             child: Column(
               children: [
@@ -971,7 +1003,10 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
 
   Widget _buildPropertyChip(String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.smallSpacing(context),
+        vertical: 4,
+      ),
       decoration: BoxDecoration(
         color: AppColors.surfaceMedium,
         borderRadius: BorderRadius.circular(4),
@@ -980,7 +1015,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
       child: Text(
         label,
         maxLines: 1,
-        style: TextStyle(
+        style: GoogleFonts.poppins(
           fontSize: AppResponsive.captionFontSize(context),
           color: AppColors.textSecondary,
         ),
@@ -1004,7 +1039,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
         children: [
           Text(
             'Payment Summary',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.subheadingFontSize(context),
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
@@ -1016,7 +1051,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
             formatMoney(_sale!.subtotal),
             isBold: false,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
           // Split exactly as the receipt and the checkout screen do, from the
           // same items, so all three views group the numbers identically.
           if (receiptLineDiscountTotal(_saleItems) > 0.009) ...[
@@ -1026,7 +1061,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
               color: Colors.red,
               isBold: false,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
           ],
           if (receiptBillDiscountRemainder(_sale!, _saleItems) > 0.009) ...[
             _buildPriceRow(
@@ -1037,7 +1072,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
               color: Colors.red,
               isBold: false,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
           ],
           _buildPriceRow(
             'Tax',
@@ -1050,10 +1085,12 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
             child: Divider(height: 1, thickness: 0.5, color: AppColors.divider),
           ),
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: AppResponsive.cardPadding(context),
             decoration: BoxDecoration(
               color: AppColors.success.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
               border: Border.all(
                 color: AppColors.success.withValues(alpha: 0.2),
                 width: 1,
@@ -1075,12 +1112,14 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
               formatMoney(_sale!.paidAmount),
               color: AppColors.success,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: AppResponsive.cardPadding(context),
               decoration: BoxDecoration(
                 color: AppColors.warning.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
                 border: Border.all(
                   color: AppColors.warning.withValues(alpha: 0.3),
                   width: 1,
@@ -1095,10 +1134,10 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
               ),
             ),
             if (_customer != null) ...[
-              const SizedBox(height: 8),
+              SizedBox(height: AppResponsive.smallSpacing(context)),
               Text(
                 "On ${_customer!.name}'s account — collect from Receive Payment.",
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   fontSize: AppResponsive.captionFontSize(context),
                   color: AppColors.textSecondary,
                 ),
@@ -1124,12 +1163,14 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 20),
+        SizedBox(height: AppResponsive.largeSpacing(context)),
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: AppResponsive.cardPadding(context),
           decoration: BoxDecoration(
             color: AppColors.info.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.smallBorderRadius(context),
+            ),
             border: Border.all(
               color: AppColors.info.withValues(alpha: 0.2),
               width: 1,
@@ -1145,11 +1186,11 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                     size: AppResponsive.smallIconSize(context),
                     color: AppColors.info,
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
                   Expanded(
                     child: Text(
                       'Split Payment Breakdown',
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: AppColors.info,
@@ -1158,7 +1199,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               ...paymentList.map((payment) {
                 final method =
                     (payment['method'] as String?)?.toUpperCase() ?? 'OTHER';
@@ -1168,7 +1209,9 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                 final change = (payment['change'] as num?)?.toDouble();
 
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
+                  padding: EdgeInsets.only(
+                    bottom: AppResponsive.smallSpacing(context),
+                  ),
                   child: Column(
                     children: [
                       Row(
@@ -1185,7 +1228,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                             child: Center(
                               child: Text(
                                 _getPaymentMethodIcon(method),
-                                style: TextStyle(
+                                style: GoogleFonts.poppins(
                                   fontSize: AppResponsive.subheadingFontSize(
                                     context,
                                   ),
@@ -1202,7 +1245,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                                   method,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
+                                  style: GoogleFonts.poppins(
                                     fontSize: AppResponsive.smallFontSize(
                                       context,
                                     ),
@@ -1215,7 +1258,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                                     'Ref: $ref',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
+                                    style: GoogleFonts.poppins(
                                       fontSize: AppResponsive.captionFontSize(
                                         context,
                                       ),
@@ -1225,11 +1268,11 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                               ],
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          SizedBox(width: AppResponsive.smallSpacing(context)),
                           Text(
                             formatMoney(amount),
                             maxLines: 1,
-                            style: TextStyle(
+                            style: GoogleFonts.poppins(
                               fontSize: AppResponsive.bodyFontSize(context),
                               fontWeight: FontWeight.w600,
                               color: AppColors.textPrimary,
@@ -1257,7 +1300,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                                 children: [
                                   Text(
                                     'Cash Received',
-                                    style: TextStyle(
+                                    style: GoogleFonts.poppins(
                                       fontSize: AppResponsive.smallFontSize(
                                         context,
                                       ),
@@ -1267,7 +1310,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                                   Text(
                                     formatMoney(received),
                                     maxLines: 1,
-                                    style: TextStyle(
+                                    style: GoogleFonts.poppins(
                                       fontSize: AppResponsive.smallFontSize(
                                         context,
                                       ),
@@ -1284,7 +1327,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                                   children: [
                                     Text(
                                       'Change Given',
-                                      style: TextStyle(
+                                      style: GoogleFonts.poppins(
                                         fontSize: AppResponsive.smallFontSize(
                                           context,
                                         ),
@@ -1295,7 +1338,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                                     Text(
                                       formatMoney(change),
                                       maxLines: 1,
-                                      style: TextStyle(
+                                      style: GoogleFonts.poppins(
                                         fontSize: AppResponsive.smallFontSize(
                                           context,
                                         ),
@@ -1325,7 +1368,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                 ),
               ],
               if (_sale!.changeReturn != null && _sale!.changeReturn! > 0) ...[
-                const SizedBox(height: 8),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
                 _buildPriceRow(
                   'Change Returned',
                   formatMoney(_sale!.changeReturn!),
@@ -1386,16 +1429,16 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
       children: [
         Text(
           label,
-          style: TextStyle(
-            fontSize: fontSize ?? 14,
+          style: GoogleFonts.poppins(
+            fontSize: fontSize ?? AppResponsive.bodyFontSize(context),
             fontWeight: isBold ? FontWeight.w600 : FontWeight.w400,
             color: color ?? AppColors.textSecondary,
           ),
         ),
         Text(
           value,
-          style: TextStyle(
-            fontSize: fontSize ?? 14,
+          style: GoogleFonts.poppins(
+            fontSize: fontSize ?? AppResponsive.bodyFontSize(context),
             fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
             color: color ?? AppColors.textPrimary,
           ),

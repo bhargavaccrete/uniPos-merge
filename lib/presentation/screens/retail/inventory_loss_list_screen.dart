@@ -66,22 +66,6 @@ class _InventoryLossListScreenState extends State<InventoryLossListScreen> {
     );
   }
 
-  /// Caps content width on large screens. Backgrounds still span edge to edge —
-  /// only what you read is constrained.
-  Widget _capped(BuildContext context, Widget child) {
-    final maxWidth = AppResponsive.maxContentWidth(context);
-    if (maxWidth == double.infinity) return child;
-    return Align(
-      // topCenter, not Center: Center aligns on BOTH axes, so a
-      // shrink-wrapping child floats in the vertical middle.
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
-      ),
-    );
-  }
-
   Widget _buildBody(BuildContext context) {
     final side = AppResponsive.padding(context).left;
 
@@ -95,9 +79,11 @@ class _InventoryLossListScreenState extends State<InventoryLossListScreen> {
             side,
             12,
           ),
-          child: _capped(
-            context,
-            AppTextField(
+          child: AppResponsive.constrainedContent(
+            context: context,
+            alignment: Alignment.topCenter,
+            maxWidth: AppResponsive.maxContentWidth(context),
+            child: AppTextField(
               controller: _searchController,
               hint: 'Search by product, supplier, GRN or reason...',
               icon: Icons.search_rounded,
@@ -141,9 +127,11 @@ class _InventoryLossListScreenState extends State<InventoryLossListScreen> {
                 );
               }
 
-              return _capped(
-                context,
-                ListView.builder(
+              return AppResponsive.constrainedContent(
+                context: context,
+                alignment: Alignment.topCenter,
+                maxWidth: AppResponsive.maxContentWidth(context),
+                child: ListView.builder(
                   padding: AppResponsive.padding(context),
                   itemCount: losses.length,
                   itemBuilder: (context, index) => _buildCard(losses[index]),
@@ -170,16 +158,18 @@ class _InventoryLossListScreenState extends State<InventoryLossListScreen> {
             horizontal: AppResponsive.padding(context).left,
             vertical: AppResponsive.smallSpacing(context),
           ),
-          child: _capped(
-            context,
-            Row(
+          child: AppResponsive.constrainedContent(
+            context: context,
+            alignment: Alignment.topCenter,
+            maxWidth: AppResponsive.maxContentWidth(context),
+            child: Row(
               children: [
                 Icon(
                   Icons.trending_down_rounded,
                   size: AppResponsive.smallIconSize(context),
                   color: AppColors.danger,
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Expanded(
                   child: Text(
                     '${damagedGoodsStore.totalLossQty} units written off • ${formatMoney(damagedGoodsStore.totalLossValue)} total',
@@ -241,7 +231,7 @@ class _InventoryLossListScreenState extends State<InventoryLossListScreen> {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [

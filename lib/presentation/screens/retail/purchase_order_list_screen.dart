@@ -11,6 +11,7 @@ import 'package:billberrylite/presentation/widget/componets/common/money_scope.d
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model_211.dart';
 import 'package:billberrylite/presentation/screens/retail/add_purchase_order_screen.dart';
@@ -260,23 +261,6 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
     });
   }
 
-  /// Caps content width on large screens. Backgrounds still span edge to edge —
-  /// only what you read is constrained, so a laptop doesn't stretch a PO card
-  /// across the whole window.
-  Widget _capped(BuildContext context, Widget child) {
-    final maxWidth = AppResponsive.maxContentWidth(context);
-    if (maxWidth == double.infinity) return child;
-    return Align(
-      // topCenter, not Center: Center aligns on BOTH axes, so a
-      // shrink-wrapping child floats in the vertical middle.
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -390,9 +374,11 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
         side,
         12,
       ),
-      child: _capped(
-        context,
-        AppTextField(
+      child: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        child: AppTextField(
           controller: _searchController,
           hint: 'Search by PO number or supplier...',
           icon: Icons.search_rounded,
@@ -432,9 +418,11 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
             side,
             gap,
           ),
-          child: _capped(
-            context,
-            Row(
+          child: AppResponsive.constrainedContent(
+            context: context,
+            alignment: Alignment.topCenter,
+            maxWidth: AppResponsive.maxContentWidth(context),
+            child: Row(
               children: [
                 Expanded(
                   child: _buildStatItem(
@@ -491,7 +479,7 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
           Text(
             value,
             maxLines: 1,
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.subheadingFontSize(context),
               fontWeight: FontWeight.w600,
               color: color,
@@ -500,7 +488,7 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
           Text(
             label,
             maxLines: 1,
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.captionFontSize(context),
               color: AppColors.textSecondary,
             ),
@@ -523,9 +511,11 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
           return _buildEmptyState(tabIndex);
         }
 
-        return _capped(
-          context,
-          ListView.builder(
+        return AppResponsive.constrainedContent(
+          context: context,
+          alignment: Alignment.topCenter,
+          maxWidth: AppResponsive.maxContentWidth(context),
+          child: ListView.builder(
             padding: AppResponsive.padding(context),
             itemCount: filteredPOs.length,
             itemBuilder: (context, index) {
@@ -556,9 +546,11 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
         horizontal: AppResponsive.padding(context).left,
         vertical: AppResponsive.smallSpacing(context),
       ),
-      child: _capped(
-        context,
-        Row(
+      child: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        child: Row(
           children: [
             Icon(
               Icons.filter_alt,
@@ -571,7 +563,7 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
                 parts.join('  •  '),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   fontSize: AppResponsive.smallFontSize(context),
                   color: AppColors.info,
                 ),
@@ -583,7 +575,7 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Text(
                   'Clear',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: AppResponsive.smallFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: AppColors.info,
@@ -608,45 +600,10 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
       message = 'No ${_tabLabels[tabIndex].toLowerCase()} purchase orders';
     }
 
-    return Center(
-      child: Padding(
-        padding: AppResponsive.padding(context),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.assignment_outlined,
-              size: AppResponsive.getValue(
-                context,
-                mobile: 80.0,
-                tablet: 92.0,
-                desktop: 104.0,
-              ),
-              color: AppColors.divider,
-            ),
-            SizedBox(height: AppResponsive.largeSpacing(context)),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: AppResponsive.subheadingFontSize(context),
-                color: AppColors.textSecondary,
-              ),
-            ),
-            if (tabIndex == 0) ...[
-              SizedBox(height: AppResponsive.smallSpacing(context)),
-              Text(
-                'Create your first PO using the + button',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: AppResponsive.bodyFontSize(context),
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+    return AppEmptyState(
+      icon: Icons.assignment_outlined,
+      title: message,
+      message: tabIndex == 0 ? 'Create your first PO using the + button' : null,
     );
   }
 
@@ -681,7 +638,7 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
                       po.poNumber,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
@@ -697,12 +654,14 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
                       color: poStatusColor(
                         po.statusEnum,
                       ).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.borderRadius(context),
+                      ),
                     ),
                     child: Text(
                       poStatusLabel(po.statusEnum),
                       maxLines: 1,
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.captionFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: poStatusColor(po.statusEnum),
@@ -737,7 +696,7 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
                 po.supplierName ?? 'Unknown Supplier',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   fontSize: AppResponsive.bodyFontSize(context),
                   color: AppColors.textSecondary,
                 ),
@@ -767,7 +726,7 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
                     Text(
                       formatMoney(po.estimatedTotal),
                       maxLines: 1,
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.smallFontSize(context),
                         color: AppColors.success,
                         fontWeight: FontWeight.w600,
@@ -788,7 +747,7 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
                     ),
                     label: Text(
                       'Receive Items',
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.bodyFontSize(context),
                       ),
                     ),
@@ -822,7 +781,7 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
         Text(
           label,
           maxLines: 1,
-          style: TextStyle(
+          style: GoogleFonts.poppins(
             fontSize: AppResponsive.smallFontSize(context),
             color: color,
             fontWeight: bold ? FontWeight.w500 : FontWeight.normal,
@@ -857,7 +816,7 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
               Text(
                 '${formatMoney(progress.billedAmount)} billed',
                 maxLines: 1,
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   fontSize: AppResponsive.smallFontSize(context),
                   color: AppColors.textSecondary,
                 ),

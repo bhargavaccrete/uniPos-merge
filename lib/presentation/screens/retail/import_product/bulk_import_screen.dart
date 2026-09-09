@@ -712,7 +712,7 @@ class _BulkImportScreenState extends State<BulkImportScreen> {
         ),
         actions: [
           appDialogCancelButton(ctx, label: 'Cancel'),
-          const SizedBox(width: 12),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           appDialogPrimaryButton(
             label: 'Import',
             onPressed: () => Navigator.pop(ctx, true),

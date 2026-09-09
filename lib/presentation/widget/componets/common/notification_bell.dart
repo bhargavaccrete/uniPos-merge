@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 
 import 'package:billberrylite/core/di/service_locator.dart';
@@ -68,7 +71,7 @@ class NotificationBell extends StatelessWidget {
                         // Three digits overflow the 16px pill, and "how many
                         // exactly" stops mattering long before then.
                         count > 99 ? '99+' : '$count',
-                        style: const TextStyle(
+                        style: GoogleFonts.poppins(
                           color: Colors.white,
                           fontSize: 9,
                           fontWeight: FontWeight.bold,

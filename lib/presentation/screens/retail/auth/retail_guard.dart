@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
@@ -112,26 +113,26 @@ class _RetailUpgradeRequiredScreen extends StatelessWidget {
                   size: 64,
                   color: Colors.amber.shade700,
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
                 Text(
                   'Not in your plan',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: AppResponsive.headingFontSize(context),
                     fontWeight: FontWeight.w700,
                     color: Colors.black87,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
                 Text(
                   'This feature isn’t included in your current plan.\n'
                   'Please contact Bill Berry to upgrade.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: AppResponsive.bodyFontSize(context),
                     color: Colors.grey.shade600,
                   ),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: AppResponsive.extraLargeSpacing(context)),
                 TextButton(
                   onPressed: () => Navigator.of(context).maybePop(),
                   child: const Text('Go Back'),

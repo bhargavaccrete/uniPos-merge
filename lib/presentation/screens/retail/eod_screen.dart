@@ -197,10 +197,13 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
     // below happen while the session is still open.
     final withdrawal = await _showSafeDropDialog(actualCashAmount);
     if (withdrawal == null || !mounted) return;
-    final keptInDrawer =
-        (actualCashAmount - withdrawal).clamp(0.0, double.infinity);
+    final keptInDrawer = (actualCashAmount - withdrawal).clamp(
+      0.0,
+      double.infinity,
+    );
     final variance = actualCashAmount - _expectedTotalCash;
-    final closerName = RestaurantSession.staffName ??
+    final closerName =
+        RestaurantSession.staffName ??
         (RestaurantSession.isAdmin ? 'Admin' : 'Staff');
 
     // Clear screen immediately and show loading
@@ -326,7 +329,8 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
         await cashMovementStore.addAdjustment(
           signedAmount: variance,
           reason: variance < 0 ? 'EOD Shortage' : 'EOD Overage',
-          note: 'Expected: ${money(_expectedTotalCash)}, '
+          note:
+              'Expected: ${money(_expectedTotalCash)}, '
               'Counted: ${money(counted)}',
           staffName: closerName,
         );
@@ -337,7 +341,8 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
           type: 'out',
           amount: withdrawal,
           reason: 'Safe drop - End of Day',
-          note: '$closerName ended day. Counted: ${money(counted)}, '
+          note:
+              '$closerName ended day. Counted: ${money(counted)}, '
               'Took to safe: ${money(withdrawal)}, '
               'Left in drawer: ${money(kept)}',
           systemClose: true,
@@ -353,10 +358,15 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
   /// Thermal only — there is no PDF fallback on the retail side. A shop with no
   /// printer paired must still be able to close, so a missing printer is said
   /// once as information, never as an error.
-  Future<void> _printSettlement(EndOfDayReport report, String closerName) async {
+  Future<void> _printSettlement(
+    EndOfDayReport report,
+    String closerName,
+  ) async {
     try {
-      final outcome =
-          await EodSettlementPrint.reprint(report, shiftUser: closerName);
+      final outcome = await EodSettlementPrint.reprint(
+        report,
+        shiftUser: closerName,
+      );
       if (!mounted) return;
       switch (outcome) {
         case EodReprintOutcome.printed:
@@ -495,7 +505,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                             ? AppColors.danger
                             : AppColors.success,
                       ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: AppResponsive.largeSpacing(context)),
                     Text(
                       'Amount to take to safe',
                       style: GoogleFonts.poppins(
@@ -503,7 +513,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: AppResponsive.smallSpacing(context)),
                     AppTextField(
                       controller: withdrawalController,
                       hint: '0.00',
@@ -519,7 +529,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                       onChanged: (_) => setDialogState(() {}),
                     ),
                     if (tooMuch) ...[
-                      const SizedBox(height: 6),
+                      SizedBox(height: 6),
                       Text(
                         'More than you counted (${money(counted)})',
                         style: GoogleFonts.poppins(
@@ -556,14 +566,17 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                         color: AppColors.textSecondary,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
                     // Second exit, matching restaurant: taking nothing out is a
                     // real choice, not a reason to retype the field to 0.
                     Align(
                       alignment: Alignment.centerLeft,
                       child: TextButton.icon(
                         onPressed: () => confirm(0),
-                        icon: const Icon(Icons.inbox_outlined, size: 18),
+                        icon: Icon(
+                          Icons.inbox_outlined,
+                          size: AppResponsive.smallIconSize(context),
+                        ),
                         label: Text(
                           'Leave all in drawer',
                           style: GoogleFonts.poppins(
@@ -577,7 +590,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                 ),
                 actions: [
                   appDialogCancelButton(dialogContext),
-                  const SizedBox(width: 12),
+                  SizedBox(width: AppResponsive.mediumSpacing(context)),
                   appDialogPrimaryButton(
                     label: 'Complete',
                     color: AppColors.primary,
@@ -634,7 +647,8 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
   /// exactly as `endday.dart` treats it.
   Future<void> _closeStaffHours() async {
     try {
-      final stale = await DayManagementService.isEodStrictlyPending() ||
+      final stale =
+          await DayManagementService.isEodStrictlyPending() ||
           await DayManagementService.hasPendingEOD();
       if (stale) {
         await shiftStore.freezeStaleShiftsAndAttendance();
@@ -656,7 +670,8 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
       await shiftStore.loadShifts();
       for (final sh in shiftStore.shifts.where((s) => s.isOpen)) {
         final now = DateTime.now();
-        final isStaleShift = stale ||
+        final isStaleShift =
+            stale ||
             sh.startTime.day != now.day ||
             sh.startTime.month != now.month ||
             sh.startTime.year != now.year;
@@ -721,7 +736,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
             children: [
               if (_isGenerating) ...[
                 const CircularProgressIndicator(),
-                const SizedBox(height: 20),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
                 Text(
                   'Processing End of Day...',
                   style: GoogleFonts.poppins(
@@ -730,12 +745,12 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                   ),
                 ),
               ] else ...[
-                const Icon(
+                Icon(
                   Icons.check_circle_outline,
                   size: 80,
                   color: AppColors.success,
                 ),
-                const SizedBox(height: 20),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
                 Text(
                   'No active transactions',
                   style: GoogleFonts.poppins(
@@ -743,7 +758,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
                 Text(
                   'Start a new day to see EOD data',
                   style: GoogleFonts.poppins(
@@ -763,7 +778,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
       appBar: buildPrimaryAppBar(
         title: 'End of Day Settlement',
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: _handleBack,
         ),
       ),
@@ -782,7 +797,9 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                 width: width,
                 decoration: BoxDecoration(
                   border: Border.all(color: AppColors.primary),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.smallBorderRadius(context),
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -810,7 +827,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                 ),
               ),
 
-              const SizedBox(height: 24),
+              SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
               // Payment Summaries
               Text(
@@ -820,18 +837,19 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               if (_currentReport != null)
                 ..._currentReport!.paymentSummaries.map((payment) {
                   return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    margin: EdgeInsets.only(
+                      bottom: AppResponsive.smallSpacing(context),
                     ),
-                    margin: const EdgeInsets.only(bottom: 8),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.smallBorderRadius(context),
+                      ),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -861,14 +879,15 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
 
               // Grand Total
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                margin: EdgeInsets.only(
+                  bottom: AppResponsive.largeSpacing(context),
                 ),
-                margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.smallBorderRadius(context),
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -889,7 +908,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                 ),
               ),
 
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
 
               // Discount Section
               if ((_currentReport?.totalDiscount ?? 0) > 0) ...[
@@ -900,16 +919,17 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  margin: EdgeInsets.only(
+                    bottom: AppResponsive.largeSpacing(context),
                   ),
-                  margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
                     color: AppColors.warning.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.smallBorderRadius(context),
+                    ),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -940,17 +960,18 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
                 ..._currentReport!.taxSummaries.map((tax) {
                   return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    margin: EdgeInsets.only(
+                      bottom: AppResponsive.smallSpacing(context),
                     ),
-                    margin: const EdgeInsets.only(bottom: 8),
                     decoration: BoxDecoration(
                       color: AppColors.info.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.smallBorderRadius(context),
+                      ),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -972,14 +993,15 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                   );
                 }),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  margin: EdgeInsets.only(
+                    bottom: AppResponsive.largeSpacing(context),
                   ),
-                  margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
                     color: AppColors.info.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.smallBorderRadius(context),
+                    ),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1000,7 +1022,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                 ),
               ],
 
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
 
               // Cash Reconciliation Section
               Container(
@@ -1019,7 +1041,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: AppResponsive.largeSpacing(context)),
 
                     // Expected Cash Calculation
                     Container(
@@ -1029,7 +1051,9 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                         border: Border.all(
                           color: AppColors.info.withValues(alpha: 0.3),
                         ),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(
+                          AppResponsive.smallBorderRadius(context),
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1042,7 +1066,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                               color: AppColors.info,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          SizedBox(height: AppResponsive.smallSpacing(context)),
                           _buildCashRow('Opening Balance:', openingBalance),
                           _buildCashRow('Cash Sales:', expectedCash),
                           _buildCashRow(
@@ -1098,7 +1122,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                       ),
                     ),
 
-                    const SizedBox(height: 20),
+                    SizedBox(height: AppResponsive.largeSpacing(context)),
 
                     // Actual Cash Input
                     Text(
@@ -1108,7 +1132,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: AppResponsive.smallSpacing(context)),
                     AppTextField(
                       controller: _actualCashController,
                       hint: 'Enter Actual Cash',
@@ -1124,7 +1148,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                       onChanged: (value) => _calculateDifference(),
                     ),
 
-                    const SizedBox(height: 20),
+                    SizedBox(height: AppResponsive.largeSpacing(context)),
 
                     // Difference
                     Text(
@@ -1134,7 +1158,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: AppResponsive.smallSpacing(context)),
                     AppTextField(
                       controller: _differenceController,
                       readOnly: true,
@@ -1143,7 +1167,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                           : Icons.trending_up_rounded,
                     ),
 
-                    const SizedBox(height: 20),
+                    SizedBox(height: AppResponsive.largeSpacing(context)),
 
                     // Remarks (Optional)
                     Text(
@@ -1153,7 +1177,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: AppResponsive.smallSpacing(context)),
                     AppTextField(
                       controller: _remarksController,
                       hint: 'Add any notes or remarks...',
@@ -1161,7 +1185,7 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                       maxLines: 3,
                     ),
 
-                    const SizedBox(height: 24),
+                    SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
                     // Complete EOD Button
                     SizedBox(
@@ -1172,7 +1196,9 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(
+                              AppResponsive.smallBorderRadius(context),
+                            ),
                           ),
                         ),
                         child: _isGenerating
@@ -1242,10 +1268,10 @@ class _RetailEODScreenState extends State<RetailEODScreen> {
             children: [
               Icon(
                 Icons.info_outline,
-                size: 14,
+                size: AppResponsive.smallIconSize(context),
                 color: AppColors.textSecondary,
               ),
-              const SizedBox(width: 4),
+              SizedBox(width: 4),
               Text(
                 label,
                 style: GoogleFonts.poppins(

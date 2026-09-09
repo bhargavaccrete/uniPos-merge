@@ -81,8 +81,9 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
       final remaining = await _returnService.remainingReturnable(widget.saleId);
 
       // Preselect when only one line can be exchanged — the common case.
-      final returnable =
-          items.where((i) => (remaining[i.varianteId] ?? 0) > 0).toList();
+      final returnable = items
+          .where((i) => (remaining[i.varianteId] ?? 0) > 0)
+          .toList();
 
       setState(() {
         _sale = sale;
@@ -142,8 +143,7 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
     }
 
     final max = _remainingFor(item);
-    final isDecimal =
-        _variantFor(item.varianteId)?.isDecimalQuantity ?? false;
+    final isDecimal = _variantFor(item.varianteId)?.isDecimalQuantity ?? false;
 
     _returnQty = isDecimal ? max : (max < 1 ? max : 1);
     _qtyController.text = formatQty(_returnQty);
@@ -190,10 +190,8 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
   Future<void> _pickReturnedItem() async {
     final picked = await showDialog<SaleItemModel>(
       context: context,
-      builder: (_) => _ReturnedItemPicker(
-        items: _returnableItems,
-        remaining: _remaining,
-      ),
+      builder: (_) =>
+          _ReturnedItemPicker(items: _returnableItems, remaining: _remaining),
     );
     if (picked == null) return;
     setState(() => _selectReturnedItem(picked));
@@ -300,93 +298,80 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _sale == null
-              ? _error('Sale not found')
-              : _returnableItems.isEmpty
-                  ? _error('Everything on this sale has already been returned')
-                  : SingleChildScrollView(
-                      child: _capped(
-                        Column(
-                          children: [
-                            _originalCard(),
-                            _returningCard(),
-                            _replacementCard(),
-                            if (_quoteError != null) _errorBanner(_quoteError!),
-                            if (_quote != null) ...[
-                              ExchangeSummaryCard(quote: _quote!),
-                              if (!_quote!.isEven) _paymentCard(),
-                            ],
-                            SizedBox(
-                                height: AppResponsive.largeSpacing(context)),
-                          ],
-                        ),
-                      ),
-                    ),
+          ? _error('Sale not found')
+          : _returnableItems.isEmpty
+          ? _error('Everything on this sale has already been returned')
+          : SingleChildScrollView(
+              child: AppResponsive.constrainedContent(
+                context: context,
+                alignment: Alignment.topCenter,
+                maxWidth: AppResponsive.maxCardWidth(context),
+                child: Column(
+                  children: [
+                    _originalCard(),
+                    _returningCard(),
+                    _replacementCard(),
+                    if (_quoteError != null) _errorBanner(_quoteError!),
+                    if (_quote != null) ...[
+                      ExchangeSummaryCard(quote: _quote!),
+                      if (!_quote!.isEven) _paymentCard(),
+                    ],
+                    SizedBox(height: AppResponsive.largeSpacing(context)),
+                  ],
+                ),
+              ),
+            ),
       bottomNavigationBar:
           _sale != null && !_isLoading && _returnableItems.isNotEmpty
-              ? _completeButton()
-              : null,
-    );
-  }
-
-  /// Caps content width on large screens, matching the Return screen.
-  Widget _capped(Widget child) {
-    final maxWidth = AppResponsive.maxCardWidth(context);
-    if (maxWidth == double.infinity) return child;
-    return Align(
-      alignment: Alignment.topCenter,
-      heightFactor: 1,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
-      ),
+          ? _completeButton()
+          : null,
     );
   }
 
   Widget _error(String message) => Center(
-        child: Padding(
-          padding: AppResponsive.padding(context),
-          child: AppEmptyState(
-            icon: Icons.swap_horiz_rounded,
-            title: message,
-          ),
-        ),
-      );
+    child: Padding(
+      padding: AppResponsive.padding(context),
+      child: AppEmptyState(icon: Icons.swap_horiz_rounded, title: message),
+    ),
+  );
 
   Widget _card({required Widget child}) => Container(
-        margin: AppResponsive.padding(context),
-        padding: AppResponsive.padding(context),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius:
-              BorderRadius.circular(AppResponsive.borderRadius(context)),
-          border: Border.all(color: AppColors.divider),
-        ),
-        child: child,
-      );
+    margin: AppResponsive.padding(context),
+    padding: AppResponsive.padding(context),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+      border: Border.all(color: AppColors.divider),
+    ),
+    child: child,
+  );
 
   Widget _sectionTitle(String text) => Text(
-        text,
-        style: GoogleFonts.poppins(
-          fontSize: AppResponsive.bodyFontSize(context),
-          fontWeight: FontWeight.w600,
-        ),
-      );
+    text,
+    style: GoogleFonts.poppins(
+      fontSize: AppResponsive.bodyFontSize(context),
+      fontWeight: FontWeight.w600,
+    ),
+  );
 
   Widget _originalCard() => _card(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _sectionTitle('Original Sale'),
-            SizedBox(height: AppResponsive.mediumSpacing(context)),
-            _row('Bill', _sale!.displayNumber),
-            _row('Paid By', _sale!.paymentType.toUpperCase()),
-            _row('Amount', formatMoney(_sale!.totalAmount)),
-            if (_sale!.dueAmount > 0)
-              _row('Outstanding', formatMoney(_sale!.dueAmount),
-                  accent: AppColors.warning),
-          ],
-        ),
-      );
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionTitle('Original Sale'),
+        SizedBox(height: AppResponsive.mediumSpacing(context)),
+        _row('Bill', _sale!.displayNumber),
+        _row('Paid By', _sale!.paymentType.toUpperCase()),
+        _row('Amount', formatMoney(_sale!.totalAmount)),
+        if (_sale!.dueAmount > 0)
+          _row(
+            'Outstanding',
+            formatMoney(_sale!.dueAmount),
+            accent: AppColors.warning,
+          ),
+      ],
+    ),
+  );
 
   Widget _returningCard() {
     final item = _returnedItem;
@@ -477,33 +462,43 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
   }
 
   Widget _placeholder(String label, VoidCallback onTap) => InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.divider),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.add_circle_outline,
-                  size: 18, color: AppColors.primary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  label,
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.bodyFontSize(context),
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ),
-            ],
-          ),
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(
+      AppResponsive.smallBorderRadius(context),
+    ),
+    child: Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.mediumSpacing(context),
+        vertical: AppResponsive.mediumSpacing(context),
+      ),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
         ),
-      );
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.add_circle_outline,
+            size: AppResponsive.smallIconSize(context),
+            color: AppColors.primary,
+          ),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
+          Expanded(
+            child: Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 
   Widget _attributes(SaleItemModel item) {
     final text = attributeStore.describeAttributes(
@@ -535,14 +530,18 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
         else
           Row(
             children: [
-              Text('Qty',
-                  style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.bodyFontSize(context))),
-              const SizedBox(width: 8),
+              Text(
+                'Qty',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                ),
+              ),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               IconButton(
                 icon: const Icon(Icons.remove_circle_outline),
-                onPressed:
-                    _returnQty > 1 ? () => _setQty(_returnQty - 1) : null,
+                onPressed: _returnQty > 1
+                    ? () => _setQty(_returnQty - 1)
+                    : null,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
@@ -593,7 +592,8 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
         Expanded(
           child: AppTextField(
             controller: _qtyController,
-            label: 'Quantity${unit != null && unit.isNotEmpty ? ' ($unit)' : ''}',
+            label:
+                'Quantity${unit != null && unit.isNotEmpty ? ' ($unit)' : ''}',
             icon: Icons.scale_outlined,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
@@ -614,9 +614,9 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
             },
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: AppResponsive.mediumSpacing(context)),
         Padding(
-          padding: const EdgeInsets.only(top: 14),
+          padding: EdgeInsets.only(top: AppResponsive.mediumSpacing(context)),
           child: Text(
             'of ${formatQtyWithUnit(max, unit)}',
             style: GoogleFonts.poppins(
@@ -630,85 +630,95 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
   }
 
   Widget _paymentCard() => _card(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionTitle(_quote!.customerPays ? 'Collect By' : 'Refund By'),
+        SizedBox(height: AppResponsive.mediumSpacing(context)),
+        Wrap(
+          spacing: 8,
           children: [
-            _sectionTitle(
-              _quote!.customerPays ? 'Collect By' : 'Refund By',
-            ),
-            SizedBox(height: AppResponsive.mediumSpacing(context)),
-            Wrap(
-              spacing: 8,
-              children: [
-                _methodChip('cash', '💵 Cash'),
-                _methodChip('card', '💳 Card'),
-                _methodChip('upi', '📱 UPI'),
-              ],
-            ),
+            _methodChip('cash', '💵 Cash'),
+            _methodChip('card', '💳 Card'),
+            _methodChip('upi', '📱 UPI'),
           ],
         ),
-      );
+      ],
+    ),
+  );
 
   Widget _methodChip(String value, String label) => ChoiceChip(
-        label: Text(label),
-        labelStyle:
-            TextStyle(fontSize: AppResponsive.bodyFontSize(context)),
-        selected: _paymentMethod == value,
-        onSelected: (_) => setState(() => _paymentMethod = value),
-      );
+    label: Text(label),
+    labelStyle: GoogleFonts.poppins(
+      fontSize: AppResponsive.bodyFontSize(context),
+    ),
+    selected: _paymentMethod == value,
+    onSelected: (_) => setState(() => _paymentMethod = value),
+  );
 
   Widget _errorBanner(String message) => Container(
-        margin: AppResponsive.padding(context),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: AppColors.danger.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.danger),
+    margin: AppResponsive.padding(context),
+    padding: EdgeInsets.symmetric(
+      horizontal: AppResponsive.mediumSpacing(context),
+      vertical: AppResponsive.smallSpacing(context),
+    ),
+    decoration: BoxDecoration(
+      color: AppColors.danger.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(
+        AppResponsive.smallBorderRadius(context),
+      ),
+      border: Border.all(color: AppColors.danger),
+    ),
+    child: Row(
+      children: [
+        Icon(
+          Icons.error_outline,
+          size: AppResponsive.smallIconSize(context),
+          color: AppColors.danger,
         ),
-        child: Row(
-          children: [
-            Icon(Icons.error_outline, size: 18, color: AppColors.danger),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                message,
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.smallFontSize(context),
-                  color: AppColors.danger,
-                ),
-              ),
+        SizedBox(width: AppResponsive.smallSpacing(context)),
+        Expanded(
+          child: Text(
+            message,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.danger,
             ),
-          ],
+          ),
         ),
-      );
+      ],
+    ),
+  );
 
   Widget _row(String label, String value, {Color? accent}) => Padding(
-        padding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label,
-                style: GoogleFonts.poppins(
-                  color: AppColors.textSecondary,
-                  fontSize: AppResponsive.bodyFontSize(context),
-                )),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.right,
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.w600,
-                  fontSize: AppResponsive.bodyFontSize(context),
-                  color: accent,
-                ),
-              ),
-            ),
-          ],
+    padding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            color: AppColors.textSecondary,
+            fontSize: AppResponsive.bodyFontSize(context),
+          ),
         ),
-      );
+        SizedBox(width: AppResponsive.smallSpacing(context)),
+        Flexible(
+          child: Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.w600,
+              fontSize: AppResponsive.bodyFontSize(context),
+              color: accent,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 
   Widget _completeButton() {
     final enabled = _quote != null && !_isProcessing;
@@ -717,7 +727,7 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
         padding: AppResponsive.padding(context),
         child: SizedBox(
           width: double.infinity,
-          height: 52,
+          height: AppResponsive.buttonHeight(context),
           child: ElevatedButton.icon(
             onPressed: enabled ? _complete : null,
             style: ElevatedButton.styleFrom(
@@ -732,7 +742,9 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white),
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
                 : const Icon(Icons.swap_horiz_rounded),
             label: Text(
@@ -780,14 +792,14 @@ class _ReturnedItemPicker extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.poppins(
                   fontWeight: FontWeight.w600,
-                  fontSize: 14,
+                  fontSize: AppResponsive.bodyFontSize(context),
                 ),
               ),
               subtitle: Text(
                 '${formatQty(left)} of ${formatQty(item.qty)} still '
                 'returnable · ${formatMoney(item.price)} each',
                 style: GoogleFonts.poppins(
-                  fontSize: 12,
+                  fontSize: AppResponsive.smallFontSize(context),
                   color: AppColors.textSecondary,
                 ),
               ),
@@ -829,8 +841,7 @@ class _ReplacementPickerState extends State<_ReplacementPicker> {
       if (v.effectivePrice <= 0) return false;
       if (query.isEmpty) return true;
 
-      final name =
-          productStore.getProductById(v.productId)?.productName ?? '';
+      final name = productStore.getProductById(v.productId)?.productName ?? '';
       return name.toLowerCase().contains(query) ||
           v.variantDescription.toLowerCase().contains(query) ||
           (v.sku ?? '').toLowerCase().contains(query) ||
@@ -858,7 +869,7 @@ class _ReplacementPickerState extends State<_ReplacementPicker> {
               autofocus: true,
               onChanged: (v) => setState(() => _query = v),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             Expanded(
               child: candidates.isEmpty
                   ? const AppEmptyState(
@@ -871,7 +882,8 @@ class _ReplacementPickerState extends State<_ReplacementPicker> {
                       separatorBuilder: (_, _) => const Divider(height: 1),
                       itemBuilder: (context, index) {
                         final v = candidates[index];
-                        final name = productStore
+                        final name =
+                            productStore
                                 .getProductById(v.productId)
                                 ?.productName ??
                             'Item';
@@ -880,14 +892,12 @@ class _ReplacementPickerState extends State<_ReplacementPicker> {
                         return ListTile(
                           contentPadding: EdgeInsets.zero,
                           title: Text(
-                            description.isEmpty
-                                ? name
-                                : '$name · $description',
+                            description.isEmpty ? name : '$name · $description',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.poppins(
                               fontWeight: FontWeight.w600,
-                              fontSize: 14,
+                              fontSize: AppResponsive.bodyFontSize(context),
                             ),
                           ),
                           subtitle: Text(
@@ -895,7 +905,7 @@ class _ReplacementPickerState extends State<_ReplacementPicker> {
                             '${formatQtyWithUnit(v.stockQty, v.effectiveUnit)} '
                             'in stock',
                             style: GoogleFonts.poppins(
-                              fontSize: 12,
+                              fontSize: AppResponsive.smallFontSize(context),
                               color: AppColors.textSecondary,
                             ),
                           ),

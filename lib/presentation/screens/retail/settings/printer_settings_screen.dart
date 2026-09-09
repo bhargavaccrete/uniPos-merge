@@ -103,13 +103,13 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                 // an A4 invoice has a fixed layout.
                 if (_settings.paperSize != PaperSize.a4) ...[
                   _buildTemplateSection(context, isTablet),
-                  const SizedBox(height: 24),
+                  SizedBox(height: AppResponsive.extraLargeSpacing(context)),
                 ],
 
                 _sectionHeader(context, 'Store Logo'),
-                const SizedBox(height: 10),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
                 _buildLogoCard(context, isTablet),
-                const SizedBox(height: 24),
+                SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
                 // Toggle groups, all but Branding — that goes last so the
                 // "Powered By" lock reads as a footnote, as restaurant does.
@@ -131,7 +131,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                   hint: 'e.g. Visit Again!',
                   onChanged: _printerService.setFooterText,
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
                 ..._toggleGroups().entries
                     .where((g) => g.key == 'Branding')
@@ -154,12 +154,12 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.cloud_done,
                           color: AppColors.success,
-                          size: 18,
+                          size: AppResponsive.smallIconSize(context),
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: AppResponsive.smallSpacing(context)),
                         Text(
                           'Settings auto-save',
                           style: GoogleFonts.poppins(
@@ -172,7 +172,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: AppResponsive.extraLargeSpacing(context)),
               ],
             ),
           ),
@@ -310,9 +310,9 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionHeader(context, title),
-        const SizedBox(height: 12),
+        SizedBox(height: AppResponsive.mediumSpacing(context)),
         ...toggles.map((t) => _buildToggleCard(context, t, isTablet)),
-        const SizedBox(height: 20),
+        SizedBox(height: AppResponsive.largeSpacing(context)),
       ],
     );
   }
@@ -336,10 +336,12 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(
           color: shown
               ? AppColors.primary.withValues(alpha: 0.3)
@@ -350,7 +352,9 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.borderRadius(context),
+          ),
           onTap: () {
             if (locked) {
               NotificationService.instance.showInfo(
@@ -378,7 +382,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                     size: 22,
                   ),
                 ),
-                const SizedBox(width: 14),
+                SizedBox(width: AppResponsive.mediumSpacing(context)),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -398,10 +402,10 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                             ),
                           ),
                           if (locked) ...[
-                            const SizedBox(width: 6),
-                            const Icon(
+                            SizedBox(width: 6),
+                            Icon(
                               Icons.lock_rounded,
-                              size: 14,
+                              size: AppResponsive.smallIconSize(context),
                               color: AppColors.textSecondary,
                             ),
                           ],
@@ -448,7 +452,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
             borderRadius: BorderRadius.circular(2),
           ),
         ),
-        const SizedBox(width: 10),
+        SizedBox(width: AppResponsive.smallSpacing(context)),
         Text(
           title,
           style: GoogleFonts.poppins(
@@ -466,7 +470,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     width: double.infinity,
     decoration: BoxDecoration(
       color: AppColors.white,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
       border: Border.all(color: AppColors.divider),
     ),
     child: child,
@@ -478,7 +482,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionHeader(context, 'Bill Receipt Template'),
-        const SizedBox(height: 10),
+        SizedBox(height: AppResponsive.smallSpacing(context)),
         Row(
           children: [
             Expanded(
@@ -491,7 +495,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                 onTap: () => _setTemplate(BillTemplate.simple),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
             Expanded(
               child: _templateCard(
                 context,
@@ -525,13 +529,15 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(12),
+        padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
         height: 110,
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.primary.withValues(alpha: 0.04)
               : AppColors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.borderRadius(context),
+          ),
           border: Border.all(
             color: isSelected ? AppColors.primary : AppColors.divider,
             width: isSelected ? 1.8 : 1.0,
@@ -548,17 +554,17 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                   color: isSelected
                       ? AppColors.primary
                       : AppColors.textSecondary,
-                  size: 20,
+                  size: AppResponsive.iconSize(context),
                 ),
                 if (isSelected)
-                  const Icon(
+                  Icon(
                     Icons.check_circle_rounded,
                     color: AppColors.primary,
-                    size: 16,
+                    size: AppResponsive.smallIconSize(context),
                   ),
               ],
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: AppResponsive.smallSpacing(context)),
             Text(
               title,
               maxLines: 1,
@@ -569,7 +575,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                 color: isSelected ? AppColors.primary : AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 2),
+            SizedBox(height: 2),
             Expanded(
               child: Text(
                 subtitle,
@@ -615,20 +621,23 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                           File(_settings.logoPath!),
                           fit: BoxFit.contain,
                         )
-                      : const Icon(
+                      : Icon(
                           Icons.storefront_outlined,
                           color: AppColors.textSecondary,
                           size: 28,
                         ),
                 ),
-                const SizedBox(width: 14),
+                SizedBox(width: AppResponsive.mediumSpacing(context)),
                 Expanded(
                   child: Row(
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: _pickLogoImage,
-                          icon: const Icon(Icons.upload_outlined, size: 18),
+                          icon: Icon(
+                            Icons.upload_outlined,
+                            size: AppResponsive.smallIconSize(context),
+                          ),
                           label: Text(
                             hasLogo ? 'Change' : 'Add Logo',
                             style: GoogleFonts.poppins(
@@ -639,7 +648,9 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppColors.primary,
                             side: const BorderSide(color: AppColors.primary),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            padding: EdgeInsets.symmetric(
+                              vertical: AppResponsive.mediumSpacing(context),
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -647,7 +658,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                         ),
                       ),
                       if (hasLogo) ...[
-                        const SizedBox(width: 10),
+                        SizedBox(width: AppResponsive.smallSpacing(context)),
                         IconButton(
                           onPressed: _removeLogoImage,
                           icon: const Icon(Icons.delete_outline_rounded),
@@ -661,7 +672,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
               ],
             ),
             if (!_settings.showLogo && hasLogo) ...[
-              const SizedBox(height: 10),
+              SizedBox(height: AppResponsive.smallSpacing(context)),
               Text(
                 'Logo printing is turned off below — this image will not appear '
                 'on receipts.',
@@ -694,7 +705,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _cardHeading(context, icon, title, description),
-            const SizedBox(height: 14),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             AppTextField(
               controller: controller,
               hint: hint,
@@ -726,7 +737,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
           ),
           child: Icon(icon, color: AppColors.primary, size: 22),
         ),
-        const SizedBox(width: 14),
+        SizedBox(width: AppResponsive.mediumSpacing(context)),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -739,7 +750,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                   color: AppColors.textPrimary,
                 ),
               ),
-              const SizedBox(height: 3),
+              SizedBox(height: 3),
               Text(
                 description,
                 style: GoogleFonts.poppins(

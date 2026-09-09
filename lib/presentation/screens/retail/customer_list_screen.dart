@@ -91,7 +91,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                   textCapitalization: TextCapitalization.words,
                   textInputAction: TextInputAction.next,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 AppTextField(
                   controller: phoneController,
                   label: 'Phone',
@@ -104,7 +104,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                   validator: PhoneRule.validate,
                   textInputAction: TextInputAction.next,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 AppTextField(
                   controller: emailController,
                   label: 'Email',
@@ -112,7 +112,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 AppTextField(
                   controller: addressController,
                   label: 'Address',
@@ -145,7 +145,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                   ],
                   textInputAction: TextInputAction.next,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 AppTextField(
                   controller: openingBalanceController,
                   label: 'Opening Balance',
@@ -173,7 +173,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
             ),
             actions: [
               appDialogCancelButton(dialogContext),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               appDialogPrimaryButton(
                 label: 'Add Customer',
                 onPressed: () => _saveNewCustomer(
@@ -269,7 +269,10 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
 
   Widget _dialogSectionLabel(String text) {
     return Padding(
-      padding: const EdgeInsets.only(top: 20, bottom: 10),
+      padding: EdgeInsets.only(
+        top: AppResponsive.largeSpacing(context),
+        bottom: AppResponsive.smallSpacing(context),
+      ),
       child: Text(
         text.toUpperCase(),
         style: GoogleFonts.poppins(
@@ -291,39 +294,21 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     ).then((_) => customerStore.loadCustomers());
   }
 
-  /// Caps content width on large screens. Backgrounds (the white search strip)
-  /// still span edge to edge — only what you read is constrained, so a laptop
-  /// doesn't stretch a one-line customer row across 1900px.
-  Widget _capped(BuildContext context, Widget child) {
-    final maxWidth = AppResponsive.maxContentWidth(context);
-    if (maxWidth == double.infinity) return child;
-    return Align(
-      // topCenter, not Center: Center aligns on BOTH axes, so a
-      // shrink-wrapping child floats in the vertical middle.
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: buildPrimaryAppBar(
-        title: 'Customers',
-      ),
+      appBar: buildPrimaryAppBar(title: 'Customers'),
       body: MoneyScope(
         child: Column(
           children: [
             Container(
               color: AppColors.white,
               padding: AppResponsive.padding(context),
-              child: _capped(
-                context,
-                AppTextField(
+              child: AppResponsive.constrainedContent(
+                context: context,
+                alignment: Alignment.topCenter,
+                child: AppTextField(
                   controller: _searchController,
                   hint: 'Search by name or phone...',
                   icon: Icons.search_rounded,
@@ -375,10 +360,13 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                           );
                   }
 
-                  return _capped(
-                    context,
-                    ListView.builder(
-                      padding: AppResponsive.padding(context).copyWith(bottom: 88),
+                  return AppResponsive.constrainedContent(
+                    context: context,
+                    alignment: Alignment.topCenter,
+                    child: ListView.builder(
+                      padding: AppResponsive.padding(
+                        context,
+                      ).copyWith(bottom: 88),
                       itemCount: customers.length,
                       itemBuilder: (context, index) =>
                           _buildCustomerCard(context, customers[index]),
@@ -464,7 +452,11 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
             horizontal: AppResponsive.padding(context).left,
             vertical: AppResponsive.smallSpacing(context),
           ),
-          child: _capped(context, content),
+          child: AppResponsive.constrainedContent(
+            context: context,
+            alignment: Alignment.topCenter,
+            child: content,
+          ),
         );
       },
     );

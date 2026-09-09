@@ -75,11 +75,9 @@ class _LicensingScreenState extends State<LicensingScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg),
-        backgroundColor:
-            isError ? AppColors.danger : AppColors.success,
+        backgroundColor: isError ? AppColors.danger : AppColors.success,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
@@ -93,7 +91,7 @@ class _LicensingScreenState extends State<LicensingScreen> {
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'License & Subscription',
-        titleFontSize: isTablet ? 22 : 20,
+        titleFontSize: AppResponsive.headingFontSize(context),
       ),
       body: SafeArea(
         child: Observer(
@@ -134,16 +132,18 @@ class _LicensingScreenState extends State<LicensingScreen> {
               const Spacer(),
               if (info != null && info.planName.isNotEmpty)
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     info.planName,
-                    style: TextStyle(
-                      fontSize: 12,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
                       color: AppColors.primary,
                       fontWeight: FontWeight.w600,
                     ),
@@ -155,17 +155,19 @@ class _LicensingScreenState extends State<LicensingScreen> {
             const SizedBox(height: 14),
             _infoRow('License Key', info.maskedKey),
             _infoRow(
-                'Expires',
-                info.expiryDate != null
-                    ? DateFormat('dd MMM yyyy').format(info.expiryDate!)
-                    : 'Never'),
+              'Expires',
+              info.expiryDate != null
+                  ? DateFormat('dd MMM yyyy').format(info.expiryDate!)
+                  : 'Never',
+            ),
           ] else ...[
             const SizedBox(height: 12),
             Text(
               'No license activated on this device.',
-              style: TextStyle(
-                  fontSize: isTablet ? 14 : 13,
-                  color: AppColors.textSecondary),
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ],
@@ -285,8 +287,11 @@ class _LicensingScreenState extends State<LicensingScreen> {
           const SizedBox(width: 6),
           Text(
             status.label,
-            style: TextStyle(
-                fontSize: 13, color: color, fontWeight: FontWeight.w600),
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -303,17 +308,20 @@ class _LicensingScreenState extends State<LicensingScreen> {
             width: 110,
             child: Text(
               label,
-              style: TextStyle(
-                  fontSize: 13, color: AppColors.textSecondary),
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
           Expanded(
             child: Text(
               value,
               style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textPrimary),
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
           if (copyable)
@@ -322,8 +330,11 @@ class _LicensingScreenState extends State<LicensingScreen> {
                 Clipboard.setData(ClipboardData(text: value));
                 _showSnack('Copied to clipboard', isError: false);
               },
-              child: Icon(Icons.copy_rounded,
-                  size: 16, color: AppColors.textSecondary),
+              child: Icon(
+                Icons.copy_rounded,
+                size: 16,
+                color: AppColors.textSecondary,
+              ),
             ),
         ],
       ),
@@ -341,8 +352,7 @@ class _LicensingScreenState extends State<LicensingScreen> {
       borderRadius: BorderRadius.circular(10),
       child: Container(
         width: double.infinity,
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(10),
@@ -354,10 +364,11 @@ class _LicensingScreenState extends State<LicensingScreen> {
             const SizedBox(width: 12),
             Text(
               label,
-              style: TextStyle(
-                  fontSize: 14,
-                  color: color,
-                  fontWeight: FontWeight.w500),
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                color: color,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
@@ -380,9 +391,10 @@ class _LicensingScreenState extends State<LicensingScreen> {
         Text(
           title,
           style: GoogleFonts.poppins(
-              fontSize: isTablet ? 15 : 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary),
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
         ),
       ],
     );
@@ -479,20 +491,20 @@ class _ActivateSheetState extends State<_ActivateSheet> {
           ),
           const SizedBox(height: 16),
           Text(
-            widget.isReactivate
-                ? 'Re-activate License'
-                : 'Activate License',
+            widget.isReactivate ? 'Re-activate License' : 'Activate License',
             style: GoogleFonts.poppins(
-                fontSize: isTablet ? 18 : 16,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary),
+              fontSize: AppResponsive.subheadingFontSize(context),
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             'Enter the license key provided with your subscription.',
-            style: TextStyle(
-                fontSize: isTablet ? 14 : 13,
-                color: AppColors.textSecondary),
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+            ),
           ),
           const SizedBox(height: 16),
           AppTextField(
@@ -516,10 +528,12 @@ class _ActivateSheetState extends State<_ActivateSheet> {
               onPressed: _loading ? null : _activate,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
-                disabledBackgroundColor:
-                    AppColors.primary.withValues(alpha: 0.5),
+                disabledBackgroundColor: AppColors.primary.withValues(
+                  alpha: 0.5,
+                ),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 elevation: 0,
               ),
               child: _loading
@@ -527,14 +541,17 @@ class _ActivateSheetState extends State<_ActivateSheet> {
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : Text(
                       'Activate',
                       style: GoogleFonts.poppins(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white),
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
             ),
           ),

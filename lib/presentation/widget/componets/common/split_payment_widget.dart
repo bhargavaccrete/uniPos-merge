@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:uuid/uuid.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
@@ -8,6 +9,7 @@ import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 /// Payment entry for split payment
 class PaymentEntry {
@@ -29,10 +31,14 @@ class PaymentEntry {
     this.referenceId,
     this.cashReceived = 0,
     this.cashChange = 0,
-  })  : id = id ?? const Uuid().v4(),
-        amountController = TextEditingController(text: amount > 0 ? amount.toStringAsFixed(2) : ''),
-        referenceController = TextEditingController(text: referenceId ?? ''),
-        cashReceivedController = TextEditingController(text: cashReceived > 0 ? cashReceived.toStringAsFixed(2) : '');
+  }) : id = id ?? const Uuid().v4(),
+       amountController = TextEditingController(
+         text: amount > 0 ? amount.toStringAsFixed(2) : '',
+       ),
+       referenceController = TextEditingController(text: referenceId ?? ''),
+       cashReceivedController = TextEditingController(
+         text: cashReceived > 0 ? cashReceived.toStringAsFixed(2) : '',
+       );
 
   void dispose() {
     amountController.dispose();
@@ -44,7 +50,8 @@ class PaymentEntry {
   bool get isCash => method == 'cash';
 
   /// For cash: the actual amount that goes into the drawer (received, or exact if split mode)
-  double get cashInDrawer => isCash ? (cashReceived > 0 ? cashReceived : amount) : amount;
+  double get cashInDrawer =>
+      isCash ? (cashReceived > 0 ? cashReceived : amount) : amount;
 
   /// What this entry actually settled of the bill.
   ///
@@ -52,7 +59,9 @@ class PaymentEntry {
   /// customer is paying only part now. Over-tender is change, never extra
   /// settlement, so this can fall below [amount] but never rise above it.
   double get settledAmount =>
-      isCash && cashReceived > 0 && cashReceived < amount ? cashReceived : amount;
+      isCash && cashReceived > 0 && cashReceived < amount
+      ? cashReceived
+      : amount;
 
   /// For cash: validate if sufficient amount received
   bool get isCashSufficient => !isCash || cashReceived >= amount;
@@ -85,7 +94,8 @@ class PaymentEntry {
 /// Split Payment Widget for checkout
 class SplitPaymentWidget extends StatefulWidget {
   final double billTotal;
-  final Function(List<PaymentEntry>, double totalPaid, double change) onPaymentChanged;
+  final Function(List<PaymentEntry>, double totalPaid, double change)
+  onPaymentChanged;
   final Function(bool isValid) onValidationChanged;
 
   /// The caller is collecting only part of the bill; the balance goes on the
@@ -161,8 +171,9 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
     if (oldWidget.billTotal != widget.billTotal && _payments.length == 1) {
       final entry = _payments[0];
       entry.amount = widget.billTotal;
-      entry.amountController.text =
-          widget.billTotal > 0 ? widget.billTotal.toStringAsFixed(2) : '';
+      entry.amountController.text = widget.billTotal > 0
+          ? widget.billTotal.toStringAsFixed(2)
+          : '';
       // Reset cash fields so they stay consistent with the new amount
       entry.cashReceived = 0;
       entry.cashReceivedController.clear();
@@ -212,7 +223,9 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
       if (payment.amount <= 0) return false;
       // For cash payments in single payment mode, validate that sufficient amount is received
       // For split payments, assume exact amount is received (cash received field is hidden)
-      if (_payments.length == 1 && payment.isCash && payment.cashReceived < payment.amount) {
+      if (_payments.length == 1 &&
+          payment.isCash &&
+          payment.cashReceived < payment.amount) {
         return false;
       }
     }
@@ -221,7 +234,13 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
 
   /// Check if any cash payment has insufficient amount
   bool get _hasCashInsufficient {
-    return _payments.any((p) => p.isCash && p.amount > 0 && p.cashReceived > 0 && p.cashReceived < p.amount);
+    return _payments.any(
+      (p) =>
+          p.isCash &&
+          p.amount > 0 &&
+          p.cashReceived > 0 &&
+          p.cashReceived < p.amount,
+    );
   }
 
   void _addPaymentEntry({double initialAmount = 0}) {
@@ -229,10 +248,12 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
     final usedMethods = _payments.map((p) => p.method).toSet();
     // Auto-select first method not already used by another entry
     final defaultMethod = enabledMethods.isNotEmpty
-        ? (enabledMethods.firstWhere(
-            (m) => !usedMethods.contains(m.value),
-            orElse: () => enabledMethods.first,
-          ).value)
+        ? (enabledMethods
+              .firstWhere(
+                (m) => !usedMethods.contains(m.value),
+                orElse: () => enabledMethods.first,
+              )
+              .value)
         : 'cash';
 
     setState(() {
@@ -270,8 +291,9 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
         if (_payments.length == 1) {
           final only = _payments.first;
           only.amount = widget.billTotal;
-          only.amountController.text =
-              widget.billTotal > 0 ? widget.billTotal.toStringAsFixed(2) : '';
+          only.amountController.text = widget.billTotal > 0
+              ? widget.billTotal.toStringAsFixed(2)
+              : '';
           only.cashChange = only.cashReceived > widget.billTotal
               ? only.cashReceived - widget.billTotal
               : 0;
@@ -308,7 +330,9 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
       _payments[index].cashReceived = received;
       // Auto-calculate change
       final billAmount = _payments[index].amount;
-      _payments[index].cashChange = received > billAmount ? received - billAmount : 0;
+      _payments[index].cashChange = received > billAmount
+          ? received - billAmount
+          : 0;
       _notifyChanges();
     });
   }
@@ -350,30 +374,30 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Bill Total Header
-     /*   Container(
+        /*   Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF4CAF50).withOpacity(0.1),
+            color: AppColors.success.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFF4CAF50).withOpacity(0.3)),
+            border: Border.all(color: AppColors.success.withOpacity(0.3)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Bill Total',
-                style: TextStyle(
-                  fontSize: 16,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.subheadingFontSize(context),
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF1A1A1A),
+                  color: AppColors.textPrimary,
                 ),
               ),
               Text(
                 '${CurrencyHelper.currentSymbol}${widget.billTotal.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontSize: 20,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.headingFontSize(context),
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF4CAF50),
+                  color: AppColors.success,
                 ),
               ),
             ],
@@ -390,11 +414,12 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
 
         // Add Payment Method Button
         TextButton.icon(
-          onPressed: () => _addPaymentEntry(initialAmount: _remaining > 0 ? _remaining : 0),
-          icon: const Icon(Icons.add_circle_outline, size: 20),
-          label: const Text('Add Payment Method'),
+          onPressed: () =>
+              _addPaymentEntry(initialAmount: _remaining > 0 ? _remaining : 0),
+          icon: Icon(Icons.add_circle_outline, size: 20),
+          label: Text('Add Payment Method'),
           style: TextButton.styleFrom(
-            foregroundColor: const Color(0xFF4CAF50),
+            foregroundColor: AppColors.success,
             padding: const EdgeInsets.symmetric(vertical: 12),
           ),
         ),
@@ -414,7 +439,7 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        border: Border.all(color: AppColors.divider),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
@@ -429,22 +454,29 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
           // Header: label + (split) delete
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Payment Method',
-                  style: TextStyle(
-                    fontSize: 13,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF6B6B6B),
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ),
               if (_payments.length > 1)
                 IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                  icon: const Icon(
+                    Icons.delete_outline,
+                    color: Colors.red,
+                    size: 20,
+                  ),
                   onPressed: () => _removePaymentEntry(index),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
                 ),
             ],
           ),
@@ -460,10 +492,10 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
               payment.isCash
                   ? 'Bill amount for this method'
                   : 'Amount collected now',
-              style: const TextStyle(
-                fontSize: 12,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
                 fontWeight: FontWeight.w500,
-                color: Color(0xFF6B6B6B),
+                color: AppColors.textSecondary,
               ),
             ),
             const SizedBox(height: 6),
@@ -477,11 +509,21 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
             ],
             prefixWidget: Padding(
               padding: const EdgeInsets.only(left: 12, right: 4),
-              child: Text('${CurrencyHelper.currentSymbol} ', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              child: Text(
+                '${CurrencyHelper.currentSymbol} ',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
             suffixIcon: _remaining > 0 && payment.amount < widget.billTotal
                 ? IconButton(
-                    icon: const Icon(Icons.add_circle, color: Color(0xFF4CAF50), size: 20),
+                    icon: Icon(
+                      Icons.add_circle,
+                      color: AppColors.success,
+                      size: 20,
+                    ),
                     tooltip: 'Fill remaining',
                     onPressed: () => _fillRemaining(index),
                     padding: EdgeInsets.zero,
@@ -503,7 +545,9 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
           ],
 
           // Cash Received Field (for Cash payments - only show for single payment)
-          if (payment.isCash && payment.amount > 0 && _payments.length == 1) ...[
+          if (payment.isCash &&
+              payment.amount > 0 &&
+              _payments.length == 1) ...[
             const SizedBox(height: 12),
             _buildCashReceivedSection(index, payment),
           ],
@@ -528,9 +572,12 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
 
         final enabledMethods = _paymentMethodStore.enabledMethods;
         if (enabledMethods.isEmpty) {
-          return const Text(
+          return Text(
             'No payment methods configured',
-            style: TextStyle(fontSize: 13, color: Colors.grey),
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              color: Colors.grey,
+            ),
           );
         }
 
@@ -540,13 +587,17 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
             .map((p) => p.method)
             .toSet();
         final availableMethods = enabledMethods
-            .where((m) =>
-                !selectedMethods.contains(m.value) || m.value == payment.method)
+            .where(
+              (m) =>
+                  !selectedMethods.contains(m.value) ||
+                  m.value == payment.method,
+            )
             .toList();
 
         // Repair selection if the current method is no longer available.
-        final currentMethodExists =
-            availableMethods.any((m) => m.value == payment.method);
+        final currentMethodExists = availableMethods.any(
+          (m) => m.value == payment.method,
+        );
         if (!currentMethodExists) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _updatePaymentMethod(index, availableMethods.first.value);
@@ -561,13 +612,15 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
             return GestureDetector(
               onTap: () => _updatePaymentMethod(index, method.value),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 9,
+                ),
                 decoration: BoxDecoration(
                   color: isSelected ? AppColors.primary : Colors.white,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color:
-                        isSelected ? AppColors.primary : const Color(0xFFE8E8E8),
+                    color: isSelected ? AppColors.primary : AppColors.divider,
                     width: 1.5,
                   ),
                 ),
@@ -577,16 +630,19 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
                     Icon(
                       _getIcon(method.iconName),
                       size: 16,
-                      color: isSelected ? Colors.white : const Color(0xFF6B6B6B),
+                      color: isSelected
+                          ? Colors.white
+                          : AppColors.textSecondary,
                     ),
                     const SizedBox(width: 6),
                     Text(
                       method.name,
-                      style: TextStyle(
-                        fontSize: 13,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w500,
-                        color:
-                            isSelected ? Colors.white : const Color(0xFF1A1A1A),
+                        color: isSelected
+                            ? Colors.white
+                            : AppColors.textPrimary,
                       ),
                     ),
                   ],
@@ -600,19 +656,20 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
   }
 
   Widget _buildCashReceivedSection(int index, PaymentEntry payment) {
-    final isInsufficient = payment.cashReceived > 0 && payment.cashReceived < payment.amount;
+    final isInsufficient =
+        payment.cashReceived > 0 && payment.cashReceived < payment.amount;
 
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: isInsufficient
             ? Colors.red.withOpacity(0.05)
-            : const Color(0xFF4CAF50).withOpacity(0.05),
+            : AppColors.success.withOpacity(0.05),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: isInsufficient
               ? Colors.red.withOpacity(0.3)
-              : const Color(0xFF4CAF50).withOpacity(0.3),
+              : AppColors.success.withOpacity(0.3),
         ),
       ),
       child: Column(
@@ -622,24 +679,26 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Bill Amount',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF6B6B6B),
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  color: AppColors.textSecondary,
                 ),
               ),
               ValueListenableBuilder<int>(
                 valueListenable: DecimalSettings.precisionNotifier,
                 builder: (context, precision, child) {
                   final symbol = CurrencyHelper.currentSymbol;
-                  final formattedAmount = payment.amount.toStringAsFixed(precision);
+                  final formattedAmount = payment.amount.toStringAsFixed(
+                    precision,
+                  );
                   return Text(
                     '$symbol$formattedAmount',
-                    style: const TextStyle(
-                      fontSize: 13,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A1A1A),
+                      color: AppColors.textPrimary,
                     ),
                   );
                 },
@@ -651,14 +710,14 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
           // Cash Received Input
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 flex: 2,
                 child: Text(
                   'Cash Received',
-                  style: TextStyle(
-                    fontSize: 13,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF1A1A1A),
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ),
@@ -667,16 +726,30 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
                 child: AppTextField(
                   controller: payment.cashReceivedController,
                   hint: '0.00',
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d*\.?\d{0,2}'),
+                    ),
                   ],
                   prefixWidget: Padding(
                     padding: const EdgeInsets.only(left: 12, right: 4),
-                    child: Text('${CurrencyHelper.currentSymbol} ', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    child: Text(
+                      '${CurrencyHelper.currentSymbol} ',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                   suffixIcon: IconButton(
-                    icon: const Icon(Icons.check_circle_outline, color: Color(0xFF4CAF50), size: 20),
+                    icon: Icon(
+                      Icons.check_circle_outline,
+                      color: AppColors.success,
+                      size: 20,
+                    ),
                     tooltip: 'Fill exact amount',
                     onPressed: () => _fillExactAmount(index),
                     padding: EdgeInsets.zero,
@@ -695,14 +768,15 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
               valueListenable: DecimalSettings.precisionNotifier,
               builder: (context, precision, child) {
                 final symbol = CurrencyHelper.currentSymbol;
-                final shortage = (payment.amount - payment.cashReceived).toStringAsFixed(precision);
+                final shortage = (payment.amount - payment.cashReceived)
+                    .toStringAsFixed(precision);
                 final partial = widget.allowPartial;
                 return Row(
                   children: [
                     Icon(
                       partial ? Icons.info_outline : Icons.warning_amber,
                       size: 16,
-                      color: partial ? const Color(0xFFFF9800) : Colors.red,
+                      color: partial ? AppColors.warning : Colors.red,
                     ),
                     const SizedBox(width: 4),
                     Expanded(
@@ -710,9 +784,9 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
                         partial
                             ? "$symbol$shortage goes on the customer's account"
                             : 'Insufficient! Need $symbol$shortage more',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: partial ? const Color(0xFFFF9800) : Colors.red,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.smallFontSize(context),
+                          color: partial ? AppColors.warning : Colors.red,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -738,12 +812,16 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.keyboard_return, size: 18, color: Colors.orange.shade700),
+                      Icon(
+                        Icons.keyboard_return,
+                        size: 18,
+                        color: Colors.orange.shade700,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         'Change to Return',
-                        style: TextStyle(
-                          fontSize: 13,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.bodyFontSize(context),
                           fontWeight: FontWeight.w600,
                           color: Colors.orange.shade700,
                         ),
@@ -754,11 +832,12 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
                     valueListenable: DecimalSettings.precisionNotifier,
                     builder: (context, precision, child) {
                       final symbol = CurrencyHelper.currentSymbol;
-                      final formattedChange = payment.cashChange.toStringAsFixed(precision);
+                      final formattedChange = payment.cashChange
+                          .toStringAsFixed(precision);
                       return Text(
                         '$symbol$formattedChange',
-                        style: TextStyle(
-                          fontSize: 16,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.subheadingFontSize(context),
                           fontWeight: FontWeight.w700,
                           color: Colors.orange.shade700,
                         ),
@@ -771,25 +850,32 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
           ],
 
           // Payment complete indicator
-          if (payment.cashReceived >= payment.amount && payment.cashReceived > 0) ...[
+          if (payment.cashReceived >= payment.amount &&
+              payment.cashReceived > 0) ...[
             const SizedBox(height: 8),
             ValueListenableBuilder<int>(
               valueListenable: DecimalSettings.precisionNotifier,
               builder: (context, precision, child) {
                 final symbol = CurrencyHelper.currentSymbol;
-                final formattedChange = payment.cashChange.toStringAsFixed(precision);
+                final formattedChange = payment.cashChange.toStringAsFixed(
+                  precision,
+                );
                 return Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.check_circle, size: 16, color: const Color(0xFF4CAF50)),
+                    Icon(
+                      Icons.check_circle,
+                      size: 16,
+                      color: AppColors.success,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       payment.cashChange > 0
                           ? 'Cash received - Return change $symbol$formattedChange'
                           : 'Exact amount received',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF4CAF50),
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        color: AppColors.success,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -814,10 +900,12 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
         return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: hasError ? Colors.red.withOpacity(0.05) : const Color(0xFFF5F5F5),
+            color: hasError
+                ? Colors.red.withOpacity(0.05)
+                : AppColors.surfaceMedium,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: hasError ? Colors.red.withOpacity(0.3) : const Color(0xFFE8E8E8),
+              color: hasError ? Colors.red.withOpacity(0.3) : AppColors.divider,
             ),
           ),
           child: Column(
@@ -826,7 +914,9 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
               _buildCalcRow(
                 'Total Paid',
                 '$symbol${_totalPaid.toStringAsFixed(precision)}',
-                valueColor: _totalPaid >= widget.billTotal ? const Color(0xFF4CAF50) : null,
+                valueColor: _totalPaid >= widget.billTotal
+                    ? AppColors.success
+                    : null,
                 isBold: true,
               ),
               const SizedBox(height: 8),
@@ -841,7 +931,10 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
                 const SizedBox(height: 4),
                 Text(
                   'Add $symbol${_remaining.toStringAsFixed(precision)} more to complete payment',
-                  style: const TextStyle(fontSize: 12, color: Colors.red),
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: Colors.red,
+                  ),
                 ),
               ],
 
@@ -853,7 +946,7 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
                   '$symbol${_change.toStringAsFixed(precision)}',
                   valueColor: Colors.orange,
                   isBold: true,
-                  fontSize: 16,
+                  fontSize: AppResponsive.subheadingFontSize(context),
                 ),
               ],
 
@@ -865,16 +958,16 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
                   children: [
                     Icon(
                       Icons.check_circle,
-                      color: const Color(0xFF4CAF50),
+                      color: AppColors.success,
                       size: 18,
                     ),
                     const SizedBox(width: 6),
-                    const Text(
+                    Text(
                       'Payment complete',
-                      style: TextStyle(
-                        color: Color(0xFF4CAF50),
+                      style: GoogleFonts.poppins(
+                        color: AppColors.success,
                         fontWeight: FontWeight.w500,
-                        fontSize: 13,
+                        fontSize: AppResponsive.bodyFontSize(context),
                       ),
                     ),
                   ],
@@ -887,24 +980,32 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
     );
   }
 
-  Widget _buildCalcRow(String label, String value, {Color? valueColor, bool isBold = false, double fontSize = 14}) {
+  Widget _buildCalcRow(
+    String label,
+    String value, {
+    Color? valueColor,
+    bool isBold = false,
+    // Nullable, resolved below — a `= 14` default is a hardcoded font that
+    // no `fontSize: [0-9]` grep will ever find.
+    double? fontSize,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           label,
-          style: TextStyle(
-            fontSize: fontSize,
+          style: GoogleFonts.poppins(
+            fontSize: fontSize ?? AppResponsive.bodyFontSize(context),
             fontWeight: isBold ? FontWeight.w600 : FontWeight.w400,
-            color: const Color(0xFF6B6B6B),
+            color: AppColors.textSecondary,
           ),
         ),
         Text(
           value,
-          style: TextStyle(
-            fontSize: fontSize,
+          style: GoogleFonts.poppins(
+            fontSize: fontSize ?? AppResponsive.bodyFontSize(context),
             fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
-            color: valueColor ?? const Color(0xFF1A1A1A),
+            color: valueColor ?? AppColors.textPrimary,
           ),
         ),
       ],

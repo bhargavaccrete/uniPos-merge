@@ -183,7 +183,7 @@ class ReportsScreen extends StatelessWidget {
               ),
               entitlementKey: RetailEntKeys.reportsQuickItems,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
             _buildSectionHeader(context, 'Purchase Reports'),
             _buildReportCard(
               context,
@@ -301,7 +301,7 @@ class ReportsScreen extends StatelessWidget {
               ),
               entitlementKey: RetailEntKeys.reportsPurchaseReturn,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
             _buildSectionHeader(context, 'Inventory Reports'),
             _buildReportCard(
               context,
@@ -331,7 +331,7 @@ class ReportsScreen extends StatelessWidget {
               ),
               entitlementKey: RetailEntKeys.reportsStockAdjustment,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
             _buildSectionHeader(context, 'Financial Reports'),
             _buildReportCard(
               context,

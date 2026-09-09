@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
 import 'package:billberrylite/domain/services/retail/report_service.dart';
@@ -128,7 +129,7 @@ class SupplierWisePurchaseReportScreen extends StatelessWidget {
             Text(
               formatMoney(row['damagedAbsorbed'] as double),
               style: (row['damagedAbsorbed'] as double) > 0
-                  ? const TextStyle(color: AppColors.danger)
+                  ? GoogleFonts.poppins(color: AppColors.danger)
                   : null,
             ),
           ),

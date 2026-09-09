@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/util/common/short_ref.dart';
 import 'package:flutter/services.dart';
 import '../../../core/di/service_locator.dart';
@@ -168,22 +169,6 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
     }
   }
 
-  /// Caps content width on large screens so this form doesn't stretch across a
-  /// laptop.
-  Widget _capped(BuildContext context, Widget child) {
-    final maxWidth = AppResponsive.maxCardWidth(context);
-    if (maxWidth == double.infinity) return child;
-    return Align(
-      // topCenter, not Center: Center aligns on BOTH axes, so a
-      // shrink-wrapping child floats in the vertical middle.
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
-      ),
-    );
-  }
-
   /// One "label — value" line of the payment-received dialog.
   Widget _resultLine(
     BuildContext context,
@@ -201,21 +186,21 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
             size: AppResponsive.smallIconSize(context),
             color: AppColors.textSecondary,
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Expanded(
             child: Text(
               label,
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: AppResponsive.smallFontSize(context),
                 color: AppColors.textSecondary,
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Text(
             value,
             maxLines: 1,
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
               color: AppColors.textPrimary,
@@ -229,7 +214,7 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
+      backgroundColor: AppColors.surfaceLight,
       appBar: AppBar(
         title: const Text('Receive Payment'),
         backgroundColor: Colors.white,
@@ -243,41 +228,45 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
             ? const Center(child: CircularProgressIndicator())
             : SingleChildScrollView(
                 padding: AppResponsive.padding(context),
-                child: _capped(
-                  context,
-                  Form(
+                child: AppResponsive.constrainedContent(
+                  context: context,
+                  alignment: Alignment.topCenter,
+                  maxWidth: AppResponsive.maxCardWidth(context),
+                  child: Form(
                     key: _formKey,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Customer Info Card
                         _buildCustomerInfoCard(),
-                        const SizedBox(height: 16),
+                        SizedBox(height: AppResponsive.largeSpacing(context)),
 
                         // Outstanding Balance Card
                         _buildOutstandingCard(),
-                        const SizedBox(height: 16),
+                        SizedBox(height: AppResponsive.largeSpacing(context)),
 
                         // Due Invoices List
                         if (_dueInvoices.isNotEmpty) ...[
                           _buildSectionTitle(
                             'Due Invoices (${_dueInvoices.length})',
                           ),
-                          const SizedBox(height: 8),
+                          SizedBox(height: AppResponsive.smallSpacing(context)),
                           _buildDueInvoicesList(),
-                          const SizedBox(height: 16),
+                          SizedBox(height: AppResponsive.largeSpacing(context)),
                         ],
 
                         // Payment Form
                         _buildSectionTitle('Payment Details'),
-                        const SizedBox(height: 12),
+                        SizedBox(height: AppResponsive.mediumSpacing(context)),
                         _buildPaymentForm(),
-                        const SizedBox(height: 24),
+                        SizedBox(
+                          height: AppResponsive.extraLargeSpacing(context),
+                        ),
 
                         // Receive Payment Button
                         SizedBox(
                           width: double.infinity,
-                          height: 54,
+                          height: AppResponsive.buttonHeight(context),
                           child: ElevatedButton.icon(
                             onPressed: (_isProcessing || _totalDue <= 0)
                                 ? null
@@ -291,12 +280,12 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
                                       color: Colors.white,
                                     ),
                                   )
-                                : const Icon(Icons.payment),
+                                : Icon(Icons.payment),
                             label: Text(
                               _isProcessing
                                   ? 'Processing...'
                                   : 'Receive Payment',
-                              style: TextStyle(
+                              style: GoogleFonts.poppins(
                                 fontSize: AppResponsive.subheadingFontSize(
                                   context,
                                 ),
@@ -304,10 +293,12 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
                               ),
                             ),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF4CAF50),
+                              backgroundColor: AppColors.success,
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(
+                                  AppResponsive.smallBorderRadius(context),
+                                ),
                               ),
                             ),
                           ),
@@ -324,52 +315,54 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
-      style: TextStyle(
+      style: GoogleFonts.poppins(
         fontSize: AppResponsive.subheadingFontSize(context),
         fontWeight: FontWeight.w600,
-        color: Color(0xFF1A1A1A),
+        color: AppColors.textPrimary,
       ),
     );
   }
 
   Widget _buildCustomerInfoCard() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Row(
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: AppResponsive.avatarSize(context),
+            height: AppResponsive.avatarSize(context),
             decoration: BoxDecoration(
-              color: const Color(0xFF4CAF50).withOpacity(0.1),
+              color: AppColors.success.withOpacity(0.1),
               borderRadius: BorderRadius.circular(24),
             ),
-            child: const Icon(Icons.person, color: Color(0xFF4CAF50)),
+            child: Icon(Icons.person, color: AppColors.success),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   widget.customer.name ?? '',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: AppResponsive.subheadingFontSize(context),
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF1A1A1A),
+                    color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                   widget.customer.phone ?? '',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: AppResponsive.bodyFontSize(context),
-                    color: Color(0xFF6B6B6B),
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -382,12 +375,14 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
 
   Widget _buildOutstandingCard() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: AppResponsive.padding(context),
       decoration: BoxDecoration(
         color: _totalDue > 0
             ? const Color(0xFFFFEBEE)
             : const Color(0xFFE8F5E9),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
         border: Border.all(
           color: _totalDue > 0
               ? Colors.red.withOpacity(0.3)
@@ -402,15 +397,15 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
             children: [
               Text(
                 'Outstanding Balance',
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   fontSize: AppResponsive.bodyFontSize(context),
-                  color: Color(0xFF6B6B6B),
+                  color: AppColors.textSecondary,
                 ),
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: 4),
               Text(
                 formatMoney(_totalDue),
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   fontSize: AppResponsive.getValue(
                     context,
                     mobile: 28.0,
@@ -429,7 +424,10 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
                 _amountController.text = _totalDue.toStringAsFixed(2);
                 setState(() {});
               },
-              icon: const Icon(Icons.check_circle_outline, size: 18),
+              icon: Icon(
+                Icons.check_circle_outline,
+                size: AppResponsive.smallIconSize(context),
+              ),
               label: const Text('Pay Full'),
               style: TextButton.styleFrom(foregroundColor: Colors.red),
             ),
@@ -442,8 +440,10 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         children: _dueInvoices.take(5).map((invoice) {
@@ -462,26 +462,28 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
               height: 40,
               decoration: BoxDecoration(
                 color: const Color(0xFFFFF3E0),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.receipt_long,
-                color: Color(0xFFFF9800),
-                size: 20,
+                color: AppColors.warning,
+                size: AppResponsive.iconSize(context),
               ),
             ),
             title: Text(
               invoice.displayNumber,
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: AppResponsive.bodyFontSize(context),
                 fontWeight: FontWeight.w500,
               ),
             ),
             subtitle: Text(
               dateStr,
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: AppResponsive.smallFontSize(context),
-                color: Color(0xFF9E9E9E),
+                color: AppColors.textSecondary,
               ),
             ),
             trailing: Column(
@@ -490,7 +492,7 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
               children: [
                 Text(
                   formatMoney(invoice.dueAmount),
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: Colors.red,
@@ -498,9 +500,9 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
                 ),
                 Text(
                   'of ${formatMoney(invoice.totalAmount)}',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: AppResponsive.captionFontSize(context),
-                    color: Color(0xFF9E9E9E),
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -513,11 +515,13 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
 
   Widget _buildPaymentForm() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -525,19 +529,19 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
           // Amount Field
           Text(
             'Amount',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           TextFormField(
             controller: _amountController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
             ],
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.subheadingFontSize(context),
               fontWeight: FontWeight.w600,
             ),
@@ -545,19 +549,25 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
               prefixText: '${CurrencyHelper.currentSymbol} ',
               hintText: '0.00',
               filled: true,
-              fillColor: const Color(0xFFFAFAFA),
+              fillColor: AppColors.surfaceLight,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFE8E8E8)),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
+                borderSide: const BorderSide(color: AppColors.divider),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFE8E8E8)),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
+                borderSide: const BorderSide(color: AppColors.divider),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
                 borderSide: const BorderSide(
-                  color: Color(0xFF4CAF50),
+                  color: AppColors.success,
                   width: 2,
                 ),
               ),
@@ -574,87 +584,95 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
             },
             onChanged: (_) => setState(() {}),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
 
           // Payment Mode
           Text(
             'Payment Mode',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           Row(
             children: [
               _buildPaymentModeChip('cash', 'Cash', Icons.money),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               _buildPaymentModeChip('upi', 'UPI', Icons.qr_code_2),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               _buildPaymentModeChip('card', 'Card', Icons.credit_card),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
 
           // Reference ID (for UPI/Card)
           if (_selectedMode != 'cash') ...[
             Text(
               'Reference ID (Optional)',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: AppResponsive.bodyFontSize(context),
                 fontWeight: FontWeight.w500,
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: AppResponsive.smallSpacing(context)),
             TextFormField(
               controller: _referenceController,
               decoration: InputDecoration(
                 hintText: 'Transaction ID',
                 filled: true,
-                fillColor: const Color(0xFFFAFAFA),
+                fillColor: AppColors.surfaceLight,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFFE8E8E8)),
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.smallBorderRadius(context),
+                  ),
+                  borderSide: const BorderSide(color: AppColors.divider),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: Color(0xFFE8E8E8)),
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.smallBorderRadius(context),
+                  ),
+                  borderSide: const BorderSide(color: AppColors.divider),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
           ],
 
           // Note
           Text(
             'Note (Optional)',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           TextFormField(
             controller: _noteController,
             maxLines: 2,
             decoration: InputDecoration(
               hintText: 'Add a note...',
               filled: true,
-              fillColor: const Color(0xFFFAFAFA),
+              fillColor: AppColors.surfaceLight,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFE8E8E8)),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
+                borderSide: const BorderSide(color: AppColors.divider),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: Color(0xFFE8E8E8)),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
+                borderSide: const BorderSide(color: AppColors.divider),
               ),
             ),
           ),
 
           // Live calculation
           if (_amountController.text.isNotEmpty) ...[
-            const SizedBox(height: 16),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
             _buildPaymentSummary(),
           ],
         ],
@@ -668,14 +686,16 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
       child: InkWell(
         onTap: () => setState(() => _selectedMode = mode),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: EdgeInsets.symmetric(
+            vertical: AppResponsive.mediumSpacing(context),
+          ),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF4CAF50) : Colors.white,
-            borderRadius: BorderRadius.circular(8),
+            color: isSelected ? AppColors.success : Colors.white,
+            borderRadius: BorderRadius.circular(
+              AppResponsive.smallBorderRadius(context),
+            ),
             border: Border.all(
-              color: isSelected
-                  ? const Color(0xFF4CAF50)
-                  : const Color(0xFFE8E8E8),
+              color: isSelected ? AppColors.success : AppColors.divider,
             ),
           ),
           child: Row(
@@ -683,16 +703,16 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
             children: [
               Icon(
                 icon,
-                size: 18,
-                color: isSelected ? Colors.white : const Color(0xFF6B6B6B),
+                size: AppResponsive.smallIconSize(context),
+                color: isSelected ? Colors.white : AppColors.textSecondary,
               ),
-              const SizedBox(width: 6),
+              SizedBox(width: 6),
               Text(
                 label,
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   fontSize: AppResponsive.bodyFontSize(context),
                   fontWeight: FontWeight.w500,
-                  color: isSelected ? Colors.white : const Color(0xFF6B6B6B),
+                  color: isSelected ? Colors.white : AppColors.textSecondary,
                 ),
               ),
             ],
@@ -707,31 +727,36 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
     final remainingAfter = _totalDue - enteredAmount;
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(8),
+        color: AppColors.surfaceMedium,
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
       ),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Current Due',
-                style: TextStyle(color: Color(0xFF6B6B6B)),
+                style: GoogleFonts.poppins(color: AppColors.textSecondary),
               ),
               Text(formatMoney(_totalDue)),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Payment', style: TextStyle(color: Color(0xFF6B6B6B))),
+              Text(
+                'Payment',
+                style: GoogleFonts.poppins(color: AppColors.textSecondary),
+              ),
               Text(
                 '- ${formatMoney(enteredAmount)}',
-                style: const TextStyle(color: Color(0xFF4CAF50)),
+                style: GoogleFonts.poppins(color: AppColors.success),
               ),
             ],
           ),
@@ -739,13 +764,13 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Remaining After',
-                style: TextStyle(fontWeight: FontWeight.w600),
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
               ),
               Text(
                 formatMoney(remainingAfter),
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   fontWeight: FontWeight.w700,
                   color: remainingAfter > 0 ? Colors.orange : Colors.green,
                 ),

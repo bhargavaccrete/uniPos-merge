@@ -138,7 +138,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
         ),
         actions: [
           appDialogCancelButton(dialogContext),
-          const SizedBox(width: 12),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           appDialogPrimaryButton(
             label: 'Add',
             onPressed: () => Navigator.pop(dialogContext, true),
@@ -210,7 +210,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
               },
             ),
             if (isUpi) ...[
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
               AppTextField(
                 controller: _upiIdController,
                 focusNode: _upiIdFocus,
@@ -221,7 +221,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                 onFieldSubmitted: (_) => _upiPayeeFocus.requestFocus(),
                 onChanged: (_) => _scheduleUpiPreview(),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
               AppTextField(
                 controller: _upiPayeeController,
                 focusNode: _upiPayeeFocus,
@@ -232,14 +232,14 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                 onFieldSubmitted: (_) => Navigator.pop(dialogContext, true),
                 onChanged: (_) => _scheduleUpiPreview(),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
               _buildQrPreview(dialogContext),
             ],
           ],
         ),
         actions: [
           appDialogCancelButton(dialogContext),
-          const SizedBox(width: 12),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           appDialogPrimaryButton(
             label: 'Update',
             onPressed: () => Navigator.pop(dialogContext, true),
@@ -294,15 +294,17 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
             color: AppColors.textPrimary,
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: AppResponsive.smallSpacing(context)),
         ValueListenableBuilder<String>(
           valueListenable: _upiQrData,
           builder: (context, qrData, _) => Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
+            padding: AppResponsive.cardPadding(context),
             decoration: BoxDecoration(
               color: AppColors.surfaceLight,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.borderRadius(context),
+              ),
               border: Border.all(color: AppColors.divider),
             ),
             child: qrData.isEmpty
@@ -313,7 +315,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                         size: 48,
                         color: AppColors.textSecondary.withValues(alpha: 0.5),
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: AppResponsive.smallSpacing(context)),
                       Text(
                         'Enter a UPI ID to generate the QR code',
                         textAlign: TextAlign.center,
@@ -327,10 +329,12 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                 : Column(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(10),
+                        padding: EdgeInsets.all(10),
                         decoration: BoxDecoration(
                           color: AppColors.white,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.smallBorderRadius(context),
+                          ),
                           border: Border.all(color: AppColors.divider),
                         ),
                         child: SizedBox(
@@ -344,7 +348,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 10),
+                      SizedBox(height: AppResponsive.smallSpacing(context)),
                       Text(
                         'Auto-generated from the UPI ID above',
                         style: GoogleFonts.poppins(
@@ -387,9 +391,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: buildPrimaryAppBar(
-        title: 'Payment Methods',
-      ),
+      appBar: buildPrimaryAppBar(title: 'Payment Methods'),
       body: AppResponsive.constrainedContent(
         context: context,
         alignment: Alignment.topCenter,
@@ -439,10 +441,12 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
     final isUpi = method.value == 'upi';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
       child: Padding(
@@ -461,7 +465,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                 size: AppResponsive.iconSize(context),
               ),
             ),
-            const SizedBox(width: 14),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -480,7 +484,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                         ),
                       ),
                       if (isBuiltIn) ...[
-                        const SizedBox(width: 8),
+                        SizedBox(width: AppResponsive.smallSpacing(context)),
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 6,
@@ -514,7 +518,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                           color: statusColor,
                         ),
                       ),
-                      const SizedBox(width: 6),
+                      SizedBox(width: 6),
                       Text(
                         enabled ? 'Enabled' : 'Disabled',
                         style: GoogleFonts.poppins(
@@ -524,13 +528,13 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                         ),
                       ),
                       if (isUpi) ...[
-                        const SizedBox(width: 10),
+                        SizedBox(width: AppResponsive.smallSpacing(context)),
                         Icon(
                           Icons.qr_code_2,
                           size: AppResponsive.captionFontSize(context) + 3,
                           color: AppColors.textSecondary,
                         ),
-                        const SizedBox(width: 4),
+                        SizedBox(width: 4),
                         Text(
                           'QR on receipt',
                           style: GoogleFonts.poppins(
@@ -581,5 +585,4 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
       ),
     );
   }
-
 }

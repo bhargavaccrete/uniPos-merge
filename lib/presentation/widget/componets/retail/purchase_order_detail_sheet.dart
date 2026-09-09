@@ -230,9 +230,7 @@ String _completedPOMessage(
     buffer.writeln('Order Value: ${formatMoney(po.estimatedTotal)}');
   }
   buffer.writeln();
-  buffer.writeln(
-    'This order is now complete. Thank you for the delivery.',
-  );
+  buffer.writeln('This order is now complete. Thank you for the delivery.');
 
   return buffer.toString().trim();
 }
@@ -461,12 +459,12 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.only(top: 10),
+      padding: EdgeInsets.only(top: AppResponsive.smallSpacing(context)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Divider(height: 1, color: AppColors.divider),
-          const SizedBox(height: 8),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           Wrap(
             spacing: 14,
             runSpacing: 4,
@@ -520,14 +518,14 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
         children: [
           TextSpan(
             text: '$label: ',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.captionFontSize(context),
               color: AppColors.textSecondary,
             ),
           ),
           TextSpan(
             text: formatQty(value),
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.smallFontSize(context),
               fontWeight: FontWeight.w700,
               color: color,
@@ -554,9 +552,11 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
         ),
         child: Container(
           height: MediaQuery.of(context).size.height * 0.75,
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: AppColors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(AppResponsive.largeBorderRadius(context)),
+            ),
           ),
           child: Column(
             children: [
@@ -575,7 +575,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                             po.poNumber,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
+                            style: GoogleFonts.poppins(
                               fontSize: AppResponsive.subheadingFontSize(
                                 context,
                               ),
@@ -587,7 +587,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                             po.supplierName ?? 'Unknown Supplier',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
+                            style: GoogleFonts.poppins(
                               fontSize: AppResponsive.bodyFontSize(context),
                               color: AppColors.textSecondary,
                             ),
@@ -604,12 +604,14 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                         color: poStatusColor(
                           po.statusEnum,
                         ).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(
+                          AppResponsive.largeBorderRadius(context),
+                        ),
                       ),
                       child: Text(
                         poStatusLabel(po.statusEnum),
                         maxLines: 1,
-                        style: TextStyle(
+                        style: GoogleFonts.poppins(
                           fontSize: AppResponsive.smallFontSize(context),
                           fontWeight: FontWeight.w600,
                           color: poStatusColor(po.statusEnum),
@@ -656,7 +658,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                           SizedBox(height: AppResponsive.largeSpacing(context)),
                           Text(
                             'Order Items',
-                            style: TextStyle(
+                            style: GoogleFonts.poppins(
                               fontSize: AppResponsive.subheadingFontSize(
                                 context,
                               ),
@@ -695,7 +697,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                                                   'Unknown Product',
                                               maxLines: 2,
                                               overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
+                                              style: GoogleFonts.poppins(
                                                 fontSize:
                                                     AppResponsive.bodyFontSize(
                                                       context,
@@ -708,7 +710,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                                                 item.variantInfo!,
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
+                                                style: GoogleFonts.poppins(
                                                   fontSize:
                                                       AppResponsive.smallFontSize(
                                                         context,
@@ -720,7 +722,11 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                                           ],
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
+                                      SizedBox(
+                                        width: AppResponsive.smallSpacing(
+                                          context,
+                                        ),
+                                      ),
                                       Column(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.end,
@@ -728,7 +734,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                                           Text(
                                             'Qty: ${item.orderedQty}',
                                             maxLines: 1,
-                                            style: TextStyle(
+                                            style: GoogleFonts.poppins(
                                               fontSize:
                                                   AppResponsive.bodyFontSize(
                                                     context,
@@ -742,7 +748,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                                                 item.estimatedTotal ?? 0,
                                               ),
                                               maxLines: 1,
-                                              style: TextStyle(
+                                              style: GoogleFonts.poppins(
                                                 fontSize:
                                                     AppResponsive.smallFontSize(
                                                       context,
@@ -769,7 +775,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                             ),
                             Text(
                               'Receiving History',
-                              style: TextStyle(
+                              style: GoogleFonts.poppins(
                                 fontSize: AppResponsive.subheadingFontSize(
                                   context,
                                 ),
@@ -791,7 +797,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
               ),
               Container(
                 padding: pad,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   border: Border(top: BorderSide(color: AppColors.divider)),
                 ),
                 child: SizedBox(
@@ -810,7 +816,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                               Icons.edit,
                               size: AppResponsive.smallIconSize(context),
                             ),
-                            label: const Text('Edit'),
+                            label: Text('Edit'),
                           ),
                         ),
                         SizedBox(width: AppResponsive.mediumSpacing(context)),
@@ -914,7 +920,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
             ),
             child: Text(
               label,
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: AppResponsive.smallFontSize(context),
                 color: AppColors.textSecondary,
               ),
@@ -923,7 +929,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: AppResponsive.smallFontSize(context),
                 fontWeight: FontWeight.w500,
               ),
@@ -966,10 +972,12 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
             .toList();
 
         return Container(
-          margin: const EdgeInsets.only(bottom: 12),
+          margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
           decoration: BoxDecoration(
             color: AppColors.white,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.smallBorderRadius(context),
+            ),
             border: Border.all(color: AppColors.divider),
           ),
           child: Column(
@@ -977,23 +985,23 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
             children: [
               // GRN Header
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
                 decoration: const BoxDecoration(
                   color: AppColors.surfaceMedium,
                   borderRadius: BorderRadius.vertical(top: Radius.circular(7)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.receipt_long,
-                      size: 16,
+                      size: AppResponsive.smallIconSize(context),
                       color: AppColors.primary,
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
                     Expanded(
                       child: Text(
                         grn.grnNumber,
-                        style: TextStyle(
+                        style: GoogleFonts.poppins(
                           fontSize: AppResponsive.bodyFontSize(context),
                           fontWeight: FontWeight.w600,
                         ),
@@ -1001,7 +1009,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                     ),
                     Text(
                       poFormatDate(grn.receivedDate),
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.smallFontSize(context),
                         color: AppColors.textSecondary,
                       ),
@@ -1011,7 +1019,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
               ),
               // GRN Summary
               Padding(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1023,7 +1031,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                           grn.totalReceivedQty.toString(),
                           AppColors.success,
                         ),
-                        const SizedBox(width: 16),
+                        SizedBox(width: AppResponsive.largeSpacing(context)),
                         _buildGRNStat(
                           context,
                           'To Stock',
@@ -1031,7 +1039,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                           AppColors.info,
                         ),
                         if (totalDamaged > 0) ...[
-                          const SizedBox(width: 16),
+                          SizedBox(width: AppResponsive.largeSpacing(context)),
                           _buildGRNStat(
                             context,
                             'Damaged',
@@ -1042,7 +1050,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                         const Spacer(),
                         Text(
                           formatMoney(grn.totalAmount ?? 0),
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             fontSize: AppResponsive.bodyFontSize(context),
                             fontWeight: FontWeight.w600,
                             color: AppColors.success,
@@ -1052,9 +1060,11 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                     ),
                     // Damaged items breakdown
                     if (totalDamaged > 0) ...[
-                      const SizedBox(height: 12),
+                      SizedBox(height: AppResponsive.mediumSpacing(context)),
                       Container(
-                        padding: const EdgeInsets.all(10),
+                        padding: EdgeInsets.all(
+                          AppResponsive.smallSpacing(context),
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.warning.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
@@ -1064,15 +1074,15 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                           children: [
                             Row(
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.warning_amber,
-                                  size: 14,
+                                  size: AppResponsive.smallIconSize(context),
                                   color: AppColors.warning,
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
                                   '$totalDamaged damaged (${formatMoney(damagedAmount)})',
-                                  style: TextStyle(
+                                  style: GoogleFonts.poppins(
                                     fontSize: AppResponsive.smallFontSize(
                                       context,
                                     ),
@@ -1139,12 +1149,12 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
         if (docs == null || docs.isEmpty) return const SizedBox.shrink();
 
         return Padding(
-          padding: const EdgeInsets.only(top: 12),
+          padding: EdgeInsets.only(top: AppResponsive.mediumSpacing(context)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Divider(height: 1, color: AppColors.divider),
-              const SizedBox(height: 10),
+              SizedBox(height: AppResponsive.smallSpacing(context)),
               Text(
                 'Linked Documents',
                 style: GoogleFonts.poppins(
@@ -1153,7 +1163,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                   color: AppColors.textSecondary,
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: AppResponsive.smallSpacing(context)),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -1222,7 +1232,10 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(6),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.smallSpacing(context),
+          vertical: 6,
+        ),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(6),
@@ -1232,7 +1245,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 13, color: color),
-            const SizedBox(width: 6),
+            SizedBox(width: 6),
             Text(
               label,
               style: GoogleFonts.poppins(
@@ -1241,8 +1254,12 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                 color: color,
               ),
             ),
-            const SizedBox(width: 2),
-            Icon(Icons.chevron_right_rounded, size: 14, color: color),
+            SizedBox(width: 2),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: AppResponsive.smallIconSize(context),
+              color: color,
+            ),
           ],
         ),
       ),
@@ -1259,14 +1276,14 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
       children: [
         Text(
           '$label: ',
-          style: TextStyle(
+          style: GoogleFonts.poppins(
             fontSize: AppResponsive.smallFontSize(context),
             color: AppColors.textSecondary,
           ),
         ),
         Text(
           value,
-          style: TextStyle(
+          style: GoogleFonts.poppins(
             fontSize: AppResponsive.smallFontSize(context),
             fontWeight: FontWeight.w600,
             color: color,
@@ -1287,10 +1304,10 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
       child: Row(
         children: [
           Icon(Icons.circle, size: 6, color: color),
-          const SizedBox(width: 6),
+          SizedBox(width: 6),
           Text(
             '$qty x $label',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.captionFontSize(context),
               color: color,
             ),

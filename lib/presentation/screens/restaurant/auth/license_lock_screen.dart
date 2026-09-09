@@ -64,8 +64,7 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
     if (success) {
       widget.onActivated();
     } else {
-      setState(
-          () => _errorMsg = _store.errorMessage ?? 'Activation failed');
+      setState(() => _errorMsg = _store.errorMessage ?? 'Activation failed');
     }
   }
 
@@ -135,8 +134,8 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
         _isDeactivated
             ? Icons.gpp_bad_rounded
             : _isExpired
-                ? Icons.lock_clock_rounded
-                : Icons.lock_outline_rounded,
+            ? Icons.lock_clock_rounded
+            : Icons.lock_outline_rounded,
         size: 48,
         color: AppColors.danger,
       ),
@@ -148,10 +147,15 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
       _isDeactivated
           ? 'License Deactivated'
           : _isExpired
-              ? 'License Expired'
-              : 'License Required',
+          ? 'License Expired'
+          : 'License Required',
       style: GoogleFonts.poppins(
-        fontSize: isTablet ? 26 : 22,
+        fontSize: AppResponsive.getValue(
+          context,
+          mobile: 22.0,
+          tablet: 26.0,
+          desktop: 30.0,
+        ),
         fontWeight: FontWeight.bold,
         color: AppColors.textPrimary,
       ),
@@ -173,8 +177,10 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
     }
     return Text(
       msg,
-      style: TextStyle(
-          fontSize: isTablet ? 15 : 13, color: AppColors.textSecondary),
+      style: GoogleFonts.poppins(
+        fontSize: AppResponsive.bodyFontSize(context),
+        color: AppColors.textSecondary,
+      ),
       textAlign: TextAlign.center,
     );
   }
@@ -190,8 +196,12 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
       ),
       child: Column(
         children: [
-          _infoRow(Icons.workspace_premium_rounded, 'Plan',
-              info.planName.isNotEmpty ? info.planName : '—', AppColors.warning),
+          _infoRow(
+            Icons.workspace_premium_rounded,
+            'Plan',
+            info.planName.isNotEmpty ? info.planName : '—',
+            AppColors.warning,
+          ),
           if (info.expiryDate != null)
             _infoRow(
               Icons.event_rounded,
@@ -212,16 +222,21 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
         children: [
           Icon(icon, size: 16, color: color),
           const SizedBox(width: 10),
-          Text('$label: ',
-              style:
-                  TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+          Text(
+            '$label: ',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              color: AppColors.textSecondary,
+            ),
+          ),
           Expanded(
             child: Text(
               value,
               style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary),
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
         ],
@@ -240,15 +255,18 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.report_gmailerrorred_rounded,
-              size: 20, color: AppColors.danger),
+          Icon(
+            Icons.report_gmailerrorred_rounded,
+            size: 20,
+            color: AppColors.danger,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               'Your license was deactivated by Bill Berry. Please reach out to '
               'reactivate this device or purchase a new license key.',
-              style: TextStyle(
-                fontSize: isTablet ? 13 : 12,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
                 color: AppColors.danger,
                 height: 1.4,
               ),
@@ -265,11 +283,11 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
       height: isTablet ? 54 : 50,
       child: ElevatedButton.icon(
         onPressed: _loading ? null : _contactSupport,
-        icon: const Icon(Icons.support_agent_rounded, color: Colors.white),
+        icon: Icon(Icons.support_agent_rounded, color: Colors.white),
         label: Text(
           'Contact Bill Berry',
           style: GoogleFonts.poppins(
-            fontSize: 15,
+            fontSize: AppResponsive.bodyFontSize(context),
             fontWeight: FontWeight.w600,
             color: Colors.white,
           ),
@@ -278,7 +296,8 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
           backgroundColor: AppColors.primary,
           elevation: 0,
           shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12)),
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       ),
     );
@@ -310,16 +329,20 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
                   color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(Icons.key_rounded,
-                    size: isTablet ? 22 : 18, color: AppColors.primary),
+                child: Icon(
+                  Icons.key_rounded,
+                  size: isTablet ? 22 : 18,
+                  color: AppColors.primary,
+                ),
               ),
               const SizedBox(width: 10),
               Text(
                 'Enter New License Key',
                 style: GoogleFonts.poppins(
-                    fontSize: isTablet ? 15 : 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary),
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ],
           ),
@@ -336,14 +359,19 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
             const SizedBox(height: 6),
             Row(
               children: [
-                Icon(Icons.error_outline_rounded,
-                    size: 14, color: AppColors.danger),
+                Icon(
+                  Icons.error_outline_rounded,
+                  size: 14,
+                  color: AppColors.danger,
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     _errorMsg!,
-                    style: TextStyle(
-                        fontSize: 12, color: AppColors.danger),
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      color: AppColors.danger,
+                    ),
                   ),
                 ),
               ],
@@ -357,25 +385,30 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
               onPressed: _loading ? null : _activate,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
-                disabledBackgroundColor:
-                    AppColors.primary.withValues(alpha: 0.5),
+                disabledBackgroundColor: AppColors.primary.withValues(
+                  alpha: 0.5,
+                ),
                 elevation: 0,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               child: _loading
                   ? const SizedBox(
                       width: 22,
                       height: 22,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : Text(
                       'Activate & Unlock',
                       style: GoogleFonts.poppins(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white),
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
             ),
           ),
@@ -387,8 +420,10 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
   Widget _supportNote(bool isTablet) {
     return Text(
       'Each license key is valid for one device only.\nContact your administrator for a new key.',
-      style: TextStyle(
-          fontSize: isTablet ? 13 : 11, color: AppColors.textSecondary),
+      style: GoogleFonts.poppins(
+        fontSize: AppResponsive.captionFontSize(context),
+        color: AppColors.textSecondary,
+      ),
       textAlign: TextAlign.center,
     );
   }

@@ -36,10 +36,8 @@ Future<bool?> showSupplierPaymentDialog({
 }) {
   return showDialog<bool>(
     context: context,
-    builder: (dialogContext) => _SupplierPaymentDialog(
-      supplier: supplier,
-      isAdjustment: isAdjustment,
-    ),
+    builder: (dialogContext) =>
+        _SupplierPaymentDialog(supplier: supplier, isAdjustment: isAdjustment),
   );
 }
 
@@ -148,9 +146,7 @@ class _SupplierPaymentDialogState extends State<_SupplierPaymentDialog> {
               ? '${widget.supplier.name} • ${formatMoney(outstanding.abs())} advance'
               : '${widget.supplier.name} • ${formatMoney(outstanding)} outstanding',
           accent: AppColors.primary,
-          icon: _isAdjustment
-              ? Icons.tune_rounded
-              : Icons.payments_outlined,
+          icon: _isAdjustment ? Icons.tune_rounded : Icons.payments_outlined,
           body: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -168,11 +164,11 @@ class _SupplierPaymentDialogState extends State<_SupplierPaymentDialog> {
                 ],
                 autofocus: true,
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
 
               if (_isAdjustment) ...[
                 _sectionLabel('DIRECTION'),
-                const SizedBox(height: 8),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
                 _choiceTile(
                   label: 'Reduce what we owe',
                   caption: 'The recorded balance was too high',
@@ -188,7 +184,7 @@ class _SupplierPaymentDialogState extends State<_SupplierPaymentDialog> {
                 ),
               ] else ...[
                 _sectionLabel('PAID BY'),
-                const SizedBox(height: 8),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -199,7 +195,7 @@ class _SupplierPaymentDialogState extends State<_SupplierPaymentDialog> {
                 ),
               ],
 
-              const SizedBox(height: 14),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               InkWell(
                 onTap: _pickDate,
                 borderRadius: BorderRadius.circular(
@@ -224,7 +220,7 @@ class _SupplierPaymentDialogState extends State<_SupplierPaymentDialog> {
                         size: AppResponsive.smallIconSize(context),
                         color: AppColors.textSecondary,
                       ),
-                      const SizedBox(width: 10),
+                      SizedBox(width: AppResponsive.smallSpacing(context)),
                       Text(
                         DateFormat('dd MMM yyyy').format(_date),
                         style: GoogleFonts.poppins(
@@ -238,7 +234,7 @@ class _SupplierPaymentDialogState extends State<_SupplierPaymentDialog> {
               ),
 
               if (!_isAdjustment) ...[
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 AppTextField(
                   controller: _referenceController,
                   label: 'Reference No',
@@ -248,13 +244,11 @@ class _SupplierPaymentDialogState extends State<_SupplierPaymentDialog> {
                 ),
               ],
 
-              const SizedBox(height: 12),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               AppTextField(
                 controller: _noteController,
                 label: 'Note',
-                hint: _isAdjustment
-                    ? 'Why the balance was wrong'
-                    : 'Optional',
+                hint: _isAdjustment ? 'Why the balance was wrong' : 'Optional',
                 icon: Icons.sticky_note_2_outlined,
                 maxLines: 2,
               ),
@@ -262,7 +256,7 @@ class _SupplierPaymentDialogState extends State<_SupplierPaymentDialog> {
           ),
           actions: [
             appDialogCancelButton(context),
-            const SizedBox(width: 12),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
             appDialogPrimaryButton(
               label: _saving
                   ? 'Saving…'
@@ -290,7 +284,10 @@ class _SupplierPaymentDialogState extends State<_SupplierPaymentDialog> {
       onTap: () => setState(() => _mode = label),
       borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.mediumSpacing(context),
+          vertical: AppResponsive.smallSpacing(context),
+        ),
         decoration: BoxDecoration(
           color: selected
               ? AppColors.primary.withValues(alpha: 0.08)

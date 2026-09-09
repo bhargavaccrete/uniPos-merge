@@ -96,22 +96,6 @@ class _PurchaseReturnListScreenState extends State<PurchaseReturnListScreen> {
     );
   }
 
-  /// Caps content width on large screens. Backgrounds still span edge to edge —
-  /// only what you read is constrained.
-  Widget _capped(BuildContext context, Widget child) {
-    final maxWidth = AppResponsive.maxContentWidth(context);
-    if (maxWidth == double.infinity) return child;
-    return Align(
-      // topCenter, not Center: Center aligns on BOTH axes, so a
-      // shrink-wrapping child floats in the vertical middle.
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
-      ),
-    );
-  }
-
   Widget _buildBody(BuildContext context) {
     final side = AppResponsive.padding(context).left;
 
@@ -125,9 +109,11 @@ class _PurchaseReturnListScreenState extends State<PurchaseReturnListScreen> {
             side,
             12,
           ),
-          child: _capped(
-            context,
-            Column(
+          child: AppResponsive.constrainedContent(
+            context: context,
+            alignment: Alignment.topCenter,
+            maxWidth: AppResponsive.maxContentWidth(context),
+            child: Column(
               children: [
                 AppTextField(
                   controller: _searchController,
@@ -165,9 +151,11 @@ class _PurchaseReturnListScreenState extends State<PurchaseReturnListScreen> {
               final returns = _visibleReturns;
               if (returns.isEmpty) return _buildEmptyState();
 
-              return _capped(
-                context,
-                ListView.builder(
+              return AppResponsive.constrainedContent(
+                context: context,
+                alignment: Alignment.topCenter,
+                maxWidth: AppResponsive.maxContentWidth(context),
+                child: ListView.builder(
                   padding: AppResponsive.padding(context),
                   itemCount: returns.length,
                   itemBuilder: (context, index) => _buildCard(returns[index]),

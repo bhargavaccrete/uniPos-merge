@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/util/color.dart';
@@ -9,10 +10,7 @@ import '../../../../../util/common/app_responsive.dart';
 class ImagePickerSheet extends StatelessWidget {
   final Function(Uint8List) onImageSelected;
 
-  const ImagePickerSheet({
-    super.key,
-    required this.onImageSelected,
-  });
+  const ImagePickerSheet({super.key, required this.onImageSelected});
 
   static Future<Uint8List?> show(BuildContext context) async {
     Uint8List? selectedBytes;
@@ -54,7 +52,9 @@ class ImagePickerSheet extends StatelessWidget {
       if (bytes.length > maxSizeInBytes) {
         if (context.mounted) {
           Navigator.pop(context);
-          NotificationService.instance.showError('Image size must be less than 3MB. Please choose a smaller image.');
+          NotificationService.instance.showError(
+            'Image size must be less than 3MB. Please choose a smaller image.',
+          );
         }
         return;
       }
@@ -64,8 +64,10 @@ class ImagePickerSheet extends StatelessWidget {
     } catch (e) {
       debugPrint('Error picking image: $e');
       if (context.mounted) {
-         Navigator.pop(context);
-         NotificationService.instance.showError('Failed to pick image. Please try again.');
+        Navigator.pop(context);
+        NotificationService.instance.showError(
+          'Failed to pick image. Please try again.',
+        );
       }
     }
   }
@@ -83,8 +85,8 @@ class ImagePickerSheet extends StatelessWidget {
             children: [
               Text(
                 'Select Image Source',
-                style: TextStyle(
-                  fontSize: 18,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.subheadingFontSize(context),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -135,8 +137,8 @@ class ImagePickerSheet extends StatelessWidget {
             SizedBox(height: 12),
             Text(
               label,
-              style: TextStyle(
-                fontSize: 16,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.subheadingFontSize(context),
                 fontWeight: FontWeight.w600,
                 color: AppColors.primary,
               ),
@@ -188,22 +190,32 @@ class ImageUploader extends StatelessWidget {
                 : Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.image, color: Colors.grey, size: 40),
+                      Icon(Icons.image, color: Colors.grey, size: 40),
                       const SizedBox(height: 5),
                       Text(
                         uploadLabel,
-                        style: TextStyle(
-                          fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.4, desktop: 16.8),
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.getValue(
+                            context,
+                            mobile: 14.0,
+                            tablet: 15.4,
+                            desktop: 16.8,
+                          ),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                       Text(
                         sizeHint,
-                        style: TextStyle(
-                          fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.2, desktop: 14.4),
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.getValue(
+                            context,
+                            mobile: 12.0,
+                            tablet: 13.2,
+                            desktop: 14.4,
+                          ),
                           color: Colors.grey.shade600,
                         ),
-                      )
+                      ),
                     ],
                   ),
           ),
@@ -211,11 +223,16 @@ class ImageUploader extends StatelessWidget {
           Text(
             'Upload Image (png, jpg, jpeg) up to 3mb',
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               color: Colors.grey,
-              fontSize: AppResponsive.getValue(context, mobile: 11.0, tablet: 12.1, desktop: 13.2),
+              fontSize: AppResponsive.getValue(
+                context,
+                mobile: 11.0,
+                tablet: 12.1,
+                desktop: 13.2,
+              ),
             ),
-          )
+          ),
         ],
       ),
     );

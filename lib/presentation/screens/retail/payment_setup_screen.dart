@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/stores/payment_method_store.dart';
@@ -64,7 +65,7 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
                 TextField(
                   controller: valueController,
                   decoration: InputDecoration(
@@ -75,7 +76,7 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
                 DropdownButtonFormField<String>(
                   value: selectedIcon,
                   decoration: InputDecoration(
@@ -89,8 +90,11 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
                       value: entry.key,
                       child: Row(
                         children: [
-                          Icon(entry.value, size: 20),
-                          const SizedBox(width: 8),
+                          Icon(
+                            entry.value,
+                            size: AppResponsive.iconSize(context),
+                          ),
+                          SizedBox(width: AppResponsive.smallSpacing(context)),
                           Text(entry.key),
                         ],
                       ),
@@ -168,7 +172,7 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Payment Methods Setup'),
+        title: Text('Payment Methods Setup'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
@@ -186,16 +190,16 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
               children: [
                 // Header Section
                 Container(
-                  padding: const EdgeInsets.all(20),
+                  padding: AppResponsive.padding(context),
                   color: Colors.grey[100],
                   child: Row(
                     children: [
                       Icon(Icons.info_outline, color: AppColors.primary),
-                      const SizedBox(width: 12),
+                      SizedBox(width: AppResponsive.mediumSpacing(context)),
                       Expanded(
                         child: Text(
                           'Enable or disable payment methods to show during checkout',
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             fontSize: AppResponsive.bodyFontSize(context),
                             color: Colors.grey[700],
                           ),
@@ -217,10 +221,12 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
                                 size: 64,
                                 color: Colors.grey[400],
                               ),
-                              const SizedBox(height: 16),
+                              SizedBox(
+                                height: AppResponsive.largeSpacing(context),
+                              ),
                               Text(
                                 'No payment methods configured',
-                                style: TextStyle(
+                                style: GoogleFonts.poppins(
                                   fontSize: AppResponsive.subheadingFontSize(
                                     context,
                                   ),
@@ -231,15 +237,19 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
                           ),
                         )
                       : ListView.builder(
-                          padding: const EdgeInsets.all(16),
+                          padding: AppResponsive.cardPadding(context),
                           itemCount: _store.paymentMethods.length,
                           itemBuilder: (context, index) {
                             final method = _store.paymentMethods[index];
                             return Card(
-                              margin: const EdgeInsets.only(bottom: 12),
+                              margin: EdgeInsets.only(
+                                bottom: AppResponsive.mediumSpacing(context),
+                              ),
                               elevation: 2,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(
+                                  AppResponsive.borderRadius(context),
+                                ),
                               ),
                               child: ListTile(
                                 contentPadding: const EdgeInsets.symmetric(
@@ -247,7 +257,9 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
                                   vertical: 8,
                                 ),
                                 leading: Container(
-                                  padding: const EdgeInsets.all(12),
+                                  padding: EdgeInsets.all(
+                                    AppResponsive.mediumSpacing(context),
+                                  ),
                                   decoration: BoxDecoration(
                                     color: method.isEnabled
                                         ? AppColors.primary.withOpacity(0.1)
@@ -264,7 +276,7 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
                                 ),
                                 title: Text(
                                   method.name,
-                                  style: TextStyle(
+                                  style: GoogleFonts.poppins(
                                     fontSize: AppResponsive.subheadingFontSize(
                                       context,
                                     ),
@@ -276,7 +288,7 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
                                 ),
                                 subtitle: Text(
                                   method.isEnabled ? 'Enabled' : 'Disabled',
-                                  style: TextStyle(
+                                  style: GoogleFonts.poppins(
                                     fontSize: AppResponsive.smallFontSize(
                                       context,
                                     ),
@@ -294,7 +306,11 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
                                           _store.togglePaymentMethod(method.id),
                                       activeColor: AppColors.primary,
                                     ),
-                                    const SizedBox(width: 8),
+                                    SizedBox(
+                                      width: AppResponsive.smallSpacing(
+                                        context,
+                                      ),
+                                    ),
                                     // Only show delete for custom methods (sortOrder > 6)
                                     if (method.sortOrder > 6)
                                       IconButton(
@@ -315,7 +331,7 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
 
                 // Bottom Action Button
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: AppResponsive.cardPadding(context),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     boxShadow: [
@@ -344,7 +360,7 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        SizedBox(width: AppResponsive.mediumSpacing(context)),
                         if (widget.onSkip != null)
                           Expanded(
                             child: OutlinedButton(
@@ -361,7 +377,7 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
                               ),
                               child: Text(
                                 'Setup Later',
-                                style: TextStyle(
+                                style: GoogleFonts.poppins(
                                   fontSize: AppResponsive.subheadingFontSize(
                                     context,
                                   ),
@@ -370,7 +386,7 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
                               ),
                             ),
                           ),
-                        const SizedBox(width: 12),
+                        SizedBox(width: AppResponsive.mediumSpacing(context)),
                         Expanded(
                           child: ElevatedButton(
                             onPressed: () {
@@ -398,7 +414,7 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
                             ),
                             child: Text(
                               widget.onComplete != null ? 'Next' : 'Done',
-                              style: TextStyle(
+                              style: GoogleFonts.poppins(
                                 fontSize: AppResponsive.subheadingFontSize(
                                   context,
                                 ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import 'package:billberrylite/domain/services/retail/report_service.dart';
@@ -114,7 +115,7 @@ class StockAdjustmentReportScreen extends StatelessWidget {
                 isIn
                     ? '+${formatQtyWithUnit(signed, unit)}'
                     : formatQtyWithUnit(signed, unit),
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   color: isIn ? AppColors.success : AppColors.danger,
                   fontWeight: FontWeight.w600,
                 ),

@@ -49,8 +49,9 @@ class _StockTakeListScreenState extends State<StockTakeListScreen> {
     }
 
     if (!StockAdjustmentService.canAdjust) {
-      NotificationService.instance
-          .showError('Only the admin can run a stock take.');
+      NotificationService.instance.showError(
+        'Only the admin can run a stock take.',
+      );
       return;
     }
 
@@ -76,9 +77,7 @@ class _StockTakeListScreenState extends State<StockTakeListScreen> {
 
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => StockTakeScreen(takeId: take.takeId),
-      ),
+      MaterialPageRoute(builder: (_) => StockTakeScreen(takeId: take.takeId)),
     );
     if (mounted) await stockTakeStore.loadTakes();
   }
@@ -86,9 +85,7 @@ class _StockTakeListScreenState extends State<StockTakeListScreen> {
   Future<void> _openTake(StockTakeModel take) async {
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => StockTakeScreen(takeId: take.takeId),
-      ),
+      MaterialPageRoute(builder: (_) => StockTakeScreen(takeId: take.takeId)),
     );
     if (mounted) await stockTakeStore.loadTakes();
   }
@@ -97,7 +94,8 @@ class _StockTakeListScreenState extends State<StockTakeListScreen> {
     final confirmed = await showAppConfirmDialog(
       context: context,
       title: 'Discard ${take.takeNumber}?',
-      message: 'The count and all its lines will be deleted. Stock is not '
+      message:
+          'The count and all its lines will be deleted. Stock is not '
           'affected — nothing was applied.',
       confirmLabel: 'Discard',
       accent: AppColors.danger,
@@ -134,7 +132,8 @@ class _StockTakeListScreenState extends State<StockTakeListScreen> {
               return AppEmptyState(
                 icon: Icons.fact_check_outlined,
                 title: 'No stock takes yet',
-                message: 'Count your shelves and apply the variances in one '
+                message:
+                    'Count your shelves and apply the variances in one '
                     'go, instead of correcting products one at a time.',
                 action: ElevatedButton.icon(
                   onPressed: _startTake,
@@ -145,9 +144,12 @@ class _StockTakeListScreenState extends State<StockTakeListScreen> {
                     foregroundColor: AppColors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 13),
+                      horizontal: 20,
+                      vertical: 13,
+                    ),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               );
@@ -188,15 +190,17 @@ class _StockTakeListScreenState extends State<StockTakeListScreen> {
 
     return InkWell(
       onTap: () => _openTake(take),
-      borderRadius:
-          BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+      borderRadius: BorderRadius.circular(
+        AppResponsive.smallBorderRadius(context),
+      ),
       child: Container(
         margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
         padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius:
-              BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.smallBorderRadius(context),
+          ),
           border: Border.all(color: AppColors.divider),
         ),
         child: Column(
@@ -231,8 +235,10 @@ class _StockTakeListScreenState extends State<StockTakeListScreen> {
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.smallSpacing(context),
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
@@ -363,7 +369,7 @@ class _ScopeDialogState extends State<_ScopeDialog> {
       ),
       actions: [
         appDialogCancelButton(context),
-        const SizedBox(width: 12),
+        SizedBox(width: AppResponsive.mediumSpacing(context)),
         appDialogPrimaryButton(
           label: 'Start',
           onPressed: () => Navigator.pop(context, _controller.text.trim()),

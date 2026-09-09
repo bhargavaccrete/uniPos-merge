@@ -74,8 +74,12 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
     // anything else is a name.
     final typed = _searchController.text.trim();
     final seededPhone = RegExp(r'^\d+$').hasMatch(typed);
-    final nameController = TextEditingController(text: seededPhone ? '' : typed);
-    final phoneController = TextEditingController(text: seededPhone ? typed : '');
+    final nameController = TextEditingController(
+      text: seededPhone ? '' : typed,
+    );
+    final phoneController = TextEditingController(
+      text: seededPhone ? typed : '',
+    );
     final emailController = TextEditingController();
     final addressController = TextEditingController();
 
@@ -119,7 +123,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
                     textCapitalization: TextCapitalization.words,
                     textInputAction: TextInputAction.next,
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
                   AppTextField(
                     controller: phoneController,
                     label: 'Phone',
@@ -136,7 +140,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
                     onFieldSubmitted: (_) => submit(),
                   ),
                   if (showMoreFields) ...[
-                    const SizedBox(height: 12),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
                     AppTextField(
                       controller: emailController,
                       label: 'Email',
@@ -144,7 +148,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
                     AppTextField(
                       controller: addressController,
                       label: 'Address',
@@ -157,7 +161,10 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
                       child: TextButton.icon(
                         onPressed: () =>
                             setDialogState(() => showMoreFields = true),
-                        icon: const Icon(Icons.add_rounded, size: 18),
+                        icon: Icon(
+                          Icons.add_rounded,
+                          size: AppResponsive.smallIconSize(context),
+                        ),
                         label: Text(
                           'Email & address',
                           style: GoogleFonts.poppins(
@@ -171,7 +178,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
               ),
               actions: [
                 appDialogCancelButton(dialogContext),
-                const SizedBox(width: 12),
+                SizedBox(width: AppResponsive.mediumSpacing(context)),
                 appDialogPrimaryButton(
                   label: 'Add & Select',
                   onPressed: submit,
@@ -285,7 +292,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
               ),
               Container(
                 color: AppColors.white,
-                padding: const EdgeInsets.all(16),
+                padding: AppResponsive.cardPadding(context),
                 child: AppTextField(
                   controller: _searchController,
                   focusNode: _searchFocusNode,
@@ -299,7 +306,10 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
                   onFieldSubmitted: _submitSearch,
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear, size: 20),
+                          icon: Icon(
+                            Icons.clear,
+                            size: AppResponsive.iconSize(context),
+                          ),
                           onPressed: () {
                             _searchController.clear();
                             _onSearchChanged('');
@@ -331,7 +341,12 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
                       }
                       return ListView.builder(
                         // Bottom pad clears the FAB.
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+                        padding: EdgeInsets.fromLTRB(
+                          AppResponsive.padding(context).left,
+                          AppResponsive.padding(context).left,
+                          AppResponsive.padding(context).left,
+                          88,
+                        ),
                         itemCount: recents.length + 1,
                         itemBuilder: (context, index) {
                           if (index == 0) return _buildListHeader('Recent');
@@ -355,7 +370,15 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
                     }
 
                     return ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+                      // Bottom pad clears the FAB. Static on purpose: it is
+                      // coupled to that button's height, not to a breakpoint,
+                      // so laddering it would under- or over-clear.
+                      padding: EdgeInsets.fromLTRB(
+                        AppResponsive.padding(context).left,
+                        AppResponsive.padding(context).left,
+                        AppResponsive.padding(context).left,
+                        88,
+                      ),
                       itemCount: results.length,
                       itemBuilder: (context, index) =>
                           _buildCustomerTile(results[index]),
@@ -382,16 +405,21 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
   Widget _buildSelectedBanner(Customer customer) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+      padding: EdgeInsets.fromLTRB(
+        AppResponsive.padding(context).left,
+        AppResponsive.mediumSpacing(context),
+        AppResponsive.smallSpacing(context),
+        AppResponsive.mediumSpacing(context),
+      ),
       color: AppColors.success.withValues(alpha: 0.08),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.check_circle_rounded,
-            size: 20,
+            size: AppResponsive.iconSize(context),
             color: AppColors.success,
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -420,7 +448,10 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
           ),
           TextButton.icon(
             onPressed: _removeSelected,
-            icon: const Icon(Icons.close_rounded, size: 16),
+            icon: Icon(
+              Icons.close_rounded,
+              size: AppResponsive.smallIconSize(context),
+            ),
             label: Text(
               'Remove',
               style: GoogleFonts.poppins(
@@ -437,7 +468,10 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
 
   Widget _buildListHeader(String label) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+      padding: EdgeInsets.symmetric(
+        horizontal: 4,
+        vertical: AppResponsive.smallSpacing(context),
+      ),
       child: Text(
         label.toUpperCase(),
         style: GoogleFonts.poppins(
@@ -454,7 +488,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
     final hasDue = customer.creditBalance > 0;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(10),
@@ -464,11 +498,14 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
         onTap: () => _selectCustomer(customer),
         borderRadius: BorderRadius.circular(10),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: EdgeInsets.symmetric(
+            horizontal: AppResponsive.mediumSpacing(context),
+            vertical: AppResponsive.smallSpacing(context),
+          ),
           child: Row(
             children: [
               CircleAvatar(
-                radius: 18,
+                radius: AppResponsive.smallAvatarSize(context) / 2,
                 backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                 child: Text(
                   (customer.name?.isNotEmpty ?? false)
@@ -481,7 +518,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -519,10 +556,10 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
               // Dues matter at the till — the cashier needs to see them before
               // putting another credit sale on this account.
               if (hasDue) ...[
-                const SizedBox(width: 8),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.smallSpacing(context),
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
@@ -542,7 +579,7 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
               const SizedBox(width: 4),
               Icon(
                 Icons.chevron_right_rounded,
-                size: 20,
+                size: AppResponsive.iconSize(context),
                 color: AppColors.textSecondary,
               ),
             ],

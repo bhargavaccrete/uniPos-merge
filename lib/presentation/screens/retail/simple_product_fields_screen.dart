@@ -138,7 +138,10 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
                       Navigator.pop(sheetContext);
                       _showCreateFieldDialog();
                     },
-                    icon: const Icon(Icons.add_circle_outline, size: 18),
+                    icon: Icon(
+                      Icons.add_circle_outline,
+                      size: AppResponsive.smallIconSize(context),
+                    ),
                     label: Text(
                       'Create New',
                       style: GoogleFonts.poppins(
@@ -153,7 +156,7 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
             const Divider(height: 1, color: AppColors.divider),
             if (available.isEmpty)
               Padding(
-                padding: const EdgeInsets.all(24),
+                padding: AppResponsive.padding(context),
                 child: Text(
                   'All existing attributes are already added.',
                   style: GoogleFonts.poppins(
@@ -203,7 +206,7 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
                   },
                 ),
               ),
-            const SizedBox(height: 8),
+            SizedBox(height: AppResponsive.smallSpacing(context)),
           ],
         ),
       ),
@@ -230,7 +233,7 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
         ),
         actions: [
           appDialogCancelButton(dialogContext),
-          const SizedBox(width: 12),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           appDialogPrimaryButton(
             label: 'Create',
             onPressed: () => Navigator.of(dialogContext).pop(true),
@@ -266,10 +269,10 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Simple Product Fields',
-        titleFontSize: 18,
+        titleFontSize: AppResponsive.subheadingFontSize(context),
         actions: [
           IconButton(
-            icon: const Icon(Icons.restart_alt_rounded),
+            icon: Icon(Icons.restart_alt_rounded),
             tooltip: 'Reset to defaults',
             onPressed: _isLoading || _isSaving ? null : _resetToDefaults,
           ),
@@ -307,12 +310,12 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
+          Icon(
             Icons.info_outline_rounded,
-            size: 18,
+            size: AppResponsive.smallIconSize(context),
             color: AppColors.primary,
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Expanded(
             child: Text(
               'These fields appear on every simple product. Remove what you '
@@ -346,13 +349,13 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
       children: [
         ..._fields.map(_buildFieldCard),
-        const SizedBox(height: 8),
+        SizedBox(height: AppResponsive.smallSpacing(context)),
         OutlinedButton.icon(
           onPressed: _showAddFieldSheet,
-          icon: const Icon(Icons.add),
+          icon: Icon(Icons.add),
           label: Text(
             'Add Field',
             style: GoogleFonts.poppins(
@@ -414,10 +417,10 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
             ),
           ),
           IconButton(
-            icon: const Icon(
+            icon: Icon(
               Icons.remove_circle_outline,
               color: AppColors.danger,
-              size: 20,
+              size: AppResponsive.iconSize(context),
             ),
             tooltip: 'Remove field',
             onPressed: () => _removeField(attribute),
@@ -429,7 +432,7 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
 
   Widget _buildBottomBar() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       decoration: const BoxDecoration(
         color: AppColors.white,
         border: Border(top: BorderSide(color: AppColors.divider)),
@@ -469,4 +472,3 @@ class _SimpleProductFieldsScreenState extends State<SimpleProductFieldsScreen> {
     );
   }
 }
-

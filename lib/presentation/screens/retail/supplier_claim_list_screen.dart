@@ -82,22 +82,6 @@ class _SupplierClaimListScreenState extends State<SupplierClaimListScreen> {
     );
   }
 
-  /// Caps content width on large screens. Backgrounds still span edge to edge —
-  /// only what you read is constrained.
-  Widget _capped(BuildContext context, Widget child) {
-    final maxWidth = AppResponsive.maxContentWidth(context);
-    if (maxWidth == double.infinity) return child;
-    return Align(
-      // topCenter, not Center: Center aligns on BOTH axes, so a
-      // shrink-wrapping child floats in the vertical middle.
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
-      ),
-    );
-  }
-
   Widget _buildBody(BuildContext context) {
     final side = AppResponsive.padding(context).left;
 
@@ -111,9 +95,11 @@ class _SupplierClaimListScreenState extends State<SupplierClaimListScreen> {
             side,
             12,
           ),
-          child: _capped(
-            context,
-            Column(
+          child: AppResponsive.constrainedContent(
+            context: context,
+            alignment: Alignment.topCenter,
+            maxWidth: AppResponsive.maxContentWidth(context),
+            child: Column(
               children: [
                 AppTextField(
                   controller: _searchController,
@@ -152,9 +138,11 @@ class _SupplierClaimListScreenState extends State<SupplierClaimListScreen> {
               final claims = _visibleClaims;
               if (claims.isEmpty) return _buildEmptyState();
 
-              return _capped(
-                context,
-                ListView.builder(
+              return AppResponsive.constrainedContent(
+                context: context,
+                alignment: Alignment.topCenter,
+                maxWidth: AppResponsive.maxContentWidth(context),
+                child: ListView.builder(
                   padding: AppResponsive.padding(context),
                   itemCount: claims.length,
                   itemBuilder: (context, index) => _buildCard(claims[index]),
@@ -181,16 +169,18 @@ class _SupplierClaimListScreenState extends State<SupplierClaimListScreen> {
             horizontal: AppResponsive.padding(context).left,
             vertical: AppResponsive.smallSpacing(context),
           ),
-          child: _capped(
-            context,
-            Row(
+          child: AppResponsive.constrainedContent(
+            context: context,
+            alignment: Alignment.topCenter,
+            maxWidth: AppResponsive.maxContentWidth(context),
+            child: Row(
               children: [
                 Icon(
                   Icons.hourglass_top_rounded,
                   size: AppResponsive.smallIconSize(context),
                   color: AppColors.warning,
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Expanded(
                   child: Text(
                     '$count open claim${count == 1 ? '' : 's'} • ${formatMoney(damagedGoodsStore.openClaimValue)} awaiting supplier decision',

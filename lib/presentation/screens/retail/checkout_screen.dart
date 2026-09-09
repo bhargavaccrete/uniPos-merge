@@ -20,6 +20,7 @@ import 'package:billberrylite/presentation/screens/retail/customer_selection_scr
 import 'package:billberrylite/presentation/widget/componets/common/split_payment_widget.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/util/color.dart';
@@ -28,7 +29,6 @@ import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/common/loyalty_points.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
-
 
 import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
@@ -40,6 +40,15 @@ class CheckoutScreen extends StatefulWidget {
   State<CheckoutScreen> createState() => _CheckoutScreenState();
 }
 
+// Values in this file that stay STATIC on purpose:
+//
+// * `circular(10)` on the Pay Later / Complete Payment buttons — the house
+//   "rectangular buttons, radius 10" rule. Panels use smallBorderRadius.
+// * The 20x20 spinner inside the pay button — an affordance sized to the
+//   button's label, not to a breakpoint.
+// * Gaps below 8 (`SizedBox` 2/4/6, `only(right: 6)`, `vertical: 6`,
+//   `right: 4`) — smallSpacing starts at 8, so snapping would double them.
+// * `circular(6)` badges and the `width: 1` divider — decorative hairlines.
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final TextEditingController _discountController = TextEditingController(
     text: '0',
@@ -204,8 +213,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   /// Whether the taxable base is worth a row of its own — only when it differs
   /// from the Item Total the customer can already see.
-  bool get _showTaxableRow =>
-      (_subtotal - _totalTaxableAmount).abs() > 0.009;
+  bool get _showTaxableRow => (_subtotal - _totalTaxableAmount).abs() > 0.009;
 
   /// Process a Credit/Pay Later sale
   /// Plan gate — blocks a NEW bill once the per-day cap is reached. Counts
@@ -285,12 +293,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               '$symbol$formattedTotal',
               emphasise: true,
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
               decoration: BoxDecoration(
                 color: AppColors.warning.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
                 border: Border.all(
                   color: AppColors.warning.withValues(alpha: 0.25),
                 ),
@@ -298,12 +308,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.info_outline_rounded,
-                    size: 18,
+                    size: AppResponsive.smallIconSize(context),
                     color: AppColors.warning,
                   ),
-                  const SizedBox(width: 10),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
                   Expanded(
                     child: Text(
                       'This creates a credit sale. The amount is added to the '
@@ -322,7 +332,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
         actions: [
           appDialogCancelButton(dialogContext),
-          const SizedBox(width: 12),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           appDialogPrimaryButton(
             label: 'Pay Later',
             color: AppColors.warning,
@@ -430,7 +440,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     bool emphasise = false,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -441,7 +451,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               color: AppColors.textSecondary,
             ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: AppResponsive.largeSpacing(context)),
           Flexible(
             child: Text(
               value,
@@ -514,8 +524,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         // `discountAmount` above stays the TOTAL (line + bill share).
         lineDiscountType: cartItem.lineDiscountType,
         lineDiscountValue: cartItem.lineDiscountValue,
-        lineDiscountAmount:
-            line.lineDiscountAmount > 0 ? line.lineDiscountAmount : null,
+        lineDiscountAmount: line.lineDiscountAmount > 0
+            ? line.lineDiscountAmount
+            : null,
         lineDiscountReason: cartItem.lineDiscountReason,
         lineDiscountNote: cartItem.lineDiscountNote,
       );
@@ -660,64 +671,49 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Observer(
           builder: (context) {
             if (cartStore.itemCount == 0) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.shopping_cart_outlined,
-                      size: 64,
-                      color: Color(0xFFD0D0D0),
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'Cart is empty',
-                      style: TextStyle(
-                        fontSize: AppResponsive.subheadingFontSize(context),
-                        color: Color(0xFF6B6B6B),
-                      ),
-                    ),
-                  ],
-                ),
+              return const AppEmptyState(
+                icon: Icons.shopping_cart_outlined,
+                title: 'Cart is empty',
+                message: 'Add items on the billing screen to check out.',
               );
             }
 
             return SingleChildScrollView(
               physics: const ClampingScrollPhysics(),
-              padding: const EdgeInsets.all(20),
+              padding: AppResponsive.padding(context),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Customer Section
                   _buildSectionTitle('Customer'),
-                  const SizedBox(height: 12),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
                   _buildCustomerCard(),
-                  const SizedBox(height: 12),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
                   _buildLoyaltyCard(),
-                  const SizedBox(height: 12),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
 
                   // Order Summary Section
                   _buildSectionTitle('Order Summary'),
-                  const SizedBox(height: 12),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
                   _buildOrderSummaryCard(),
-                  const SizedBox(height: 24),
+                  SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
                   // Billing Details Section
                   _buildSectionTitle('Billing Details'),
-                  const SizedBox(height: 12),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
                   _buildBillingDetailsCard(),
-                  const SizedBox(height: 24),
+                  SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
                   // Per-rate GST slabs (hidden when tax is off or zero)
                   _buildGstBreakdownCard(),
 
                   // Total Summary Section
                   _buildTotalSummaryCard(),
-                  const SizedBox(height: 24),
+                  SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
                   // Split Payment Section
                   _buildSectionTitle('Payment'),
-                  const SizedBox(height: 12),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
                   SplitPaymentWidget(
                     billTotal: _grandTotal,
                     onPaymentChanged: _onPaymentChanged,
@@ -727,9 +723,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     // as an error — the shortfall is the intent here.
                     allowPartial: _allowPartialPayment,
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
                   _buildPartialPaymentCard(),
-                  const SizedBox(height: 24),
+                  SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
                   // Payment Action Buttons
                   Row(
@@ -738,49 +734,54 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       Expanded(
                         flex: 1,
                         child: SizedBox(
-                          height: 54,
+                          height: AppResponsive.buttonHeight(context),
                           child: ElevatedButton.icon(
                             onPressed: _isProcessing
                                 ? null
                                 : _processCreditSale,
-                            icon: const Icon(Icons.schedule, size: 20),
+                            icon: Icon(
+                              Icons.schedule,
+                              size: AppResponsive.iconSize(context),
+                            ),
                             label: Text(
                               'Pay Later',
-                              style: TextStyle(
+                              style: GoogleFonts.poppins(
                                 fontSize: AppResponsive.bodyFontSize(context),
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFFF9800),
+                              backgroundColor: AppColors.warning,
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                               elevation: 0,
-                              disabledBackgroundColor: const Color(0xFFB0B0B0),
+                              disabledBackgroundColor: AppColors.textSecondary
+                                  .withValues(alpha: 0.4),
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: AppResponsive.mediumSpacing(context)),
                       // Complete Payment Button
                       Expanded(
                         flex: 2,
                         child: SizedBox(
-                          height: 54,
+                          height: AppResponsive.buttonHeight(context),
                           child: ElevatedButton(
                             onPressed: _canSubmitPayment
                                 ? _processCheckout
                                 : null,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF4CAF50),
+                              backgroundColor: AppColors.success,
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                               elevation: 0,
-                              disabledBackgroundColor: const Color(0xFFB0B0B0),
+                              disabledBackgroundColor: AppColors.textSecondary
+                                  .withValues(alpha: 0.4),
                             ),
                             child: _isProcessing && !_isCreditSale
                                 ? const SizedBox(
@@ -807,7 +808,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                             _changeReturn > 0
                                                 ? 'Pay ($symbol$formattedChange change)'
                                                 : 'Complete Payment',
-                                            style: TextStyle(
+                                            style: GoogleFonts.poppins(
                                               fontSize:
                                                   AppResponsive.bodyFontSize(
                                                     context,
@@ -836,9 +837,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
-      style: TextStyle(
+      style: GoogleFonts.poppins(
         fontSize: AppResponsive.subheadingFontSize(context),
-        color: Color(0xFF1A1A1A),
+        color: AppColors.textPrimary,
         fontWeight: FontWeight.w600,
       ),
     );
@@ -846,11 +847,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _buildOrderSummaryCard() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider, width: 0.5),
       ),
       child: Column(
         children: [
@@ -859,7 +862,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             '${cartStore.totalItems}',
             isBold: false,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
           ValueListenableBuilder<String>(
             valueListenable: CurrencyHelper.currencyNotifier,
             builder: (context, currencyCode, child) {
@@ -875,7 +878,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     // the label has to say which — it is the tax-inclusive
                     // gross under inclusive pricing and the pre-tax base under
                     // exclusive. Matches the Total Summary card's wording.
-                    _bill.isTaxInclusive ? 'Subtotal (incl. $_taxName)'
+                    _bill.isTaxInclusive
+                        ? 'Subtotal (incl. $_taxName)'
                         : 'Subtotal',
                     '$symbol$formattedSubtotal',
                     isBold: false,
@@ -891,11 +895,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _buildBillingDetailsCard() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider, width: 0.5),
       ),
       child: Column(
         children: [
@@ -904,134 +910,153 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           // checkout route itself stays open to every role: it is mid-sale, and
           // the billing entrance is the gate.
           if (LineDiscountService.canDiscount) ...[
-          // Discount type — flat amount or percentage of the item total
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Discount',
-                  style: TextStyle(
-                    fontSize: AppResponsive.bodyFontSize(context),
-                    color: Color(0xFF6B6B6B),
-                  ),
-                ),
-              ),
-              _buildDiscountTypeToggle(),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Preset percentages — only meaningful in percentage mode
-          if (retailCartStore.discountType == DiscountType.percentage) ...[
-            Row(
-              children: [
-                5,
-                10,
-                15,
-                20,
-                25,
-              ].map((p) => Expanded(child: _buildPercentPreset(p))).toList(),
-            ),
-            const SizedBox(height: 12),
-          ],
-
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  retailCartStore.discountType == DiscountType.percentage
-                      ? 'Percentage off'
-                      : 'Amount off',
-                  style: TextStyle(
-                    fontSize: AppResponsive.smallFontSize(context),
-                    color: Color(0xFF6B6B6B),
-                  ),
-                ),
-              ),
-              SizedBox(
-                width: AppResponsive.getValue(
-                  context,
-                  mobile: 120.0,
-                  tablet: 140.0,
-                  desktop: 160.0,
-                ),
-                child: AppTextField(
-                  controller: _discountController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  // keyboardType alone is a hint, not a constraint — a hardware
-                  // keyboard or paste can still enter '-50'. The engine clamps
-                  // the value too; this just stops it being typed.
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(
-                      RegExp(r'^\d*\.?\d{0,2}'),
-                    ),
-                  ],
-                  textAlign: TextAlign.right,
-                  // The affix has to follow the mode, or a 25% discount reads
-                  // as "₹25". Percentage takes the leading icon the line
-                  // discount dialog uses; an amount keeps the currency symbol.
-                  icon: retailCartStore.discountType == DiscountType.percentage
-                      ? Icons.percent_rounded
-                      : null,
-                  prefixWidget:
-                      retailCartStore.discountType == DiscountType.percentage
-                      ? null
-                      : Padding(
-                          padding: const EdgeInsets.only(left: 12, right: 4),
-                          child: Text(CurrencyHelper.currentSymbol),
-                        ),
-                  onChanged: (value) {
-                    setState(() {});
-                  },
-                ),
-              ),
-            ],
-          ),
-
-          // Reason — only asked for once an ORDER-LEVEL discount applies.
-          // Line discounts collect their own reason in their own dialog.
-          if (retailCartStore.discountValue > 0) ...[
-            const Divider(height: 24, thickness: 0.5, color: Color(0xFFE8E8E8)),
+            // Discount type — flat amount or percentage of the item total
             Row(
               children: [
                 Expanded(
                   child: Text(
-                    'Reason',
-                    style: TextStyle(
+                    'Discount',
+                    style: GoogleFonts.poppins(
                       fontSize: AppResponsive.bodyFontSize(context),
-                      color: Color(0xFF6B6B6B),
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),
-                DropdownButton<String>(
-                  value: _selectedDiscountReason,
-                  underline: const SizedBox.shrink(),
-                  style: TextStyle(
-                    fontSize: AppResponsive.bodyFontSize(context),
-                    fontWeight: FontWeight.w500,
+                _buildDiscountTypeToggle(),
+              ],
+            ),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
+
+            // Preset percentages — only meaningful in percentage mode
+            if (retailCartStore.discountType == DiscountType.percentage) ...[
+              Row(
+                children: [
+                  5,
+                  10,
+                  15,
+                  20,
+                  25,
+                ].map((p) => Expanded(child: _buildPercentPreset(p))).toList(),
+              ),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
+            ],
+
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    retailCartStore.discountType == DiscountType.percentage
+                        ? 'Percentage off'
+                        : 'Amount off',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
                   ),
-                  items: _discountReasons
-                      .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v == null) return;
-                    setState(() => _selectedDiscountReason = v);
-                  },
+                ),
+                SizedBox(
+                  width: AppResponsive.getValue(
+                    context,
+                    mobile: 120.0,
+                    tablet: 140.0,
+                    desktop: 160.0,
+                  ),
+                  child: AppTextField(
+                    controller: _discountController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    // keyboardType alone is a hint, not a constraint — a hardware
+                    // keyboard or paste can still enter '-50'. The engine clamps
+                    // the value too; this just stops it being typed.
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'^\d*\.?\d{0,2}'),
+                      ),
+                    ],
+                    textAlign: TextAlign.right,
+                    // The affix has to follow the mode, or a 25% discount reads
+                    // as "₹25". Percentage takes the leading icon the line
+                    // discount dialog uses; an amount keeps the currency symbol.
+                    icon:
+                        retailCartStore.discountType == DiscountType.percentage
+                        ? Icons.percent_rounded
+                        : null,
+                    prefixWidget:
+                        retailCartStore.discountType == DiscountType.percentage
+                        ? null
+                        : Padding(
+                            padding: EdgeInsets.only(
+                              left: AppResponsive.mediumSpacing(context),
+                              right: 4,
+                            ),
+                            // Needs its own style: a field prefix has no
+                            // ancestor text style to inherit, so an unstyled
+                            // Text here renders the currency glyph in the
+                            // platform default while the field beside it is
+                            // Poppins.
+                            child: Text(
+                              CurrencyHelper.currentSymbol,
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.bodyFontSize(context),
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                    onChanged: (value) {
+                      setState(() {});
+                    },
+                  ),
                 ),
               ],
             ),
-            if (_selectedDiscountReason == 'Other') ...[
-              const SizedBox(height: 8),
-              AppTextField(
-                controller: _otherReasonController,
-                hint: 'Enter reason',
-                icon: Icons.notes_rounded,
-                onChanged: (_) => setState(() {}),
+
+            // Reason — only asked for once an ORDER-LEVEL discount applies.
+            // Line discounts collect their own reason in their own dialog.
+            if (retailCartStore.discountValue > 0) ...[
+              Divider(
+                height: AppResponsive.extraLargeSpacing(context),
+                thickness: 0.5,
+                color: AppColors.divider,
               ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Reason',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  DropdownButton<String>(
+                    value: _selectedDiscountReason,
+                    underline: const SizedBox.shrink(),
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w500,
+                    ),
+                    items: _discountReasons
+                        .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                        .toList(),
+                    onChanged: (v) {
+                      if (v == null) return;
+                      setState(() => _selectedDiscountReason = v);
+                    },
+                  ),
+                ],
+              ),
+              if (_selectedDiscountReason == 'Other') ...[
+                SizedBox(height: AppResponsive.smallSpacing(context)),
+                AppTextField(
+                  controller: _otherReasonController,
+                  hint: 'Enter reason',
+                  icon: Icons.notes_rounded,
+                  onChanged: (_) => setState(() {}),
+                ),
+              ],
             ],
-          ],
           ],
         ],
       ),
@@ -1050,10 +1075,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         final precision = DecimalSettings.precision;
 
         return Container(
-          padding: const EdgeInsets.all(16),
+          padding: AppResponsive.cardPadding(context),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.smallBorderRadius(context),
+            ),
+            border: Border.all(color: AppColors.divider, width: 0.5),
           ),
           child: Column(
             children: [
@@ -1065,7 +1092,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       children: [
                         Text(
                           'Partial Payment',
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             fontSize: AppResponsive.bodyFontSize(context),
                             fontWeight: FontWeight.w600,
                           ),
@@ -1075,7 +1102,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           hasCustomer
                               ? 'Collect part now, balance on account'
                               : 'Select a customer to enable',
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             fontSize: AppResponsive.smallFontSize(context),
                           ),
                         ),
@@ -1084,7 +1111,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                   Switch(
                     value: _allowPartialPayment,
-                    activeColor: const Color(0xFFFF9800),
+                    activeColor: AppColors.warning,
                     // Stays tappable without a customer so we can explain why
                     // it won't turn on, rather than greying out silently.
                     onChanged: (on) {
@@ -1102,25 +1129,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               // The customer can be cleared after switching this on — say so,
               // instead of just disabling the pay button with no reason.
               if (_allowPartialPayment && !hasCustomer) ...[
-                const Divider(
-                  height: 20,
+                Divider(
+                  height: AppResponsive.largeSpacing(context),
                   thickness: 0.5,
-                  color: Color(0xFFE8E8E8),
+                  color: AppColors.divider,
                 ),
                 Row(
                   children: [
                     Icon(
                       Icons.info_outline,
-                      size: 16,
-                      color: Color(0xFFFF9800),
+                      size: AppResponsive.smallIconSize(context),
+                      color: AppColors.warning,
                     ),
-                    SizedBox(width: 8),
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
                     Expanded(
                       child: Text(
                         'Select a customer — the balance is recorded on their account.',
-                        style: TextStyle(
+                        style: GoogleFonts.poppins(
                           fontSize: AppResponsive.smallFontSize(context),
-                          color: Color(0xFFFF9800),
+                          color: AppColors.warning,
                         ),
                       ),
                     ),
@@ -1132,24 +1159,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               // was reduced would otherwise look partial while recording as
               // fully paid.
               if (_allowPartialPayment && hasCustomer) ...[
-                const Divider(
-                  height: 20,
+                Divider(
+                  height: AppResponsive.largeSpacing(context),
                   thickness: 0.5,
-                  color: Color(0xFFE8E8E8),
+                  color: AppColors.divider,
                 ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       'Collecting Now',
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.bodyFontSize(context),
-                        color: const Color(0xFF6B6B6B),
+                        color: AppColors.textSecondary,
                       ),
                     ),
                     Text(
                       '$symbol${_totalPaid.toStringAsFixed(precision)}',
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                       ),
@@ -1162,38 +1189,38 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   children: [
                     Text(
                       'Balance Due',
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.bodyFontSize(context),
-                        color: const Color(0xFF6B6B6B),
+                        color: AppColors.textSecondary,
                       ),
                     ),
                     Text(
                       '$symbol${_balanceDue.toStringAsFixed(precision)}',
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.subheadingFontSize(context),
                         fontWeight: FontWeight.w700,
-                        color: _balanceDue > 0 ? null : const Color(0xFF6B6B6B),
+                        color: _balanceDue > 0 ? null : AppColors.textSecondary,
                       ),
                     ),
                   ],
                 ),
                 if (_balanceDue <= 0) ...[
-                  const SizedBox(height: 8),
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.info_outline,
-                        size: 16,
-                        color: Color(0xFF6B6B6B),
+                        size: AppResponsive.smallIconSize(context),
+                        color: AppColors.textSecondary,
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: AppResponsive.smallSpacing(context)),
                       Expanded(
                         child: Text(
                           'The full bill is tendered — this records as fully '
                           'paid. Reduce the amount above to leave a balance.',
-                          style: TextStyle(
+                          style: GoogleFonts.poppins(
                             fontSize: AppResponsive.smallFontSize(context),
-                            color: const Color(0xFF6B6B6B),
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ),
@@ -1231,28 +1258,28 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         final redeemable = available.clamp(0, billBefore.floor()).toInt();
 
         return Container(
-          padding: const EdgeInsets.all(16),
+          padding: AppResponsive.cardPadding(context),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: const Color(0xFFFF9800).withOpacity(0.25),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.smallBorderRadius(context),
             ),
+            border: Border.all(color: AppColors.warning.withOpacity(0.25)),
           ),
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.card_giftcard,
-                color: Color(0xFFFF9800),
-                size: 22,
+                color: AppColors.warning,
+                size: AppResponsive.iconSize(context),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Redeem Loyalty Points',
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                       ),
@@ -1262,9 +1289,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       redeemable > 0
                           ? '$available pts available · redeem $redeemable = $symbol$redeemable'
                           : '$available pts available',
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.smallFontSize(context),
-                        color: Color(0xFF6B6B6B),
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -1272,7 +1299,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
               Switch(
                 value: _pointsRedeemed > 0,
-                activeColor: const Color(0xFFFF9800),
+                activeColor: AppColors.warning,
                 onChanged: redeemable <= 0
                     ? null
                     : (on) {
@@ -1315,17 +1342,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           setState(() {});
         },
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          padding: EdgeInsets.symmetric(
+            horizontal: AppResponsive.cardPadding(context).left,
+            vertical: 6,
+          ),
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFF4CAF50) : const Color(0xFFF5F5F5),
+            color: selected ? AppColors.success : AppColors.surfaceMedium,
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
             label,
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.w600,
-              color: selected ? Colors.white : const Color(0xFF6B6B6B),
+              color: selected ? Colors.white : AppColors.textSecondary,
             ),
           ),
         ),
@@ -1353,26 +1383,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         },
         child: Container(
           alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: EdgeInsets.symmetric(
+            vertical: AppResponsive.smallSpacing(context),
+          ),
           decoration: BoxDecoration(
-            color: selected
-                ? const Color(0xFF4CAF50).withOpacity(0.1)
-                : Colors.white,
+            color: selected ? AppColors.success.withOpacity(0.1) : Colors.white,
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
-              color: selected
-                  ? const Color(0xFF4CAF50)
-                  : const Color(0xFFE8E8E8),
+              color: selected ? AppColors.success : AppColors.divider,
             ),
           ),
           child: Text(
             '$percent%',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.smallFontSize(context),
               fontWeight: FontWeight.w600,
-              color: selected
-                  ? const Color(0xFF4CAF50)
-                  : const Color(0xFF6B6B6B),
+              color: selected ? AppColors.success : AppColors.textSecondary,
             ),
           ),
         ),
@@ -1392,25 +1418,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 24),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.only(bottom: AppResponsive.extraLargeSpacing(context)),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider, width: 0.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             '$_taxName Breakdown',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.bodyFontSize(context),
-              color: Color(0xFF1A1A1A),
+              color: AppColors.textPrimary,
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
           ...breakdown.entries.map((entry) {
             final rate = entry.key;
             final data = entry.value;
@@ -1423,7 +1451,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   builder: (context, precision, child) {
                     final symbol = CurrencyHelper.currentSymbol;
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
+                      padding: EdgeInsets.only(
+                        bottom: AppResponsive.smallSpacing(context),
+                      ),
                       child: Column(
                         children: [
                           Row(
@@ -1431,8 +1461,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             children: [
                               Text(
                                 '$_taxName ${GstService.formatGstRate(rate)}',
-                                style: TextStyle(
-                                  color: Color(0xFF6B6B6B),
+                                style: GoogleFonts.poppins(
+                                  color: AppColors.textSecondary,
                                   fontSize: AppResponsive.smallFontSize(
                                     context,
                                   ),
@@ -1440,7 +1470,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               ),
                               Text(
                                 '$symbol${data.totalGstAmount.toStringAsFixed(precision)}',
-                                style: TextStyle(
+                                style: GoogleFonts.poppins(
                                   fontSize: AppResponsive.smallFontSize(
                                     context,
                                   ),
@@ -1452,13 +1482,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           if (_splitsTax && _taxComponents != null) ...[
                             const SizedBox(height: 4),
                             Row(
-                              mainAxisAlignment:
-                                  MainAxisAlignment.spaceBetween,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
                                   '  ${_taxComponents.first} ${GstService.formatGstRate(rate / 2)}',
-                                  style: TextStyle(
-                                    color: Color(0xFF9E9E9E),
+                                  style: GoogleFonts.poppins(
+                                    color: AppColors.textSecondary,
                                     fontSize: AppResponsive.smallFontSize(
                                       context,
                                     ),
@@ -1466,8 +1495,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                 ),
                                 Text(
                                   '$symbol${data.cgstAmount.toStringAsFixed(precision)}',
-                                  style: TextStyle(
-                                    color: Color(0xFF9E9E9E),
+                                  style: GoogleFonts.poppins(
+                                    color: AppColors.textSecondary,
                                     fontSize: AppResponsive.smallFontSize(
                                       context,
                                     ),
@@ -1476,13 +1505,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               ],
                             ),
                             Row(
-                              mainAxisAlignment:
-                                  MainAxisAlignment.spaceBetween,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
                                   '  ${_taxComponents.second} ${GstService.formatGstRate(rate / 2)}',
-                                  style: TextStyle(
-                                    color: Color(0xFF9E9E9E),
+                                  style: GoogleFonts.poppins(
+                                    color: AppColors.textSecondary,
                                     fontSize: AppResponsive.smallFontSize(
                                       context,
                                     ),
@@ -1490,8 +1518,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                 ),
                                 Text(
                                   '$symbol${data.sgstAmount.toStringAsFixed(precision)}',
-                                  style: TextStyle(
-                                    color: Color(0xFF9E9E9E),
+                                  style: GoogleFonts.poppins(
+                                    color: AppColors.textSecondary,
                                     fontSize: AppResponsive.smallFontSize(
                                       context,
                                     ),
@@ -1522,12 +1550,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           builder: (context, precision, child) {
             final symbol = CurrencyHelper.currentSymbol;
             return Container(
-              padding: const EdgeInsets.all(20),
+              padding: AppResponsive.padding(context),
               decoration: BoxDecoration(
-                color: const Color(0xFF4CAF50).withOpacity(0.05),
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.success.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
                 border: Border.all(
-                  color: const Color(0xFF4CAF50).withOpacity(0.2),
+                  color: AppColors.success.withOpacity(0.2),
                   width: 1,
                 ),
               ),
@@ -1542,7 +1572,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     '$symbol${_subtotal.toStringAsFixed(precision)}',
                     isBold: false,
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
                   if (_discountAmount > 0) ...[
                     // Split exactly as the receipt does, so the cashier and the
                     // customer are never looking at differently-grouped numbers.
@@ -1556,7 +1586,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         isBold: false,
                         color: Colors.red,
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: AppResponsive.smallSpacing(context)),
                     ],
                     if (_billDiscountRemainder > 0.009) ...[
                       _buildSummaryRow(
@@ -1567,7 +1597,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         isBold: false,
                         color: Colors.red,
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: AppResponsive.smallSpacing(context)),
                     ],
                   ],
                   // Shown whenever it differs from the Item Total — i.e. under
@@ -1583,7 +1613,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       '$symbol${_totalTaxableAmount.toStringAsFixed(precision)}',
                       isBold: false,
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: AppResponsive.smallSpacing(context)),
                   ],
                   if (_totalGstAmount > 0) ...[
                     if (_splitsTax && _taxComponents != null) ...[
@@ -1591,16 +1621,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         _taxComponents.first,
                         '$_taxSign$symbol${_totalCgstAmount.toStringAsFixed(precision)}',
                         isBold: false,
-                        color: const Color(0xFF4CAF50),
+                        color: AppColors.success,
                       ),
                       const SizedBox(height: 4),
                       _buildSummaryRow(
                         _taxComponents.second,
                         '$_taxSign$symbol${_totalSgstAmount.toStringAsFixed(precision)}',
                         isBold: false,
-                        color: const Color(0xFF4CAF50),
+                        color: AppColors.success,
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: AppResponsive.smallSpacing(context)),
                     ],
                     _buildSummaryRow(
                       // "Total" only means something when the two component
@@ -1611,12 +1641,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       _taxLabel,
                       '$_taxSign$symbol${_totalGstAmount.toStringAsFixed(precision)}',
                       isBold: false,
-                      color: const Color(0xFF4CAF50),
+                      color: AppColors.success,
                     ),
-                    const Divider(
-                      height: 20,
+                    Divider(
+                      height: AppResponsive.largeSpacing(context),
                       thickness: 0.5,
-                      color: Color(0xFFE8E8E8),
+                      color: AppColors.divider,
                     ),
                   ],
                   if (_bill.loyaltyRedemption > 0) ...[
@@ -1625,7 +1655,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       '- $symbol${_bill.loyaltyRedemption.toStringAsFixed(precision)}',
                       isBold: false,
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: AppResponsive.smallSpacing(context)),
                   ],
                   // Rounding adjustment baked into the grand total; signed so a
                   // downward rounding reads as a deduction.
@@ -1635,7 +1665,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       '${_bill.roundOff >= 0 ? '+ ' : '- '}$symbol${_bill.roundOff.abs().toStringAsFixed(precision)}',
                       isBold: false,
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: AppResponsive.smallSpacing(context)),
                   ],
                   _buildSummaryRow(
                     _bill.loyaltyRedemption > 0 ? 'Net Payable' : 'Grand Total',
@@ -1664,17 +1694,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       children: [
         Text(
           label,
-          style: TextStyle(
-            fontSize: fontSize ?? 14,
-            color: color ?? const Color(0xFF1A1A1A),
+          style: GoogleFonts.poppins(
+            fontSize: fontSize ?? AppResponsive.bodyFontSize(context),
+            color: color ?? AppColors.textPrimary,
             fontWeight: isBold ? FontWeight.w600 : FontWeight.w400,
           ),
         ),
         Text(
           value,
-          style: TextStyle(
-            fontSize: fontSize ?? 14,
-            color: color ?? const Color(0xFF1A1A1A),
+          style: GoogleFonts.poppins(
+            fontSize: fontSize ?? AppResponsive.bodyFontSize(context),
+            color: color ?? AppColors.textPrimary,
             fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
@@ -1708,10 +1738,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             // Amount
             Container(
               alignment: Alignment.center,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.padding(context).left,
+                vertical: AppResponsive.mediumSpacing(context),
+              ),
               decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.surfaceMedium,
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
               ),
               child: ValueListenableBuilder<String>(
                 valueListenable: CurrencyHelper.currencyNotifier,
@@ -1728,14 +1763,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       );
                       return Text(
                         '$symbol$formattedAmount',
-                        style: TextStyle(
+                        style: GoogleFonts.poppins(
                           fontSize: AppResponsive.getValue(
                             context,
                             mobile: 28.0,
                             tablet: 32.0,
                             desktop: 36.0,
                           ),
-                          color: Color(0xFF4CAF50),
+                          color: AppColors.success,
                           fontWeight: FontWeight.w700,
                         ),
                       );
@@ -1748,18 +1783,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             // Partial payment: spell out the bill and what is still owed,
             // so a big green number can't be mistaken for a settled sale.
             if (isPartial) ...[
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
               ValueListenableBuilder<int>(
                 valueListenable: DecimalSettings.precisionNotifier,
                 builder: (context, precision, child) {
                   final symbol = CurrencyHelper.currentSymbol;
                   return Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: EdgeInsets.all(
+                      AppResponsive.mediumSpacing(context),
+                    ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFF9800).withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(8),
+                      color: AppColors.warning.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.smallBorderRadius(context),
+                      ),
                       border: Border.all(
-                        color: const Color(0xFFFF9800).withOpacity(0.25),
+                        color: AppColors.warning.withOpacity(0.25),
                       ),
                     ),
                     child: Column(
@@ -1769,17 +1808,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           children: [
                             Text(
                               'Bill Total',
-                              style: TextStyle(
+                              style: GoogleFonts.poppins(
                                 fontSize: AppResponsive.smallFontSize(context),
-                                color: Color(0xFF6B6B6B),
+                                color: AppColors.textSecondary,
                               ),
                             ),
                             Text(
                               '$symbol${sale.totalAmount.toStringAsFixed(precision)}',
-                              style: TextStyle(
+                              style: GoogleFonts.poppins(
                                 fontSize: AppResponsive.smallFontSize(context),
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFF1A1A1A),
+                                color: AppColors.textPrimary,
                               ),
                             ),
                           ],
@@ -1790,19 +1829,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           children: [
                             Text(
                               'Balance Due',
-                              style: TextStyle(
+                              style: GoogleFonts.poppins(
                                 fontSize: AppResponsive.bodyFontSize(context),
-                                color: Color(0xFF6B6B6B),
+                                color: AppColors.textSecondary,
                               ),
                             ),
                             Text(
                               '$symbol${sale.dueAmount.toStringAsFixed(precision)}',
-                              style: TextStyle(
+                              style: GoogleFonts.poppins(
                                 fontSize: AppResponsive.subheadingFontSize(
                                   context,
                                 ),
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFFFF9800),
+                                color: AppColors.warning,
                               ),
                             ),
                           ],
@@ -1817,7 +1856,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
         actions: [
           appDialogCancelButton(dialogContext, label: 'Skip & Close'),
-          const SizedBox(width: 12),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           appDialogPrimaryButton(
             label: 'Print Receipt',
             color: AppColors.success,
@@ -1884,13 +1923,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           children: [
             // Amount Info
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: AppResponsive.cardPadding(context),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF3E0),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: const Color(0xFFFF9800).withOpacity(0.3),
+                color: AppColors.warning.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
                 ),
+                border: Border.all(color: AppColors.warning.withOpacity(0.3)),
               ),
               child: ValueListenableBuilder<String>(
                 valueListenable: CurrencyHelper.currencyNotifier,
@@ -1912,18 +1951,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             children: [
                               Text(
                                 'Total Amount',
-                                style: TextStyle(
+                                style: GoogleFonts.poppins(
                                   fontSize: AppResponsive.bodyFontSize(context),
-                                  color: Color(0xFF6B6B6B),
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                               Text(
                                 '$symbol$formattedTotal',
-                                style: TextStyle(
+                                style: GoogleFonts.poppins(
                                   fontSize: AppResponsive.subheadingFontSize(
                                     context,
                                   ),
-                                  color: Color(0xFFFF9800),
+                                  color: AppColors.warning,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
@@ -1935,35 +1974,35 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             children: [
                               Text(
                                 'Customer',
-                                style: TextStyle(
+                                style: GoogleFonts.poppins(
                                   fontSize: AppResponsive.bodyFontSize(context),
-                                  color: Color(0xFF6B6B6B),
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                               Text(
                                 customer.name ?? '',
-                                style: TextStyle(
+                                style: GoogleFonts.poppins(
                                   fontSize: AppResponsive.bodyFontSize(context),
-                                  color: Color(0xFF1A1A1A),
+                                  color: AppColors.textPrimary,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          SizedBox(height: AppResponsive.smallSpacing(context)),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
                                 'New Balance',
-                                style: TextStyle(
+                                style: GoogleFonts.poppins(
                                   fontSize: AppResponsive.bodyFontSize(context),
-                                  color: Color(0xFF6B6B6B),
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                               Text(
                                 '$symbol$formattedBalance',
-                                style: TextStyle(
+                                style: GoogleFonts.poppins(
                                   fontSize: AppResponsive.bodyFontSize(context),
                                   color: Colors.red,
                                   fontWeight: FontWeight.w600,
@@ -1978,12 +2017,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 },
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: AppResponsive.smallSpacing(context)),
             Text(
               'Payment is pending. Stock has been deducted.',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: AppResponsive.smallFontSize(context),
-                color: Color(0xFF9E9E9E),
+                color: AppColors.textSecondary,
               ),
               textAlign: TextAlign.center,
             ),
@@ -1995,7 +2034,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         // `mounted` had already gone false.
         actions: [
           appDialogCancelButton(dialogContext, label: 'Skip & Close'),
-          const SizedBox(width: 12),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           appDialogPrimaryButton(
             label: 'Print Invoice',
             color: AppColors.warning,
@@ -2061,32 +2100,36 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             }
           },
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: AppResponsive.cardPadding(context),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
+              border: Border.all(color: AppColors.divider, width: 0.5),
             ),
             child: Row(
               children: [
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: AppResponsive.avatarSize(context),
+                  height: AppResponsive.avatarSize(context),
                   decoration: BoxDecoration(
                     color: customer != null
-                        ? const Color(0xFF4CAF50).withOpacity(0.1)
-                        : const Color(0xFFF5F5F5),
-                    borderRadius: BorderRadius.circular(8),
+                        ? AppColors.success.withOpacity(0.1)
+                        : AppColors.surfaceMedium,
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.smallBorderRadius(context),
+                    ),
                   ),
                   child: Icon(
                     color: customer != null
-                        ? const Color(0xFF4CAF50)
-                        : const Color(0xFF6B6B6B),
-                    size: 24,
+                        ? AppColors.success
+                        : AppColors.textSecondary,
+                    size: AppResponsive.iconSize(context),
                     customer != null ? Icons.person : Icons.person_add_outlined,
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: AppResponsive.mediumSpacing(context)),
                 Expanded(
                   child: customer != null
                       ? Column(
@@ -2094,17 +2137,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           children: [
                             Text(
                               customer.name ?? '',
-                              style: TextStyle(
+                              style: GoogleFonts.poppins(
                                 fontSize: AppResponsive.bodyFontSize(context),
-                                color: Color(0xFF1A1A1A),
+                                color: AppColors.textPrimary,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               customer.phone ?? '',
-                              style: TextStyle(
-                                color: Color(0xFF6B6B6B),
+                              style: GoogleFonts.poppins(
+                                color: AppColors.textSecondary,
                                 fontSize: AppResponsive.smallFontSize(context),
                               ),
                             ),
@@ -2115,17 +2158,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           children: [
                             Text(
                               'Add Customer',
-                              style: TextStyle(
+                              style: GoogleFonts.poppins(
                                 fontSize: AppResponsive.bodyFontSize(context),
-                                color: Color(0xFF6B6B6B),
+                                color: AppColors.textSecondary,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                             SizedBox(height: 4),
                             Text(
                               'Optional - Tap to select',
-                              style: TextStyle(
-                                color: Color(0xFFB0B0B0),
+                              style: GoogleFonts.poppins(
+                                color: AppColors.textSecondary,
                                 fontSize: AppResponsive.smallFontSize(context),
                               ),
                             ),
@@ -2133,8 +2176,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ),
                 ),
                 Icon(
-                  size: 18,
-                  color: const Color(0xFFB0B0B0),
+                  size: AppResponsive.smallIconSize(context),
+                  color: AppColors.textSecondary,
                   customer != null
                       ? Icons.edit_outlined
                       : Icons.arrow_forward_ios,

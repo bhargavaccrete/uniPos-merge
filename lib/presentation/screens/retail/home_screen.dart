@@ -304,7 +304,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // Notification bell. White tint to read on the primary AppBar.
     return [
       NotificationBell(iconSize: AppResponsive.iconSize(context)),
-      const SizedBox(width: 8),
+      SizedBox(width: AppResponsive.smallSpacing(context)),
     ];
   }
 
@@ -320,8 +320,8 @@ class _HomeScreenState extends State<HomeScreen> {
         color: AppColors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: AppResponsive.shadowBlurRadius(context),
             offset: const Offset(0, 2),
           ),
         ],
@@ -329,6 +329,10 @@ class _HomeScreenState extends State<HomeScreen> {
       child: AppResponsive.constrainedContent(
         context: context,
         alignment: Alignment.topCenter,
+        // No-op today (the parent Column passes unbounded height so Align
+        // shrink-wraps), but explicit so this band can never expand to fill if
+        // the parent ever bounds it — see constrainedContent's doc.
+        heightFactor: 1,
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: _gutter(context)),
           child: Row(
@@ -370,7 +374,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 tint: AppColors.primary,
                 iconSize: AppResponsive.iconSize(context),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
             ],
           ),
         ),
@@ -379,15 +383,32 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ==================== DESKTOP SIDEBAR ====================
+  /// Sidebar width, proportional and clamped.
+  ///
+  /// A frozen 280 was 27% of a 1024px screen but only 11% of a 2560px one.
+  /// A breakpoint ladder cannot fix that — desktop is a RAY (1024 → ∞), so
+  /// every width above 1024 would read the same value. Scale against the real
+  /// width instead and clamp both ends.
+  ///
+  /// This feeds the grid: a narrower sidebar widens the pane, so [_columnsFor]
+  /// reflows with it.
+  /// Floor is 280 (the old fixed value) on purpose: it keeps every window up
+  /// to ~1555px pixel-identical to the layout already signed off, so this only
+  /// ever ADDS width on large monitors.
+  double _sidebarWidth(BuildContext context) =>
+      (AppResponsive.screenWidth(context) * 0.18).clamp(280.0, 340.0);
+
   Widget _buildDesktopSidebar(BuildContext context) {
     return Container(
-      width: 280,
+      width: _sidebarWidth(context),
       decoration: BoxDecoration(
         color: AppColors.primary,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: AppResponsive.shadowBlurRadius(context),
+            // Directional, not dimensional — a 2px sideways shadow does not
+            // scale with the breakpoint.
             offset: const Offset(2, 0),
           ),
         ],
@@ -396,22 +417,24 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           // Logo/Brand section
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: AppResponsive.cardPadding(context),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
                   decoration: BoxDecoration(
                     color: AppColors.white,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.borderRadius(context),
+                    ),
                   ),
                   child: Icon(
                     Icons.store_rounded,
                     color: AppColors.primary,
-                    size: 28,
+                    size: AppResponsive.largeIconSize(context),
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: AppResponsive.mediumSpacing(context)),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -456,7 +479,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Expanded(
             child: SingleChildScrollView(
               child: Padding(
-                padding: const EdgeInsets.all(20),
+                padding: AppResponsive.padding(context),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -469,7 +492,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         letterSpacing: 1.2,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: AppResponsive.largeSpacing(context)),
                     Observer(
                       builder: (context) {
                         final now = DateTime.now();
@@ -504,7 +527,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         );
                       },
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
                     Observer(
                       builder: (context) => _buildSidebarStat(
                         Icons.inventory_2_rounded,
@@ -512,7 +535,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         '${productStore.products.length}',
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
                     Observer(
                       builder: (context) => _buildSidebarStat(
                         Icons.people_rounded,
@@ -528,11 +551,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // Footer
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: AppResponsive.padding(context),
             child: Column(
               children: [
                 const Divider(color: Colors.white24, height: 1),
-                const SizedBox(height: 16),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
                 Text(
                   '© 2025 Bill Berry Lite',
                   style: GoogleFonts.poppins(
@@ -553,23 +576,31 @@ class _HomeScreenState extends State<HomeScreen> {
   /// and divider tokens are dark-on-light and would vanish or glare here.
   Widget _buildSidebarStat(IconData icon, String label, String value) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10),
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
             ),
-            child: Icon(icon, color: Colors.white, size: 18),
+            child: Icon(
+              icon,
+              color: Colors.white,
+              size: AppResponsive.smallIconSize(context),
+            ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -876,13 +907,6 @@ class _HomeScreenState extends State<HomeScreen> {
         color: Colors.red,
         onTap: () => _confirmLogout(context),
       ),
-
-      // DashboardMenuCard(
-      //   icon: Icons.settings_rounded,
-      //   title: 'ex pos',
-      //   color: Colors.blueGrey,
-      //   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RetailPosScreen())),
-      // ),
     ];
   }
 

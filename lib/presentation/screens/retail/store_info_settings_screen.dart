@@ -222,10 +222,12 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                     children: [
                       // Info Card
                       Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: AppResponsive.cardPadding(context),
                         decoration: BoxDecoration(
                           color: AppColors.info.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.borderRadius(context),
+                          ),
                           border: Border.all(
                             color: AppColors.info.withValues(alpha: 0.3),
                           ),
@@ -233,11 +235,13 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                         child: Row(
                           children: [
                             Icon(Icons.info_outline, color: AppColors.info),
-                            const SizedBox(width: 12),
+                            SizedBox(
+                              width: AppResponsive.mediumSpacing(context),
+                            ),
                             Expanded(
                               child: Text(
                                 'This information will appear on all receipts and invoices',
-                                style: TextStyle(
+                                style: GoogleFonts.poppins(
                                   fontSize: AppResponsive.bodyFontSize(context),
                                   color: AppColors.textSecondary,
                                 ),
@@ -246,25 +250,29 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(
+                        height: AppResponsive.extraLargeSpacing(context),
+                      ),
 
                       // Logo Section
                       _buildSectionHeader('Store Logo'),
-                      const SizedBox(height: 8),
+                      SizedBox(height: AppResponsive.smallSpacing(context)),
                       Text(
                         'Your logo will appear on receipts and invoices',
-                        style: TextStyle(
+                        style: GoogleFonts.poppins(
                           fontSize: AppResponsive.bodyFontSize(context),
                           color: Colors.grey[600],
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
                       _buildLogoSection(),
-                      const SizedBox(height: 24),
+                      SizedBox(
+                        height: AppResponsive.extraLargeSpacing(context),
+                      ),
 
                       // Business Details Section
                       _buildSectionHeader('Business Details'),
-                      const SizedBox(height: 16),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
                       _buildTextField(
                         controller: _storeNameController,
                         label: 'Store Name',
@@ -277,14 +285,14 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
                       _buildTextField(
                         controller: _ownerNameController,
                         label: 'Owner Name',
                         icon: Icons.person,
                         hint: 'e.g., John Doe',
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
                       _buildTextField(
                         controller: _gstNumberController,
                         label: 'GST Number',
@@ -292,7 +300,7 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                         hint: 'e.g., 22AAAAA0000A1Z5',
                         textCapitalization: TextCapitalization.characters,
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
                       _buildTextField(
                         controller: _foodLicenseController,
                         label: FoodLicenseRule.label,
@@ -308,11 +316,13 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                             : null,
                         validator: FoodLicenseRule.validate,
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(
+                        height: AppResponsive.extraLargeSpacing(context),
+                      ),
 
                       // Address Section
                       _buildSectionHeader('Address'),
-                      const SizedBox(height: 16),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
                       _buildTextField(
                         controller: _addressController,
                         label: 'Street Address',
@@ -320,7 +330,7 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                         hint: 'e.g., 123 Main Street',
                         maxLines: 2,
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
                       Row(
                         children: [
                           Expanded(
@@ -332,7 +342,7 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                               hint: 'e.g., Mumbai',
                             ),
                           ),
-                          const SizedBox(width: 16),
+                          SizedBox(width: AppResponsive.largeSpacing(context)),
                           Expanded(
                             child: _buildTextField(
                               controller: _pincodeController,
@@ -345,18 +355,20 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
                       _buildTextField(
                         controller: _stateController,
                         label: 'State',
                         icon: Icons.map,
                         hint: 'e.g., Maharashtra',
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(
+                        height: AppResponsive.extraLargeSpacing(context),
+                      ),
 
                       // Contact Information Section
                       _buildSectionHeader('Contact Information'),
-                      const SizedBox(height: 16),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
                       _buildTextField(
                         controller: _phoneController,
                         label: 'Phone Number',
@@ -364,7 +376,7 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                         hint: '+91 1234567890',
                         keyboardType: TextInputType.phone,
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
                       _buildTextField(
                         controller: _emailController,
                         label: 'Email Address',
@@ -372,7 +384,9 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                         hint: 'store@example.com',
                         keyboardType: TextInputType.emailAddress,
                       ),
-                      const SizedBox(height: 32),
+                      SizedBox(
+                        height: AppResponsive.extraLargeSpacing(context),
+                      ),
 
                       // Save Button
                       SizedBox(
@@ -399,7 +413,7 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                                 )
                               : Text(
                                   'Save Information',
-                                  style: TextStyle(
+                                  style: GoogleFonts.poppins(
                                     color: AppColors.white,
                                     fontSize: AppResponsive.subheadingFontSize(
                                       context,
@@ -460,10 +474,12 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
 
   Widget _buildLogoSection() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: Colors.grey[300]!),
       ),
       child: Column(
@@ -474,17 +490,21 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
             width: 150,
             decoration: BoxDecoration(
               color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.borderRadius(context),
+              ),
               border: Border.all(color: Colors.grey[300]!),
             ),
             child: _logoBytes != null
                 ? ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.borderRadius(context),
+                    ),
                     child: Image.memory(_logoBytes!, fit: BoxFit.contain),
                   )
                 : Icon(Icons.image_outlined, size: 60, color: Colors.grey[400]),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
 
           // Buttons
           Row(
@@ -494,28 +514,35 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                 onPressed: _pickLogo,
                 icon: Icon(
                   _logoBytes != null ? Icons.edit : Icons.upload,
-                  size: 18,
+                  size: AppResponsive.smallIconSize(context),
                 ),
                 label: Text(_logoBytes != null ? 'Change Logo' : 'Upload Logo'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.primary,
                   side: BorderSide(color: AppColors.primary),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.smallBorderRadius(context),
+                    ),
                   ),
                 ),
               ),
               if (_logoBytes != null) ...[
-                const SizedBox(width: 12),
+                SizedBox(width: AppResponsive.mediumSpacing(context)),
                 OutlinedButton.icon(
                   onPressed: _deleteLogo,
-                  icon: const Icon(Icons.delete_outline, size: 18),
+                  icon: Icon(
+                    Icons.delete_outline,
+                    size: AppResponsive.smallIconSize(context),
+                  ),
                   label: Text('Remove'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.danger,
                     side: BorderSide(color: AppColors.danger),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.smallBorderRadius(context),
+                      ),
                     ),
                   ),
                 ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/util/common/quantity_format.dart';
 
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
@@ -88,9 +89,7 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
   /// left one that reorders at 30 amber at 8, so this report and the Stock
   /// Alerts card disagreed about the very same rows.
   Color _severityColor(Map<String, dynamic> row) =>
-      StockAlertService.isCritical(row)
-          ? AppColors.danger
-          : AppColors.warning;
+      StockAlertService.isCritical(row) ? AppColors.danger : AppColors.warning;
 
   @override
   Widget build(BuildContext context) {
@@ -251,15 +250,16 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
                 : 'Current stock',
             child: Text(
               formatQty(stock),
-              style: TextStyle(fontWeight: FontWeight.w700, color: color),
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
             ),
           ),
         ),
         // `formatQty`, not the raw value: a variant-level reorder point is a
         // double and used to render "5.0" beside a global fallback's "10".
-        DataCell(
-          Text(formatQty((item['reorderPoint'] as num).toDouble())),
-        ),
+        DataCell(Text(formatQty((item['reorderPoint'] as num).toDouble()))),
         DataCell(Text(costPrice == null ? '—' : formatMoney(costPrice))),
       ],
     );
@@ -277,8 +277,8 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
       ),
       child: Text(
         'Bundle',
-        style: TextStyle(
-          fontSize: 10,
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.captionFontSize(context),
           fontWeight: FontWeight.w700,
           color: AppColors.info,
         ),

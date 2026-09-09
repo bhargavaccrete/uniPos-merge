@@ -340,7 +340,7 @@ class _SalesTotalsReportViewState extends State<SalesTotalsReportView> {
                   Text(
                     formatQty(qty),
                     style: isNegative
-                        ? const TextStyle(color: AppColors.danger)
+                        ? GoogleFonts.poppins(color: AppColors.danger)
                         : null,
                   ),
                 ),
@@ -348,7 +348,7 @@ class _SalesTotalsReportViewState extends State<SalesTotalsReportView> {
                   Text(
                     formatMoney(revenue),
                     style: isNegative
-                        ? const TextStyle(color: AppColors.danger)
+                        ? GoogleFonts.poppins(color: AppColors.danger)
                         : null,
                   ),
                 ),

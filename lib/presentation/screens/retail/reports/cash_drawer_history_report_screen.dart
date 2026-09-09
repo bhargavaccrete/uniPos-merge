@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
@@ -105,7 +106,7 @@ class CashDrawerHistoryReportScreen extends StatelessWidget {
             DataCell(
               Text(
                 formatMoney(amount.abs()),
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   color: isOut ? AppColors.danger : AppColors.success,
                 ),
               ),

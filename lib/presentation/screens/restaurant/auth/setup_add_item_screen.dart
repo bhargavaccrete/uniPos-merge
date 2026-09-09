@@ -45,11 +45,8 @@ class SetupAddItemScreen extends StatefulWidget {
   final VoidCallback? onNext;
   final VoidCallback? onPrevious;
 
-  const SetupAddItemScreen({
-    Key? key,
-    this.onNext,
-    this.onPrevious,
-  }) : super(key: key);
+  const SetupAddItemScreen({Key? key, this.onNext, this.onPrevious})
+    : super(key: key);
 
   @override
   State<SetupAddItemScreen> createState() => _SetupAddItemScreenState();
@@ -91,7 +88,8 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   List<ItemVariante> _selectedVariants = [];
   List<String> _selectedChoiceIds = [];
   List<String> _selectedExtraIds = [];
-  List<String> _defaultChoiceOptionIds = []; // per-item default-selected choice options
+  List<String> _defaultChoiceOptionIds =
+      []; // per-item default-selected choice options
 
   // Tax selection - SINGLE TAX ONLY
   List<Tax> _availableTaxes = [];
@@ -173,8 +171,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       setState(() {
         _availableTaxes = taxStore.taxes.toList();
       });
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   // ============ IMAGE UPLOAD ============
@@ -188,20 +185,22 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
     if (pickedFile != null) {
       // Read image as bytes for web compatibility
       final bytes = await pickedFile.readAsBytes();
-      
+
       // Validate image size (max 2MB)
       if (bytes.length > 2 * 1024 * 1024) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Image is too large. Please select an image under 2MB.'),
+              content: Text(
+                'Image is too large. Please select an image under 2MB.',
+              ),
               backgroundColor: Colors.red,
             ),
           );
         }
         return;
       }
-      
+
       setState(() {
         _selectedImage = File(pickedFile.path);
         _selectedImageBytes = bytes;
@@ -220,7 +219,9 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
 
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = 'img_$timestamp.jpg';
-      final savedImage = await imageFile.copy('${productImagesDir.path}/$fileName');
+      final savedImage = await imageFile.copy(
+        '${productImagesDir.path}/$fileName',
+      );
 
       return savedImage.path;
     } catch (e) {
@@ -241,9 +242,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   Future<void> _showCategorySelection() async {
     final result = await Navigator.push<Category>(
       context,
-      MaterialPageRoute(
-        builder: (context) => const CategoryManagementScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const CategoryManagementScreen()),
     );
 
     if (result != null) {
@@ -272,7 +271,9 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       } else if (price <= 0) {
         errors.add('Price must be greater than 0');
       } else if (price > 99999.99) {
-        errors.add('Price cannot exceed ${CurrencyHelper.currentSymbol}99,999.99');
+        errors.add(
+          'Price cannot exceed ${CurrencyHelper.currentSymbol}99,999.99',
+        );
       } else {
         // Allow max 2 decimal places
         final parts = _priceController.text.trim().split('.');
@@ -304,10 +305,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   }
 
   void _showValidationDialog(List<String> errors) {
-    showAppErrorDialog(
-      context: context,
-      errors: errors,
-    );
+    showAppErrorDialog(context: context, errors: errors);
   }
 
   // ============ ADD MORE INFO ============
@@ -345,8 +343,9 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         }
         _selectedChoiceIds = List<String>.from(result['choiceIds'] ?? []);
         _selectedExtraIds = List<String>.from(result['extraIds'] ?? []);
-        _defaultChoiceOptionIds =
-            List<String>.from(result['defaultChoiceOptionIds'] ?? []);
+        _defaultChoiceOptionIds = List<String>.from(
+          result['defaultChoiceOptionIds'] ?? [],
+        );
       });
     }
   }
@@ -399,8 +398,19 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
     if (AppConfig.isSetupComplete &&
         !lic.licenseBypassed &&
         Entitlements.instance.hasManifest) {
-      if (!PlanGuard.allowedOr(context, EntKeys.manageMenuItems, featureName: 'Menu Items')) return;
-      if (!PlanGuard.withinLimitOr(context, EntKeys.manageMenuItemsMax, itemStore.items.length, unit: 'items')) return;
+      if (!PlanGuard.allowedOr(
+        context,
+        EntKeys.manageMenuItems,
+        featureName: 'Menu Items',
+      ))
+        return;
+      if (!PlanGuard.withinLimitOr(
+        context,
+        EntKeys.manageMenuItemsMax,
+        itemStore.items.length,
+        unit: 'items',
+      ))
+        return;
     }
 
     // Validate all fields
@@ -424,20 +434,17 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(),
-        ),
+        builder: (context) => const Center(child: CircularProgressIndicator()),
       );
 
       // Save image if selected and convert to bytes
       Uint8List? imageBytes = _selectedImageBytes;
-      
+
       // Try to save to local storage for persistence/caching (legacy support)
       if (_selectedImage != null) {
         try {
-           _savedImagePath = await _saveImageToLocalStorage(_selectedImage!);
-        } catch (e) {
-        }
+          _savedImagePath = await _saveImageToLocalStorage(_selectedImage!);
+        } catch (e) {}
       }
 
       // Calculate tax rate from selected taxes
@@ -488,7 +495,9 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
 
       if (success) {
         // Show success
-        NotificationService.instance.showSuccess('Item "${item.name}" added successfully!');
+        NotificationService.instance.showSuccess(
+          'Item "${item.name}" added successfully!',
+        );
 
         // Track in session summary
         setState(() {
@@ -511,7 +520,8 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       } else {
         // Show error from store
         NotificationService.instance.showError(
-            itemStore.errorMessage ?? 'Error saving item');
+          itemStore.errorMessage ?? 'Error saving item',
+        );
       }
     } catch (e) {
       // Close loading
@@ -572,28 +582,30 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
               onPressed: widget.onPrevious,
             )
           : null,
-      titleWidget: widget.onNext != null ? null : Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Add Menu Items',
-            style: GoogleFonts.poppins(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
+      titleWidget: widget.onNext != null
+          ? null
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Add Menu Items',
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: AppResponsive.subheadingFontSize(context),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (_totalItemsInDatabase > 0)
+                  Text(
+                    '$_totalItemsInDatabase item${_totalItemsInDatabase > 1 ? 's' : ''} in database',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white70,
+                      fontSize: AppResponsive.smallFontSize(context),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+              ],
             ),
-          ),
-          if (_totalItemsInDatabase > 0)
-            Text(
-              '$_totalItemsInDatabase item${_totalItemsInDatabase > 1 ? 's' : ''} in database',
-              style: GoogleFonts.poppins(
-                color: Colors.white70,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-        ],
-      ),
       actions: [
         IconButton(
           icon: const Icon(Icons.upload_file),
@@ -615,7 +627,14 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
 
   Widget _buildBody() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(
+        AppResponsive.getValue(
+          context,
+          mobile: 20.0,
+          tablet: 24.0,
+          desktop: 28.0,
+        ),
+      ),
       child: Form(
         key: _formKey,
         child: Column(
@@ -624,33 +643,36 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
             _buildBulkImportCard(),
             const SizedBox(height: 20),
             _buildSectionHeader('Basic Information', Icons.info_outline),
-            const SizedBox(height: 15),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
             _buildBasicInfoSection(),
-            const SizedBox(height: 25),
+            SizedBox(height: AppResponsive.extraLargeSpacing(context)),
             _buildSectionHeader('Item Type', Icons.restaurant),
-            const SizedBox(height: 15),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
             _buildItemTypeSection(),
-            const SizedBox(height: 25),
+            SizedBox(height: AppResponsive.extraLargeSpacing(context)),
             _buildSectionHeader('Selling Method', Icons.scale),
-            const SizedBox(height: 15),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
             _buildSellingMethodSection(),
-            const SizedBox(height: 25),
+            SizedBox(height: AppResponsive.extraLargeSpacing(context)),
             // Stock module — only when `inventory` is in the plan.
             if (PlanEnforce.allows(EntKeys.inventory)) ...[
-              _buildSectionHeader('Inventory Management', Icons.inventory_2_outlined),
-              const SizedBox(height: 15),
+              _buildSectionHeader(
+                'Inventory Management',
+                Icons.inventory_2_outlined,
+              ),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
               _buildInventorySection(),
-              const SizedBox(height: 25),
+              SizedBox(height: AppResponsive.extraLargeSpacing(context)),
             ],
             _buildSectionHeader('Tax Selection', Icons.receipt_long),
-            const SizedBox(height: 15),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
             _buildTaxSection(),
-            const SizedBox(height: 25),
+            SizedBox(height: AppResponsive.extraLargeSpacing(context)),
             _buildSectionHeader('Additional Options', Icons.extension),
-            const SizedBox(height: 15),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
             _buildAdditionalOptionsSection(),
             if (_totalItemsInDatabase > 0) ...[
-              const SizedBox(height: 25),
+              SizedBox(height: AppResponsive.extraLargeSpacing(context)),
               _buildViewItemsBanner(),
             ],
           ],
@@ -663,11 +685,11 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
     return Row(
       children: [
         Icon(icon, color: AppColors.primary, size: 22),
-        const SizedBox(width: 10),
+        SizedBox(width: AppResponsive.smallSpacing(context)),
         Text(
           title,
           style: GoogleFonts.poppins(
-            fontSize: 16,
+            fontSize: AppResponsive.subheadingFontSize(context),
             fontWeight: FontWeight.w600,
             color: Colors.black87,
           ),
@@ -678,17 +700,26 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
 
   Widget _buildBulkImportCard() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(
+        AppResponsive.getValue(
+          context,
+          mobile: 20.0,
+          tablet: 24.0,
+          desktop: 28.0,
+        ),
+      ),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppColors.primary.withOpacity(0.1),
-            Colors.blue.withOpacity(0.05),
+            AppColors.primary.withValues(alpha: 0.1),
+            Colors.blue.withValues(alpha: 0.05),
           ],
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(
-          color: AppColors.primary.withOpacity(0.3),
+          color: AppColors.primary.withValues(alpha: 0.3),
           width: 2,
         ),
       ),
@@ -698,18 +729,20 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
+                  color: AppColors.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.smallBorderRadius(context),
+                  ),
                 ),
                 child: Icon(
                   Icons.table_chart,
-                  size: 32,
+                  size: AppResponsive.largeIconSize(context),
                   color: AppColors.primary,
                 ),
               ),
-              const SizedBox(width: 15),
+              SizedBox(width: AppResponsive.largeSpacing(context)),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -717,7 +750,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                     Text(
                       'Bulk Import Items',
                       style: GoogleFonts.poppins(
-                        fontSize: 16,
+                        fontSize: AppResponsive.subheadingFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: Colors.black87,
                       ),
@@ -726,7 +759,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                     Text(
                       'Upload multiple items at once using Excel',
                       style: GoogleFonts.poppins(
-                        fontSize: 12,
+                        fontSize: AppResponsive.smallFontSize(context),
                         color: Colors.grey[600],
                       ),
                     ),
@@ -735,7 +768,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 15),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
           Row(
             children: [
               Expanded(
@@ -744,7 +777,8 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const RestaurantBulkImportScreen(),
+                        builder: (context) =>
+                            const RestaurantBulkImportScreen(),
                       ),
                     );
                     // Reload item count after bulk import
@@ -755,7 +789,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                     'Start Bulk Import',
                     style: GoogleFonts.poppins(
                       fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                      fontSize: AppResponsive.bodyFontSize(context),
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
@@ -763,29 +797,35 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.smallBorderRadius(context),
+                      ),
                     ),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
             decoration: BoxDecoration(
               color: Colors.blue[50],
               borderRadius: BorderRadius.circular(6),
             ),
             child: Row(
               children: [
-                Icon(Icons.info_outline, size: 16, color: Colors.blue[700]),
-                const SizedBox(width: 8),
+                Icon(
+                  Icons.info_outline,
+                  size: AppResponsive.smallIconSize(context),
+                  color: Colors.blue[700],
+                ),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Expanded(
                   child: Text(
                     'Download template, add items, and import back',
                     style: GoogleFonts.poppins(
-                      fontSize: 11,
+                      fontSize: AppResponsive.captionFontSize(context),
                       color: Colors.blue[700],
                     ),
                   ),
@@ -800,13 +840,22 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
 
   Widget _buildBasicInfoSection() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(
+        AppResponsive.getValue(
+          context,
+          mobile: 20.0,
+          tablet: 24.0,
+          desktop: 28.0,
+        ),
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -825,9 +874,10 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
             icon: Icons.restaurant_menu_rounded,
             required: true,
             textInputAction: TextInputAction.next,
-            onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_codeFocusNode),
+            onFieldSubmitted: (_) =>
+                FocusScope.of(context).requestFocus(_codeFocusNode),
           ),
-          const SizedBox(height: 15),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
 
           // Item Code (Required)
           AppTextField(
@@ -838,13 +888,12 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
             icon: Icons.qr_code_scanner_rounded,
             required: true,
             keyboardType: TextInputType.number,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-            ],
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             textInputAction: TextInputAction.next,
-            onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_priceFocusNode),
+            onFieldSubmitted: (_) =>
+                FocusScope.of(context).requestFocus(_priceFocusNode),
           ),
-          const SizedBox(height: 15),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
 
           // Price (Required)
           AppTextField(
@@ -859,9 +908,10 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
               FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
             ],
             textInputAction: TextInputAction.next,
-            onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_descriptionFocusNode),
+            onFieldSubmitted: (_) =>
+                FocusScope.of(context).requestFocus(_descriptionFocusNode),
           ),
-          const SizedBox(height: 15),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
 
           // Category (Required) — with inline error
           Column(
@@ -879,20 +929,25 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                   padding: const EdgeInsets.only(top: 6, left: 4),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline,
-                          size: 14, color: AppColors.danger),
+                      const Icon(
+                        Icons.error_outline,
+                        size: 14,
+                        color: AppColors.danger,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         'Category is required',
                         style: GoogleFonts.poppins(
-                            fontSize: 12, color: AppColors.danger),
+                          fontSize: AppResponsive.smallFontSize(context),
+                          color: AppColors.danger,
+                        ),
                       ),
                     ],
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 15),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
 
           // Description (Optional)
           AppTextField(
@@ -905,7 +960,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
             minLines: 1,
             onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
           ),
-          const SizedBox(height: 15),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
 
           // Image Upload
           _buildImageUploadSection(),
@@ -921,17 +976,19 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         Text(
           'Item Image (Optional)',
           style: GoogleFonts.poppins(
-            fontSize: 14,
+            fontSize: AppResponsive.bodyFontSize(context),
             fontWeight: FontWeight.w500,
             color: Colors.black87,
           ),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: AppResponsive.smallSpacing(context)),
         if (_selectedImageBytes != null)
           Stack(
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.borderRadius(context),
+                ),
                 child: Image.memory(
                   _selectedImageBytes!,
                   height: 200,
@@ -945,12 +1002,18 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                 child: InkWell(
                   onTap: _removeImage,
                   child: Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: EdgeInsets.all(
+                      AppResponsive.smallSpacing(context),
+                    ),
                     decoration: const BoxDecoration(
                       color: Colors.red,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.close, color: Colors.white, size: 18),
+                    child: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 18,
+                    ),
                   ),
                 ),
               ),
@@ -959,36 +1022,52 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         else
           InkWell(
             onTap: _pickImage,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.borderRadius(context),
+            ),
             child: Container(
               height: 140,
               width: double.infinity,
               decoration: BoxDecoration(
                 color: AppColors.surfaceLight,
                 border: Border.all(color: AppColors.divider),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.borderRadius(context),
+                ),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: EdgeInsets.all(
+                      AppResponsive.mediumSpacing(context),
+                    ),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.08),
+                      color: AppColors.primary.withValues(alpha: 0.08),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.add_photo_alternate_rounded,
-                        size: 30, color: AppColors.primary),
+                    child: Icon(
+                      Icons.add_photo_alternate_rounded,
+                      size: AppResponsive.largeIconSize(context),
+                      color: AppColors.primary,
+                    ),
                   ),
-                  const SizedBox(height: 10),
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
                   Text(
                     'Tap to upload image',
-                    style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.primary),
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.primary,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     'From Gallery',
-                    style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary),
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -1000,13 +1079,22 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
 
   Widget _buildItemTypeSection() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(
+        AppResponsive.getValue(
+          context,
+          mobile: 20.0,
+          tablet: 24.0,
+          desktop: 28.0,
+        ),
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -1023,7 +1111,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
               () => setState(() => _itemType = 'Veg'),
             ),
           ),
-          const SizedBox(width: 15),
+          SizedBox(width: AppResponsive.largeSpacing(context)),
           Expanded(
             child: _buildItemTypeOption(
               'Non-Veg',
@@ -1056,17 +1144,17 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
             width: isSelected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(10),
-          color: isSelected ? color.withOpacity(0.1) : Colors.transparent,
+          color: isSelected ? color.withValues(alpha: 0.1) : Colors.transparent,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, color: color, size: 20),
-            const SizedBox(width: 8),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
             Text(
               label,
               style: GoogleFonts.poppins(
-                fontSize: 14,
+                fontSize: AppResponsive.bodyFontSize(context),
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                 color: isSelected ? color : Colors.black87,
               ),
@@ -1099,13 +1187,22 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
 
   Widget _buildInventorySection() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(
+        AppResponsive.getValue(
+          context,
+          mobile: 20.0,
+          tablet: 24.0,
+          desktop: 28.0,
+        ),
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -1129,7 +1226,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
           ),
           if (_trackInventory) ...[
             const Divider(),
-            const SizedBox(height: 10),
+            SizedBox(height: AppResponsive.smallSpacing(context)),
             if (_selectedVariants.isEmpty)
               AppTextField(
                 controller: _stockController,
@@ -1137,15 +1234,22 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                 label: 'Current Stock',
                 hint: '0',
                 icon: Icons.inventory_2_rounded,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
                 ],
               )
             else
-              Text('Stock is set per variant in More Info.',
-                  style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600])),
-            const SizedBox(height: 14),
+              Text(
+                'Stock is set per variant in More Info.',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  color: Colors.grey[600],
+                ),
+              ),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             _yesNoRow(
               title: 'Low-stock alert',
               subtitle: 'Warn when this item runs low',
@@ -1153,24 +1257,31 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
               onChanged: (v) => setState(() => _lowStockAlertEnabled = v),
             ),
             if (_lowStockAlertEnabled) ...[
-              const SizedBox(height: 10),
-              Builder(builder: (_) {
-                final unit = _sellingMethod == SellingMethod.byWeight
-                    ? _selectedUnit
-                    : 'pcs';
-                return AppTextField(
-                  controller: _lowStockController,
-                  label: 'Alert threshold ($unit, optional)',
-                  hint: 'Default: ${AppSettings.lowStockThreshold.toStringAsFixed(0)} $unit',
-                  icon: Icons.warning_amber_rounded,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                  ],
-                );
-              }),
+              SizedBox(height: AppResponsive.smallSpacing(context)),
+              Builder(
+                builder: (_) {
+                  final unit = _sellingMethod == SellingMethod.byWeight
+                      ? _selectedUnit
+                      : 'pcs';
+                  return AppTextField(
+                    controller: _lowStockController,
+                    label: 'Alert threshold ($unit, optional)',
+                    hint:
+                        'Default: ${AppSettings.lowStockThreshold.toStringAsFixed(0)} $unit',
+                    icon: Icons.warning_amber_rounded,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'^\d*\.?\d{0,2}'),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ],
-            const SizedBox(height: 14),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             _yesNoRow(
               title: 'Allow Order When Out of Stock',
               subtitle: 'Customers can order even when stock is 0',
@@ -1200,19 +1311,27 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title,
-                  style: GoogleFonts.poppins(
-                      fontSize: 14, fontWeight: FontWeight.w500)),
+              Text(
+                title,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               if (subtitle != null) ...[
                 const SizedBox(height: 2),
-                Text(subtitle,
-                    style: GoogleFonts.poppins(
-                        fontSize: 12, color: Colors.grey[600])),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: Colors.grey[600],
+                  ),
+                ),
               ],
             ],
           ),
         ),
-        const SizedBox(width: 10),
+        SizedBox(width: AppResponsive.smallSpacing(context)),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1240,23 +1359,35 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   }
 
   Widget _buildTaxSection() {
-    final rate = _selectedTaxIds.isNotEmpty ? _calculateTotalTaxPercentage() / 100 : null;
+    final rate = _selectedTaxIds.isNotEmpty
+        ? _calculateTotalTaxPercentage() / 100
+        : null;
     return TaxSelectorButton(taxRate: rate, onTap: _selectTax);
   }
 
   Widget _buildAdditionalOptionsSection() {
-    final hasSelections = _selectedVariants.isNotEmpty ||
+    final hasSelections =
+        _selectedVariants.isNotEmpty ||
         _selectedChoiceIds.isNotEmpty ||
         _selectedExtraIds.isNotEmpty;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(
+        AppResponsive.getValue(
+          context,
+          mobile: 20.0,
+          tablet: 24.0,
+          desktop: 28.0,
+        ),
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -1264,15 +1395,21 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       ),
       child: InkWell(
         onTap: _navigateToAddMoreInfo,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
         child: Container(
-          padding: const EdgeInsets.all(15),
+          padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
           decoration: BoxDecoration(
             border: Border.all(
               color: hasSelections ? AppColors.primary : Colors.grey[300]!,
             ),
-            borderRadius: BorderRadius.circular(8),
-            color: hasSelections ? AppColors.primary.withOpacity(0.05) : Colors.transparent,
+            borderRadius: BorderRadius.circular(
+              AppResponsive.smallBorderRadius(context),
+            ),
+            color: hasSelections
+                ? AppColors.primary.withValues(alpha: 0.05)
+                : Colors.transparent,
           ),
           child: Row(
             children: [
@@ -1280,7 +1417,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                 Icons.extension,
                 color: hasSelections ? AppColors.primary : Colors.grey[600],
               ),
-              const SizedBox(width: 15),
+              SizedBox(width: AppResponsive.largeSpacing(context)),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1288,7 +1425,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                     Text(
                       'Add More Info',
                       style: GoogleFonts.poppins(
-                        fontSize: 14,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: Colors.black87,
                       ),
@@ -1299,14 +1436,20 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                           ? 'Variants: ${_selectedVariants.length}, Choices: ${_selectedChoiceIds.length}, Extras: ${_selectedExtraIds.length}'
                           : 'Add variants, choices, and extras',
                       style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        color: hasSelections ? AppColors.primary : Colors.grey[600],
+                        fontSize: AppResponsive.smallFontSize(context),
+                        color: hasSelections
+                            ? AppColors.primary
+                            : Colors.grey[600],
                       ),
                     ),
                   ],
                 ),
               ),
-              Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey[400]),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: AppResponsive.smallIconSize(context),
+                color: Colors.grey[400],
+              ),
             ],
           ),
         ),
@@ -1321,8 +1464,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       onTap: () async {
         await Navigator.push(
           context,
-          MaterialPageRoute(
-              builder: (_) => const SetupItemsListScreen()),
+          MaterialPageRoute(builder: (_) => const SetupItemsListScreen()),
         );
         // Refresh count in case items were edited/deleted
         await _loadItemCount();
@@ -1331,20 +1473,27 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: AppColors.success.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.borderRadius(context),
+          ),
           border: Border.all(
-              color: AppColors.success.withValues(alpha: 0.3), width: 1.5),
+            color: AppColors.success.withValues(alpha: 0.3),
+            width: 1.5,
+          ),
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
               decoration: BoxDecoration(
                 color: AppColors.success.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.check_circle_outline,
-                  color: AppColors.success, size: 22),
+              child: const Icon(
+                Icons.check_circle_outline,
+                color: AppColors.success,
+                size: 22,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -1354,20 +1503,26 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                   Text(
                     '$_totalItemsInDatabase item${_totalItemsInDatabase > 1 ? 's' : ''} added',
                     style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.success),
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.success,
+                    ),
                   ),
                   Text(
                     'Tap to view, edit or verify items',
                     style: GoogleFonts.poppins(
-                        fontSize: 12, color: AppColors.textSecondary),
+                      fontSize: AppResponsive.smallFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios,
-                size: 14, color: AppColors.textSecondary),
+            const Icon(
+              Icons.arrow_forward_ios,
+              size: 14,
+              color: AppColors.textSecondary,
+            ),
           ],
         ),
       ),
@@ -1392,7 +1547,8 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   }
 
   Future<void> _handleNext() async {
-    final hasUnsavedInput = _itemNameController.text.isNotEmpty ||
+    final hasUnsavedInput =
+        _itemNameController.text.isNotEmpty ||
         _priceController.text.isNotEmpty ||
         _selectedCategoryId != null;
 
@@ -1430,12 +1586,19 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
 
   Widget _buildBottomBar() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(
+        AppResponsive.getValue(
+          context,
+          mobile: 20.0,
+          tablet: 24.0,
+          desktop: 28.0,
+        ),
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -1448,17 +1611,17 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
               onTap: _saveItem,
               bgcolor: AppColors.primary,
               bordercircular: 10,
-              height: AppResponsive.height(context, 0.06),
+              height: AppResponsive.buttonHeight(context),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(Icons.add, color: Colors.white),
-                  const SizedBox(width: 10),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
                   Text(
                     'Add Item',
                     style: GoogleFonts.poppins(
                       color: Colors.white,
-                      fontSize: 16,
+                      fontSize: AppResponsive.subheadingFontSize(context),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1467,18 +1630,22 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
             ),
           ),
           if (widget.onNext != null) ...[
-            const SizedBox(width: 15),
+            SizedBox(width: AppResponsive.largeSpacing(context)),
             CommonButton(
               onTap: _handleNext,
-              bgcolor: _totalItemsInDatabase > 0 ? Colors.green : Colors.grey[600]!,
+              bgcolor: _totalItemsInDatabase > 0
+                  ? Colors.green
+                  : Colors.grey[600]!,
               bordercircular: 10,
-              height: AppResponsive.height(context, 0.06),
+              height: AppResponsive.buttonHeight(context),
               width: 130,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    _totalItemsInDatabase > 0 ? Icons.arrow_forward : Icons.skip_next,
+                    _totalItemsInDatabase > 0
+                        ? Icons.arrow_forward
+                        : Icons.skip_next,
                     color: Colors.white,
                   ),
                   const SizedBox(width: 5),
@@ -1486,7 +1653,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                     _totalItemsInDatabase > 0 ? 'Continue' : 'Skip',
                     style: GoogleFonts.poppins(
                       color: Colors.white,
-                      fontSize: 16,
+                      fontSize: AppResponsive.subheadingFontSize(context),
                       fontWeight: FontWeight.w600,
                     ),
                   ),

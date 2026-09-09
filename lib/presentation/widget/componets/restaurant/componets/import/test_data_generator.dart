@@ -3,6 +3,9 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:hive/hive.dart';
@@ -35,15 +38,39 @@ class TestDataGenerator {
 
   /// Generate test item names
   static final List<String> _itemPrefixes = [
-    'Delicious', 'Special', 'Chef\'s', 'Premium', 'Classic',
-    'Spicy', 'Grilled', 'Fried', 'Baked', 'Fresh',
-    'Homemade', 'Signature', 'Golden', 'Crispy', 'Tender'
+    'Delicious',
+    'Special',
+    'Chef\'s',
+    'Premium',
+    'Classic',
+    'Spicy',
+    'Grilled',
+    'Fried',
+    'Baked',
+    'Fresh',
+    'Homemade',
+    'Signature',
+    'Golden',
+    'Crispy',
+    'Tender',
   ];
 
   static final List<String> _itemTypes = [
-    'Pasta', 'Rice', 'Burger', 'Pizza', 'Sandwich',
-    'Wrap', 'Curry', 'Salad', 'Soup', 'Noodles',
-    'Paneer', 'Vegetable', 'Dal', 'Biryani', 'Pulao'
+    'Pasta',
+    'Rice',
+    'Burger',
+    'Pizza',
+    'Sandwich',
+    'Wrap',
+    'Curry',
+    'Salad',
+    'Soup',
+    'Noodles',
+    'Paneer',
+    'Vegetable',
+    'Dal',
+    'Biryani',
+    'Pulao',
   ];
 
   /// Generate random price
@@ -62,11 +89,16 @@ class TestDataGenerator {
   /// Generate random ID
   static String _generateId() {
     return DateTime.now().millisecondsSinceEpoch.toString() +
-           _random.nextInt(999999).toString();
+        _random.nextInt(999999).toString();
   }
 
   /// Size variant names
-  static final List<String> _sizeNames = ['Small', 'Medium', 'Large', 'Extra Large'];
+  static final List<String> _sizeNames = [
+    'Small',
+    'Medium',
+    'Large',
+    'Extra Large',
+  ];
 
   /// Topping names
   static final List<String> _toppingNames = [
@@ -82,9 +114,11 @@ class TestDataGenerator {
     'Garlic',
   ];
 
-
   /// Generate a placeholder image for items with more variety
-  static Future<String> _generatePlaceholderImage(String itemName, int index) async {
+  static Future<String> _generatePlaceholderImage(
+    String itemName,
+    int index,
+  ) async {
     try {
       final appDir = await getApplicationDocumentsDirectory();
       final productDir = Directory('${appDir.path}/product_images');
@@ -130,15 +164,28 @@ class TestDataGenerator {
 
       // Draw decorative shapes for variety
       final shapePaint = Paint()..color = Colors.white.withOpacity(0.2);
-      canvas.drawCircle(Offset(size.width * 0.2, size.height * 0.3), 60, shapePaint);
-      canvas.drawCircle(Offset(size.width * 0.8, size.height * 0.7), 80, shapePaint);
+      canvas.drawCircle(
+        Offset(size.width * 0.2, size.height * 0.3),
+        60,
+        shapePaint,
+      );
+      canvas.drawCircle(
+        Offset(size.width * 0.8, size.height * 0.7),
+        80,
+        shapePaint,
+      );
 
       // Draw text with shadow
       final textPainter = TextPainter(
         text: TextSpan(
-          text: itemName.length > 20 ? '${itemName.substring(0, 17)}...' : itemName,
-          style: const TextStyle(
+          text: itemName.length > 20
+              ? '${itemName.substring(0, 17)}...'
+              : itemName,
+          style: GoogleFonts.poppins(
             color: Colors.white,
+            // Static: this text is rasterised onto a canvas by a TextPainter,
+            // so the size is a pixel dimension of the generated image, not a
+            // layout value — and there is no BuildContext here anyway.
             fontSize: 28,
             fontWeight: FontWeight.bold,
             shadows: [
@@ -156,16 +203,19 @@ class TestDataGenerator {
       textPainter.layout(maxWidth: size.width - 40);
       textPainter.paint(
         canvas,
-        Offset((size.width - textPainter.width) / 2, (size.height - textPainter.height) / 2),
+        Offset(
+          (size.width - textPainter.width) / 2,
+          (size.height - textPainter.height) / 2,
+        ),
       );
 
       // Add item number at bottom
       final numberPainter = TextPainter(
         text: TextSpan(
           text: '#${index + 1}',
-          style: const TextStyle(
+          style: GoogleFonts.poppins(
             color: Colors.white70,
-            fontSize: 18,
+            fontSize: 18, // canvas raster size — see above
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -179,12 +229,16 @@ class TestDataGenerator {
 
       // Convert to image
       final picture = recorder.endRecording();
-      final image = await picture.toImage(size.width.toInt(), size.height.toInt());
+      final image = await picture.toImage(
+        size.width.toInt(),
+        size.height.toInt(),
+      );
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       final bytes = byteData!.buffer.asUint8List();
 
       // Save to file
-      final fileName = 'img_${DateTime.now().millisecondsSinceEpoch}_$index.jpg';
+      final fileName =
+          'img_${DateTime.now().millisecondsSinceEpoch}_$index.jpg';
       final filePath = p.join(productDir.path, fileName);
       final file = File(filePath);
       await file.writeAsBytes(bytes);
@@ -228,7 +282,7 @@ class TestDataGenerator {
       'Cheese Options',
       'Vegetable Toppings',
       'Premium Toppings',
-      'Special Add-ons'
+      'Special Add-ons',
     ];
 
     for (int i = 0; i < 3; i++) {
@@ -238,12 +292,15 @@ class TestDataGenerator {
       // Generate 3-5 toppings per group
       final toppingCount = 3 + _random.nextInt(3);
       for (int j = 0; j < toppingCount; j++) {
-        final toppingName = _toppingNames[_random.nextInt(_toppingNames.length)];
+        final toppingName =
+            _toppingNames[_random.nextInt(_toppingNames.length)];
         final topping = Topping(
           name: '$toppingName ${j + 1}',
           // isveg: _random.nextBool(),
-          isveg:true,
-          price: double.parse((10 + _random.nextDouble() * 40).toStringAsFixed(2)),
+          isveg: true,
+          price: double.parse(
+            (10 + _random.nextDouble() * 40).toStringAsFixed(2),
+          ),
           isContainSize: false,
           createdTime: DateTime.now(),
           editCount: 0,
@@ -268,7 +325,9 @@ class TestDataGenerator {
       await extraBox.put(extraId, extra);
     }
 
-    debugPrint('✅ Generated ${extraGroups.take(3).length} extra groups with toppings!');
+    debugPrint(
+      '✅ Generated ${extraGroups.take(3).length} extra groups with toppings!',
+    );
   }
 
   /// Generate test categories
@@ -300,7 +359,10 @@ class TestDataGenerator {
   }
 
   /// Generate test items with variants, extras, and images
-  static Future<void> generateTestItems(int count, {bool withImages = true}) async {
+  static Future<void> generateTestItems(
+    int count, {
+    bool withImages = true,
+  }) async {
     final itemBox = Hive.box<Items>('itemBoxs');
     final categoryBox = Hive.box<Category>('categories');
     final variantBox = Hive.box<VariantModel>('variante');
@@ -311,7 +373,9 @@ class TestDataGenerator {
       await generateTestCategories(10);
     }
 
-    debugPrint('📦 Generating $count test items${withImages ? ' with images' : ''}...');
+    debugPrint(
+      '📦 Generating $count test items${withImages ? ' with images' : ''}...',
+    );
 
     final categories = categoryBox.values.toList();
     final variants = variantBox.values.toList();
@@ -338,22 +402,29 @@ class TestDataGenerator {
       if (allowVariants && _random.nextDouble() < 0.5 && variants.isNotEmpty) {
         itemVariants = [];
 
-        final shuffledVariants = List<VariantModel>.from(variants)..shuffle(_random);
-        final variantCount = 2 + _random.nextInt(
-          shuffledVariants.length > 2 ? shuffledVariants.length - 1 : 1,
-        );
+        final shuffledVariants = List<VariantModel>.from(variants)
+          ..shuffle(_random);
+        final variantCount =
+            2 +
+            _random.nextInt(
+              shuffledVariants.length > 2 ? shuffledVariants.length - 1 : 1,
+            );
 
         for (int j = 0; j < variantCount; j++) {
           final variant = shuffledVariants[j];
           final priceMultiplier = 1.0 + (j * 0.25);
-          final variantPrice = double.parse((basePrice * priceMultiplier).toStringAsFixed(2));
+          final variantPrice = double.parse(
+            (basePrice * priceMultiplier).toStringAsFixed(2),
+          );
 
-          itemVariants.add(ItemVariante(
-            variantId: variant.id,
-            price: variantPrice,
-            trackInventory: false,
-            stockQuantity: 100,
-          ));
+          itemVariants.add(
+            ItemVariante(
+              variantId: variant.id,
+              price: variantPrice,
+              trackInventory: false,
+              stockQuantity: 100,
+            ),
+          );
         }
 
         // Set display price to the minimum variant price (first variant)
@@ -366,7 +437,9 @@ class TestDataGenerator {
       List<String>? extraIds;
       if (allowExtras && extras.isNotEmpty && _random.nextDouble() < 0.6) {
         final shuffledExtras = List<Extramodel>.from(extras)..shuffle(_random);
-        final selectedExtras = shuffledExtras.take(1 + _random.nextInt(2)).toList();
+        final selectedExtras = shuffledExtras
+            .take(1 + _random.nextInt(2))
+            .toList();
 
         if (selectedExtras.isNotEmpty) {
           extraIds = selectedExtras.map((e) => e.Id).toList();
@@ -375,7 +448,9 @@ class TestDataGenerator {
 
       // Validate price before creating item
       if (displayPrice <= 0) {
-        debugPrint('⚠️ Skipping invalid item: $itemName (price: $displayPrice)');
+        debugPrint(
+          '⚠️ Skipping invalid item: $itemName (price: $displayPrice)',
+        );
         skippedCount++;
         i--; // Retry this iteration
         continue;
@@ -401,9 +476,11 @@ class TestDataGenerator {
       final item = Items(
         id: _generateId(),
         name: itemName,
-        price: displayPrice, // Always set a valid price (base price or minimum variant price)
+        price:
+            displayPrice, // Always set a valid price (base price or minimum variant price)
         categoryOfItem: randomCategory.id,
-        description: 'Test item #${i + 1} - This is a delicious dish made with the finest ingredients.',
+        description:
+            'Test item #${i + 1} - This is a delicious dish made with the finest ingredients.',
         imageBytes: imageBytes,
         isVeg: 'veg', // Always generate vegetarian items
         unit: 'plate',
@@ -426,7 +503,9 @@ class TestDataGenerator {
       if (items.length >= 50) {
         await itemBox.addAll(items);
         items.clear();
-        debugPrint('✅ Generated ${i + 1}/$count items${withImages ? " ($imageCount with images)" : ""}');
+        debugPrint(
+          '✅ Generated ${i + 1}/$count items${withImages ? " ($imageCount with images)" : ""}',
+        );
       }
     }
 
@@ -435,7 +514,9 @@ class TestDataGenerator {
       await itemBox.addAll(items);
     }
 
-    debugPrint('✅ All $count items generated!${withImages ? " ($imageCount items have images)" : ""}');
+    debugPrint(
+      '✅ All $count items generated!${withImages ? " ($imageCount items have images)" : ""}',
+    );
     if (skippedCount > 0) {
       debugPrint('⚠️ Skipped $skippedCount invalid items during generation');
     }
@@ -465,7 +546,9 @@ class TestDataGenerator {
     await generateTestItems(items, withImages: withImages);
 
     debugPrint('✅ Test data generation complete!');
-    debugPrint('📊 Total: $categories categories, ${_sizeNames.length} variants, 3 extra groups, $items items${withImages ? " (with images)" : ""}');
+    debugPrint(
+      '📊 Total: $categories categories, ${_sizeNames.length} variants, 3 extra groups, $items items${withImages ? " (with images)" : ""}',
+    );
   }
 
   /// Clear all test data and images

@@ -103,7 +103,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         alignment: Alignment.topCenter,
         maxWidth: AppResponsive.maxCardWidth(context),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: AppResponsive.padding(context),
           child: Form(
             key: _formKey,
             child: Column(
@@ -111,16 +111,18 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               children: [
                 // Info Card
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: AppResponsive.cardPadding(context),
                   decoration: BoxDecoration(
                     color: AppColors.info.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.borderRadius(context),
+                    ),
                     border: Border.all(color: AppColors.info.withOpacity(0.3)),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.info_outline, color: AppColors.info),
-                      const SizedBox(width: 12),
+                      Icon(Icons.info_outline, color: AppColors.info),
+                      SizedBox(width: AppResponsive.mediumSpacing(context)),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -133,7 +135,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                 color: AppColors.info,
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            SizedBox(height: 4),
                             Text(
                               'PIN must be 4–6 digits',
                               style: GoogleFonts.poppins(
@@ -147,27 +149,31 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
                 // Error Message
                 if (_errorMessage != null) ...[
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: EdgeInsets.all(
+                      AppResponsive.mediumSpacing(context),
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.danger.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.smallBorderRadius(context),
+                      ),
                       border: Border.all(
                         color: AppColors.danger.withOpacity(0.3),
                       ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.error_outline,
                           color: AppColors.danger,
-                          size: 20,
+                          size: AppResponsive.iconSize(context),
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: AppResponsive.smallSpacing(context)),
                         Expanded(
                           child: Text(
                             _errorMessage!,
@@ -180,7 +186,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: AppResponsive.extraLargeSpacing(context)),
                 ],
 
                 // Current PIN
@@ -198,7 +204,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
 
                 // New PIN
                 _buildPinField(
@@ -218,7 +224,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
 
                 // Confirm New PIN
                 _buildPinField(
@@ -238,7 +244,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 32),
+                SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
                 // Change PIN Button
                 SizedBox(
@@ -249,7 +255,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(
+                          AppResponsive.borderRadius(context),
+                        ),
                       ),
                       elevation: 0,
                       disabledBackgroundColor: AppColors.divider,
@@ -305,7 +313,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       suffixIcon: IconButton(
         icon: Icon(
           obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-          size: 20,
+          size: AppResponsive.iconSize(context),
           color: AppColors.textSecondary,
         ),
         onPressed: onToggleVisibility,

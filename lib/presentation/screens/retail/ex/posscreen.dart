@@ -29,7 +29,8 @@ import 'package:billberrylite/presentation/widget/componets/retail/price_overrid
 import 'package:billberrylite/presentation/widget/componets/retail/cart_quantity_field.dart';
 import 'package:billberrylite/domain/services/retail/price_override_service.dart';
 import 'package:billberrylite/domain/services/retail/line_discount_service.dart';
-import 'package:billberrylite/domain/services/retail/retail_billing_service.dart' show DiscountType;
+import 'package:billberrylite/domain/services/retail/retail_billing_service.dart'
+    show DiscountType;
 import 'package:billberrylite/presentation/widget/componets/retail/line_discount_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/retail/quick_item_dialog.dart';
 import 'package:billberrylite/domain/services/retail/quick_item_service.dart';
@@ -45,9 +46,29 @@ import 'package:billberrylite/data/models/common/categorymodel_300.dart';
 import 'package:billberrylite/presentation/widget/componets/common/weight_item_dialog.dart';
 
 /// House card elevation — the same soft lift ReportCard/parked sales use.
+///
+/// Static blur: this is a top-level `const`, so there is no `BuildContext` to
+/// resolve `AppResponsive.shadowBlurRadius` against.
 const List<BoxShadow> _cardShadow = [
   BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2)),
 ];
+
+// Values in this file that stay STATIC on purpose, so they don't read as
+// misses in the next sweep:
+//
+// * `BorderRadius.circular(10)` on every button, chip and menu — the house
+//   "rectangular buttons, radius 10" rule. Laddering it would make buttons
+//   8 on a phone and 12 on desktop.
+// * The category dropdown's `height: 56`, `horizontal: 14` and `circular(12)`
+//   — deliberately matched to `AppTextField`, which is NOT responsive.
+//   Laddering them would desync the dropdown from the fields beside it.
+// * Gaps below 8 (`SizedBox(4)`, `SizedBox(6)`, `vertical: 2`, `top: 4`) —
+//   `smallSpacing` starts at 8, so snapping would double or triple them.
+// * Hairlines and affordances: divider `height: 1`, borders `1` / `1.5`,
+//   `circular(2)` and the sheet's 40×4 grab handle.
+// * The 40×40 scanner button — a tap target, sized for the finger rather
+//   than the breakpoint.
+// * `_CartColumns` — sized from measured PANE width instead; see that class.
 
 /// Why the POS is refusing to open billing. The blocking screen reads this to
 /// name the actual problem instead of always offering "Start Day".
@@ -57,6 +78,92 @@ enum _BillingBlock {
 
   /// No session at all yet.
   dayNotStarted,
+}
+
+/// Column geometry for the cart table (header row + line list).
+///
+/// Bucketed on the MEASURED pane width, never `AppResponsive`'s screen
+/// breakpoints. The cart is a `flex:` pane — 60% of the tablet tree, 65% of the
+/// desktop one — so a 600px tablet hands it only ~360px while `AppResponsive`
+/// still reports "tablet". Screen-derived widths reserved 254px of that for the
+/// fixed columns and left the product name **49px**, about four characters.
+///
+/// The header and the list must resolve ONE instance of this, in a
+/// `LayoutBuilder` that wraps both. That shared instance is the only thing
+/// keeping each label above the cell it names.
+class _CartColumns {
+  const _CartColumns._({
+    required this.listPad,
+    required this.cardPad,
+    required this.gap,
+    required this.price,
+    required this.stacked,
+  });
+
+  /// Whether the line renders as two rows rather than one table row.
+  ///
+  /// True for the narrow bucket, i.e. any pane under 480 — the same boundary
+  /// the paddings already use, so there is no second threshold to keep in sync.
+  ///
+  /// The cutoff is arithmetic, not taste: [qty] + [actions] + a 74px total
+  /// claim 238px before the name gets anything. A 320px pane left the name
+  /// **34px**, and even 360px only reached 74px. The columnar table is a
+  /// ≥480px affordance; below that the card stacks.
+  final bool stacked;
+
+  /// Padding on the cart `ListView`.
+  final double listPad;
+
+  /// Padding inside each line card.
+  final double cardPad;
+
+  /// Space between columns.
+  final double gap;
+
+  /// Line-total column. Never below 74: a 60px cell clipped "₹2000.00" onto a
+  /// second line.
+  final double price;
+
+  /// The quantity stepper: two 32px keys, a 52px field, and the two 4px gaps
+  /// between them. Dictated by `CartQuantityStepperButton` and
+  /// `CartQuantityField` — if either widget's width changes, change this too.
+  static const double qty = 32 + 4 + 52 + 4 + 32; // 124
+
+  /// Slot for the per-line overflow menu. This is a COLUMN, not blank space:
+  /// the header reserves it so everything to its left stays aligned.
+  static const double actions = 40;
+
+  /// Header padding has to clear the list's padding AND the card's, or every
+  /// label sits `cardPad` to the left of the value it names.
+  double get sidePad => listPad + cardPad;
+
+  static _CartColumns of(double paneWidth) {
+    if (paneWidth < 480) {
+      return const _CartColumns._(
+        listPad: 8,
+        cardPad: 10,
+        gap: 6,
+        price: 74,
+        stacked: true,
+      );
+    }
+    if (paneWidth < 760) {
+      return const _CartColumns._(
+        listPad: 12,
+        cardPad: 12,
+        gap: 8,
+        price: 74,
+        stacked: false,
+      );
+    }
+    return const _CartColumns._(
+      listPad: 16,
+      cardPad: 12,
+      gap: 12,
+      price: 84,
+      stacked: false,
+    );
+  }
 }
 
 class RetailPosScreen extends StatefulWidget {
@@ -74,6 +181,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
   bool _isScannerActive = false;
   String? _lastScannedBarcode;
   DateTime? _lastScanTime;
+
+  /// Category filter for the browse pane. Null means "All".
+  String? _browseCategoryId;
 
   MobileScannerController? _scannerController;
 
@@ -152,9 +262,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                 : 'Start the day to begin billing',
             message: eodPending
                 ? 'A day is still open from earlier. Complete End of Day to '
-                    'settle its cash, then start today.'
+                      'settle its cash, then start today.'
                 : "Record your opening cash balance so the day's sales and "
-                    'cash drawer reconcile at End of Day.',
+                      'cash drawer reconcile at End of Day.',
             action: Column(
               children: [
                 SizedBox(
@@ -312,8 +422,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
           // so POS is the bottom of the stack. Popping would drop the user back
           // into onboarding (create store / restore backup). Show a blocking
           // state instead — whichever one the gate set.
-          setState(() =>
-              _billingBlock ??= _BillingBlock.dayNotStarted);
+          setState(() => _billingBlock ??= _BillingBlock.dayNotStarted);
         }
         return;
       }
@@ -407,15 +516,17 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     String description,
   ) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.only(bottom: AppResponsive.largeSpacing(context)),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
             decoration: BoxDecoration(
               color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
             ),
             child: Icon(
               icon,
@@ -423,7 +534,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
               color: AppColors.primary,
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -512,7 +623,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
       message: expiry == null
           ? '${product.productName} is past its expiry date. Sell it anyway?'
           : '${product.productName} expired on '
-              '${kExpiryDateFormat.format(expiry)}. Sell it anyway?',
+                '${kExpiryDateFormat.format(expiry)}. Sell it anyway?',
       confirmLabel: 'Sell anyway',
       cancelLabel: 'Cancel',
       accent: AppColors.danger,
@@ -569,8 +680,11 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
       if (!await _confirmExpiredSale(product, variants.first)) return;
       final qty = await _resolveQuantity(product, variants.first);
       if (qty == null) return;
-      final result =
-          await cartStore.addItemToTab(product, variants.first, qty: qty);
+      final result = await cartStore.addItemToTab(
+        product,
+        variants.first,
+        qty: qty,
+      );
       _clearSearch();
       if (mounted) {
         if (result.success) {
@@ -629,8 +743,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
           if (mounted) _clearSearch();
           return;
         }
-        final result =
-            await cartStore.addItemToTab(product, variant, qty: qty);
+        final result = await cartStore.addItemToTab(product, variant, qty: qty);
 
         if (mounted) {
           _clearSearch();
@@ -674,8 +787,11 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
       if (!await _confirmExpiredSale(product, selectedVariant)) return;
       final qty = await _resolveQuantity(product, selectedVariant);
       if (qty == null) return;
-      final result =
-          await cartStore.addItemToTab(product, selectedVariant, qty: qty);
+      final result = await cartStore.addItemToTab(
+        product,
+        selectedVariant,
+        qty: qty,
+      );
       if (result.success) {
         NotificationService.instance.showSuccess(
           '${product.productName} ${selectedVariant.shortDescription} added to cart',
@@ -727,7 +843,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
           ),
           actions: [
             appDialogCancelButton(context),
-            const SizedBox(width: 12),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
             appDialogPrimaryButton(
               label: 'Hold',
               color: AppColors.warning,
@@ -783,7 +899,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
               CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
               Text(
                 'Initializing POS...',
                 style: GoogleFonts.poppins(
@@ -917,22 +1033,23 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
         QuickItemDialog(
           defaultGstRate: defaultGstRate,
           money: _money,
-          onApply: ({
-            required String name,
-            required double price,
-            required double gstRate,
-            required int qty,
-          }) async {
-            final result = await cartStore.addQuickItemToTab(
-              name: name,
-              price: price,
-              gstRate: gstRate,
-              qty: qty,
-            );
-            return result.success
-                ? null
-                : (result.errorMessage ?? 'Could not add the item');
-          },
+          onApply:
+              ({
+                required String name,
+                required double price,
+                required double gstRate,
+                required int qty,
+              }) async {
+                final result = await cartStore.addQuickItemToTab(
+                  name: name,
+                  price: price,
+                  gstRate: gstRate,
+                  qty: qty,
+                );
+                return result.success
+                    ? null
+                    : (result.errorMessage ?? 'Could not add the item');
+              },
         ),
       ),
     );
@@ -947,9 +1064,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
           _buildSearchResults()
         else ...[
           if (_isScannerActive) _buildScannerContainer(),
-          _buildHeaderRow(context),
-          const Divider(height: 1, thickness: 0.5, color: AppColors.divider),
-          Expanded(child: _buildSimpleCart(context)),
+          Expanded(child: _buildCartTable(context)),
         ],
         _buildSimpleSummary(context),
       ],
@@ -970,11 +1085,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                 Expanded(
                   child: Container(
                     color: AppColors.white,
-                    child: const AppEmptyState(
-                      icon: Icons.search,
-                      title: 'Search for products',
-                      message: 'Use the search bar or scanner',
-                    ),
+                    child: _buildBrowsePane(context),
                   ),
                 ),
             ],
@@ -987,13 +1098,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
             children: [
               _buildTabBar(),
               if (_isScannerActive) _buildScannerContainer(),
-              _buildHeaderRow(context),
-              const Divider(
-                height: 1,
-                thickness: 0.5,
-                color: AppColors.divider,
-              ),
-              Expanded(child: _buildSimpleCart(context)),
+              Expanded(child: _buildCartTable(context)),
               _buildSimpleSummary(context),
             ],
           ),
@@ -1017,7 +1122,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
             child: Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: AppResponsive.padding(context),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1029,7 +1134,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                           color: AppColors.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: AppResponsive.mediumSpacing(context)),
                       _buildSearchBarWithScanner(context),
                     ],
                   ),
@@ -1042,13 +1147,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                 if (_showSearchResults)
                   _buildSearchResults()
                 else
-                  const Expanded(
-                    child: AppEmptyState(
-                      icon: Icons.search,
-                      title: 'Search for products',
-                      message: 'Use the search bar or scanner',
-                    ),
-                  ),
+                  Expanded(child: _buildBrowsePane(context)),
               ],
             ),
           ),
@@ -1078,7 +1177,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: AppResponsive.mediumSpacing(context)),
                     Observer(
                       builder: (context) => Container(
                         padding: const EdgeInsets.symmetric(
@@ -1087,7 +1186,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                         ),
                         decoration: BoxDecoration(
                           color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.borderRadius(context),
+                          ),
                         ),
                         child: Text(
                           '${cartStore.itemCount} items',
@@ -1103,13 +1204,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                 ),
               ),
               if (_isScannerActive) _buildScannerContainer(),
-              _buildHeaderRow(context),
-              const Divider(
-                height: 1,
-                thickness: 0.5,
-                color: AppColors.divider,
-              ),
-              Expanded(child: _buildSimpleCart(context)),
+              Expanded(child: _buildCartTable(context)),
               _buildSimpleSummary(context),
             ],
           ),
@@ -1127,21 +1222,30 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
 
   Widget _buildScannerContainer() {
     return Container(
-      height: 150,
+      height: AppResponsive.getValue(
+        context,
+        mobile: 150.0,
+        tablet: 180.0,
+        desktop: 210.0,
+      ),
       margin: const EdgeInsets.all(5),
       decoration: BoxDecoration(
         color: Colors.black,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 8,
+            blurRadius: AppResponsive.shadowBlurRadius(context),
             offset: const Offset(0, 4),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         // The scan window is a Rect in the scanner's own layout space, so it
         // has to be measured, not guessed. The old fixed 250×100 frame also
         // overflowed on narrow phones.
@@ -1189,7 +1293,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                       scanWindow: scanWindow,
                       borderColor: AppColors.success,
                       borderWidth: 3,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.borderRadius(context),
+                      ),
                     ),
                   ),
                 ],
@@ -1212,10 +1318,10 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                   top: 8,
                   right: 0,
                   child: IconButton(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.close,
                       color: AppColors.white,
-                      size: 20,
+                      size: AppResponsive.iconSize(context),
                     ),
                     onPressed: _toggleScanner,
                     style: IconButton.styleFrom(
@@ -1273,7 +1379,10 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
   Widget _buildSearchBarWithScanner(BuildContext context) {
     return Container(
       // color: AppColors.danger,
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.padding(context).left,
+        vertical: AppResponsive.smallSpacing(context),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -1304,7 +1413,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                   : null,
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Container(
             height: 40,
             width: 40,
@@ -1316,7 +1425,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
               icon: Icon(
                 _isScannerActive ? Icons.close : Icons.qr_code_scanner,
                 color: AppColors.white,
-                size: 20,
+                size: AppResponsive.iconSize(context),
               ),
               padding: EdgeInsets.zero,
               onPressed: _toggleScanner,
@@ -1336,7 +1445,10 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+              padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.padding(context).left,
+                vertical: AppResponsive.smallSpacing(context),
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -1365,7 +1477,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
             const Divider(height: 1, thickness: 0.5, color: AppColors.divider),
             Expanded(
               child: ListView.builder(
-                padding: const EdgeInsets.all(16),
+                padding: AppResponsive.cardPadding(context),
                 itemCount: _searchResults.length,
                 itemBuilder: (context, index) {
                   final product = _searchResults[index];
@@ -1399,34 +1511,40 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
         final stock = variants.fold<double>(0.0, (sum, v) => sum + v.stockQty);
 
         return Container(
-          margin: const EdgeInsets.only(bottom: 12),
+          margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
           decoration: BoxDecoration(
             color: AppColors.white,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.borderRadius(context),
+            ),
             border: Border.all(color: AppColors.divider, width: 0.5),
             boxShadow: _cardShadow,
           ),
           child: InkWell(
             onTap: () => _onProductSelected(product),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.borderRadius(context),
+            ),
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
               child: Row(
                 children: [
                   Container(
-                    width: 44,
-                    height: 44,
+                    width: AppResponsive.avatarSize(context),
+                    height: AppResponsive.avatarSize(context),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.smallBorderRadius(context),
+                      ),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.inventory_2_outlined,
                       color: AppColors.primary,
-                      size: 22,
+                      size: AppResponsive.iconSize(context),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: AppResponsive.mediumSpacing(context)),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1462,8 +1580,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                         // again on add. Renders nothing when not alerting.
                         Builder(
                           builder: (_) {
-                            final expiry = productStore
-                                .expiryStatusForProduct(product.productId);
+                            final expiry = productStore.expiryStatusForProduct(
+                              product.productId,
+                            );
                             if (!expiry.isAlerting) {
                               return const SizedBox.shrink();
                             }
@@ -1497,7 +1616,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                           color: stock > 0
                               ? AppColors.primary.withValues(alpha: 0.1)
                               : AppColors.danger.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.smallBorderRadius(context),
+                          ),
                         ),
                         child: Text(
                           stock > 0 ? 'Stock: $stock' : 'Out of stock',
@@ -1512,11 +1633,11 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(width: 8),
-                  const Icon(
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
+                  Icon(
                     Icons.add_circle_outline,
                     color: AppColors.primary,
-                    size: 24,
+                    size: AppResponsive.iconSize(context),
                   ),
                 ],
               ),
@@ -1527,56 +1648,328 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     );
   }
 
-  Widget _buildHeaderRow(BuildContext context) {
-    return Container(
-      color: AppColors.white,
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 3,
-            child: Text(
-              'Item Name',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.bodyFontSize(context),
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
+  /*----------------------------------BROWSE PANE ----------------------------------*/
+
+  /// Target width of one browse tile; column count is derived from it.
+  static const double _browseTileWidth = 130;
+
+  /// What the tablet/desktop search pane shows before anything is typed.
+  ///
+  /// That pane is 40% of the tablet tree and 35% of the desktop one, and it
+  /// held a permanent "Search for products" empty state — a third of the till
+  /// doing nothing until the cashier typed.
+  ///
+  /// It costs NO new billing logic: a tile calls [_onProductSelected], the same
+  /// entry point the search rows and the scanner already use, so the variant
+  /// picker, the expired-stock gate, the loose-goods weight sheet and cart
+  /// errors all behave exactly as before.
+  ///
+  /// Mobile never reaches this — it has no split pane.
+  Widget _buildBrowsePane(BuildContext context) {
+    return Observer(
+      builder: (context) {
+        final products = productStore.products;
+        if (products.isEmpty) {
+          return const AppEmptyState(
+            icon: Icons.inventory_2_outlined,
+            title: 'No products yet',
+            message: 'Products you add will be browsable here',
+          );
+        }
+
+        // Only categories that actually carry a product — an empty chip is a
+        // dead tap.
+        final usedIds = products.map((p) => p.category).toSet();
+        final categories = categoryStore.categories
+            .where((c) => usedIds.contains(c.id))
+            .toList();
+
+        final visible = _browseCategoryId == null
+            ? products.toList()
+            : products.where((p) => p.category == _browseCategoryId).toList();
+
+        return Column(
+          children: [
+            _buildBrowseChips(context, categories),
+            const Divider(height: 1, thickness: 0.5, color: AppColors.divider),
+            Expanded(child: _buildBrowseGrid(context, visible)),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Category filter strip. Deliberately styled like the cart tab chips —
+  /// same radius, padding and 160px cap — so the two strips read as one family.
+  Widget _buildBrowseChips(BuildContext context, List<Category> categories) {
+    Widget chip(String label, String? id) {
+      final selected = _browseCategoryId == id;
+      return Padding(
+        padding: const EdgeInsets.only(right: 6),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => setState(() => _browseCategoryId = id),
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 160),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: selected ? AppColors.primary : AppColors.surfaceMedium,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  color: selected ? AppColors.white : AppColors.textPrimary,
+                ),
               ),
             ),
           ),
-          SizedBox(width: 12),
+        ),
+      );
+    }
+
+    return Container(
+      color: AppColors.white,
+      padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            chip('All', null),
+            ...categories.map((c) => chip(c.name, c.id)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Tile grid.
+  ///
+  /// Columns come from the MEASURED pane width, not the screen: this sits in a
+  /// `flex:` pane, so screen breakpoints would over-count columns exactly the
+  /// way they did for the cart table.
+  Widget _buildBrowseGrid(BuildContext context, List<ProductModel> products) {
+    if (products.isEmpty) {
+      return const AppEmptyState(
+        icon: Icons.search_off_rounded,
+        title: 'Nothing in this category',
+        message: 'Pick another category, or use search',
+      );
+    }
+
+    final spacing = AppResponsive.gridSpacing(context);
+    final pad = AppResponsive.smallSpacing(context);
+    // A grid cell is a FIXED height, so this is sized for the tallest tile
+    // (icon chip + two-line name + price) and the tile keeps static internal
+    // padding. Growing that padding is what re-triggers BOTTOM OVERFLOWED.
+    final extent = AppResponsive.getValue(
+      context,
+      mobile: 128.0,
+      tablet: 138.0,
+      desktop: 150.0,
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final avail = constraints.maxWidth - pad * 2;
+        final columns = ((avail + spacing) / (_browseTileWidth + spacing))
+            .floor()
+            .clamp(2, 5);
+
+        return GridView.builder(
+          padding: EdgeInsets.all(pad),
+          itemCount: products.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            crossAxisSpacing: spacing,
+            mainAxisSpacing: spacing,
+            mainAxisExtent: extent,
+          ),
+          itemBuilder: (context, i) => _buildBrowseTile(context, products[i]),
+        );
+      },
+    );
+  }
+
+  /// One browse tile. Price is derived the same way the search row derives it,
+  /// so the two never disagree about what a product costs.
+  Widget _buildBrowseTile(BuildContext context, ProductModel product) {
+    return Observer(
+      builder: (context) {
+        final variants = productStore.variantsFor(product.productId);
+        final first = variants.isNotEmpty ? variants.first : null;
+        var price = first?.effectivePrice ?? 0;
+        if (price == 0) {
+          price = product.defaultPrice ?? product.defaultMrp ?? 0;
+        }
+        final stock = variants.fold<double>(0.0, (s, v) => s + v.stockQty);
+        final outOfStock = stock <= 0;
+        final radius = BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        );
+
+        return Material(
+          color: AppColors.white,
+          borderRadius: radius,
+          child: InkWell(
+            // The add path is shared with search and scan — nothing about
+            // variants, expiry or loose goods is re-implemented here.
+            onTap: () => _onProductSelected(product),
+            borderRadius: radius,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: radius,
+                border: Border.all(color: AppColors.divider, width: 0.5),
+                boxShadow: _cardShadow,
+              ),
+              // Static: fixed-height cell, see _buildBrowseGrid.
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.smallBorderRadius(context),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.inventory_2_outlined,
+                          color: AppColors.primary,
+                          size: AppResponsive.smallIconSize(context),
+                        ),
+                      ),
+                      const Spacer(),
+                      if (outOfStock)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.danger.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(
+                              AppResponsive.smallBorderRadius(context),
+                            ),
+                          ),
+                          child: Text(
+                            'Out',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.captionFontSize(context),
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.danger,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    product.productName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    _money(price),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// The cart table: header row and line list sized from ONE measurement.
+  ///
+  /// Both halves take the same [_CartColumns], resolved here from the pane's
+  /// real width. Resolving it separately at each call site is what let the
+  /// labels drift off their cells.
+  Widget _buildCartTable(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cols = _CartColumns.of(constraints.maxWidth);
+        return Column(
+          children: [
+            // A stacked card has no columns to label, so the header goes with
+            // it rather than sitting there wrapping to "Item Na me".
+            if (!cols.stacked) ...[
+              _buildHeaderRow(context, cols),
+              const Divider(
+                height: 1,
+                thickness: 0.5,
+                color: AppColors.divider,
+              ),
+            ],
+            Expanded(child: _buildSimpleCart(context, cols)),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildHeaderRow(BuildContext context, _CartColumns cols) {
+    final labelStyle = GoogleFonts.poppins(
+      fontSize: AppResponsive.bodyFontSize(context),
+      fontWeight: FontWeight.w600,
+      color: AppColors.textSecondary,
+    );
+
+    return Container(
+      color: AppColors.white,
+      // sidePad, not listPad: the rows below sit inside a card that adds its
+      // own padding, so a bare 20 put every label left of its column.
+      padding: EdgeInsets.fromLTRB(cols.sidePad, 12, cols.sidePad, 12),
+      child: Row(
+        children: [
+          Expanded(child: Text('Item Name', style: labelStyle)),
+          SizedBox(width: cols.gap),
           SizedBox(
-            width: 110,
+            width: _CartColumns.qty,
             child: Text(
               'Quantity',
               textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.bodyFontSize(context),
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
-              ),
+              style: labelStyle,
             ),
           ),
-          SizedBox(width: 12),
+          SizedBox(width: cols.gap),
           SizedBox(
-            width: 70,
-            child: Text(
-              'Price',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.bodyFontSize(context),
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
-              ),
-              textAlign: TextAlign.right,
-            ),
+            width: cols.price,
+            child: Text('Price', style: labelStyle, textAlign: TextAlign.right),
           ),
-          SizedBox(width: 40),
+          // Reserves the overflow-menu column — see _CartColumns.actions.
+          const SizedBox(width: _CartColumns.actions),
         ],
       ),
     );
   }
 
-  Widget _buildSimpleCart(BuildContext context) {
+  Widget _buildSimpleCart(BuildContext context, _CartColumns cols) {
     return Observer(
       builder: (context) {
         if (cartStore.itemCount == 0) {
@@ -1588,7 +1981,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(cols.listPad),
           itemCount: cartStore.itemCount,
           itemBuilder: (context, index) {
             return Observer(
@@ -1599,132 +1992,22 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                 final item = cartStore.items[index];
 
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
+                  margin: EdgeInsets.only(
+                    bottom: AppResponsive.mediumSpacing(context),
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.white,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.borderRadius(context),
+                    ),
                     border: Border.all(color: AppColors.divider, width: 0.5),
                     boxShadow: _cardShadow,
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                cartStore.getDisplayName(item),
-                                style: GoogleFonts.poppins(
-                                  fontSize: AppResponsive.bodyFontSize(context),
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textPrimary,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              _buildLinePrice(context, item),
-                              // The search row is gone once the item is in the
-                              // cart, so without this the warning disappears
-                              // exactly when the customer is standing there.
-                              // Judged per variant, like the add-time gate.
-                              Builder(
-                                builder: (_) {
-                                  final variant = productStore.variants
-                                      .where(
-                                          (v) => v.varianteId == item.variantId)
-                                      .firstOrNull;
-                                  if (variant == null) {
-                                    return const SizedBox.shrink();
-                                  }
-                                  final status = productStore
-                                      .expiryStatusForVariant(variant);
-                                  if (!status.isAlerting) {
-                                    return const SizedBox.shrink();
-                                  }
-                                  return Padding(
-                                    padding: const EdgeInsets.only(top: 4),
-                                    child: ExpiryStatusPill(status: status),
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            CartQuantityStepperButton(
-                              icon: Icons.remove_rounded,
-                              color: AppColors.textSecondary,
-                              onTap: () => cartStore
-                                  .decrementQuantityInTab(item.variantId),
-                            ),
-                            const SizedBox(width: 4),
-                            // Keyed by cart line: the list is dynamic, and an
-                            // unkeyed field would carry one line's controller
-                            // (and half-typed text) onto another after a
-                            // removal.
-                            CartQuantityField(
-                              key: ValueKey(item.cartItemId),
-                              qty: item.qty,
-                              // Only a loose-goods line may take a fraction;
-                              // a piece line keeps its digits-only keypad.
-                              allowDecimal: productStore.variants
-                                      .where((v) =>
-                                          v.varianteId == item.variantId)
-                                      .firstOrNull
-                                      ?.isDecimalQuantity ??
-                                  false,
-                              onSubmitted: (qty) =>
-                                  _applyTypedQuantity(item, qty),
-                            ),
-                            const SizedBox(width: 4),
-                            CartQuantityStepperButton(
-                              icon: Icons.add_rounded,
-                              color: AppColors.primary,
-                              onTap: () async {
-                                final result = await cartStore
-                                    .incrementQuantityInTab(item.variantId);
-                                if (!result.success && mounted) {
-                                  NotificationService.instance.showWarning(
-                                    result.errorMessage ??
-                                        'Cannot add more items',
-                                  );
-                                }
-                              },
-                            ),
-                          ],
-                        ),
-                        const SizedBox(width: 8),
-                        SizedBox(
-                          // 60 clipped a 4-digit total: "₹2000.00" wrapped onto
-                          // two lines. Sized for the widest realistic line total.
-                          width: 74,
-                          child: Text(
-                            _money(item.total),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.right,
-                            style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.bodyFontSize(context),
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 40,
-                          child: _buildLineActions(item),
-                        ),
-                      ],
-                    ),
+                    padding: EdgeInsets.all(cols.cardPad),
+                    child: cols.stacked
+                        ? _buildStackedLine(context, item, cols)
+                        : _buildColumnarLine(context, item, cols),
                   ),
                 );
               },
@@ -1732,6 +2015,181 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
           },
         );
       },
+    );
+  }
+
+  /// Table row: name | qty | total | menu, aligned to the header above it.
+  Widget _buildColumnarLine(
+    BuildContext context,
+    CartItemModel item,
+    _CartColumns cols,
+  ) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _lineName(context, item),
+              const SizedBox(height: 4),
+              _buildLinePrice(context, item),
+              _lineExpiryPill(item),
+            ],
+          ),
+        ),
+        SizedBox(width: cols.gap),
+        // Fixed to the same constant the header reserves, so the two can
+        // never drift apart.
+        SizedBox(
+          width: _CartColumns.qty,
+          child: _lineQtyControls(context, item),
+        ),
+        SizedBox(width: cols.gap),
+        SizedBox(width: cols.price, child: _lineTotal(context, item)),
+        SizedBox(width: _CartColumns.actions, child: _buildLineActions(item)),
+      ],
+    );
+  }
+
+  /// Two-row card for panes narrower than [_CartColumns.stackBelow].
+  ///
+  /// The columnar row cannot fit there and no amount of padding tuning saves
+  /// it: the stepper alone is 124px, and with the total and the menu the fixed
+  /// columns claim 244px. On a 320px phone that left the product NAME 34px —
+  /// the header wrapped to "Item Na me" and names broke mid-word.
+  ///
+  /// Stacking gives the name the full card width. The header row is dropped
+  /// with it, because it has nothing left to label.
+  Widget _buildStackedLine(
+    BuildContext context,
+    CartItemModel item,
+    _CartColumns cols,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: _lineName(context, item)),
+            SizedBox(width: cols.gap),
+            SizedBox(width: cols.price, child: _lineTotal(context, item)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildLinePrice(context, item),
+                  _lineExpiryPill(item),
+                ],
+              ),
+            ),
+            SizedBox(width: cols.gap),
+            SizedBox(
+              width: _CartColumns.qty,
+              child: _lineQtyControls(context, item),
+            ),
+            SizedBox(
+              width: _CartColumns.actions,
+              child: _buildLineActions(item),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _lineName(BuildContext context, CartItemModel item) => Text(
+    cartStore.getDisplayName(item),
+    style: GoogleFonts.poppins(
+      fontSize: AppResponsive.bodyFontSize(context),
+      fontWeight: FontWeight.w600,
+      color: AppColors.textPrimary,
+    ),
+    maxLines: 2,
+    overflow: TextOverflow.ellipsis,
+  );
+
+  Widget _lineTotal(BuildContext context, CartItemModel item) => Text(
+    _money(item.total),
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
+    textAlign: TextAlign.right,
+    style: GoogleFonts.poppins(
+      fontSize: AppResponsive.bodyFontSize(context),
+      fontWeight: FontWeight.w700,
+      color: AppColors.textPrimary,
+    ),
+  );
+
+  /// Expiry warning for a cart line.
+  ///
+  /// The search row is gone once the item is in the cart, so without this the
+  /// warning disappears exactly when the customer is standing there. Judged per
+  /// variant, like the add-time gate. Renders nothing when not alerting.
+  Widget _lineExpiryPill(CartItemModel item) {
+    final variant = productStore.variants
+        .where((v) => v.varianteId == item.variantId)
+        .firstOrNull;
+    if (variant == null) return const SizedBox.shrink();
+    final status = productStore.expiryStatusForVariant(variant);
+    if (!status.isAlerting) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: ExpiryStatusPill(status: status),
+    );
+  }
+
+  Widget _lineQtyControls(BuildContext context, CartItemModel item) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CartQuantityStepperButton(
+          icon: Icons.remove_rounded,
+          color: AppColors.textSecondary,
+          onTap: () => cartStore.decrementQuantityInTab(item.variantId),
+        ),
+        const SizedBox(width: 4),
+        // Keyed by cart line: the list is dynamic, and an unkeyed field would
+        // carry one line's controller (and half-typed text) onto another after
+        // a removal.
+        CartQuantityField(
+          key: ValueKey(item.cartItemId),
+          qty: item.qty,
+          // Only a loose-goods line may take a fraction; a piece line keeps
+          // its digits-only keypad.
+          allowDecimal:
+              productStore.variants
+                  .where((v) => v.varianteId == item.variantId)
+                  .firstOrNull
+                  ?.isDecimalQuantity ??
+              false,
+          onSubmitted: (qty) => _applyTypedQuantity(item, qty),
+        ),
+        const SizedBox(width: 4),
+        CartQuantityStepperButton(
+          icon: Icons.add_rounded,
+          color: AppColors.primary,
+          onTap: () async {
+            final result = await cartStore.incrementQuantityInTab(
+              item.variantId,
+            );
+            if (!result.success && mounted) {
+              NotificationService.instance.showWarning(
+                result.errorMessage ?? 'Cannot add more items',
+              );
+            }
+          },
+        ),
+      ],
     );
   }
 
@@ -1782,7 +2240,8 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     // A quick item has no catalogue price to override — the cashier typed the
     // price it is selling at. Discount and Remove stay: both are meaningful on
     // an ad-hoc line.
-    final canOverride = PriceOverrideService.canOverride &&
+    final canOverride =
+        PriceOverrideService.canOverride &&
         !QuickItemService.isQuickItem(item.variantId);
     final canDiscount = LineDiscountService.canDiscount;
 
@@ -1790,7 +2249,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
       tooltip: 'Line options',
       icon: Icon(
         Icons.more_vert,
-        size: 20,
+        size: AppResponsive.iconSize(context),
         color: AppColors.textSecondary,
       ),
       padding: EdgeInsets.zero,
@@ -1811,33 +2270,45 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
       },
       itemBuilder: (context) => [
         if (canOverride)
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'override',
             child: Row(
               children: [
-                Icon(Icons.sell_outlined, size: 18, color: AppColors.primary),
-                SizedBox(width: 10),
+                Icon(
+                  Icons.sell_outlined,
+                  size: AppResponsive.smallIconSize(context),
+                  color: AppColors.primary,
+                ),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Text('Price Override'),
               ],
             ),
           ),
         if (canDiscount)
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'discount',
             child: Row(
               children: [
-                Icon(Icons.percent_rounded, size: 18, color: AppColors.primary),
-                SizedBox(width: 10),
+                Icon(
+                  Icons.percent_rounded,
+                  size: AppResponsive.smallIconSize(context),
+                  color: AppColors.primary,
+                ),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Text('Discount'),
               ],
             ),
           ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'remove',
           child: Row(
             children: [
-              Icon(Icons.delete_outline, size: 18, color: AppColors.danger),
-              SizedBox(width: 10),
+              Icon(
+                Icons.delete_outline,
+                size: AppResponsive.smallIconSize(context),
+                color: AppColors.danger,
+              ),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Text('Remove'),
             ],
           ),
@@ -1856,8 +2327,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     final isQuick = QuickItemService.isQuickItem(item.variantId);
     // A quick item has no catalogue row by design, so its lookup miss is
     // expected rather than the "someone deleted this product" case below.
-    final variant =
-        isQuick ? null : await productStore.getVariantById(item.variantId);
+    final variant = isQuick
+        ? null
+        : await productStore.getVariantById(item.variantId);
     if (!mounted) return;
 
     if (!isQuick && variant == null) {
@@ -1874,23 +2346,24 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
           item: item,
           variant: variant,
           money: _money,
-          onApply: ({
-            required DiscountType type,
-            required double value,
-            required String reason,
-            String? note,
-          }) async {
-            final result = await cartStore.setLineDiscountInTab(
-              variantId: item.variantId,
-              type: type,
-              value: value,
-              reason: reason,
-              note: note,
-            );
-            return result.success
-                ? null
-                : (result.errorMessage ?? 'Could not apply discount');
-          },
+          onApply:
+              ({
+                required DiscountType type,
+                required double value,
+                required String reason,
+                String? note,
+              }) async {
+                final result = await cartStore.setLineDiscountInTab(
+                  variantId: item.variantId,
+                  type: type,
+                  value: value,
+                  reason: reason,
+                  note: note,
+                );
+                return result.success
+                    ? null
+                    : (result.errorMessage ?? 'Could not apply discount');
+              },
         ),
       ),
     );
@@ -1904,7 +2377,8 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     final overridden = item.isPriceOverridden;
     // Matches the overflow menu: no catalogue price behind a quick item, so the
     // price is a plain label rather than a control.
-    final canOverride = PriceOverrideService.canOverride &&
+    final canOverride =
+        PriceOverrideService.canOverride &&
         !QuickItemService.isQuickItem(item.variantId);
 
     // A Wrap, NOT a Row. With an override AND a line discount this line carries
@@ -1991,19 +2465,22 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
           item: item,
           variant: variant,
           money: _money,
-          onApply: ({
-            required double newPrice,
-            required String reason,
-            String? note,
-          }) async {
-            final result = await cartStore.overrideLinePriceInTab(
-              variantId: item.variantId,
-              newPrice: newPrice,
-              reason: reason,
-              note: note,
-            );
-            return result.success ? null : (result.errorMessage ?? 'Could not apply price');
-          },
+          onApply:
+              ({
+                required double newPrice,
+                required String reason,
+                String? note,
+              }) async {
+                final result = await cartStore.overrideLinePriceInTab(
+                  variantId: item.variantId,
+                  newPrice: newPrice,
+                  reason: reason,
+                  note: note,
+                );
+                return result.success
+                    ? null
+                    : (result.errorMessage ?? 'Could not apply price');
+              },
         ),
       ),
     );
@@ -2033,7 +2510,10 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
         final totalPrice = retailCartStore.bill.grandTotal;
 
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: EdgeInsets.symmetric(
+            horizontal: AppResponsive.mediumSpacing(context),
+            vertical: AppResponsive.smallSpacing(context),
+          ),
           decoration: BoxDecoration(
             color: AppColors.white,
             border: Border(
@@ -2069,7 +2549,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                     children: [
                       Icon(
                         Icons.shopping_cart,
-                        size: 18,
+                        size: AppResponsive.smallIconSize(context),
                         color: AppColors.primary,
                       ),
                       const SizedBox(width: 6),
@@ -2084,7 +2564,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: AppResponsive.mediumSpacing(context)),
                 // Total price
                 Expanded(
                   child: Column(
@@ -2115,7 +2595,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                 ),
                 // Checkout button
                 SizedBox(
-                  height: 44,
+                  height: AppResponsive.buttonHeight(context),
                   child: ElevatedButton(
                     onPressed: () async {
                       final result = await Navigator.push(
@@ -2151,7 +2631,10 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                           ),
                         ),
                         SizedBox(width: 6),
-                        Icon(Icons.arrow_forward, size: 18),
+                        Icon(
+                          Icons.arrow_forward,
+                          size: AppResponsive.smallIconSize(context),
+                        ),
                       ],
                     ),
                   ),
@@ -2169,7 +2652,12 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     return Observer(
       builder: (context) {
         return Container(
-          height: 48,
+          height: AppResponsive.getValue(
+            context,
+            mobile: 48.0,
+            tablet: 52.0,
+            desktop: 56.0,
+          ),
           decoration: BoxDecoration(
             color: AppColors.white,
             border: Border(
@@ -2284,7 +2772,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                                     },
                                     child: Icon(
                                       Icons.close,
-                                      size: 16,
+                                      size: AppResponsive.smallIconSize(
+                                        context,
+                                      ),
                                       color: isActive
                                           ? AppColors.white.withValues(
                                               alpha: 0.8,
@@ -2327,7 +2817,11 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.add, size: 16, color: AppColors.primary),
+                          Icon(
+                            Icons.add,
+                            size: AppResponsive.smallIconSize(context),
+                            color: AppColors.primary,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             'New',
@@ -2386,10 +2880,12 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => Container(
-          height: MediaQuery.of(context).size.height * 0.85,
+          height: AppResponsive.bottomSheetMaxHeight(context),
           decoration: BoxDecoration(
             color: AppColors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(AppResponsive.largeBorderRadius(context)),
+            ),
           ),
           child: Column(
             children: [
@@ -2405,22 +2901,29 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
               ),
               // Header
               Padding(
-                padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.padding(context).left,
+                  vertical: AppResponsive.largeSpacing(context),
+                ),
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: EdgeInsets.all(
+                        AppResponsive.smallSpacing(context),
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(
+                          AppResponsive.smallBorderRadius(context),
+                        ),
                       ),
                       child: Icon(
                         Icons.add_box,
                         color: AppColors.primary,
-                        size: 24,
+                        size: AppResponsive.iconSize(context),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: AppResponsive.mediumSpacing(context)),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2469,10 +2972,12 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                     children: [
                       // Barcode display
                       Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: AppResponsive.cardPadding(context),
                         decoration: BoxDecoration(
                           color: AppColors.primary.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.smallBorderRadius(context),
+                          ),
                           border: Border.all(
                             color: AppColors.primary.withValues(alpha: 0.2),
                           ),
@@ -2482,9 +2987,11 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                             Icon(
                               Icons.qr_code,
                               color: AppColors.primary,
-                              size: 24,
+                              size: AppResponsive.iconSize(context),
                             ),
-                            const SizedBox(width: 12),
+                            SizedBox(
+                              width: AppResponsive.mediumSpacing(context),
+                            ),
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -2513,7 +3020,9 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(
+                        height: AppResponsive.extraLargeSpacing(context),
+                      ),
                       // AppTextField renders its own label + required marker —
                       // a Text above each field would print it twice.
                       AppTextField(
@@ -2524,7 +3033,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                         required: true,
                         autofocus: true,
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
                       // Keyed by category id, not name — two categories can
                       // share a display name. Styled to match AppTextField.
                       Container(
@@ -2537,12 +3046,14 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.category_outlined,
                               color: AppColors.primary,
-                              size: 20,
+                              size: AppResponsive.iconSize(context),
                             ),
-                            const SizedBox(width: 12),
+                            SizedBox(
+                              width: AppResponsive.mediumSpacing(context),
+                            ),
                             Expanded(
                               child: DropdownButtonHideUnderline(
                                 child: DropdownButton<String>(
@@ -2590,7 +3101,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -2618,7 +3129,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          SizedBox(width: AppResponsive.mediumSpacing(context)),
                           Expanded(
                             child: AppTextField(
                               controller: mrpController,
@@ -2644,7 +3155,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
                       AppTextField(
                         controller: stockController,
                         label: 'Stock Quantity',
@@ -2661,7 +3172,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
               ),
               // Bottom buttons
               Container(
-                padding: const EdgeInsets.all(24),
+                padding: AppResponsive.padding(context),
                 decoration: BoxDecoration(
                   color: AppColors.white,
                   border: Border(
@@ -2670,7 +3181,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                   boxShadow: [
                     BoxShadow(
                       color: Color(0x0A000000),
-                      blurRadius: 8,
+                      blurRadius: AppResponsive.shadowBlurRadius(context),
                       offset: Offset(0, -2),
                     ),
                   ],
@@ -2681,7 +3192,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         appDialogCancelButton(context),
-                        const SizedBox(width: 12),
+                        SizedBox(width: AppResponsive.mediumSpacing(context)),
                         appDialogPrimaryButton(
                           label: 'Add to Cart',
                           onPressed: () async {

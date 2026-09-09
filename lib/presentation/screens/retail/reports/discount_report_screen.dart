@@ -57,7 +57,7 @@ class DiscountReportScreen extends StatelessWidget {
   Widget _money(BuildContext context, double value) {
     return Text(
       formatMoney(value),
-      style: TextStyle(
+      style: GoogleFonts.poppins(
         fontSize: AppResponsive.bodyFontSize(context),
         color: value < 0 ? AppColors.danger : null,
       ),
@@ -125,7 +125,8 @@ class DiscountReportScreen extends StatelessWidget {
           ReportSummaryCard(
             title: 'Total Given Away',
             value: formatMoney(given),
-            subtitle: 'across ${rows.length} sale${rows.length == 1 ? '' : 's'}',
+            subtitle:
+                'across ${rows.length} sale${rows.length == 1 ? '' : 's'}',
             icon: Icons.card_giftcard_rounded,
             color: AppColors.warning,
           ),
@@ -238,9 +239,7 @@ class DiscountReportScreen extends StatelessWidget {
           DataCell(_money(context, row['overrideDelta'] as double)),
           DataCell(Text('${row['loyaltyPointsUsed']}')),
           DataCell(_money(context, row['totalGivenAway'] as double)),
-          DataCell(
-            Text('${(row['giveawayPct'] as num).toStringAsFixed(1)}%'),
-          ),
+          DataCell(Text('${(row['giveawayPct'] as num).toStringAsFixed(1)}%')),
         ],
       ),
       exportData: (rows) => ReportExportData(

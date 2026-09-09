@@ -21,7 +21,9 @@ class RetailNeedHelpScreen extends StatelessWidget {
       final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!ok) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('No app available to handle this action')),
+          const SnackBar(
+            content: Text('No app available to handle this action'),
+          ),
         );
       }
     } catch (_) {
@@ -37,12 +39,9 @@ class RetailNeedHelpScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: buildPrimaryAppBar(
-        title: 'Need Help?',
-        centerTitle: true,
-      ),
+      appBar: buildPrimaryAppBar(title: 'Need Help?', centerTitle: true),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -50,32 +49,34 @@ class RetailNeedHelpScreen extends StatelessWidget {
             SizedBox(height: AppResponsive.largeSpacing(context)),
 
             _sectionTitle(context, 'Contact Us'),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             _contactCard(
               context: context,
               icon: Icons.call_rounded,
-              color: const Color(0xFF2E7D32),
+              color: AppColors.success,
               title: 'Call Support',
               value: _phone,
-              onTap: () => _launch(context, Uri.parse('tel:${_digits(_phone)}')),
+              onTap: () =>
+                  _launch(context, Uri.parse('tel:${_digits(_phone)}')),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             _contactCard(
               context: context,
               icon: Icons.mail_rounded,
-              color: const Color(0xFFD84315),
+              color: AppColors.orange,
               title: 'Email Us',
               value: _email,
               onTap: () => _launch(
                 context,
                 Uri.parse(
-                    'mailto:$_email?subject=${Uri.encodeComponent('Bill Berry Lite Support')}'),
+                  'mailto:$_email?subject=${Uri.encodeComponent('Bill Berry Lite Support')}',
+                ),
               ),
             ),
 
-            const SizedBox(height: 28),
+            SizedBox(height: 28),
             _sectionTitle(context, 'Frequently Asked'),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             ..._faqs.map((f) => _faqTile(context, f)),
           ],
         ),
@@ -87,7 +88,7 @@ class RetailNeedHelpScreen extends StatelessWidget {
   Widget _heroBanner(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: AppResponsive.padding(context),
       decoration: BoxDecoration(
         color: AppColors.primary,
         borderRadius: BorderRadius.circular(16),
@@ -95,15 +96,18 @@ class RetailNeedHelpScreen extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.support_agent_rounded,
-                color: Colors.white, size: 30),
+            child: Icon(
+              Icons.support_agent_rounded,
+              color: Colors.white,
+              size: 30,
+            ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: AppResponsive.largeSpacing(context)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -116,7 +120,7 @@ class RetailNeedHelpScreen extends StatelessWidget {
                     color: Colors.white,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                   'Reach our support team or browse common questions below.',
                   style: GoogleFonts.poppins(
@@ -175,7 +179,7 @@ class RetailNeedHelpScreen extends StatelessWidget {
                 ),
                 child: Icon(icon, color: color, size: 22),
               ),
-              const SizedBox(width: 14),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -188,7 +192,7 @@ class RetailNeedHelpScreen extends StatelessWidget {
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    SizedBox(height: 2),
                     Text(
                       value,
                       style: GoogleFonts.poppins(
@@ -199,8 +203,11 @@ class RetailNeedHelpScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded,
-                  color: AppColors.textSecondary, size: 22),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textSecondary,
+                size: 22,
+              ),
             ],
           ),
         ),
@@ -234,10 +241,12 @@ class RetailNeedHelpScreen extends StatelessWidget {
 
   Widget _faqTile(BuildContext context, _Faq faq) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
       child: Theme(

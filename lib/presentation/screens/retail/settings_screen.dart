@@ -58,10 +58,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// Day state for the Day Management cards, read in one pass so the two cards
   /// can never disagree about whether the open session is overdue.
   Future<({bool started, bool eodPending})> _dayState() async => (
-        started: await DayManagementService.isDayStarted(),
-        eodPending: await DayManagementService.isEodStrictlyPending() ||
-            await DayManagementService.hasPendingEOD(),
-      );
+    started: await DayManagementService.isDayStarted(),
+    eodPending:
+        await DayManagementService.isEodStrictlyPending() ||
+        await DayManagementService.hasPendingEOD(),
+  );
 
   /// Replaces re-opening the start-day dialog. Tapping "Start Day" while a
   /// session was live routed to `startSession`, which minted a second session,
@@ -179,7 +180,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 },
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
             ],
 
             // Data Management Section
@@ -202,11 +203,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   }
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const BackupScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => const BackupScreen(),
+                    ),
                   );
                 },
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
             ],
 
             // Day Management Section
@@ -231,15 +234,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       title: !isDayStarted
                           ? 'Start Day'
                           : eodPending
-                              ? 'Previous Day Still Open'
-                              : 'Day In Progress',
+                          ? 'Previous Day Still Open'
+                          : 'Day In Progress',
                       subtitle: !isDayStarted
                           ? 'Set opening balance to begin operations'
                           : eodPending
-                              ? 'Complete End of Day below to settle it'
-                              : 'View session start time and opening balance',
-                      iconColor:
-                          eodPending ? AppColors.warning : AppColors.success,
+                          ? 'Complete End of Day below to settle it'
+                          : 'View session start time and opening balance',
+                      iconColor: eodPending
+                          ? AppColors.warning
+                          : AppColors.success,
                       onTap: () async {
                         if (isDayStarted) {
                           // Read-only. Re-running the start flow here used to
@@ -265,8 +269,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         subtitle: eodPending
                             ? 'Settle the previous day to resume billing'
                             : 'Close day and reconcile cash',
-                        iconColor:
-                            eodPending ? AppColors.warning : AppColors.info,
+                        iconColor: eodPending
+                            ? AppColors.warning
+                            : AppColors.info,
                         onTap: () async {
                           await Navigator.push(
                             context,
@@ -282,7 +287,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 );
               },
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
 
             // Printing Section — device connection first, then what goes on the
             // paper. Both use the same shared printer stack the restaurant side
@@ -299,7 +304,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const RetailPrinterConnectionScreen(),
+                      builder: (context) =>
+                          const RetailPrinterConnectionScreen(),
                     ),
                   );
                 },
@@ -320,7 +326,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 },
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
             ],
 
             // Product Settings Section
@@ -372,7 +378,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 },
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
             ],
 
             // Stock Alerts Section
@@ -380,7 +386,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _sectionHeader(context, 'NOTIFICATIONS'),
               _buildStockAlertThresholdCard(context),
 
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
             ],
 
             // Display & Format Section
@@ -389,7 +395,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _buildCurrencyCard(context),
               _buildDecimalPrecisionCard(context),
 
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
             ],
 
             // Billing Preferences — settings that already governed retail bills
@@ -403,7 +409,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _buildVisualKeyboardCard(context),
               _buildRefundsCard(context),
 
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
             ],
 
             // Payment Settings Section
@@ -432,7 +438,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 },
               ),
 
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
             ],
 
             // Tax Section — hidden entirely for a business that answered
@@ -466,7 +472,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 },
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
             ],
 
             if (TaxFeature.enabled) ...[
@@ -498,7 +504,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 // GST Reports and EOD Reports used to live here — a reports section
                 // filed under TAX SETTINGS. Both now sit in the Reports hub, which
                 // is where someone looks for a report. Settings stays config only.
-                const SizedBox(height: 16),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
               ],
             ],
 
@@ -527,7 +533,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 },
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
             ],
 
             // Help & Support — deliberately outside the 'settings' gate.
@@ -582,32 +588,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required VoidCallback onTap,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
       child: ListTile(
         onTap: onTap,
         leading: Container(
-          padding: const EdgeInsets.all(8),
+          padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
           decoration: BoxDecoration(
             color: iconColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.smallBorderRadius(context),
+            ),
           ),
           child: Icon(icon, color: iconColor, size: 24),
         ),
         title: Text(
           title,
-          style: TextStyle(
+          style: GoogleFonts.poppins(
             fontSize: AppResponsive.bodyFontSize(context),
             fontWeight: FontWeight.w600,
           ),
         ),
         subtitle: Text(
           subtitle,
-          style: TextStyle(
+          style: GoogleFonts.poppins(
             fontSize: AppResponsive.captionFontSize(context),
             color: AppColors.textSecondary,
           ),
@@ -633,10 +643,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Widget? child,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
       child: Column(
@@ -644,23 +656,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ListTile(
             onTap: () => onChanged(!value),
             leading: Container(
-              padding: const EdgeInsets.all(8),
+              padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
               decoration: BoxDecoration(
                 color: iconColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
               ),
               child: Icon(icon, color: iconColor, size: 24),
             ),
             title: Text(
               title,
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: AppResponsive.bodyFontSize(context),
                 fontWeight: FontWeight.w600,
               ),
             ),
             subtitle: Text(
               subtitle,
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: AppResponsive.captionFontSize(context),
                 color: AppColors.textSecondary,
               ),
@@ -719,7 +733,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               color: AppColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -820,7 +834,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               color: AppColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -834,8 +848,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color:
-                        selected ? Colors.deepPurple : AppColors.surfaceLight,
+                    color: selected
+                        ? Colors.deepPurple
+                        : AppColors.surfaceLight,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: selected ? Colors.deepPurple : AppColors.divider,
@@ -847,9 +862,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     style: GoogleFonts.poppins(
                       fontSize: AppResponsive.smallFontSize(context),
                       fontWeight: FontWeight.w600,
-                      color: selected
-                          ? AppColors.white
-                          : AppColors.textPrimary,
+                      color: selected ? AppColors.white : AppColors.textPrimary,
                     ),
                   ),
                 ),
@@ -873,46 +886,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return ValueListenableBuilder<int>(
       valueListenable: RestaurantSession.timeoutMinutesNotifier,
       builder: (context, current, _) => Container(
-        margin: const EdgeInsets.only(bottom: 12),
+        margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.borderRadius(context),
+          ),
           border: Border.all(color: AppColors.divider),
         ),
-        padding: const EdgeInsets.all(16),
+        padding: AppResponsive.cardPadding(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
                   decoration: BoxDecoration(
                     color: Colors.orange.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.smallBorderRadius(context),
+                    ),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.lock_clock_rounded,
                     color: Colors.orange,
                     size: 24,
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: AppResponsive.mediumSpacing(context)),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Auto Logout Timeout',
-                        style: TextStyle(
+                        style: GoogleFonts.poppins(
                           fontSize: AppResponsive.bodyFontSize(context),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      SizedBox(height: 2),
                       Text(
                         'Lock session after period of inactivity',
-                        style: TextStyle(
+                        style: GoogleFonts.poppins(
                           fontSize: AppResponsive.captionFontSize(context),
                           color: AppColors.textSecondary,
                         ),
@@ -922,9 +939,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             const Divider(height: 1, color: AppColors.divider),
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -938,8 +955,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color:
-                          selected ? Colors.orange : AppColors.surfaceLight,
+                      color: selected ? Colors.orange : AppColors.surfaceLight,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: selected ? Colors.orange : AppColors.divider,
@@ -973,7 +989,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context, _) {
         final autoCloseOn =
             AppSettings.settingsNotifier.value["Auto Close Stale Shift"] ??
-                true;
+            true;
         return _buildToggleCard(
           context,
           icon: Icons.history_toggle_off_rounded,
@@ -1011,7 +1027,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               color: AppColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -1037,9 +1053,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     style: GoogleFonts.poppins(
                       fontSize: AppResponsive.smallFontSize(context),
                       fontWeight: FontWeight.w600,
-                      color: selected
-                          ? AppColors.white
-                          : AppColors.textPrimary,
+                      color: selected ? AppColors.white : AppColors.textPrimary,
                     ),
                   ),
                 ),
@@ -1053,21 +1067,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildStockAlertThresholdCard(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
       child: ListTile(
         onTap: () => _showThresholdDialog(context),
         leading: Container(
-          padding: const EdgeInsets.all(8),
+          padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
           decoration: BoxDecoration(
             color: AppColors.warning.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.smallBorderRadius(context),
+            ),
           ),
-          child: const Icon(
+          child: Icon(
             Icons.notifications_active,
             color: AppColors.warning,
             size: 24,
@@ -1075,7 +1093,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         title: Text(
           'Stock Alert Threshold',
-          style: TextStyle(
+          style: GoogleFonts.poppins(
             fontSize: AppResponsive.bodyFontSize(context),
             fontWeight: FontWeight.w600,
           ),
@@ -1083,7 +1101,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         subtitle: Observer(
           builder: (_) => Text(
             'Alert when stock falls below ${stockAlertStore.threshold}',
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.captionFontSize(context),
               color: AppColors.textSecondary,
             ),
@@ -1091,14 +1109,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         trailing: Observer(
           builder: (_) => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: AppColors.warning.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
             ),
             child: Text(
               '${stockAlertStore.threshold}',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: AppResponsive.bodyFontSize(context),
                 fontWeight: FontWeight.bold,
                 color: AppColors.warning,
@@ -1123,7 +1143,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required VoidCallback onTap,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
       child: Material(
         color: selected
             ? AppColors.primary.withValues(alpha: 0.08)
@@ -1143,7 +1163,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   size: AppResponsive.smallIconSize(context),
                   color: selected ? AppColors.primary : AppColors.textSecondary,
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: AppResponsive.mediumSpacing(context)),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1214,29 +1234,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildCurrencyCard(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
       child: ListTile(
         onTap: () => _showCurrencyDialog(context),
         leading: Container(
-          padding: const EdgeInsets.all(8),
+          padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
           decoration: BoxDecoration(
             color: AppColors.success.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.smallBorderRadius(context),
+            ),
           ),
-          child: const Icon(
-            Icons.attach_money,
-            color: AppColors.success,
-            size: 24,
-          ),
+          child: Icon(Icons.attach_money, color: AppColors.success, size: 24),
         ),
         title: Text(
           'Currency',
-          style: TextStyle(
+          style: GoogleFonts.poppins(
             fontSize: AppResponsive.bodyFontSize(context),
             fontWeight: FontWeight.w600,
           ),
@@ -1247,7 +1267,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             final currency = CurrencyHelper.currencies[currencyCode];
             return Text(
               '${currency?.name ?? 'Indian Rupee'} (${currency?.symbol ?? '₹'})',
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: AppResponsive.captionFontSize(context),
                 color: AppColors.textSecondary,
               ),
@@ -1260,14 +1280,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             final symbol =
                 CurrencyHelper.currencies[currencyCode]?.symbol ?? '₹';
             return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: AppColors.success.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
               ),
               child: Text(
                 symbol,
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   fontSize: AppResponsive.subheadingFontSize(context),
                   fontWeight: FontWeight.bold,
                   color: AppColors.success,
@@ -1324,21 +1346,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildDecimalPrecisionCard(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
       child: ListTile(
         onTap: () => _showDecimalPrecisionDialog(context),
         leading: Container(
-          padding: const EdgeInsets.all(8),
+          padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
           decoration: BoxDecoration(
             color: AppColors.info.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.smallBorderRadius(context),
+            ),
           ),
-          child: const Icon(
+          child: Icon(
             Icons.format_list_numbered,
             color: AppColors.info,
             size: 24,
@@ -1346,7 +1372,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         title: Text(
           'Decimal Precision',
-          style: TextStyle(
+          style: GoogleFonts.poppins(
             fontSize: AppResponsive.bodyFontSize(context),
             fontWeight: FontWeight.w600,
           ),
@@ -1356,7 +1382,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           builder: (context, precision, child) {
             return Text(
               DecimalSettings.getPrecisionLabel(precision),
-              style: TextStyle(
+              style: GoogleFonts.poppins(
                 fontSize: AppResponsive.captionFontSize(context),
                 color: AppColors.textSecondary,
               ),
@@ -1367,14 +1393,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           valueListenable: DecimalSettings.precisionNotifier,
           builder: (context, precision, child) {
             return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: AppColors.info.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
               ),
               child: Text(
                 '$precision',
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   fontSize: AppResponsive.bodyFontSize(context),
                   fontWeight: FontWeight.bold,
                   color: AppColors.info,

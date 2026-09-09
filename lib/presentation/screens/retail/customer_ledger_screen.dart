@@ -98,11 +98,11 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
           ),
           if (_dateFilter != null)
             IconButton(
-              icon: const Icon(Icons.filter_alt_off_outlined),
+              icon: Icon(Icons.filter_alt_off_outlined),
               tooltip: 'Clear filter',
               onPressed: () => setState(() => _dateFilter = null),
             ),
-          const SizedBox(width: 4),
+          SizedBox(width: 4),
         ],
       ),
       body: MoneyScope(
@@ -128,12 +128,14 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                         color: AppColors.info.withValues(alpha: 0.08),
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.calendar_today_rounded,
-                              size: 14,
+                              size: AppResponsive.smallIconSize(context),
                               color: AppColors.info,
                             ),
-                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: AppResponsive.smallSpacing(context),
+                            ),
                             Text(
                               '${DateFormat('dd/MM/yy').format(_dateFilter!.start)} — ${DateFormat('dd/MM/yy').format(_dateFilter!.end)}',
                               style: GoogleFonts.poppins(
@@ -186,11 +188,16 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
     final hasDue = widget.customer.creditBalance > 0;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.symmetric(
+        horizontal: AppResponsive.cardPadding(context).left,
+        vertical: AppResponsive.mediumSpacing(context),
+      ),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
       child: Column(
@@ -211,7 +218,7 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -238,9 +245,9 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
           const Divider(height: 1, color: AppColors.divider),
-          const SizedBox(height: 14),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -277,7 +284,7 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
             color: color,
           ),
         ),
-        const SizedBox(height: 2),
+        SizedBox(height: 2),
         Text(
           label,
           style: GoogleFonts.poppins(
@@ -336,28 +343,36 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
           Column(
             children: [
               Container(
-                width: 38,
-                height: 38,
+                width: AppResponsive.smallAvatarSize(context),
+                height: AppResponsive.smallAvatarSize(context),
                 decoration: BoxDecoration(
                   color: iconColor.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                   border: Border.all(color: iconColor, width: 2),
                 ),
-                child: Icon(icon, color: iconColor, size: 18),
+                child: Icon(
+                  icon,
+                  color: iconColor,
+                  size: AppResponsive.smallIconSize(context),
+                ),
               ),
               if (!isLast)
                 Expanded(child: Container(width: 2, color: AppColors.divider)),
             ],
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
 
           Expanded(
             child: Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(12),
+              margin: EdgeInsets.only(
+                bottom: AppResponsive.largeSpacing(context),
+              ),
+              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
               decoration: BoxDecoration(
                 color: AppColors.white,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
                 border: Border.all(color: AppColors.divider),
               ),
               child: Column(
@@ -370,7 +385,7 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                       color: AppColors.textSecondary,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: 4),
                   Text(
                     entry.description,
                     style: GoogleFonts.poppins(
@@ -379,7 +394,7 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [

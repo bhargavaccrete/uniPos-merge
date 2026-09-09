@@ -122,7 +122,7 @@ class _SupplierClaimDetailScreenState extends State<SupplierClaimDetailScreen> {
                   color: AppColors.textSecondary,
                 ),
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               AppTextField(
                 controller: noteController,
                 label: 'Resolution note',
@@ -134,7 +134,7 @@ class _SupplierClaimDetailScreenState extends State<SupplierClaimDetailScreen> {
           ),
           actions: [
             appDialogCancelButton(dialogContext),
-            const SizedBox(width: 12),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
             appDialogPrimaryButton(
               label: _transitionLabel(target),
               color: accent,
@@ -209,9 +209,11 @@ class _SupplierClaimDetailScreenState extends State<SupplierClaimDetailScreen> {
                   AppResponsive.padding(context).left,
                   AppResponsive.largeSpacing(context),
                 ),
-                child: _capped(
-                  context,
-                  Column(
+                child: AppResponsive.constrainedContent(
+                  context: context,
+                  alignment: Alignment.topCenter,
+                  maxWidth: AppResponsive.maxCardWidth(context),
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildHeaderCard(),
@@ -229,22 +231,6 @@ class _SupplierClaimDetailScreenState extends State<SupplierClaimDetailScreen> {
                   ),
                 ),
               ),
-      ),
-    );
-  }
-
-  /// Caps content width on large screens so a stack of detail cards doesn't
-  /// stretch across a laptop.
-  Widget _capped(BuildContext context, Widget child) {
-    final maxWidth = AppResponsive.maxCardWidth(context);
-    if (maxWidth == double.infinity) return child;
-    return Align(
-      // topCenter, not Center: Center aligns on BOTH axes, so a
-      // shrink-wrapping child floats in the vertical middle.
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
       ),
     );
   }
@@ -277,7 +263,7 @@ class _SupplierClaimDetailScreenState extends State<SupplierClaimDetailScreen> {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -388,18 +374,23 @@ class _SupplierClaimDetailScreenState extends State<SupplierClaimDetailScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            // Flexible + ellipsis: spaceBetween shares out SURPLUS only, so a
+            // longer stage label on a narrow phone would overflow the row.
             for (final stage in stages)
-              Text(
-                _statusLabel(stage),
-                maxLines: 1,
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.captionFontSize(context),
-                  fontWeight: stage == current
-                      ? FontWeight.w700
-                      : FontWeight.w400,
-                  color: stage == current
-                      ? supplierClaimStatusColor(stage)
-                      : AppColors.textSecondary,
+              Flexible(
+                child: Text(
+                  _statusLabel(stage),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.captionFontSize(context),
+                    fontWeight: stage == current
+                        ? FontWeight.w700
+                        : FontWeight.w400,
+                    color: stage == current
+                        ? supplierClaimStatusColor(stage)
+                        : AppColors.textSecondary,
+                  ),
                 ),
               ),
           ],
@@ -510,7 +501,7 @@ class _SupplierClaimDetailScreenState extends State<SupplierClaimDetailScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -750,7 +741,7 @@ class _SupplierClaimDetailScreenState extends State<SupplierClaimDetailScreen> {
                   size: AppResponsive.iconSize(context),
                   color: iconColor ?? AppColors.primary,
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Expanded(
                   child: Text(
                     title,

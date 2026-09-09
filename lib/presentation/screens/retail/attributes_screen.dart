@@ -60,7 +60,7 @@ class _AttributesScreenState extends State<AttributesScreen> {
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Product Attributes',
-        titleFontSize: 18,
+        titleFontSize: AppResponsive.subheadingFontSize(context),
       ),
       body: SafeArea(
         child: AppResponsive.constrainedContent(
@@ -84,7 +84,9 @@ class _AttributesScreenState extends State<AttributesScreen> {
               }
 
               return ListView(
-                padding: AppResponsive.screenPadding(context).copyWith(bottom: 88),
+                padding: AppResponsive.screenPadding(
+                  context,
+                ).copyWith(bottom: 88),
                 children: [
                   _buildExplainer(),
                   SizedBox(height: AppResponsive.mediumSpacing(context)),
@@ -130,12 +132,12 @@ class _AttributesScreenState extends State<AttributesScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
+          Icon(
             Icons.info_outline_rounded,
-            size: 18,
+            size: AppResponsive.smallIconSize(context),
             color: AppColors.primary,
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Expanded(
             child: Text(
               'Attributes are shared across every product. Variable products '
@@ -327,7 +329,7 @@ class _AttributesScreenState extends State<AttributesScreen> {
                     : (_) => Navigator.pop(dialogContext, read()),
               ),
               if (isColor) ...[
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 AppTextField(
                   controller: colorController,
                   label: 'Color Code (optional)',
@@ -338,7 +340,7 @@ class _AttributesScreenState extends State<AttributesScreen> {
                 ),
               ],
               if (helper != null) ...[
-                const SizedBox(height: 10),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
                 Text(
                   helper,
                   style: GoogleFonts.poppins(
@@ -351,7 +353,7 @@ class _AttributesScreenState extends State<AttributesScreen> {
           ),
           actions: [
             appDialogCancelButton(dialogContext),
-            const SizedBox(width: 12),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
             appDialogPrimaryButton(
               label: confirmLabel,
               onPressed: () => Navigator.pop(dialogContext, read()),
@@ -440,11 +442,13 @@ class _AttributeCard extends StatelessWidget {
     final isColor = _isColorAttribute(attribute.name);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.fromLTRB(16, 12, 8, 16),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
+      padding: EdgeInsets.fromLTRB(16, 12, 8, 16),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
         // Same soft lift the POS and report cards use.
         boxShadow: const [
@@ -505,7 +509,7 @@ class _AttributeCard extends StatelessWidget {
               ],
             ],
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           const Divider(height: 1, color: AppColors.divider),
           SizedBox(height: AppResponsive.smallSpacing(context)),
 
@@ -536,32 +540,35 @@ class _AttributeCard extends StatelessWidget {
                         .toList(),
                   ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
 
           if (canEdit)
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: OutlinedButton.icon(
-              onPressed: onAddValue,
-              icon: const Icon(Icons.add, size: 18),
-              label: Text(
-                'Add Value',
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.smallFontSize(context),
-                  fontWeight: FontWeight.w600,
+            Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: OutlinedButton.icon(
+                onPressed: onAddValue,
+                icon: Icon(
+                  Icons.add,
+                  size: AppResponsive.smallIconSize(context),
                 ),
-              ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                side: const BorderSide(color: AppColors.primary),
-                padding: const EdgeInsets.symmetric(vertical: 11),
-                minimumSize: const Size(double.infinity, 0),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                label: Text(
+                  'Add Value',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.primary),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  minimumSize: const Size(double.infinity, 0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -615,7 +622,11 @@ class _ValueChip extends StatelessWidget {
     final selected = await showMenu<String>(
       context: context,
       color: AppColors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+      ),
       position: RelativeRect.fromLTRB(
         topLeft.dx,
         topLeft.dy + box.size.height,
@@ -627,12 +638,12 @@ class _ValueChip extends StatelessWidget {
           value: 'edit',
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.edit_outlined,
-                size: 18,
+                size: AppResponsive.smallIconSize(context),
                 color: AppColors.textPrimary,
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Text(
                 'Edit',
                 style: GoogleFonts.poppins(
@@ -646,12 +657,12 @@ class _ValueChip extends StatelessWidget {
           value: 'delete',
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.delete_outline,
-                size: 18,
+                size: AppResponsive.smallIconSize(context),
                 color: AppColors.danger,
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Text(
                 'Delete',
                 style: GoogleFonts.poppins(
@@ -685,7 +696,10 @@ class _ValueChip extends StatelessWidget {
           onTap: canEdit ? onEdit : null,
           onLongPress: canEdit ? () => _showMenu(context) : null,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: EdgeInsets.symmetric(
+              horizontal: AppResponsive.mediumSpacing(context),
+              vertical: AppResponsive.smallSpacing(context),
+            ),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: AppColors.divider),
@@ -703,7 +717,7 @@ class _ValueChip extends StatelessWidget {
                       border: Border.all(color: AppColors.divider),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
                 ],
                 Text(
                   value.value,
@@ -783,7 +797,7 @@ Future<String?> _promptAttributeName({
         ),
         actions: [
           appDialogCancelButton(dialogContext),
-          const SizedBox(width: 12),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           appDialogPrimaryButton(
             label: confirmLabel,
             onPressed: () =>

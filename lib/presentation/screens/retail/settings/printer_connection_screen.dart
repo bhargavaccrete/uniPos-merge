@@ -68,7 +68,7 @@ class _RetailPrinterConnectionScreenState
         onPressed: _openAddPrinter,
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.white,
-        icon: const Icon(Icons.add),
+        icon: Icon(Icons.add),
         label: Text(
           'Add Printer',
           style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
@@ -106,7 +106,7 @@ class _RetailPrinterConnectionScreenState
                 _sectionHeader('ACTIVE PRINTER'),
                 if (active != null) _activeCard(active) else _noActiveCard(),
                 if (others.isNotEmpty) ...[
-                  const SizedBox(height: 8),
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
                   _sectionHeader('OTHER SAVED PRINTERS'),
                   ...others.map(_otherRow),
                 ],
@@ -121,7 +121,7 @@ class _RetailPrinterConnectionScreenState
   // ── Active printer ─────────────────────────────────────────────────────────
   Widget _activeCard(SavedPrinterModel p) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(14),
@@ -140,7 +140,7 @@ class _RetailPrinterConnectionScreenState
                 ),
                 child: Icon(_iconFor(p), color: AppColors.success, size: 22),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -152,7 +152,7 @@ class _RetailPrinterConnectionScreenState
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    SizedBox(height: 2),
                     Text(
                       '${p.type.toUpperCase()} · ${p.paperSize}mm · ${p.address}',
                       style: GoogleFonts.poppins(
@@ -170,13 +170,16 @@ class _RetailPrinterConnectionScreenState
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
           Row(
             children: [
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () => _testPrint(p),
-                  icon: const Icon(Icons.print_outlined, size: 18),
+                  icon: Icon(
+                    Icons.print_outlined,
+                    size: AppResponsive.smallIconSize(context),
+                  ),
                   label: Text(
                     'Test Print',
                     style: GoogleFonts.poppins(
@@ -187,17 +190,22 @@ class _RetailPrinterConnectionScreenState
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.primary,
                     side: BorderSide(color: AppColors.primary),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: EdgeInsets.symmetric(
+                      vertical: AppResponsive.mediumSpacing(context),
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               OutlinedButton.icon(
                 onPressed: () => _confirmDelete(p),
-                icon: const Icon(Icons.delete_outline, size: 18),
+                icon: Icon(
+                  Icons.delete_outline,
+                  size: AppResponsive.smallIconSize(context),
+                ),
                 label: Text(
                   'Remove',
                   style: GoogleFonts.poppins(
@@ -228,16 +236,22 @@ class _RetailPrinterConnectionScreenState
   /// was deleted from inside a tab.
   Widget _noActiveCard() {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.warning.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          Icon(Icons.info_outline, size: 18, color: AppColors.warning),
-          const SizedBox(width: 8),
+          Icon(
+            Icons.info_outline,
+            size: AppResponsive.smallIconSize(context),
+            color: AppColors.warning,
+          ),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Expanded(
             child: Text(
               'No printer selected — tap one below to make it active.',
@@ -255,10 +269,12 @@ class _RetailPrinterConnectionScreenState
   // ── Other saved printers ───────────────────────────────────────────────────
   Widget _otherRow(SavedPrinterModel p) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
       child: ListTile(
@@ -292,7 +308,7 @@ class _RetailPrinterConnectionScreenState
             IconButton(
               icon: Icon(
                 Icons.delete_outline,
-                size: 20,
+                size: AppResponsive.iconSize(context),
                 color: AppColors.danger,
               ),
               tooltip: 'Delete',
@@ -306,7 +322,7 @@ class _RetailPrinterConnectionScreenState
 
   Widget _sectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8, top: 4),
+      padding: EdgeInsets.only(bottom: 8, top: 4),
       child: Text(
         title,
         style: GoogleFonts.poppins(
