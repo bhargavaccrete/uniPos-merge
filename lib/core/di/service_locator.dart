@@ -99,6 +99,7 @@ import 'package:billberrylite/domain/store/common/attendance_store.dart';
 import 'package:billberrylite/domain/store/common/notification_store.dart';
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 import 'package:billberrylite/domain/services/common/license_api_service.dart';
+import 'package:billberrylite/domain/services/common/windows_spooler/windows_spooler_service.dart';
 import 'package:billberrylite/domain/services/restaurant/thermal_printer_service.dart';
 
 import 'package:billberrylite/data/repositories/common/attendance_repository.dart';
@@ -187,8 +188,17 @@ Future<void> setupServiceLocator() async {
   // "not registered inside GetIt".
   locator.registerLazySingleton<PrinterRepository>(() => PrinterRepository());
   locator.registerLazySingleton<ThermalPrinterService>(() => ThermalPrinterService());
+  // Windows spooler is a fourth transport, not part of ThermalPrinterService:
+  // flutter_thermal_printer has no Windows implementation, so Windows reaches
+  // the printer through the OS print queue instead of the hardware.
+  locator.registerLazySingleton<WindowsSpoolerService>(
+      () => WindowsSpoolerService());
   locator.registerLazySingleton<PrinterStore>(
-    () => PrinterStore(locator<PrinterRepository>(), locator<ThermalPrinterService>()),
+    () => PrinterStore(
+      locator<PrinterRepository>(),
+      locator<ThermalPrinterService>(),
+      windowsSpooler: locator<WindowsSpoolerService>(),
+    ),
   );
 
   // Notification feed — common to both modes for the same reason as the

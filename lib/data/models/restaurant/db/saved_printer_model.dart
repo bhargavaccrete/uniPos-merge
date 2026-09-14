@@ -12,10 +12,13 @@ class SavedPrinterModel extends HiveObject {
   final String name;
 
   @HiveField(2)
-  final String type; // 'bluetooth' | 'wifi' | 'usb'
+  final String type; // 'bluetooth' | 'wifi' | 'usb' | 'windows'
 
   @HiveField(3)
-  final String address; // MAC for BT, "IP:port" for WiFi, "vendorId:productId" for USB
+  // MAC for BT, "IP:port" for WiFi, "vendorId:productId" for USB, and the
+  // Windows spooler queue name for 'windows'. The queue name may itself
+  // contain a colon ("Printer on SERVER:2") — never split it.
+  final String address;
 
   @HiveField(4)
   final int paperSize; // 58 or 80 (mm)
@@ -43,6 +46,10 @@ class SavedPrinterModel extends HiveObject {
   bool get isBluetooth => type == 'bluetooth';
   bool get isWifi => type == 'wifi';
   bool get isUsb => type == 'usb';
+
+  /// Printed through the Windows print spooler rather than direct to hardware.
+  bool get isWindows => type == 'windows';
+
   bool get isKotPrinter => role == 'kot' || role == 'both';
   bool get isReceiptPrinter => role == 'receipt' || role == 'both';
 

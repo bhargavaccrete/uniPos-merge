@@ -38,6 +38,13 @@ mixin _$PrinterStore on _PrinterStore, Store {
           Computed<List<SavedPrinterModel>>(() => super.wifiPrinters,
               name: '_PrinterStore.wifiPrinters'))
       .value;
+  Computed<List<SavedPrinterModel>>? _$windowsPrintersComputed;
+
+  @override
+  List<SavedPrinterModel> get windowsPrinters => (_$windowsPrintersComputed ??=
+          Computed<List<SavedPrinterModel>>(() => super.windowsPrinters,
+              name: '_PrinterStore.windowsPrinters'))
+      .value;
 
   late final _$savedPrintersAtom =
       Atom(name: '_PrinterStore.savedPrinters', context: context);
@@ -237,6 +244,24 @@ mixin _$PrinterStore on _PrinterStore, Store {
         assignRole: assignRole));
   }
 
+  late final _$saveWindowsPrinterAsyncAction =
+      AsyncAction('_PrinterStore.saveWindowsPrinter', context: context);
+
+  @override
+  Future<void> saveWindowsPrinter(
+      {required String name,
+      required String queueName,
+      int paperSize = 80,
+      String role = 'both',
+      String? assignRole}) {
+    return _$saveWindowsPrinterAsyncAction.run(() => super.saveWindowsPrinter(
+        name: name,
+        queueName: queueName,
+        paperSize: paperSize,
+        role: role,
+        assignRole: assignRole));
+  }
+
   late final _$testWifiConnectionAsyncAction =
       AsyncAction('_PrinterStore.testWifiConnection', context: context);
 
@@ -304,8 +329,10 @@ mixin _$PrinterStore on _PrinterStore, Store {
       AsyncAction('_PrinterStore.sendBytes', context: context);
 
   @override
-  Future<bool> sendBytes(List<int> bytes, SavedPrinterModel printer) {
-    return _$sendBytesAsyncAction.run(() => super.sendBytes(bytes, printer));
+  Future<bool> sendBytes(List<int> bytes, SavedPrinterModel printer,
+      {bool verifyDelivery = false}) {
+    return _$sendBytesAsyncAction.run(
+        () => super.sendBytes(bytes, printer, verifyDelivery: verifyDelivery));
   }
 
   late final _$testPrintAsyncAction =
@@ -345,7 +372,8 @@ isPrinting: ${isPrinting},
 hasDefaultKotPrinter: ${hasDefaultKotPrinter},
 hasDefaultReceiptPrinter: ${hasDefaultReceiptPrinter},
 bluetoothPrinters: ${bluetoothPrinters},
-wifiPrinters: ${wifiPrinters}
+wifiPrinters: ${wifiPrinters},
+windowsPrinters: ${windowsPrinters}
     ''';
   }
 }

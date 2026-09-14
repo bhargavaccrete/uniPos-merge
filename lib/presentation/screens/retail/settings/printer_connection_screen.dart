@@ -49,10 +49,14 @@ class _RetailPrinterConnectionScreenState
     ).then((_) => printerStore.loadSavedPrinters());
   }
 
+  // WiFi is the fallback, so any new transport must be named explicitly here
+  // or it silently renders as a WiFi printer.
   IconData _iconFor(SavedPrinterModel p) => p.isBluetooth
       ? Icons.bluetooth
       : p.isUsb
       ? Icons.usb
+      : p.isWindows
+      ? Icons.desktop_windows_outlined
       : Icons.wifi;
 
   @override

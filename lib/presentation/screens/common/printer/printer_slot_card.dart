@@ -1,3 +1,6 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -225,7 +228,12 @@ class _PrinterSlotCardState extends State<PrinterSlotCard> {
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.primary)),
-                        subtitle: Text('Bluetooth · WiFi · USB',
+                        // Bluetooth and USB can't reach a printer on Windows —
+                        // don't advertise them there.
+                        subtitle: Text(
+                            !kIsWeb && Platform.isWindows
+                                ? 'Windows · WiFi'
+                                : 'Bluetooth · WiFi · USB',
                             style: GoogleFonts.poppins(
                                 fontSize: 11, color: AppColors.textSecondary)),
                         onTap: () {
@@ -259,11 +267,15 @@ class _PrinterSlotCardState extends State<PrinterSlotCard> {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Icon(
+        // WiFi is the fallback, so any new transport must be named explicitly
+        // here or it silently renders as a WiFi printer.
         p.isBluetooth
             ? Icons.bluetooth
             : p.isUsb
                 ? Icons.usb
-                : Icons.wifi,
+                : p.isWindows
+                    ? Icons.desktop_windows_outlined
+                    : Icons.wifi,
         color: AppColors.info,
       ),
       title: Text(p.name,
