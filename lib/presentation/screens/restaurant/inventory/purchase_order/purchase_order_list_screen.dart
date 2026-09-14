@@ -79,7 +79,9 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
   Future<void> _navigateToReceiving(RestaurantPurchaseOrderModel po) async {
     final result = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(builder: (_) => GoodsReceivingScreen(purchaseOrder: po)),
+      MaterialPageRoute(
+        builder: (_) => GoodsReceivingScreen(purchaseOrder: po),
+      ),
     );
     if (result == true) {
       restaurantPurchaseOrderStore.loadPurchaseOrders();
@@ -101,14 +103,17 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
       final wantShare = await showAppConfirmDialog(
         context: context,
         title: 'Purchase Order sent',
-        message: 'Would you like to share this Purchase Order with the supplier on WhatsApp?',
+        message:
+            'Would you like to share this Purchase Order with the supplier on WhatsApp?',
         confirmLabel: 'Share on WhatsApp',
         cancelLabel: 'Not Now',
         accent: AppColors.success,
         icon: Icons.share_rounded,
       );
       if (wantShare && mounted) {
-        final items = restaurantPurchaseOrderItemRepository.getItemsByPOId(po.poId);
+        final items = restaurantPurchaseOrderItemRepository.getItemsByPOId(
+          po.poId,
+        );
         await sharePurchaseOrderToWhatsApp(
           context: context,
           po: po,
@@ -149,9 +154,11 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
             final pos = restaurantPurchaseOrderStore.purchaseOrders.toList();
 
             final openCount = pos
-                .where((p) =>
-                    p.statusEnum == RestaurantPOStatus.sent ||
-                    p.statusEnum == RestaurantPOStatus.partiallyReceived)
+                .where(
+                  (p) =>
+                      p.statusEnum == RestaurantPOStatus.sent ||
+                      p.statusEnum == RestaurantPOStatus.partiallyReceived,
+                )
                 .length;
             final draftCount = pos
                 .where((p) => p.statusEnum == RestaurantPOStatus.draft)
@@ -183,23 +190,29 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
                     ),
                   ],
                 ),
+                // Hero stays full-bleed; only the card list narrows.
                 Expanded(
-                  child: pos.isEmpty
-                      ? AppEmptyState(
-                          icon: Icons.assignment_outlined,
-                          title: 'No purchase orders yet',
-                          message: 'Create your first PO using the + button',
-                          action: appEmptyStateAction(
-                            label: 'Create Purchase Order',
-                            onPressed: _navigateToAdd,
+                  child: AppResponsive.constrainedContent(
+                    context: context,
+                    maxWidth: AppResponsive.maxFormWidth(context),
+                    alignment: Alignment.topCenter,
+                    child: pos.isEmpty
+                        ? AppEmptyState(
+                            icon: Icons.assignment_outlined,
+                            title: 'No purchase orders yet',
+                            message: 'Create your first PO using the + button',
+                            action: appEmptyStateAction(
+                              label: 'Create Purchase Order',
+                              onPressed: _navigateToAdd,
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: AppResponsive.padding(context),
+                            itemCount: pos.length,
+                            itemBuilder: (context, index) =>
+                                _buildPOCard(pos[index]),
                           ),
-                        )
-                      : ListView.builder(
-                          padding: AppResponsive.padding(context),
-                          itemCount: pos.length,
-                          itemBuilder: (context, index) =>
-                              _buildPOCard(pos[index]),
-                        ),
+                  ),
                 ),
               ],
             );
@@ -248,7 +261,7 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
                       po.poNumber,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
@@ -256,15 +269,17 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
                     ),
                   ),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: statusColor.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(9),
                     ),
                     child: Text(
                       poStatusLabel(status),
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.captionFontSize(context),
                         fontWeight: FontWeight.w700,
                         color: statusColor,
@@ -278,7 +293,7 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
                 po.supplierName ?? 'Unknown Supplier',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   fontSize: AppResponsive.bodyFontSize(context),
                   color: AppColors.textSecondary,
                 ),
@@ -302,7 +317,7 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
                   if (po.estimatedTotal > 0)
                     Text(
                       formatMoney(po.estimatedTotal),
-                      style: TextStyle(
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.smallFontSize(context),
                         color: AppColors.success,
                         fontWeight: FontWeight.w600,
@@ -317,8 +332,10 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
                   height: AppResponsive.buttonHeight(context),
                   child: OutlinedButton.icon(
                     onPressed: () => _markSent(po),
-                    icon: Icon(Icons.send,
-                        size: AppResponsive.smallIconSize(context)),
+                    icon: Icon(
+                      Icons.send,
+                      size: AppResponsive.smallIconSize(context),
+                    ),
                     label: const Text('Mark Sent'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primary,
@@ -333,8 +350,10 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
                   height: AppResponsive.buttonHeight(context),
                   child: OutlinedButton.icon(
                     onPressed: () => _navigateToReceiving(po),
-                    icon: Icon(Icons.local_shipping,
-                        size: AppResponsive.smallIconSize(context)),
+                    icon: Icon(
+                      Icons.local_shipping,
+                      size: AppResponsive.smallIconSize(context),
+                    ),
                     label: const Text('Receive'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primary,
@@ -356,9 +375,13 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
       children: [
         Icon(icon, size: AppResponsive.smallIconSize(context), color: color),
         const SizedBox(width: 4),
-        Text(label,
-            style: TextStyle(
-                fontSize: AppResponsive.smallFontSize(context), color: color)),
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.smallFontSize(context),
+            color: color,
+          ),
+        ),
       ],
     );
   }
@@ -398,8 +421,9 @@ class _PODetailSheetState extends State<_PODetailSheet> {
 
   void _loadItems() {
     setState(() {
-      _items =
-          restaurantPurchaseOrderItemRepository.getItemsByPOId(widget.po.poId);
+      _items = restaurantPurchaseOrderItemRepository.getItemsByPOId(
+        widget.po.poId,
+      );
       _loading = false;
     });
   }
@@ -448,7 +472,9 @@ class _PODetailSheetState extends State<_PODetailSheet> {
                           child: Text(
                             po.poNumber,
                             style: GoogleFonts.poppins(
-                              fontSize: 18,
+                              fontSize: AppResponsive.subheadingFontSize(
+                                context,
+                              ),
                               fontWeight: FontWeight.w600,
                               color: AppColors.textPrimary,
                             ),
@@ -456,7 +482,9 @@ class _PODetailSheetState extends State<_PODetailSheet> {
                         ),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: poStatusColor(status).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
@@ -464,7 +492,7 @@ class _PODetailSheetState extends State<_PODetailSheet> {
                           child: Text(
                             poStatusLabel(status),
                             style: GoogleFonts.poppins(
-                              fontSize: 12,
+                              fontSize: AppResponsive.smallFontSize(context),
                               fontWeight: FontWeight.w600,
                               color: poStatusColor(status),
                             ),
@@ -476,14 +504,18 @@ class _PODetailSheetState extends State<_PODetailSheet> {
                     Text(
                       po.supplierName ?? 'Unknown Supplier',
                       style: GoogleFonts.poppins(
-                          fontSize: 14, color: AppColors.textSecondary),
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     if (po.notes?.isNotEmpty == true) ...[
                       const SizedBox(height: 8),
                       Text(
                         po.notes!,
                         style: GoogleFonts.poppins(
-                            fontSize: 13, color: AppColors.textSecondary),
+                          fontSize: AppResponsive.smallFontSize(context),
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ],
                   ],
@@ -494,55 +526,59 @@ class _PODetailSheetState extends State<_PODetailSheet> {
                 child: _loading
                     ? const Center(child: CircularProgressIndicator())
                     : _items.isEmpty
-                        ? const AppEmptyState(
-                            dense: true,
-                            icon: Icons.inventory_2_outlined,
-                            title: 'No line items',
-                          )
-                        : ListView.separated(
-                            controller: scrollController,
-                            padding: const EdgeInsets.all(20),
-                            itemCount: _items.length,
-                            separatorBuilder: (_, __) =>
-                                const Divider(height: 20),
-                            itemBuilder: (context, index) {
-                              final item = _items[index];
-                              return Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          item.itemName ?? 'Unknown Item',
-                                          style: GoogleFonts.poppins(
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 14),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          'Qty: ${item.orderedQty}'
-                                          '${item.estimatedPrice != null ? ' @ ${formatMoney(item.estimatedPrice!)}' : ''}',
-                                          style: GoogleFonts.poppins(
-                                              fontSize: 12,
-                                              color: AppColors.textSecondary),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  if (item.estimatedTotal != null)
+                    ? const AppEmptyState(
+                        dense: true,
+                        icon: Icons.inventory_2_outlined,
+                        title: 'No line items',
+                      )
+                    : ListView.separated(
+                        controller: scrollController,
+                        padding: const EdgeInsets.all(20),
+                        itemCount: _items.length,
+                        separatorBuilder: (_, __) => const Divider(height: 20),
+                        itemBuilder: (context, index) {
+                          final item = _items[index];
+                          return Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
                                     Text(
-                                      formatMoney(item.estimatedTotal!),
+                                      item.itemName ?? 'Unknown Item',
                                       style: GoogleFonts.poppins(
                                         fontWeight: FontWeight.w600,
-                                        color: AppColors.success,
+                                        fontSize: AppResponsive.bodyFontSize(
+                                          context,
+                                        ),
                                       ),
                                     ),
-                                ],
-                              );
-                            },
-                          ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Qty: ${item.orderedQty}'
+                                      '${item.estimatedPrice != null ? ' @ ${formatMoney(item.estimatedPrice!)}' : ''}',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: AppResponsive.smallFontSize(
+                                          context,
+                                        ),
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (item.estimatedTotal != null)
+                                Text(
+                                  formatMoney(item.estimatedTotal!),
+                                  style: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.success,
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      ),
               ),
               if (status == RestaurantPOStatus.draft ||
                   po.canReceive ||
@@ -567,11 +603,11 @@ class _PODetailSheetState extends State<_PODetailSheet> {
                                   );
                                 }
                               : () => sharePurchaseOrderToWhatsApp(
-                                    context: context,
-                                    po: po,
-                                    items: _items,
-                                    phone: phone,
-                                  ),
+                                  context: context,
+                                  po: po,
+                                  items: _items,
+                                  phone: phone,
+                                ),
                           color: (phone == null || phone.trim().isEmpty)
                               ? AppColors.textSecondary
                               : AppColors.success,
@@ -613,7 +649,9 @@ String buildWhatsAppPOMessage({
     return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
   }
 
-  buffer.writeln('Expected Delivery: ${localFormatDate(po.expectedDeliveryDate)}');
+  buffer.writeln(
+    'Expected Delivery: ${localFormatDate(po.expectedDeliveryDate)}',
+  );
   if (po.notes?.isNotEmpty == true) {
     buffer.writeln('Notes: ${po.notes}');
   }
@@ -624,7 +662,9 @@ String buildWhatsAppPOMessage({
     final unit = itemDetail?.unit ?? '';
     final unitStr = unit.isNotEmpty ? ' $unit' : '';
     final qty = item.orderedQty;
-    final cleanQty = qty == qty.toInt() ? qty.toInt().toString() : qty.toString();
+    final cleanQty = qty == qty.toInt()
+        ? qty.toInt().toString()
+        : qty.toString();
     buffer.writeln('- ${item.itemName} — Qty: $cleanQty$unitStr');
   }
   buffer.writeln();
@@ -641,7 +681,9 @@ Future<void> sharePurchaseOrderToWhatsApp({
 }) async {
   final cleanPhone = cleanSupplierPhone(phone);
   if (cleanPhone.isEmpty) {
-    NotificationService.instance.showError('Supplier mobile number is not available.');
+    NotificationService.instance.showError(
+      'Supplier mobile number is not available.',
+    );
     return;
   }
 
@@ -650,7 +692,8 @@ Future<void> sharePurchaseOrderToWhatsApp({
     items: items,
     allItems: itemStore.items,
   );
-  final whatsappUrl = 'https://wa.me/$cleanPhone?text=${Uri.encodeComponent(message)}';
+  final whatsappUrl =
+      'https://wa.me/$cleanPhone?text=${Uri.encodeComponent(message)}';
   final uri = Uri.parse(whatsappUrl);
 
   try {

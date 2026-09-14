@@ -22,7 +22,8 @@ class VariantTab extends StatefulWidget {
   State<VariantTab> createState() => _VariantTabState();
 }
 
-class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMixin {
+class _VariantTabState extends State<VariantTab>
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
   TextEditingController variantController = TextEditingController();
@@ -30,7 +31,8 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
   String query = '';
   VariantModel? editingVariante;
 
-  bool get _canEdit => RestaurantSession.isAdmin || RestaurantSession.staffRole == 'Manager';
+  bool get _canEdit =>
+      RestaurantSession.isAdmin || RestaurantSession.staffRole == 'Manager';
   // Plan entitlements layered on the role check (manage_menu.variants.*).
   // Visibility = role only; entitlement enforced on action (openBottomSheet/_delete).
   bool get _canAddVariant => _canEdit;
@@ -56,11 +58,12 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
 
   void openBottomSheet({VariantModel? variante}) {
     if (!PlanGuard.allowedOr(
-        context,
-        variante == null
-            ? EntKeys.manageMenuVariantsAdd
-            : EntKeys.manageMenuVariantsEdit,
-        featureName: variante == null ? 'Add Variants' : 'Edit Variants')) {
+      context,
+      variante == null
+          ? EntKeys.manageMenuVariantsAdd
+          : EntKeys.manageMenuVariantsEdit,
+      featureName: variante == null ? 'Add Variants' : 'Edit Variants',
+    )) {
       return;
     }
     if (variante != null) {
@@ -78,7 +81,10 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
         barrierDismissible: true,
         builder: (ctx) => Dialog(
           backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 80, vertical: 40),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 80,
+            vertical: 40,
+          ),
           child: ConstrainedBox(
             constraints: BoxConstraints(
               maxWidth: 480,
@@ -137,7 +143,7 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
@@ -145,10 +151,10 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
                 child: Icon(
                   isEditing ? Icons.edit_rounded : Icons.tune_rounded,
                   color: AppColors.primary,
-                  size: 20,
+                  size: AppResponsive.iconSize(context),
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -156,7 +162,7 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
                     Text(
                       isEditing ? 'Edit Variant' : 'Add Variant',
                       style: GoogleFonts.poppins(
-                        fontSize: 16,
+                        fontSize: AppResponsive.subheadingFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: Colors.black87,
                       ),
@@ -166,7 +172,7 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
                           ? 'Update the variant name'
                           : 'Create a new variant option',
                       style: GoogleFonts.poppins(
-                        fontSize: 12,
+                        fontSize: AppResponsive.smallFontSize(context),
                         color: Colors.grey.shade500,
                       ),
                     ),
@@ -196,7 +202,7 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
             textInputAction: TextInputAction.done,
             onFieldSubmitted: (_) => _addOrEditVariante(),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
 
           // ── Action buttons ────────────────────────────────────────────
           Row(
@@ -205,21 +211,27 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
                 child: OutlinedButton(
                   onPressed: () => Navigator.pop(ctx),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    padding: EdgeInsets.symmetric(
+                      vertical: AppResponsive.mediumSpacing(context),
+                    ),
                     side: BorderSide(color: Colors.grey.shade300),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.borderRadius(context),
+                      ),
+                    ),
                   ),
                   child: Text(
                     'Cancel',
                     style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: Colors.grey.shade700,
-                        fontWeight: FontWeight.w500),
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      color: Colors.grey.shade700,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               Expanded(
                 flex: 2,
                 child: ElevatedButton.icon(
@@ -228,21 +240,27 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
                     isEditing
                         ? Icons.check_rounded
                         : Icons.add_circle_outline_rounded,
-                    size: 18,
+                    size: AppResponsive.smallIconSize(context),
                     color: Colors.white,
                   ),
                   label: Text(
                     isEditing ? 'Update Variant' : 'Add Variant',
                     style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white),
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    padding: EdgeInsets.symmetric(
+                      vertical: AppResponsive.mediumSpacing(context),
+                    ),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.borderRadius(context),
+                      ),
+                    ),
                     elevation: 0,
                   ),
                 ),
@@ -262,16 +280,23 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
     }
 
     // Duplicate name check (excluding current item when editing)
-    final exists = variantStore.variants.any((v) =>
-        v.name.toLowerCase() == trimmedName.toLowerCase() &&
-        v.id != (editingVariante?.id ?? ''));
+    final exists = variantStore.variants.any(
+      (v) =>
+          v.name.toLowerCase() == trimmedName.toLowerCase() &&
+          v.id != (editingVariante?.id ?? ''),
+    );
     if (exists) {
-      NotificationService.instance.showError('A variant with this name already exists');
+      NotificationService.instance.showError(
+        'A variant with this name already exists',
+      );
       return;
     }
 
     if (editingVariante != null) {
-      final updateVariante = VariantModel(id: editingVariante!.id, name: trimmedName);
+      final updateVariante = VariantModel(
+        id: editingVariante!.id,
+        name: trimmedName,
+      );
       await variantStore.updateVariant(updateVariante);
     } else {
       final newvariante = VariantModel(id: Uuid().v4(), name: trimmedName);
@@ -284,7 +309,12 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
   }
 
   Future<void> _delete(String id) async {
-    if (!PlanGuard.allowedOr(context, EntKeys.manageMenuVariantsDelete, featureName: 'Delete Variants')) return;
+    if (!PlanGuard.allowedOr(
+      context,
+      EntKeys.manageMenuVariantsDelete,
+      featureName: 'Delete Variants',
+    ))
+      return;
     final variant = variantStore.variants.firstWhere((v) => v.id == id);
     final confirmed = await showAppConfirmDialog(
       context: context,
@@ -299,7 +329,6 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
       await variantStore.deleteVariant(id);
     }
   }
-
 
   @override
   @override
@@ -321,7 +350,11 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
               icon: Icons.search_rounded,
               suffixIcon: query.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.clear, color: Colors.grey, size: 20),
+                      icon: Icon(
+                        Icons.clear,
+                        color: Colors.grey,
+                        size: AppResponsive.iconSize(context),
+                      ),
                       onPressed: () {
                         searchController.clear();
                       },
@@ -332,7 +365,9 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
 
           // Variants List
           Expanded(
-            child: isTablet ? _buildTabletLayout(size) : _buildMobileLayout(size),
+            child: isTablet
+                ? _buildTabletLayout(size)
+                : _buildMobileLayout(size),
           ),
 
           if (_canAddVariant) _buildAddButton(),
@@ -374,10 +409,26 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
         return GridView.builder(
           padding: AppResponsive.padding(context),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: AppResponsive.gridColumns(context, mobile: 3, tablet: 4, desktop: 5),
+            crossAxisCount: AppResponsive.gridColumns(
+              context,
+              mobile: 3,
+              tablet: 4,
+              desktop: 5,
+            ),
             crossAxisSpacing: AppResponsive.gridSpacing(context),
             mainAxisSpacing: AppResponsive.gridSpacing(context),
-            childAspectRatio: 4,
+            // Absolute height for tablet AND desktop — see the full note in
+            // items_tab.dart. The old flat ratio of 4 turned desktop's narrow
+            // 5-column cells (~176px at 1024) into 44px-tall cards, which a
+            // 16px font plus padding can't fit. This grid never runs on mobile
+            // (_buildMobileLayout returns a ListView).
+            //
+            // Sized for the WORST case, not the common one: the name is
+            // maxLines: 2, so a long variant wraps to ~45px of text, plus 24px
+            // vertical padding = ~71px at desktop sizes. Short names like
+            // "Half" only need ~47px, which is why a too-small value here
+            // looks fine until someone adds a long one.
+            mainAxisExtent: 80.0,
           ),
           itemCount: filteredVariants.length,
           itemBuilder: (context, index) {
@@ -406,22 +457,24 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Lottie.asset(AppImages.notfoundanimation, height: height * 0.25),
-          SizedBox(height: 16),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
           Text(
             query.isEmpty ? 'No Variants Found' : 'No matching variants',
             style: GoogleFonts.poppins(
-              fontSize: 18,
+              fontSize: AppResponsive.subheadingFontSize(context),
               fontWeight: FontWeight.w600,
               color: Colors.grey.shade700,
             ),
           ),
           if (query.isEmpty)
             Padding(
-              padding: EdgeInsets.only(top: 8),
+              padding: EdgeInsets.only(
+                top: AppResponsive.smallSpacing(context),
+              ),
               child: Text(
                 'Add variants to customize your items',
                 style: GoogleFonts.poppins(
-                  fontSize: 14,
+                  fontSize: AppResponsive.bodyFontSize(context),
                   color: Colors.grey.shade500,
                 ),
               ),
@@ -434,10 +487,15 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
   Widget _buildVariantCard(VariantModel variante, {required bool isGrid}) {
     if (isGrid) {
       return Container(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.mediumSpacing(context),
+          vertical: AppResponsive.smallSpacing(context),
+        ),
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.borderRadius(context),
+          ),
           border: Border.all(color: AppColors.divider.withOpacity(0.5)),
           boxShadow: [
             BoxShadow(
@@ -449,13 +507,48 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
         ),
         child: Row(
           children: [
-            Icon(Icons.tune, color: AppColors.primary, size: AppResponsive.iconSize(context)),
-            SizedBox(width: 8),
-            Expanded(child: Text(variante.name, style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis)),
+            Icon(
+              Icons.tune,
+              color: AppColors.primary,
+              size: AppResponsive.iconSize(context),
+            ),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
+            Expanded(
+              child: Text(
+                variante.name,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             if (_canEditVariant)
-              InkWell(onTap: () => openBottomSheet(variante: variante), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: AppResponsive.smallIconSize(context), color: AppColors.primary))),
+              InkWell(
+                onTap: () => openBottomSheet(variante: variante),
+                child: Padding(
+                  padding: EdgeInsets.all(6),
+                  child: Icon(
+                    Icons.edit_outlined,
+                    size: AppResponsive.smallIconSize(context),
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
             if (_canDeleteVariant)
-              InkWell(onTap: () => _delete(variante.id), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: AppResponsive.smallIconSize(context), color: Colors.red))),
+              InkWell(
+                onTap: () => _delete(variante.id),
+                child: Padding(
+                  padding: EdgeInsets.all(6),
+                  child: Icon(
+                    Icons.delete_outline,
+                    size: AppResponsive.smallIconSize(context),
+                    color: Colors.red,
+                  ),
+                ),
+              ),
           ],
         ),
       );
@@ -466,7 +559,9 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
       padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider.withOpacity(0.5)),
         boxShadow: [
           BoxShadow(
@@ -482,16 +577,53 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
             padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
             decoration: BoxDecoration(
               color: AppColors.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
             ),
-            child: Icon(Icons.tune, color: AppColors.primary, size: AppResponsive.iconSize(context)),
+            child: Icon(
+              Icons.tune,
+              color: AppColors.primary,
+              size: AppResponsive.iconSize(context),
+            ),
           ),
-          SizedBox(width: 12),
-          Expanded(child: Text(variante.name, style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis)),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
+          Expanded(
+            child: Text(
+              variante.name,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
           if (_canEditVariant)
-            InkWell(onTap: () => openBottomSheet(variante: variante), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: AppResponsive.smallIconSize(context), color: AppColors.primary))),
+            InkWell(
+              onTap: () => openBottomSheet(variante: variante),
+              child: Padding(
+                padding: EdgeInsets.all(6),
+                child: Icon(
+                  Icons.edit_outlined,
+                  size: AppResponsive.smallIconSize(context),
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
           if (_canDeleteVariant)
-            InkWell(onTap: () => _delete(variante.id), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: AppResponsive.smallIconSize(context), color: Colors.red))),
+            InkWell(
+              onTap: () => _delete(variante.id),
+              child: Padding(
+                padding: EdgeInsets.all(6),
+                child: Icon(
+                  Icons.delete_outline,
+                  size: AppResponsive.smallIconSize(context),
+                  color: Colors.red,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -517,13 +649,23 @@ class _VariantTabState extends State<VariantTab> with AutomaticKeepAliveClientMi
           child: ElevatedButton.icon(
             onPressed: () => openBottomSheet(),
             icon: Icon(Icons.add, size: AppResponsive.iconSize(context)),
-            label: Text('Add Variant', style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w500)),
+            label: Text(
+              'Add Variant',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               elevation: 0,
-              padding: EdgeInsets.symmetric(vertical: AppResponsive.mediumSpacing(context)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: EdgeInsets.symmetric(
+                vertical: AppResponsive.mediumSpacing(context),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           ),
         ),

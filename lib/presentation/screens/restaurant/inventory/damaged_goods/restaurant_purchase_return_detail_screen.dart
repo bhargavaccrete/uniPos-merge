@@ -50,8 +50,9 @@ class _RestaurantPurchaseReturnDetailScreenState
   }
 
   Future<void> _loadItems() async {
-    final items =
-        await restaurantDamagedGoodsStore.getReturnItems(_model.returnId);
+    final items = await restaurantDamagedGoodsStore.getReturnItems(
+      _model.returnId,
+    );
     if (!mounted) return;
     setState(() {
       _items = items;
@@ -120,11 +121,11 @@ class _RestaurantPurchaseReturnDetailScreenState
                 Text(
                   _model.isCreditApplied
                       ? 'This return was already credited. Saving again updates '
-                        'the note details only — the supplier balance will not '
-                        'move a second time.'
+                            'the note details only — the supplier balance will not '
+                            'move a second time.'
                       : 'Recording a credit note closes the return and reduces '
-                        'the supplier balance by the credit amount. The GRN '
-                        'billed these units, so this is what claws that back.',
+                            'the supplier balance by the credit amount. The GRN '
+                            'billed these units, so this is what claws that back.',
                   style: GoogleFonts.poppins(
                     fontSize: AppResponsive.captionFontSize(context),
                     height: 1.4,
@@ -193,8 +194,9 @@ class _RestaurantPurchaseReturnDetailScreenState
     );
     if (!confirmed || !mounted) return;
 
-    final ok =
-        await restaurantDamagedGoodsStore.cancelPurchaseReturn(_model.returnId);
+    final ok = await restaurantDamagedGoodsStore.cancelPurchaseReturn(
+      _model.returnId,
+    );
     if (!mounted) return;
 
     if (!ok) {
@@ -254,13 +256,13 @@ class _RestaurantPurchaseReturnDetailScreenState
 
   Widget _capped(BuildContext context, Widget child) {
     final maxWidth = AppResponsive.maxCardWidth(context);
+    // Mobile is uncapped — returning early keeps two widgets out of the tree.
     if (maxWidth == double.infinity) return child;
-    return Align(
+    return AppResponsive.constrainedContent(
+      context: context,
+      maxWidth: maxWidth,
       alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
-      ),
+      child: child,
     );
   }
 

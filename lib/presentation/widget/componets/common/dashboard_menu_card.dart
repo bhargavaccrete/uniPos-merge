@@ -53,11 +53,15 @@ class DashboardMenuCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.largeBorderRadius(context),
+        ),
         child: Container(
           decoration: BoxDecoration(
             color: AppColors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.largeBorderRadius(context),
+            ),
             border: Border.all(color: AppColors.divider, width: 1),
             boxShadow: [
               BoxShadow(
@@ -74,10 +78,16 @@ class DashboardMenuCard extends StatelessWidget {
                 clipBehavior: Clip.none,
                 children: [
                   Container(
+                    // Cell-internal padding and icon size stay static: this
+                    // card is a GridView cell whose height is fixed by
+                    // childAspectRatio, so growing either bottom-overflows it.
+                    // `isCompact` is the intended ladder here.
                     padding: EdgeInsets.all(isCompact ? 14 : 20),
                     decoration: BoxDecoration(
                       color: color.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.borderRadius(context),
+                      ),
                     ),
                     child: Icon(icon, size: isCompact ? 28 : 38, color: color),
                   ),
@@ -87,14 +97,18 @@ class DashboardMenuCard extends StatelessWidget {
               ),
               SizedBox(height: isCompact ? 10 : 14),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                // Horizontal only — no effect on the cell's fixed height.
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.smallSpacing(context),
+                ),
                 child: Text(
                   title,
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
-                    fontSize: isCompact ? 14 : 16,
+                    // 14/15/16 — holds on mobile, never grows past today's 16.
+                    fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
@@ -115,12 +129,17 @@ class DashboardMenuCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.largeBorderRadius(context),
+        ),
         child: Container(
+          // Cell-internal padding stays static — see the note in build().
           padding: EdgeInsets.all(isCompact ? 12 : 15),
           decoration: BoxDecoration(
             color: AppColors.white,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.largeBorderRadius(context),
+            ),
             border: Border.all(color: color.withValues(alpha: 0.14), width: 1),
             boxShadow: [
               BoxShadow(
@@ -152,7 +171,9 @@ class DashboardMenuCard extends StatelessWidget {
                               Color.lerp(color, Colors.black, 0.18) ?? color,
                             ],
                           ),
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.borderRadius(context),
+                          ),
                           boxShadow: [
                             BoxShadow(
                               color: color.withValues(alpha: 0.35),
@@ -173,7 +194,9 @@ class DashboardMenuCard extends StatelessWidget {
                   ),
                   Icon(
                     Icons.arrow_outward_rounded,
-                    size: 18,
+                    // Row height is set by the taller medallion beside it, so
+                    // this can scale without touching the cell's height.
+                    size: AppResponsive.smallIconSize(context),
                     color: color.withValues(alpha: 0.55),
                   ),
                 ],
@@ -184,7 +207,7 @@ class DashboardMenuCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.poppins(
-                  fontSize: isCompact ? 14 : 15.5,
+                  fontSize: AppResponsive.bodyFontSize(context),
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
                 ),
@@ -195,7 +218,9 @@ class DashboardMenuCard extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.poppins(
-                  fontSize: 11,
+                  // 11/12/13 — unchanged on mobile, and the rich grid's cells
+                  // carry ~100px of headroom on tablet/desktop.
+                  fontSize: AppResponsive.captionFontSize(context),
                   height: 1.25,
                   color: AppColors.textSecondary,
                 ),

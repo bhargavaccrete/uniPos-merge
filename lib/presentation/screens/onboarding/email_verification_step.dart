@@ -542,7 +542,9 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
       child: Align(
         alignment: Alignment.centerLeft,
         child: Text(msg,
-            style: GoogleFonts.poppins(fontSize: 12, color: AppColors.danger)),
+            style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.danger)),
       ),
     );
   }

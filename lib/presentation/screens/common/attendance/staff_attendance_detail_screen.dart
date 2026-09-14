@@ -26,10 +26,12 @@ class StaffAttendanceDetailScreen extends StatefulWidget {
   });
 
   @override
-  State<StaffAttendanceDetailScreen> createState() => _StaffAttendanceDetailScreenState();
+  State<StaffAttendanceDetailScreen> createState() =>
+      _StaffAttendanceDetailScreenState();
 }
 
-class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScreen> {
+class _StaffAttendanceDetailScreenState
+    extends State<StaffAttendanceDetailScreen> {
   late List<AttendanceModel> records;
 
   @override
@@ -43,7 +45,9 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
       widget.from,
       widget.to,
     );
-    final filteredResult = result.where((r) => r.staffName == widget.staffName).toList();
+    final filteredResult = result
+        .where((r) => r.staffName == widget.staffName)
+        .toList();
     setState(() {
       records = filteredResult;
     });
@@ -58,62 +62,104 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) {
           return AppDialogShell(
-          title: 'Add Missing Shift',
-          subtitle: _fullDayLabel(day),
-          accent: AppColors.primary,
-          icon: Icons.more_time_rounded,
-          body: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: const Text('Clock In'),
-                subtitle: Text('${inTime.hour.toString().padLeft(2, '0')}:${inTime.minute.toString().padLeft(2, '0')}'),
-                trailing: Icon(Icons.access_time, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
-                onTap: () async {
-                  final t = await showTimePicker(context: context, initialTime: inTime);
-                  if (t != null) setState(() => inTime = t);
-                },
-              ),
-              ListTile(
-                title: const Text('Clock Out'),
-                subtitle: Text('${outTime.hour.toString().padLeft(2, '0')}:${outTime.minute.toString().padLeft(2, '0')}'),
-                trailing: Icon(Icons.access_time, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
-                onTap: () async {
-                  final t = await showTimePicker(context: context, initialTime: outTime);
-                  if (t != null) setState(() => outTime = t);
+            title: 'Add Missing Shift',
+            subtitle: _fullDayLabel(day),
+            accent: AppColors.primary,
+            icon: Icons.more_time_rounded,
+            body: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  title: const Text('Clock In'),
+                  subtitle: Text(
+                    '${inTime.hour.toString().padLeft(2, '0')}:${inTime.minute.toString().padLeft(2, '0')}',
+                  ),
+                  trailing: Icon(
+                    Icons.access_time,
+                    size: AppResponsive.getValue(
+                      context,
+                      mobile: 18.0,
+                      tablet: 20.0,
+                      desktop: 22.0,
+                    ),
+                  ),
+                  onTap: () async {
+                    final t = await showTimePicker(
+                      context: context,
+                      initialTime: inTime,
+                    );
+                    if (t != null) setState(() => inTime = t);
+                  },
+                ),
+                ListTile(
+                  title: const Text('Clock Out'),
+                  subtitle: Text(
+                    '${outTime.hour.toString().padLeft(2, '0')}:${outTime.minute.toString().padLeft(2, '0')}',
+                  ),
+                  trailing: Icon(
+                    Icons.access_time,
+                    size: AppResponsive.getValue(
+                      context,
+                      mobile: 18.0,
+                      tablet: 20.0,
+                      desktop: 22.0,
+                    ),
+                  ),
+                  onTap: () async {
+                    final t = await showTimePicker(
+                      context: context,
+                      initialTime: outTime,
+                    );
+                    if (t != null) setState(() => outTime = t);
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              appDialogCancelButton(ctx),
+              const SizedBox(width: 12),
+              appDialogPrimaryButton(
+                label: 'Add Shift',
+                onPressed: () async {
+                  final clockIn = DateTime(
+                    day.year,
+                    day.month,
+                    day.day,
+                    inTime.hour,
+                    inTime.minute,
+                  );
+                  DateTime clockOut = DateTime(
+                    day.year,
+                    day.month,
+                    day.day,
+                    outTime.hour,
+                    outTime.minute,
+                  );
+
+                  if (clockOut.isBefore(clockIn)) {
+                    clockOut = clockOut.add(
+                      const Duration(days: 1),
+                    ); // Overnight shift
+                  }
+
+                  final record = AttendanceModel(
+                    id: const Uuid().v4(),
+                    staffName: widget.staffName,
+                    staffRole: widget.staffRole,
+                    clockIn: clockIn,
+                    clockOut: clockOut,
+                    totalMinutes: clockOut.difference(clockIn).inMinutes,
+                    date:
+                        '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}',
+                  );
+
+                  await attendanceStore.addRecord(record);
+                  Navigator.pop(ctx);
+                  _refreshRecords();
                 },
               ),
             ],
-          ),
-          actions: [
-            appDialogCancelButton(ctx),
-            const SizedBox(width: 12),
-            appDialogPrimaryButton(
-              label: 'Add Shift',
-              onPressed: () async {
-                final clockIn = DateTime(day.year, day.month, day.day, inTime.hour, inTime.minute);                DateTime clockOut = DateTime(day.year, day.month, day.day, outTime.hour, outTime.minute);
-
-                if (clockOut.isBefore(clockIn)) {
-                  clockOut = clockOut.add(const Duration(days: 1)); // Overnight shift
-                }
-
-                final record = AttendanceModel(
-                  id: const Uuid().v4(),
-                  staffName: widget.staffName,
-                  staffRole: widget.staffRole,
-                  clockIn: clockIn,
-                  clockOut: clockOut,
-                  totalMinutes: clockOut.difference(clockIn).inMinutes,
-                  date: '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}',
-                );
-
-                await attendanceStore.addRecord(record);
-                Navigator.pop(ctx);
-                _refreshRecords();
-              },
-            ),
-          ],
-        );
+          );
         },
       ),
     );
@@ -121,92 +167,150 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
 
   Future<void> _showEditDialog(AttendanceModel record) async {
     TimeOfDay? newInTime = TimeOfDay.fromDateTime(record.clockIn);
-    TimeOfDay? newOutTime = record.clockOut != null ? TimeOfDay.fromDateTime(record.clockOut!) : null;
+    TimeOfDay? newOutTime = record.clockOut != null
+        ? TimeOfDay.fromDateTime(record.clockOut!)
+        : null;
 
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) {
           return AppDialogShell(
-          title: 'Edit Timesheet',
-          accent: AppColors.primary,
-          icon: Icons.edit_calendar_rounded,
-          body: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: const Text('Clock In'),
-                subtitle: Text('${newInTime!.hour.toString().padLeft(2, '0')}:${newInTime!.minute.toString().padLeft(2, '0')}'),
-                trailing: Icon(Icons.edit, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
-                onTap: () async {
-                  final t = await showTimePicker(context: context, initialTime: newInTime!);
-                  if (t != null) setState(() => newInTime = t);
-                },
-              ),
-              ListTile(
-                title: const Text('Clock Out'),
-                subtitle: Text(newOutTime == null ? 'Not Clocked Out' : '${newOutTime!.hour.toString().padLeft(2, '0')}:${newOutTime!.minute.toString().padLeft(2, '0')}'),
-                trailing: Icon(Icons.edit, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
-                onTap: () async {
-                  final t = await showTimePicker(context: context, initialTime: newOutTime ?? TimeOfDay.now());
-                  if (t != null) setState(() => newOutTime = t);
-                },
-              ),
-              const SizedBox(height: 4),
-              SizedBox(
-                width: double.infinity,
-                child: TextButton.icon(
-                  onPressed: () async {
-                    final confirm = await showAppConfirmDialog(
+            title: 'Edit Timesheet',
+            accent: AppColors.primary,
+            icon: Icons.edit_calendar_rounded,
+            body: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  title: const Text('Clock In'),
+                  subtitle: Text(
+                    '${newInTime!.hour.toString().padLeft(2, '0')}:${newInTime!.minute.toString().padLeft(2, '0')}',
+                  ),
+                  trailing: Icon(
+                    Icons.edit,
+                    size: AppResponsive.getValue(
+                      context,
+                      mobile: 18.0,
+                      tablet: 20.0,
+                      desktop: 22.0,
+                    ),
+                  ),
+                  onTap: () async {
+                    final t = await showTimePicker(
                       context: context,
-                      title: 'Delete Record?',
-                      message: 'This action cannot be undone.',
-                      confirmLabel: 'Delete',
-                      accent: Colors.red,
-                      icon: Icons.delete_rounded,
+                      initialTime: newInTime!,
                     );
-                    if (confirm == true) {
-                      await attendanceStore.deleteRecord(record.id);
-                      if (ctx.mounted) Navigator.pop(ctx);
-                      _refreshRecords();
-                    }
+                    if (t != null) setState(() => newInTime = t);
                   },
-                  icon: Icon(Icons.delete, color: Colors.red, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
-                  label: const Text('Delete', style: TextStyle(color: Colors.red)),
                 ),
+                ListTile(
+                  title: const Text('Clock Out'),
+                  subtitle: Text(
+                    newOutTime == null
+                        ? 'Not Clocked Out'
+                        : '${newOutTime!.hour.toString().padLeft(2, '0')}:${newOutTime!.minute.toString().padLeft(2, '0')}',
+                  ),
+                  trailing: Icon(
+                    Icons.edit,
+                    size: AppResponsive.getValue(
+                      context,
+                      mobile: 18.0,
+                      tablet: 20.0,
+                      desktop: 22.0,
+                    ),
+                  ),
+                  onTap: () async {
+                    final t = await showTimePicker(
+                      context: context,
+                      initialTime: newOutTime ?? TimeOfDay.now(),
+                    );
+                    if (t != null) setState(() => newOutTime = t);
+                  },
+                ),
+                const SizedBox(height: 4),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton.icon(
+                    onPressed: () async {
+                      final confirm = await showAppConfirmDialog(
+                        context: context,
+                        title: 'Delete Record?',
+                        message: 'This action cannot be undone.',
+                        confirmLabel: 'Delete',
+                        accent: Colors.red,
+                        icon: Icons.delete_rounded,
+                      );
+                      if (confirm == true) {
+                        await attendanceStore.deleteRecord(record.id);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        _refreshRecords();
+                      }
+                    },
+                    icon: Icon(
+                      Icons.delete,
+                      color: Colors.red,
+                      size: AppResponsive.getValue(
+                        context,
+                        mobile: 18.0,
+                        tablet: 20.0,
+                        desktop: 22.0,
+                      ),
+                    ),
+                    label: Text(
+                      'Delete',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.buttonFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              appDialogCancelButton(ctx),
+              const SizedBox(width: 12),
+              appDialogPrimaryButton(
+                label: 'Save',
+                onPressed: () async {
+                  final baseDate = record.clockIn;
+                  final newClockIn = DateTime(
+                    baseDate.year,
+                    baseDate.month,
+                    baseDate.day,
+                    newInTime!.hour,
+                    newInTime!.minute,
+                  );
+
+                  DateTime? newClockOut;
+                  if (newOutTime != null) {
+                    newClockOut = DateTime(
+                      baseDate.year,
+                      baseDate.month,
+                      baseDate.day,
+                      newOutTime!.hour,
+                      newOutTime!.minute,
+                    );
+                    // Handle overnight shifts if outTime is earlier than inTime
+                    if (newClockOut.isBefore(newClockIn)) {
+                      newClockOut = newClockOut.add(const Duration(days: 1));
+                    }
+                  }
+
+                  await attendanceStore.updateRecord(
+                    recordId: record.id,
+                    newClockIn: newClockIn,
+                    newClockOut: newClockOut,
+                  );
+
+                  Navigator.pop(ctx);
+                  _refreshRecords();
+                },
               ),
             ],
-          ),
-          actions: [
-            appDialogCancelButton(ctx),
-            const SizedBox(width: 12),
-            appDialogPrimaryButton(
-              label: 'Save',
-              onPressed: () async {
-                final baseDate = record.clockIn;
-                final newClockIn = DateTime(baseDate.year, baseDate.month, baseDate.day, newInTime!.hour, newInTime!.minute);
-
-                DateTime? newClockOut;
-                if (newOutTime != null) {
-                  newClockOut = DateTime(baseDate.year, baseDate.month, baseDate.day, newOutTime!.hour, newOutTime!.minute);
-                  // Handle overnight shifts if outTime is earlier than inTime
-                  if (newClockOut.isBefore(newClockIn)) {
-                    newClockOut = newClockOut.add(const Duration(days: 1));
-                  }
-                }
-
-                await attendanceStore.updateRecord(
-                  recordId: record.id,
-                  newClockIn: newClockIn,
-                  newClockOut: newClockOut,
-                );
-
-                Navigator.pop(ctx);
-                _refreshRecords();
-              },
-            ),
-          ],
-        );
+          );
         },
       ),
     );
@@ -215,13 +319,13 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
   List<DateTime> get _days {
     final days = <DateTime>[];
     var d = widget.from;
-    
+
     final now = DateTime.now();
     var effectiveTo = widget.to;
     if (effectiveTo.isAfter(now)) {
       effectiveTo = DateTime(now.year, now.month, now.day, 23, 59, 59);
     }
-    
+
     if (widget.from.isAfter(effectiveTo)) return [];
 
     while (!d.isAfter(effectiveTo)) {
@@ -232,7 +336,8 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
   }
 
   List<AttendanceModel> _dayRecords(DateTime day) {
-    final key = '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+    final key =
+        '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
     return records.where((r) => r.date == key).toList();
   }
 
@@ -244,7 +349,8 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
       if (r.totalMinutes != null) return s + r.totalMinutes!;
       if (!r.isOpen) return s;
       final gross = now.difference(r.clockIn).inMinutes;
-      final breaks = (r.breakTotalMinutes ?? 0) +
+      final breaks =
+          (r.breakTotalMinutes ?? 0) +
           (r.isOnBreak && r.breakStartTime != null
               ? now.difference(r.breakStartTime!).inMinutes
               : 0);
@@ -260,11 +366,33 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
     return '${h}h ${m}m';
   }
 
-  String _fmtTime(DateTime d) => '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+  String _fmtTime(DateTime d) =>
+      '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
   String _fullDayLabel(DateTime d) {
-    const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const weekdays = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return '${weekdays[d.weekday - 1]}, ${d.day} ${months[d.month - 1]} ${d.year}';
   }
 
@@ -290,8 +418,18 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
           preferredSize: const Size.fromHeight(20),
           child: Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: Text(widget.staffRole,
-                style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0), color: Colors.white70)),
+            child: Text(
+              widget.staffRole,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.getValue(
+                  context,
+                  mobile: 12.0,
+                  tablet: 13.0,
+                  desktop: 14.0,
+                ),
+                color: Colors.white70,
+              ),
+            ),
           ),
         ),
       ),
@@ -303,22 +441,41 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
             padding: const EdgeInsets.symmetric(vertical: 16),
             decoration: BoxDecoration(
               color: AppColors.white,
-              borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.borderRadius(context),
+              ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.04),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
-                )
+                ),
               ],
             ),
             child: Row(
               children: [
-                _summaryTile('$_presentCount', 'Days Present', Colors.green.shade600, Icons.check_circle_outline),
+                _summaryTile(
+                  '$_presentCount',
+                  'Days Present',
+                  Colors.green.shade600,
+                  Icons.check_circle_outline,
+                ),
                 _vDivider(),
-                _summaryTile('$_absentCount', 'Days Absent', _absentCount > 0 ? Colors.red.shade400 : AppColors.textSecondary, Icons.cancel_outlined),
+                _summaryTile(
+                  '$_absentCount',
+                  'Days Absent',
+                  _absentCount > 0
+                      ? Colors.red.shade400
+                      : AppColors.textSecondary,
+                  Icons.cancel_outlined,
+                ),
                 _vDivider(),
-                _summaryTile(_fmtMins(_totalMinutes), 'Total Hours', Colors.blue.shade600, Icons.timer_outlined),
+                _summaryTile(
+                  _fmtMins(_totalMinutes),
+                  'Total Hours',
+                  Colors.blue.shade600,
+                  Icons.timer_outlined,
+                ),
               ],
             ),
           ),
@@ -328,14 +485,42 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                Icon(Icons.date_range, size: AppResponsive.getValue(context, mobile: 14.0, tablet: 16.0, desktop: 18.0), color: AppColors.textSecondary),
+                Icon(
+                  Icons.date_range,
+                  size: AppResponsive.getValue(
+                    context,
+                    mobile: 14.0,
+                    tablet: 16.0,
+                    desktop: 18.0,
+                  ),
+                  color: AppColors.textSecondary,
+                ),
                 const SizedBox(width: 6),
                 Text(
                   '${widget.from.day}/${widget.from.month}/${widget.from.year}  –  ${widget.to.day}/${widget.to.month}/${widget.to.year}',
-                  style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0), color: AppColors.textSecondary),
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.getValue(
+                      context,
+                      mobile: 12.0,
+                      tablet: 13.0,
+                      desktop: 14.0,
+                    ),
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 const Spacer(),
-                Text('${days.length} days', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0), color: AppColors.textSecondary)),
+                Text(
+                  '${days.length} days',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.getValue(
+                      context,
+                      mobile: 12.0,
+                      tablet: 13.0,
+                      desktop: 14.0,
+                    ),
+                    color: AppColors.textSecondary,
+                  ),
+                ),
               ],
             ),
           ),
@@ -343,141 +528,388 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
 
           // ── Day-wise list ─────────────────────────────────────────────
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              itemCount: days.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (_, i) {
-                final day = days[i];
-                final dayRecs = _dayRecords(day);
-                final isPresent = dayRecs.isNotEmpty;
-                final today = _isToday(day);
+            child: AppResponsive.constrainedContent(
+              context: context,
+              maxWidth: AppResponsive.maxFormWidth(context),
+              alignment: Alignment.topCenter,
+              child: ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                itemCount: days.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (_, i) {
+                  final day = days[i];
+                  final dayRecs = _dayRecords(day);
+                  final isPresent = dayRecs.isNotEmpty;
+                  final today = _isToday(day);
 
-                return Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-                    border: Border.all(
-                      color: today ? AppColors.primary.withOpacity(0.5) : isPresent ? Colors.green.shade200 : AppColors.divider,
-                      width: today ? 1.5 : 1,
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: isPresent ? Colors.green.shade50 : AppColors.surfaceLight,
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: today ? AppColors.primary : isPresent ? Colors.green.shade600 : AppColors.divider,
-                                borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text('${day.day}', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0), fontWeight: FontWeight.w700, color: isPresent || today ? Colors.white : AppColors.textSecondary)),
-                                  Text(_monthShort(day.month), style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 9.0, tablet: 10.0, desktop: 11.0), color: isPresent || today ? Colors.white70 : AppColors.textSecondary)),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(_fullDayLabel(day), style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0), fontWeight: FontWeight.w600, color: today ? AppColors.primary : AppColors.textPrimary)),
-                                  if (today) Text('Today', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 10.0, tablet: 11.0, desktop: 12.0), color: AppColors.primary)),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(color: isPresent ? Colors.green.shade600 : Colors.red.shade100, borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context))),
-                              child: Text(isPresent ? 'Present' : 'Absent', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 11.0, tablet: 12.0, desktop: 13.0), fontWeight: FontWeight.w700, color: isPresent ? Colors.white : Colors.red.shade700)),
-                            ),
-                            if (RestaurantSession.isAdmin)
-                              IconButton(
-                                icon: Icon(Icons.add_circle, color: AppColors.primary, size: AppResponsive.getValue(context, mobile: 22.0, tablet: 24.0, desktop: 26.0)),
-                                onPressed: () => _showAddShiftDialog(day),
-                              ),
-                          ],
-                        ),
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.borderRadius(context),
                       ),
-                      if (isPresent)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-                          child: Column(
-                            children: dayRecs.asMap().entries.map((entry) {
-                              final idx = entry.key;
-                              final r = entry.value;
-                              return Padding(
-                                padding: EdgeInsets.only(top: idx == 0 ? 0 : 8),
-                                child: Row(
+                      border: Border.all(
+                        color: today
+                            ? AppColors.primary.withOpacity(0.5)
+                            : isPresent
+                            ? Colors.green.shade200
+                            : AppColors.divider,
+                        width: today ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isPresent
+                                ? Colors.green.shade50
+                                : AppColors.surfaceLight,
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(12),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: today
+                                      ? AppColors.primary
+                                      : isPresent
+                                      ? Colors.green.shade600
+                                      : AppColors.divider,
+                                  borderRadius: BorderRadius.circular(
+                                    AppResponsive.smallBorderRadius(context),
+                                  ),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    if (dayRecs.length > 1)
-                                      Container(
-                                        width: 20, height: 20,
-                                        margin: const EdgeInsets.only(right: 8),
-                                        decoration: BoxDecoration(color: AppColors.divider, shape: BoxShape.circle),
-                                        child: Center(child: Text('${idx + 1}', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 10.0, tablet: 11.0, desktop: 12.0), fontWeight: FontWeight.w700))),
+                                    Text(
+                                      '${day.day}',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: AppResponsive.getValue(
+                                          context,
+                                          mobile: 14.0,
+                                          tablet: 15.0,
+                                          desktop: 16.0,
+                                        ),
+                                        fontWeight: FontWeight.w700,
+                                        color: isPresent || today
+                                            ? Colors.white
+                                            : AppColors.textSecondary,
                                       ),
-                                    Icon(Icons.login, size: AppResponsive.getValue(context, mobile: 14.0, tablet: 16.0, desktop: 18.0), color: Colors.green.shade600),
-                                    const SizedBox(width: 4),
-                                    Text(_fmtTime(r.clockIn), style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0), fontWeight: FontWeight.w600, color: Colors.green.shade700)),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                                      child: Text('→', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0), color: AppColors.textSecondary)),
                                     ),
-                                    Icon(Icons.logout, size: AppResponsive.getValue(context, mobile: 14.0, tablet: 16.0, desktop: 18.0), color: r.isOpen ? Colors.orange.shade600 : AppColors.textSecondary),
-                                    const SizedBox(width: 4),
-                                    Text(r.formattedClockOut, style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0), fontWeight: FontWeight.w600, color: r.isOpen ? Colors.orange.shade700 : AppColors.textSecondary)),
-                                    const Spacer(),
-                                    if (RestaurantSession.isAdmin)
-                                      IconButton(
-                                        icon: Icon(Icons.edit, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0), color: Colors.blue.shade600),
-                                        padding: EdgeInsets.zero,
-                                        constraints: BoxConstraints(),
-                                        onPressed: () => _showEditDialog(r),
+                                    Text(
+                                      _monthShort(day.month),
+                                      style: GoogleFonts.poppins(
+                                        fontSize: AppResponsive.getValue(
+                                          context,
+                                          mobile: 9.0,
+                                          tablet: 10.0,
+                                          desktop: 11.0,
+                                        ),
+                                        color: isPresent || today
+                                            ? Colors.white70
+                                            : AppColors.textSecondary,
                                       ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: r.isOpen ? Colors.orange.shade50 : Colors.blue.shade50,
-                                        borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
-                                        border: Border.all(color: r.isOpen ? Colors.orange.shade200 : Colors.blue.shade200),
-                                      ),
-                                      child: Text(_openShiftLabel(r), style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0), fontWeight: FontWeight.w600, color: r.isOpen ? Colors.orange.shade800 : Colors.blue.shade700)),
                                     ),
                                   ],
                                 ),
-                              );
-                            }).toList(),
-                          ),
-                        )
-                      else
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.event_busy, size: AppResponsive.getValue(context, mobile: 16.0, tablet: 18.0, desktop: 20.0), color: AppColors.textSecondary),
-                              const SizedBox(width: 6),
-                              Text('No attendance recorded', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0), color: AppColors.textSecondary)),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _fullDayLabel(day),
+                                      style: GoogleFonts.poppins(
+                                        fontSize: AppResponsive.getValue(
+                                          context,
+                                          mobile: 13.0,
+                                          tablet: 14.0,
+                                          desktop: 15.0,
+                                        ),
+                                        fontWeight: FontWeight.w600,
+                                        color: today
+                                            ? AppColors.primary
+                                            : AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    if (today)
+                                      Text(
+                                        'Today',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: AppResponsive.getValue(
+                                            context,
+                                            mobile: 10.0,
+                                            tablet: 11.0,
+                                            desktop: 12.0,
+                                          ),
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isPresent
+                                      ? Colors.green.shade600
+                                      : Colors.red.shade100,
+                                  borderRadius: BorderRadius.circular(
+                                    AppResponsive.smallBorderRadius(context),
+                                  ),
+                                ),
+                                child: Text(
+                                  isPresent ? 'Present' : 'Absent',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.getValue(
+                                      context,
+                                      mobile: 11.0,
+                                      tablet: 12.0,
+                                      desktop: 13.0,
+                                    ),
+                                    fontWeight: FontWeight.w700,
+                                    color: isPresent
+                                        ? Colors.white
+                                        : Colors.red.shade700,
+                                  ),
+                                ),
+                              ),
+                              if (RestaurantSession.isAdmin)
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.add_circle,
+                                    color: AppColors.primary,
+                                    size: AppResponsive.getValue(
+                                      context,
+                                      mobile: 22.0,
+                                      tablet: 24.0,
+                                      desktop: 26.0,
+                                    ),
+                                  ),
+                                  onPressed: () => _showAddShiftDialog(day),
+                                ),
                             ],
                           ),
                         ),
-                    ],
-                  ),
-                );
-              },
+                        if (isPresent)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+                            child: Column(
+                              children: dayRecs.asMap().entries.map((entry) {
+                                final idx = entry.key;
+                                final r = entry.value;
+                                return Padding(
+                                  padding: EdgeInsets.only(
+                                    top: idx == 0 ? 0 : 8,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      if (dayRecs.length > 1)
+                                        Container(
+                                          width: 20,
+                                          height: 20,
+                                          margin: const EdgeInsets.only(
+                                            right: 8,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.divider,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              '${idx + 1}',
+                                              style: GoogleFonts.poppins(
+                                                fontSize:
+                                                    AppResponsive.getValue(
+                                                      context,
+                                                      mobile: 10.0,
+                                                      tablet: 11.0,
+                                                      desktop: 12.0,
+                                                    ),
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      Icon(
+                                        Icons.login,
+                                        size: AppResponsive.getValue(
+                                          context,
+                                          mobile: 14.0,
+                                          tablet: 16.0,
+                                          desktop: 18.0,
+                                        ),
+                                        color: Colors.green.shade600,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        _fmtTime(r.clockIn),
+                                        style: GoogleFonts.poppins(
+                                          fontSize: AppResponsive.getValue(
+                                            context,
+                                            mobile: 13.0,
+                                            tablet: 14.0,
+                                            desktop: 15.0,
+                                          ),
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.green.shade700,
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                        ),
+                                        child: Text(
+                                          '→',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: AppResponsive.getValue(
+                                              context,
+                                              mobile: 13.0,
+                                              tablet: 14.0,
+                                              desktop: 15.0,
+                                            ),
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        ),
+                                      ),
+                                      Icon(
+                                        Icons.logout,
+                                        size: AppResponsive.getValue(
+                                          context,
+                                          mobile: 14.0,
+                                          tablet: 16.0,
+                                          desktop: 18.0,
+                                        ),
+                                        color: r.isOpen
+                                            ? Colors.orange.shade600
+                                            : AppColors.textSecondary,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        r.formattedClockOut,
+                                        style: GoogleFonts.poppins(
+                                          fontSize: AppResponsive.getValue(
+                                            context,
+                                            mobile: 13.0,
+                                            tablet: 14.0,
+                                            desktop: 15.0,
+                                          ),
+                                          fontWeight: FontWeight.w600,
+                                          color: r.isOpen
+                                              ? Colors.orange.shade700
+                                              : AppColors.textSecondary,
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      if (RestaurantSession.isAdmin)
+                                        IconButton(
+                                          icon: Icon(
+                                            Icons.edit,
+                                            size: AppResponsive.getValue(
+                                              context,
+                                              mobile: 18.0,
+                                              tablet: 20.0,
+                                              desktop: 22.0,
+                                            ),
+                                            color: Colors.blue.shade600,
+                                          ),
+                                          padding: EdgeInsets.zero,
+                                          constraints: BoxConstraints(),
+                                          onPressed: () => _showEditDialog(r),
+                                        ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 3,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: r.isOpen
+                                              ? Colors.orange.shade50
+                                              : Colors.blue.shade50,
+                                          borderRadius: BorderRadius.circular(
+                                            AppResponsive.smallBorderRadius(
+                                              context,
+                                            ),
+                                          ),
+                                          border: Border.all(
+                                            color: r.isOpen
+                                                ? Colors.orange.shade200
+                                                : Colors.blue.shade200,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          _openShiftLabel(r),
+                                          style: GoogleFonts.poppins(
+                                            fontSize: AppResponsive.getValue(
+                                              context,
+                                              mobile: 12.0,
+                                              tablet: 13.0,
+                                              desktop: 14.0,
+                                            ),
+                                            fontWeight: FontWeight.w600,
+                                            color: r.isOpen
+                                                ? Colors.orange.shade800
+                                                : Colors.blue.shade700,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          )
+                        else
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.event_busy,
+                                  size: AppResponsive.getValue(
+                                    context,
+                                    mobile: 16.0,
+                                    tablet: 18.0,
+                                    desktop: 20.0,
+                                  ),
+                                  color: AppColors.textSecondary,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'No attendance recorded',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.getValue(
+                                      context,
+                                      mobile: 12.0,
+                                      tablet: 13.0,
+                                      desktop: 14.0,
+                                    ),
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
           ),
         ],
@@ -489,11 +921,26 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
     if (!r.isOpen) return r.formattedDuration;
     final now = DateTime.now();
     // Same day → simple "Still In"
-    if (now.day == r.clockIn.day && now.month == r.clockIn.month && now.year == r.clockIn.year) {
+    if (now.day == r.clockIn.day &&
+        now.month == r.clockIn.month &&
+        now.year == r.clockIn.year) {
       return 'Still In';
     }
     // Crossed midnight — show date range e.g. "Still In\nApr 21→22"
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return 'Still In\n${months[r.clockIn.month - 1]} ${r.clockIn.day}→${now.day}';
   }
 
@@ -501,19 +948,66 @@ class _StaffAttendanceDetailScreenState extends State<StaffAttendanceDetailScree
     return Expanded(
       child: Column(
         children: [
-          Icon(icon, color: color, size: AppResponsive.getValue(context, mobile: 22.0, tablet: 24.0, desktop: 26.0)),
+          Icon(
+            icon,
+            color: color,
+            size: AppResponsive.getValue(
+              context,
+              mobile: 22.0,
+              tablet: 24.0,
+              desktop: 26.0,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(value, style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0), fontWeight: FontWeight.w700, color: color)),
-          Text(label, textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 10.0, tablet: 11.0, desktop: 12.0), color: AppColors.textSecondary)),
+          Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.getValue(
+                context,
+                mobile: 16.0,
+                tablet: 17.0,
+                desktop: 18.0,
+              ),
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.getValue(
+                context,
+                mobile: 10.0,
+                tablet: 11.0,
+                desktop: 12.0,
+              ),
+              color: AppColors.textSecondary,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _vDivider() => Container(width: 1, height: 48, color: AppColors.divider);
+  Widget _vDivider() =>
+      Container(width: 1, height: 48, color: AppColors.divider);
 
   String _monthShort(int m) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return months[m - 1];
   }
 }

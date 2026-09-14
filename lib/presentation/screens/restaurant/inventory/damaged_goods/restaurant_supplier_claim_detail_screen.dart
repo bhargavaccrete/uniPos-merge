@@ -45,8 +45,9 @@ class _RestaurantSupplierClaimDetailScreenState
   }
 
   Future<void> _loadItems() async {
-    final items =
-        await restaurantDamagedGoodsStore.getClaimItems(_model.claimId);
+    final items = await restaurantDamagedGoodsStore.getClaimItems(
+      _model.claimId,
+    );
     if (!mounted) return;
     setState(() {
       _items = items;
@@ -241,13 +242,13 @@ class _RestaurantSupplierClaimDetailScreenState
 
   Widget _capped(BuildContext context, Widget child) {
     final maxWidth = AppResponsive.maxCardWidth(context);
+    // Mobile is uncapped — returning early keeps two widgets out of the tree.
     if (maxWidth == double.infinity) return child;
-    return Align(
+    return AppResponsive.constrainedContent(
+      context: context,
+      maxWidth: maxWidth,
       alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
-      ),
+      child: child,
     );
   }
 
@@ -430,9 +431,13 @@ class _RestaurantSupplierClaimDetailScreenState
     }
   }
 
-  Widget _stageDot(RestaurantSupplierClaimStatus stage, {required bool reached}) {
-    final color =
-        reached ? restaurantSupplierClaimStatusColor(stage) : AppColors.divider;
+  Widget _stageDot(
+    RestaurantSupplierClaimStatus stage, {
+    required bool reached,
+  }) {
+    final color = reached
+        ? restaurantSupplierClaimStatusColor(stage)
+        : AppColors.divider;
     final dot = AppResponsive.getValue(
       context,
       mobile: 22.0,
@@ -685,7 +690,9 @@ class _RestaurantSupplierClaimDetailScreenState
                 ),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: restaurantSupplierClaimStatusColor(transitions[i]),
+                backgroundColor: restaurantSupplierClaimStatusColor(
+                  transitions[i],
+                ),
                 foregroundColor: AppColors.white,
                 elevation: 0,
                 padding: EdgeInsets.symmetric(

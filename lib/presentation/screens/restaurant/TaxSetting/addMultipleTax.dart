@@ -47,7 +47,7 @@ class _AddtaxState extends State<Addtax> {
     super.dispose();
   }
 
-  void _clearControllers(){
+  void _clearControllers() {
     _taxNumberController.clear();
     _taxNameController.clear();
   }
@@ -59,9 +59,7 @@ class _AddtaxState extends State<Addtax> {
     final taxPercentage = double.tryParse(_taxNumberController.text.trim());
 
     if (taxName.isEmpty || taxPercentage == null) {
-      NotificationService.instance.showError(
-        'Enter a valid Tax Name/Number',
-      );
+      NotificationService.instance.showError('Enter a valid Tax Name/Number');
       return;
     }
 
@@ -122,7 +120,6 @@ class _AddtaxState extends State<Addtax> {
     }
   }
 
-
   Future<void> _delete(String id) async {
     await taxStore.deleteTax(id);
   }
@@ -137,9 +134,7 @@ class _AddtaxState extends State<Addtax> {
       }
     }
 
-    NotificationService.instance.showSuccess(
-      'Tax applied to all items',
-    );
+    NotificationService.instance.showSuccess('Tax applied to all items');
   }
 
   @override
@@ -147,15 +142,20 @@ class _AddtaxState extends State<Addtax> {
     final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
-        backgroundColor: AppColors.surfaceLight,
-        appBar: buildPrimaryAppBar(
-          title: 'Tax Settings',
-          titleFontSize: AppResponsive.headingFontSize(context),
-        ),
-        body: Column(
-          children: [
-            // Tax List
-            Expanded(
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: 'Tax Settings',
+        titleFontSize: AppResponsive.headingFontSize(context),
+      ),
+      body: Column(
+        children: [
+          // Tax List — capped so rows do not span a 1440px laptop. The
+          // Scaffold background stays full-bleed; only the content narrows.
+          Expanded(
+            child: AppResponsive.constrainedContent(
+              context: context,
+              maxWidth: AppResponsive.maxFormWidth(context),
+              alignment: Alignment.topCenter,
               child: Observer(
                 builder: (context) {
                   if (taxStore.isLoading) {
@@ -179,14 +179,21 @@ class _AddtaxState extends State<Addtax> {
                         children: [
                           Icon(
                             Icons.calculate_outlined,
-                            size: AppResponsive.getValue(context, mobile: 64.0, tablet: 80.0, desktop: 96.0),
+                            size: AppResponsive.getValue(
+                              context,
+                              mobile: 64.0,
+                              tablet: 80.0,
+                              desktop: 96.0,
+                            ),
                             color: AppColors.divider,
                           ),
-                          SizedBox(height: AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0)),
+                          SizedBox(height: AppResponsive.largeSpacing(context)),
                           Text(
                             'No taxes configured yet',
                             style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 18.0, desktop: 20.0),
+                              fontSize: AppResponsive.subheadingFontSize(
+                                context,
+                              ),
                               fontWeight: FontWeight.w500,
                               color: AppColors.textSecondary,
                             ),
@@ -195,7 +202,12 @@ class _AddtaxState extends State<Addtax> {
                           Text(
                             'Add your first tax to get started',
                             style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0),
+                              fontSize: AppResponsive.getValue(
+                                context,
+                                mobile: 13.0,
+                                tablet: 14.0,
+                                desktop: 15.0,
+                              ),
                               color: AppColors.textSecondary,
                             ),
                           ),
@@ -205,23 +217,41 @@ class _AddtaxState extends State<Addtax> {
                   }
 
                   return ListView.builder(
-                    padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0)),
+                    padding: EdgeInsets.all(
+                      AppResponsive.largeSpacing(context),
+                    ),
                     itemCount: allTax.length,
                     itemBuilder: (context, index) {
                       final tax = allTax[index];
                       return Container(
-                        margin: EdgeInsets.only(bottom: AppResponsive.getValue(context, mobile: 10.0, tablet: 12.0, desktop: 14.0)),
-                        padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 14.0, tablet: 16.0, desktop: 18.0)),
+                        margin: EdgeInsets.only(
+                          bottom: AppResponsive.getValue(
+                            context,
+                            mobile: 10.0,
+                            tablet: 12.0,
+                            desktop: 14.0,
+                          ),
+                        ),
+                        padding: EdgeInsets.all(
+                          AppResponsive.getValue(
+                            context,
+                            mobile: 14.0,
+                            tablet: 16.0,
+                            desktop: 18.0,
+                          ),
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.white,
-                          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-                          border: Border.all(
-                            color: AppColors.divider,
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.borderRadius(context),
                           ),
+                          border: Border.all(color: AppColors.divider),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withValues(alpha: 0.03),
-                              blurRadius: AppResponsive.shadowBlurRadius(context),
+                              blurRadius: AppResponsive.shadowBlurRadius(
+                                context,
+                              ),
                               offset: Offset(0, 2),
                             ),
                           ],
@@ -234,12 +264,18 @@ class _AddtaxState extends State<Addtax> {
                               children: [
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         tax.taxname,
                                         style: GoogleFonts.poppins(
-                                          fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0),
+                                          fontSize: AppResponsive.getValue(
+                                            context,
+                                            mobile: 16.0,
+                                            tablet: 17.0,
+                                            desktop: 18.0,
+                                          ),
                                           fontWeight: FontWeight.w600,
                                           color: AppColors.textPrimary,
                                         ),
@@ -247,17 +283,34 @@ class _AddtaxState extends State<Addtax> {
                                       SizedBox(height: 6),
                                       Container(
                                         padding: EdgeInsets.symmetric(
-                                          horizontal: AppResponsive.getValue(context, mobile: 8.0, tablet: 10.0, desktop: 12.0),
-                                          vertical: AppResponsive.getValue(context, mobile: 4.0, tablet: 5.0, desktop: 6.0),
+                                          horizontal:
+                                              AppResponsive.smallSpacing(
+                                                context,
+                                              ),
+                                          vertical: AppResponsive.getValue(
+                                            context,
+                                            mobile: 4.0,
+                                            tablet: 5.0,
+                                            desktop: 6.0,
+                                          ),
                                         ),
                                         decoration: BoxDecoration(
-                                          color: AppColors.primary.withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(8),
+                                          color: AppColors.primary.withValues(
+                                            alpha: 0.1,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                         ),
                                         child: Text(
                                           'Tax Rate: ${DecimalSettings.formatAmount(tax.taxperecentage ?? 0)}%',
                                           style: GoogleFonts.poppins(
-                                            fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0),
+                                            fontSize: AppResponsive.getValue(
+                                              context,
+                                              mobile: 13.0,
+                                              tablet: 14.0,
+                                              desktop: 15.0,
+                                            ),
                                             color: AppColors.primary,
                                             fontWeight: FontWeight.w600,
                                           ),
@@ -269,36 +322,51 @@ class _AddtaxState extends State<Addtax> {
                                 Row(
                                   children: [
                                     IconButton(
-                                      onPressed: () => _model(isTablet, existingTax: tax),
+                                      onPressed: () =>
+                                          _model(isTablet, existingTax: tax),
                                       icon: Icon(Icons.edit_rounded),
                                       color: AppColors.primary,
                                       style: IconButton.styleFrom(
-                                        backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                                        backgroundColor: AppColors.primary
+                                            .withValues(alpha: 0.1),
                                       ),
                                     ),
                                     SizedBox(width: 8),
                                     IconButton(
-                                      onPressed: () => _showDeleteConfirmation(context, tax.id),
+                                      onPressed: () => _showDeleteConfirmation(
+                                        context,
+                                        tax.id,
+                                      ),
                                       icon: Icon(Icons.delete_rounded),
                                       color: Colors.red,
                                       style: IconButton.styleFrom(
-                                        backgroundColor: Colors.red.withValues(alpha: 0.1),
+                                        backgroundColor: Colors.red.withValues(
+                                          alpha: 0.1,
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
                               ],
                             ),
-                            SizedBox(height: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0)),
+                            SizedBox(
+                              height: AppResponsive.mediumSpacing(context),
+                            ),
                             SizedBox(
                               width: double.infinity,
-                              height: AppResponsive.getValue(context, mobile: 44.0, tablet: 48.0, desktop: 52.0),
+                              height: AppResponsive.getValue(
+                                context,
+                                mobile: 44.0,
+                                tablet: 48.0,
+                                desktop: 52.0,
+                              ),
                               child: ElevatedButton.icon(
                                 onPressed: () {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) => ApplyTaxScreen(taxToApply: tax),
+                                      builder: (_) =>
+                                          ApplyTaxScreen(taxToApply: tax),
                                     ),
                                   );
                                 },
@@ -310,11 +378,21 @@ class _AddtaxState extends State<Addtax> {
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
-                                icon: Icon(Icons.check_circle_outline_rounded, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
+                                icon: Icon(
+                                  Icons.check_circle_outline_rounded,
+                                  size: AppResponsive.getValue(
+                                    context,
+                                    mobile: 18.0,
+                                    tablet: 20.0,
+                                    desktop: 22.0,
+                                  ),
+                                ),
                                 label: Text(
                                   'Apply Tax on Items',
                                   style: GoogleFonts.poppins(
-                                    fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -328,16 +406,26 @@ class _AddtaxState extends State<Addtax> {
                 },
               ),
             ),
+          ),
 
-
-            // Add Tax Button — hidden while tax is disabled for this business
-            if (TaxFeature.enabled)
-              Container(
-                color: Colors.white,
-                padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0)),
+          // Add Tax Button — hidden while tax is disabled for this business.
+          // The white strip spans the window; only the button is capped.
+          if (TaxFeature.enabled)
+            Container(
+              color: Colors.white,
+              padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
+              child: AppResponsive.constrainedContent(
+                context: context,
+                maxWidth: AppResponsive.maxFormWidth(context),
+                heightFactor: 1,
                 child: SizedBox(
                   width: double.infinity,
-                  height: AppResponsive.getValue(context, mobile: 50.0, tablet: 54.0, desktop: 58.0),
+                  height: AppResponsive.getValue(
+                    context,
+                    mobile: 50.0,
+                    tablet: 54.0,
+                    desktop: 58.0,
+                  ),
                   child: ElevatedButton.icon(
                     onPressed: () => _model(isTablet),
                     style: ElevatedButton.styleFrom(
@@ -348,19 +436,34 @@ class _AddtaxState extends State<Addtax> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    icon: Icon(Icons.add_circle_rounded, size: AppResponsive.getValue(context, mobile: 22.0, tablet: 24.0, desktop: 26.0)),
+                    icon: Icon(
+                      Icons.add_circle_rounded,
+                      size: AppResponsive.getValue(
+                        context,
+                        mobile: 22.0,
+                        tablet: 24.0,
+                        desktop: 26.0,
+                      ),
+                    ),
                     label: Text(
                       'Add New Tax',
                       style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0),
+                        fontSize: AppResponsive.getValue(
+                          context,
+                          mobile: 16.0,
+                          tablet: 17.0,
+                          desktop: 18.0,
+                        ),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                 ),
               ),
-          ],
-        ));
+            ),
+        ],
+      ),
+    );
   }
 
   Widget _buildDisabledState(BuildContext context) {
@@ -370,14 +473,19 @@ class _AddtaxState extends State<Addtax> {
         children: [
           Icon(
             Icons.receipt_long_outlined,
-            size: AppResponsive.getValue(context, mobile: 64.0, tablet: 80.0, desktop: 96.0),
+            size: AppResponsive.getValue(
+              context,
+              mobile: 64.0,
+              tablet: 80.0,
+              desktop: 96.0,
+            ),
             color: AppColors.divider,
           ),
-          SizedBox(height: AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0)),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
           Text(
             'Tax is currently disabled',
             style: GoogleFonts.poppins(
-              fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 18.0, desktop: 20.0),
+              fontSize: AppResponsive.subheadingFontSize(context),
               fontWeight: FontWeight.w500,
               color: AppColors.textSecondary,
             ),
@@ -387,7 +495,12 @@ class _AddtaxState extends State<Addtax> {
             'This business is marked as not registered for tax during setup.',
             textAlign: TextAlign.center,
             style: GoogleFonts.poppins(
-              fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0),
+              fontSize: AppResponsive.getValue(
+                context,
+                mobile: 13.0,
+                tablet: 14.0,
+                desktop: 15.0,
+              ),
               color: AppColors.textSecondary,
             ),
           ),
@@ -395,7 +508,6 @@ class _AddtaxState extends State<Addtax> {
       ),
     );
   }
-
 
   void _showDeleteConfirmation(BuildContext context, String taxId) async {
     final confirmed = await showAppConfirmDialog(
@@ -412,11 +524,14 @@ class _AddtaxState extends State<Addtax> {
     }
   }
 
-
   /// Shared field block (name + % + optional "apply to all" checkbox), used by
   /// BOTH the tablet dialog and the mobile bottom sheet so they never drift.
   /// Carries the focus chain: name → % → done submits.
-  Widget _taxFields(bool isEdit, StateSetter setModalState, {Tax? existingTax}) {
+  Widget _taxFields(
+    bool isEdit,
+    StateSetter setModalState, {
+    Tax? existingTax,
+  }) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -443,12 +558,15 @@ class _AddtaxState extends State<Addtax> {
                 label: 'Tax %',
                 hint: 'e.g. 18',
                 icon: Icons.percent_rounded,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                 ],
                 textInputAction: TextInputAction.done,
-                onFieldSubmitted: (_) => _addOrUpdateTax(existingTax: existingTax),
+                onFieldSubmitted: (_) =>
+                    _addOrUpdateTax(existingTax: existingTax),
               ),
             ),
           ],
@@ -474,7 +592,12 @@ class _AddtaxState extends State<Addtax> {
                   child: Text(
                     'Apply to all existing items',
                     style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0),
+                      fontSize: AppResponsive.getValue(
+                        context,
+                        mobile: 13.0,
+                        tablet: 14.0,
+                        desktop: 15.0,
+                      ),
                       color: AppColors.textPrimary,
                     ),
                   ),
@@ -489,7 +612,11 @@ class _AddtaxState extends State<Addtax> {
 
   /// Mobile bottom-sheet body: drag handle + header + shared fields + the
   /// standard app-dialog action buttons (kept a sheet on mobile by design).
-  Widget _buildSheetContent(bool isEdit, StateSetter setModalState, {Tax? existingTax}) {
+  Widget _buildSheetContent(
+    bool isEdit,
+    StateSetter setModalState, {
+    Tax? existingTax,
+  }) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -524,7 +651,7 @@ class _AddtaxState extends State<Addtax> {
               child: Text(
                 isEdit ? 'Edit Tax' : 'Add New Tax',
                 style: GoogleFonts.poppins(
-                  fontSize: 18,
+                  fontSize: AppResponsive.subheadingFontSize(context),
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
                 ),
@@ -606,7 +733,11 @@ class _AddtaxState extends State<Addtax> {
                 top: 20,
               ),
               child: SingleChildScrollView(
-                child: _buildSheetContent(isEdit, setModalState, existingTax: existingTax),
+                child: _buildSheetContent(
+                  isEdit,
+                  setModalState,
+                  existingTax: existingTax,
+                ),
               ),
             );
           },
@@ -615,4 +746,3 @@ class _AddtaxState extends State<Addtax> {
     );
   }
 }
-

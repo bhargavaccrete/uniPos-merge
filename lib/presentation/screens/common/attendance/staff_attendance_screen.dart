@@ -47,7 +47,9 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
           builder: (ctx, setDialogState) {
             void verify() {
               if (RestaurantAuthHelper.verifyPassword(
-                  pinController.text.trim(), staff.pinNo.trim())) {
+                pinController.text.trim(),
+                staff.pinNo.trim(),
+              )) {
                 Navigator.pop(ctx, true);
               } else {
                 setDialogState(() {
@@ -91,12 +93,19 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
                       padding: const EdgeInsets.only(top: 6, left: 4),
                       child: Row(
                         children: [
-                          Icon(Icons.error_outline_rounded,
-                              size: 14, color: AppColors.danger),
+                          Icon(
+                            Icons.error_outline_rounded,
+                            size: 14,
+                            color: AppColors.danger,
+                          ),
                           const SizedBox(width: 6),
-                          Text('Incorrect PIN',
-                              style: GoogleFonts.poppins(
-                                  fontSize: 12, color: AppColors.danger)),
+                          Text(
+                            'Incorrect PIN',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.smallFontSize(context),
+                              color: AppColors.danger,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -105,10 +114,7 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
               actions: [
                 appDialogCancelButton(ctx),
                 const SizedBox(width: 12),
-                appDialogPrimaryButton(
-                  label: 'Verify',
-                  onPressed: verify,
-                ),
+                appDialogPrimaryButton(label: 'Verify', onPressed: verify),
               ],
             );
           },
@@ -129,7 +135,9 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
     final open = attendanceStore.getActiveRecord(fullName);
     if (open != null) {
       await attendanceStore.clockOut(open.id);
-      if (mounted) _showSnack('${staff.firstName} clocked out', Colors.orange.shade700);
+      if (mounted) {
+        _showSnack('${staff.firstName} clocked out', Colors.orange.shade700);
+      }
     } else {
       final sessionId = await DayManagementService.getCurrentSessionId();
       await attendanceStore.clockIn(
@@ -137,7 +145,12 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
         staffRole: staff.isCashier,
         sessionId: sessionId,
       );
-      if (mounted) _showSnack('${staff.firstName} clocked in at ${_fmt(DateTime.now())}', Colors.green.shade700);
+      if (mounted) {
+        _showSnack(
+          '${staff.firstName} clocked in at ${_fmt(DateTime.now())}',
+          Colors.green.shade700,
+        );
+      }
     }
 
     setState(() => _loadingStaffId = null);
@@ -154,10 +167,14 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
     if (open != null) {
       if (open.isOnBreak) {
         await attendanceStore.endBreak(open.id);
-        if (mounted) _showSnack('${staff.firstName} ended break', Colors.green.shade700);
+        if (mounted) {
+          _showSnack('${staff.firstName} ended break', Colors.green.shade700);
+        }
       } else {
         await attendanceStore.startBreak(open.id);
-        if (mounted) _showSnack('${staff.firstName} started break', Colors.blue.shade700);
+        if (mounted) {
+          _showSnack('${staff.firstName} started break', Colors.blue.shade700);
+        }
       }
     }
     setState(() => _loadingStaffId = null);
@@ -186,245 +203,361 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Observer(builder: (_) {
-        // Exclude the currently logged-in staff — their session IS their attendance
-        final loggedInName = RestaurantSession.staffName?.toLowerCase().trim();
-        final allStaff = staffStore.staff.where((s) {
-          if (!s.isActive) return false;
-          if (loggedInName == null) return true; // admin logged in — show all staff
-          final fullName = '${s.firstName} ${s.lastName}'.trim().toLowerCase();
-          return fullName != loggedInName;
-        }).toList();
+      body: Observer(
+        builder: (_) {
+          // Exclude the currently logged-in staff — their session IS their attendance
+          final loggedInName = RestaurantSession.staffName
+              ?.toLowerCase()
+              .trim();
+          final allStaff = staffStore.staff.where((s) {
+            if (!s.isActive) return false;
+            if (loggedInName == null) {
+              return true; // admin logged in — show all staff
+            }
+            final fullName = '${s.firstName} ${s.lastName}'
+                .trim()
+                .toLowerCase();
+            return fullName != loggedInName;
+          }).toList();
 
-        if (allStaff.isEmpty) {
-          return Center(
-            child: Text('No staff found',
-                style: GoogleFonts.poppins(color: AppColors.textSecondary)),
-          );
-        }
-
-        // Summary row
-        final inCount = allStaff.where((s) {
-          final name = '${s.firstName} ${s.lastName}'.trim();
-          return attendanceStore.getActiveRecord(name) != null;
-        }).length;
-
-        return Column(
-          children: [
-            // ── Summary bar ───────────────────────────────────────────
-            Container(
-              margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.25),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+          if (allStaff.isEmpty) {
+            return Center(
+              child: Text(
+                'No staff found',
+                style: GoogleFonts.poppins(color: AppColors.textSecondary),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _summaryTile('Total Staff', '${allStaff.length}', Colors.white70),
-                  _divider(),
-                  _summaryTile('Clocked In', '$inCount', Colors.greenAccent.shade100),
-                  _divider(),
-                  _summaryTile('Not In', '${allStaff.length - inCount}', Colors.orange.shade200),
-                ],
-              ),
-            ),
+            );
+          }
 
-            // ── Staff list ────────────────────────────────────────────
-            Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                itemCount: allStaff.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (_, i) {
-                  final staff = allStaff[i];
-                  final fullName = '${staff.firstName} ${staff.lastName}'.trim();
-                  final openRecord = attendanceStore.getActiveRecord(fullName);
-                  final isIn = openRecord != null;
-                  final isOnBreak = isIn && openRecord.isOnBreak;
-                  final isLoading = _loadingStaffId == staff.id;
+          // Summary row
+          final inCount = allStaff.where((s) {
+            final name = '${s.firstName} ${s.lastName}'.trim();
+            return attendanceStore.getActiveRecord(name) != null;
+          }).length;
 
-                  return Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: AppColors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: isOnBreak
-                            ? Colors.blue.shade200
-                            : (isIn ? Colors.green.shade200 : AppColors.divider),
-                        width: 1.2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
+          return Column(
+            children: [
+              // ── Summary bar ───────────────────────────────────────────
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 18,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.25),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
-                    child: Row(
-                      children: [
-                        // Avatar
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _summaryTile(
+                      'Total Staff',
+                      '${allStaff.length}',
+                      Colors.white70,
+                    ),
+                    _divider(),
+                    _summaryTile(
+                      'Clocked In',
+                      '$inCount',
+                      Colors.greenAccent.shade100,
+                    ),
+                    _divider(),
+                    _summaryTile(
+                      'Not In',
+                      '${allStaff.length - inCount}',
+                      Colors.orange.shade200,
+                    ),
+                  ],
+                ),
+              ),
+
+              // ── Staff list ────────────────────────────────────────────
+              Expanded(
+                child: AppResponsive.constrainedContent(
+                  context: context,
+                  maxWidth: AppResponsive.maxFormWidth(context),
+                  alignment: Alignment.topCenter,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                    itemCount: allStaff.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (_, i) {
+                      final staff = allStaff[i];
+                      final fullName = '${staff.firstName} ${staff.lastName}'
+                          .trim();
+                      final openRecord = attendanceStore.getActiveRecord(
+                        fullName,
+                      );
+                      final isIn = openRecord != null;
+                      final isOnBreak = isIn && openRecord.isOnBreak;
+                      final isLoading = _loadingStaffId == staff.id;
+
+                      return Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
                             color: isOnBreak
-                                ? Colors.blue.shade50
-                                : (isIn ? Colors.green.shade50 : AppColors.surfaceMedium),
-                            shape: BoxShape.circle,
+                                ? Colors.blue.shade200
+                                : (isIn
+                                      ? Colors.green.shade200
+                                      : AppColors.divider),
+                            width: 1.2,
                           ),
-                          child: Center(
-                            child: Text(
-                              staff.firstName.isNotEmpty
-                                  ? staff.firstName[0].toUpperCase()
-                                  : '?',
-                              style: GoogleFonts.poppins(
-                                fontSize: AppResponsive.getValue(context, mobile: 18.0, tablet: 19.0, desktop: 20.0),
-                                fontWeight: FontWeight.w700,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            // Avatar
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
                                 color: isOnBreak
-                                    ? Colors.blue.shade700
-                                    : (isIn ? Colors.green.shade700 : AppColors.textSecondary),
+                                    ? Colors.blue.shade50
+                                    : (isIn
+                                          ? Colors.green.shade50
+                                          : AppColors.surfaceMedium),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  staff.firstName.isNotEmpty
+                                      ? staff.firstName[0].toUpperCase()
+                                      : '?',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.getValue(
+                                      context,
+                                      mobile: 18.0,
+                                      tablet: 19.0,
+                                      desktop: 20.0,
+                                    ),
+                                    fontWeight: FontWeight.w700,
+                                    color: isOnBreak
+                                        ? Colors.blue.shade700
+                                        : (isIn
+                                              ? Colors.green.shade700
+                                              : AppColors.textSecondary),
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
+                            const SizedBox(width: 12),
 
-                        // Name + role + time
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(fullName,
-                                  style: GoogleFonts.poppins(
-                                      fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0), fontWeight: FontWeight.w600)),
-                              Text(staff.isCashier,
-                                  style: GoogleFonts.poppins(
-                                      fontSize: AppResponsive.getValue(context, mobile: 11.0, tablet: 12.0, desktop: 13.0), color: AppColors.textSecondary)),
-                              if (isIn)
-                                Text(
-                                  isOnBreak 
-                                      ? 'On Break • Worked ${_liveDuration(openRecord)}'
-                                      : 'In since ${openRecord.formattedClockIn}  •  ${_liveDuration(openRecord)}',
-                                  style: GoogleFonts.poppins(
-                                      fontSize: AppResponsive.getValue(context, mobile: 11.0, tablet: 12.0, desktop: 13.0), color: isOnBreak ? Colors.blue.shade700 : Colors.green.shade700),
-                                ),
-                            ],
-                          ),
-                        ),
-
-                        // Action Buttons
-                        isLoading
-                            ? const SizedBox(
-                                width: 36,
-                                height: 36,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : Row(
+                            // Name + role + time
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  Text(
+                                    fullName,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: AppResponsive.getValue(
+                                        context,
+                                        mobile: 14.0,
+                                        tablet: 15.0,
+                                        desktop: 16.0,
+                                      ),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  Text(
+                                    staff.isCashier,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: AppResponsive.getValue(
+                                        context,
+                                        mobile: 11.0,
+                                        tablet: 12.0,
+                                        desktop: 13.0,
+                                      ),
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
                                   if (isIn)
-                                    GestureDetector(
-                                      onTap: () => _toggleBreak(staff),
-                                      child: Container(
-                                        margin: const EdgeInsets.only(right: 8),
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 8),
-                                        decoration: BoxDecoration(
-                                          color: isOnBreak
-                                              ? Colors.green.shade600
-                                              : Colors.blue.shade600,
-                                          borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+                                    Text(
+                                      isOnBreak
+                                          ? 'On Break • Worked ${_liveDuration(openRecord)}'
+                                          : 'In since ${openRecord.formattedClockIn}  •  ${_liveDuration(openRecord)}',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: AppResponsive.getValue(
+                                          context,
+                                          mobile: 11.0,
+                                          tablet: 12.0,
+                                          desktop: 13.0,
                                         ),
-                                        child: Text(
-                                          isOnBreak ? 'RESUME' : 'BREAK',
-                                          style: GoogleFonts.poppins(
-                                            fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0),
-                                            fontWeight: FontWeight.w700,
-                                            color: Colors.white,
+                                        color: isOnBreak
+                                            ? Colors.blue.shade700
+                                            : Colors.green.shade700,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+
+                            // Action Buttons
+                            isLoading
+                                ? const SizedBox(
+                                    width: 36,
+                                    height: 36,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Row(
+                                    children: [
+                                      if (isIn)
+                                        GestureDetector(
+                                          onTap: () => _toggleBreak(staff),
+                                          child: Container(
+                                            margin: const EdgeInsets.only(
+                                              right: 8,
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 8,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: isOnBreak
+                                                  ? Colors.green.shade600
+                                                  : Colors.blue.shade600,
+                                              borderRadius: BorderRadius.circular(
+                                                AppResponsive.smallBorderRadius(
+                                                  context,
+                                                ),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              isOnBreak ? 'RESUME' : 'BREAK',
+                                              style: GoogleFonts.poppins(
+                                                fontSize:
+                                                    AppResponsive.getValue(
+                                                      context,
+                                                      mobile: 12.0,
+                                                      tablet: 13.0,
+                                                      desktop: 14.0,
+                                                    ),
+                                                fontWeight: FontWeight.w700,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      GestureDetector(
+                                        onTap: () => _toggle(staff),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 8,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isIn
+                                                ? Colors.orange.shade600
+                                                : Colors.green.shade600,
+                                            borderRadius: BorderRadius.circular(
+                                              AppResponsive.smallBorderRadius(
+                                                context,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            isIn ? 'OUT' : 'IN',
+                                            style: GoogleFonts.poppins(
+                                              fontSize: AppResponsive.getValue(
+                                                context,
+                                                mobile: 13.0,
+                                                tablet: 14.0,
+                                                desktop: 15.0,
+                                              ),
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.white,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ),
-                                  GestureDetector(
-                                    onTap: () => _toggle(staff),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 16, vertical: 8),
-                                      decoration: BoxDecoration(
-                                        color: isIn
-                                            ? Colors.orange.shade600
-                                            : Colors.green.shade600,
-                                        borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
-                                      ),
-                                      child: Text(
-                                        isIn ? 'OUT' : 'IN',
-                                        style: GoogleFonts.poppins(
-                                          fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0),
-                                          fontWeight: FontWeight.w700,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                      ],
-                    ),
-                  );
-                },
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ),
-            ),
-          ],
-        );
-      }),
+            ],
+          );
+        },
+      ),
     );
   }
 
   Widget _summaryTile(String label, String value, Color valueColor) {
     return Column(
       children: [
-        Text(value,
-            style: GoogleFonts.poppins(
-                fontSize: AppResponsive.getValue(context, mobile: 22.0, tablet: 23.0, desktop: 24.0), fontWeight: FontWeight.w700, color: valueColor)),
-        Text(label,
-            style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 11.0, tablet: 12.0, desktop: 13.0), color: Colors.white70)),
+        Text(
+          value,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.getValue(
+              context,
+              mobile: 22.0,
+              tablet: 23.0,
+              desktop: 24.0,
+            ),
+            fontWeight: FontWeight.w700,
+            color: valueColor,
+          ),
+        ),
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.getValue(
+              context,
+              mobile: 11.0,
+              tablet: 12.0,
+              desktop: 13.0,
+            ),
+            color: Colors.white70,
+          ),
+        ),
       ],
     );
   }
 
-  Widget _divider() => Container(
-        height: 32,
-        width: 1,
-        color: Colors.white.withOpacity(0.3),
-      );
+  Widget _divider() =>
+      Container(height: 32, width: 1, color: Colors.white.withOpacity(0.3));
 
   String _fmt(DateTime d) =>
       '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
   String _liveDuration(AttendanceModel record) {
     final now = DateTime.now();
-    int activeMinutes = now.difference(record.clockIn).inMinutes - (record.breakTotalMinutes ?? 0);
+    int activeMinutes =
+        now.difference(record.clockIn).inMinutes -
+        (record.breakTotalMinutes ?? 0);
     if (record.isOnBreak && record.breakStartTime != null) {
       activeMinutes -= now.difference(record.breakStartTime!).inMinutes;
     }
-    
+
     // Prevent negative duration just in case
     if (activeMinutes < 0) activeMinutes = 0;
-    
+
     final h = activeMinutes ~/ 60;
     final m = activeMinutes % 60;
     if (h == 0) return '${m}m';
     return '${h}h ${m}m';
   }
 }
-

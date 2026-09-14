@@ -28,11 +28,7 @@ class CategorySelectorButton extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(
-              Icons.category_outlined,
-              size: 20,
-              color: AppColors.primary,
-            ),
+            Icon(Icons.category_outlined, size: 20, color: AppColors.primary),
             const SizedBox(width: 10),
             Expanded(
               child: Text(

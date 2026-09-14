@@ -191,7 +191,7 @@ class _VariantPickerDialogState extends State<VariantPickerDialog> {
         ? ((AppResponsive.screenWidth(context) -
                     AppResponsive.dialogWidth(context)) /
                 2)
-            .clamp(40.0, 200.0)
+            .clamp(40.0, double.infinity)
         : 20.0;
     final hasActiveFilter = _selectedFilters.values.any((v) => v != null);
 

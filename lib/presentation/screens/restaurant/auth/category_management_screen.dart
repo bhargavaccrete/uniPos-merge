@@ -9,6 +9,7 @@ import 'package:billberrylite/domain/services/restaurant/notification_service.da
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Button.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 /// Category Management Screen
 /// Allows users to view, add, edit, and delete categories with images
@@ -17,7 +18,8 @@ class CategoryManagementScreen extends StatefulWidget {
   const CategoryManagementScreen({Key? key}) : super(key: key);
 
   @override
-  State<CategoryManagementScreen> createState() => _CategoryManagementScreenState();
+  State<CategoryManagementScreen> createState() =>
+      _CategoryManagementScreenState();
 }
 
 class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
@@ -45,7 +47,9 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
       // Count items per category
       _itemCounts.clear();
       for (final category in _categories) {
-        final count = itemStore.items.where((item) => item.categoryOfItem == category.id).length;
+        final count = itemStore.items
+            .where((item) => item.categoryOfItem == category.id)
+            .length;
         _itemCounts[category.id] = count;
       }
     } catch (e) {
@@ -57,11 +61,14 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
   Future<void> _addCategory() async {
     final result = await showDialog<Category>(
       context: context,
+      useRootNavigator: false, // stays inside the wizard's pane
       builder: (context) => const AddCategoryDialog(),
     );
 
     if (result != null) {
-      NotificationService.instance.showSuccess('Category "${result.name}" added successfully!');
+      NotificationService.instance.showSuccess(
+        'Category "${result.name}" added successfully!',
+      );
       _loadCategories();
     }
   }
@@ -69,11 +76,14 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
   Future<void> _editCategory(Category category) async {
     final result = await showDialog<Category>(
       context: context,
+      useRootNavigator: false, // stays inside the wizard's pane
       builder: (context) => AddCategoryDialog(existingCategory: category),
     );
 
     if (result != null) {
-      NotificationService.instance.showSuccess('Category "${result.name}" updated successfully!');
+      NotificationService.instance.showSuccess(
+        'Category "${result.name}" updated successfully!',
+      );
       _loadCategories();
     }
   }
@@ -102,10 +112,14 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
         final success = await categoryStore.deleteCategory(category.id);
 
         if (success) {
-          NotificationService.instance.showSuccess('Category "${category.name}" deleted');
+          NotificationService.instance.showSuccess(
+            'Category "${category.name}" deleted',
+          );
           _loadCategories();
         } else {
-          NotificationService.instance.showError('Error deleting category: ${categoryStore.errorMessage ?? "Unknown error"}');
+          NotificationService.instance.showError(
+            'Error deleting category: ${categoryStore.errorMessage ?? "Unknown error"}',
+          );
         }
       } catch (e) {
         NotificationService.instance.showError('Error deleting category: $e');
@@ -123,21 +137,24 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
       backgroundColor: Colors.grey[50],
       appBar: buildPrimaryAppBar(
         title: 'Category Management',
-        titleFontSize: 18,
+        titleFontSize: AppResponsive.subheadingFontSize(context),
         actions: const [],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _categories.isEmpty
-              ? _buildEmptyState()
-              : _buildCategoryList(),
+          ? _buildEmptyState()
+          : _buildCategoryList(),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addCategory,
         backgroundColor: AppColors.primary,
-        icon: const Icon(Icons.add,color: AppColors.white),
+        icon: const Icon(Icons.add, color: AppColors.white),
         label: Text(
           'Add Category',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600,color: AppColors.white),
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.w600,
+            color: AppColors.white,
+          ),
         ),
       ),
     );
@@ -146,27 +163,42 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(40),
+        padding: EdgeInsets.all(
+          AppResponsive.getValue(
+            context,
+            mobile: 40.0,
+            tablet: 48.0,
+            desktop: 56.0,
+          ),
+        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.category_outlined,
-                size: 100, color: Colors.grey[300]),
-            const SizedBox(height: 20),
+            Icon(
+              Icons.category_outlined,
+              size: AppResponsive.getValue(
+                context,
+                mobile: 100.0,
+                tablet: 120.0,
+                desktop: 140.0,
+              ),
+              color: Colors.grey[300],
+            ),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
             Text(
               'No Categories Yet',
               style: GoogleFonts.poppins(
-                fontSize: 22,
+                fontSize: AppResponsive.headingFontSize(context),
                 fontWeight: FontWeight.w600,
                 color: Colors.grey[600],
               ),
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: AppResponsive.smallSpacing(context)),
             Text(
               'Add your first category to organize your menu items',
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
-                fontSize: 14,
+                fontSize: AppResponsive.bodyFontSize(context),
                 color: Colors.grey[500],
               ),
             ),
@@ -175,13 +207,13 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
             //   onTap: _addCategory,
             //   bgcolor: AppColors.primary,
             //   bordercircular: 10,
-            //   height: 50,
+            //   height: AppResponsive.buttonHeight(context),
             //   width: 200,
             //   child: Row(
             //     mainAxisAlignment: MainAxisAlignment.center,
             //     children: [
             //       const Icon(Icons.add, color: Colors.white),
-            //       const SizedBox(width: 10),
+            //       SizedBox(width: AppResponsive.smallSpacing(context)),
             //       Text(
             //         'Add Category',
             //         style: GoogleFonts.poppins(
@@ -200,24 +232,34 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
 
   Widget _buildCategoryList() {
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.largeSpacing(context),
+        vertical: AppResponsive.mediumSpacing(context),
+      ),
       itemCount: _categories.length,
       itemBuilder: (context, index) {
         final category = _categories[index];
         final itemCount = _itemCounts[category.id] ?? 0;
 
         return Container(
-          margin: const EdgeInsets.only(bottom: 8),
+          margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.borderRadius(context),
+            ),
             border: Border.all(color: Colors.grey.shade200),
           ),
           child: InkWell(
             onTap: () => _selectCategory(category),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.borderRadius(context),
+            ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.mediumSpacing(context),
+                vertical: AppResponsive.smallSpacing(context),
+              ),
               child: Row(
                 children: [
                   // Category Image or Icon
@@ -228,9 +270,13 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                       borderRadius: BorderRadius.circular(10),
                       color: AppColors.primary.withValues(alpha: 0.1),
                     ),
-                    child: Icon(Icons.category_rounded, color: AppColors.primary, size: 20),
+                    child: Icon(
+                      Icons.category_rounded,
+                      color: AppColors.primary,
+                      size: AppResponsive.iconSize(context),
+                    ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: AppResponsive.mediumSpacing(context)),
 
                   // Category Info
                   Expanded(
@@ -241,7 +287,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                         Text(
                           category.name,
                           style: GoogleFonts.poppins(
-                            fontSize: 14,
+                            fontSize: AppResponsive.bodyFontSize(context),
                             fontWeight: FontWeight.w600,
                             color: AppColors.textPrimary,
                           ),
@@ -251,7 +297,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                         Text(
                           '$itemCount item${itemCount != 1 ? 's' : ''}',
                           style: GoogleFonts.poppins(
-                            fontSize: 11,
+                            fontSize: AppResponsive.captionFontSize(context),
                             color: AppColors.textSecondary,
                             fontWeight: FontWeight.w500,
                           ),
@@ -267,21 +313,33 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
                       padding: const EdgeInsets.all(7),
                       decoration: BoxDecoration(
                         color: Colors.blue.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(
+                          AppResponsive.smallBorderRadius(context),
+                        ),
                       ),
-                      child: Icon(Icons.edit_rounded, color: Colors.blue, size: 16),
+                      child: Icon(
+                        Icons.edit_rounded,
+                        color: Colors.blue,
+                        size: AppResponsive.smallIconSize(context),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
                   GestureDetector(
                     onTap: () => _deleteCategory(category),
                     child: Container(
                       padding: const EdgeInsets.all(7),
                       decoration: BoxDecoration(
                         color: Colors.red.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(
+                          AppResponsive.smallBorderRadius(context),
+                        ),
                       ),
-                      child: Icon(Icons.delete_rounded, color: Colors.red, size: 16),
+                      child: Icon(
+                        Icons.delete_rounded,
+                        color: Colors.red,
+                        size: AppResponsive.smallIconSize(context),
+                      ),
                     ),
                   ),
                 ],
@@ -329,11 +387,15 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
     if (_formKey.currentState!.validate()) {
       // Duplicate name check (case-insensitive, exclude self when editing)
       final trimmedName = _nameController.text.trim().toLowerCase();
-      final duplicate = categoryStore.categories.any((c) =>
-          c.name.trim().toLowerCase() == trimmedName &&
-          c.id != (widget.existingCategory?.id ?? ''));
+      final duplicate = categoryStore.categories.any(
+        (c) =>
+            c.name.trim().toLowerCase() == trimmedName &&
+            c.id != (widget.existingCategory?.id ?? ''),
+      );
       if (duplicate) {
-        NotificationService.instance.showError('A category with this name already exists');
+        NotificationService.instance.showError(
+          'A category with this name already exists',
+        );
         return;
       }
 
@@ -341,14 +403,18 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
         // Show loading
         showDialog(
           context: context,
+          useRootNavigator: false, // stays inside the wizard's pane
           barrierDismissible: false,
-          builder: (context) => const Center(child: CircularProgressIndicator()),
+          builder: (context) =>
+              const Center(child: CircularProgressIndicator()),
         );
 
         final category = Category(
           id: _isEditing ? widget.existingCategory!.id : _uuid.v4(),
           name: _nameController.text.trim(),
-          createdTime: _isEditing ? widget.existingCategory!.createdTime : DateTime.now(),
+          createdTime: _isEditing
+              ? widget.existingCategory!.createdTime
+              : DateTime.now(),
           editCount: _isEditing ? widget.existingCategory!.editCount + 1 : 0,
         );
 
@@ -369,7 +435,9 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
         } else {
           // Show error
           if (mounted) {
-            NotificationService.instance.showError('Error saving category: ${categoryStore.errorMessage ?? "Unknown error"}');
+            NotificationService.instance.showError(
+              'Error saving category: ${categoryStore.errorMessage ?? "Unknown error"}',
+            );
           }
         }
       } catch (e) {
@@ -392,7 +460,7 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -400,21 +468,27 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
                 // ── Header ─────────────────────────────────────────
                 Row(
                   children: [
-                    Icon(Icons.category_outlined,
-                        color: AppColors.primary, size: 24),
-                    const SizedBox(width: 10),
+                    Icon(
+                      Icons.category_outlined,
+                      color: AppColors.primary,
+                      size: AppResponsive.iconSize(context),
+                    ),
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
                     Expanded(
                       child: Text(
                         _isEditing ? 'Edit Category' : 'Add New Category',
                         style: GoogleFonts.poppins(
-                          fontSize: 18,
+                          fontSize: AppResponsive.subheadingFontSize(context),
                           fontWeight: FontWeight.w600,
                           color: Colors.black87,
                         ),
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close, size: 20),
+                      icon: Icon(
+                        Icons.close,
+                        size: AppResponsive.iconSize(context),
+                      ),
                       onPressed: () => Navigator.pop(context),
                       style: IconButton.styleFrom(
                         backgroundColor: AppColors.surfaceLight,
@@ -423,11 +497,11 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
 
                 // ── Category Name ───────────────────────────────────
                 _sectionHeader('Category Name', Icons.label_outline_rounded),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 _card(
                   child: AppTextField(
                     controller: _nameController,
@@ -443,7 +517,7 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
                     },
                   ),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
                 // ── Buttons ─────────────────────────────────────────
                 Row(
@@ -454,28 +528,30 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
                         bgcolor: Colors.white,
                         bordercolor: Colors.grey[300],
                         bordercircular: 10,
-                        height: 50,
+                        height: AppResponsive.buttonHeight(context),
                         child: Text(
                           'Cancel',
                           style: GoogleFonts.poppins(
-                              color: Colors.grey[700],
-                              fontWeight: FontWeight.w600),
+                            color: Colors.grey[700],
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: AppResponsive.mediumSpacing(context)),
                     Expanded(
                       child: CommonButton(
                         onTap: _saveCategory,
                         bgcolor: AppColors.primary,
                         bordercircular: 10,
-                        height: 50,
+                        height: AppResponsive.buttonHeight(context),
                         child: Text(
                           _isEditing ? 'Update' : 'Add',
                           style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600),
+                            color: Colors.white,
+                            fontSize: AppResponsive.buttonFontSize(context),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
@@ -492,14 +568,19 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
   Widget _sectionHeader(String title, IconData icon) {
     return Row(
       children: [
-        Icon(icon, color: AppColors.primary, size: 20),
-        const SizedBox(width: 8),
+        Icon(
+          icon,
+          color: AppColors.primary,
+          size: AppResponsive.iconSize(context),
+        ),
+        SizedBox(width: AppResponsive.smallSpacing(context)),
         Text(
           title,
           style: GoogleFonts.poppins(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87),
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
         ),
       ],
     );
@@ -507,10 +588,12 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
 
   Widget _card({required Widget child}) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -522,5 +605,4 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
       child: child,
     );
   }
-
 }

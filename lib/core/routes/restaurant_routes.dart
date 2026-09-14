@@ -54,7 +54,6 @@ import 'package:billberrylite/presentation/screens/restaurant/auth/category_mana
 // Restaurant - Customers
 import 'package:billberrylite/presentation/screens/restaurant/customer/customer_list_screen.dart';
 import 'package:billberrylite/presentation/screens/restaurant/customer/manage_customers_screen.dart';
-import 'package:billberrylite/presentation/screens/restaurant/customer/add_edit_customer_screen.dart';
 import 'package:billberrylite/presentation/screens/restaurant/customer/customer_detail_screen.dart';
 
 // Restaurant - Online Orders
@@ -117,12 +116,16 @@ import '../../presentation/screens/restaurant/cash_drawer/cash_drawer_history_sc
 class RestaurantRoutes {
   /// Wraps a widget builder with [RestaurantGuard] to enforce login + optional role check.
   /// [permission] maps to a key in [RestaurantSession.canAccess].
-  static WidgetBuilder _guard(Widget child, [String? permission, String? entitlement]) =>
+  static WidgetBuilder _guard(
+    Widget child, [
+    String? permission,
+    String? entitlement,
+  ]) =>
       (_) => RestaurantGuard(
-            child: child,
-            permissionKey: permission,
-            entitlementKey: entitlement,
-          );
+        child: child,
+        permissionKey: permission,
+        entitlementKey: entitlement,
+      );
 
   static Map<String, WidgetBuilder> get routes => {
     // Core (restaurant flow)
@@ -132,10 +135,10 @@ class RestaurantRoutes {
     RouteNames.restore: (_) => const ExistingUserRestoreScreen(),
     RouteNames.licenseKeyEntry: (_) => const LicenseKeyEntryScreen(),
     RouteNames.licenseLock: (context) => LicenseLockScreen(
-          onActivated: () {
-            LicenseStore.navigateToNextScreen(context);
-          },
-        ),
+      onActivated: () {
+        LicenseStore.navigateToNextScreen(context);
+      },
+    ),
     RouteNames.setupWizard: (_) => const SetupWizardScreen(),
 
     // Restaurant - Auth
@@ -146,27 +149,70 @@ class RestaurantRoutes {
     RouteNames.restaurantNotifications: _guard(const NotificationsScreen()),
 
     // Restaurant - Orders
-    RouteNames.restaurantStartOrder: _guard(const Startorder(), 'startOrder', EntKeys.billing),
-    RouteNames.restaurantOrder: _guard(const Order(), 'startOrder', EntKeys.billing),
-    RouteNames.restaurantActiveOrders: _guard(const Activeorder(), 'startOrder', EntKeys.billing),
-    RouteNames.restaurantPastOrders: _guard(const Pastorder(), 'startOrder', EntKeys.billing),
-    RouteNames.restaurantOrderDetails: _guard(const Orderdetails(), 'startOrder', EntKeys.billing),
+    RouteNames.restaurantStartOrder: _guard(
+      const Startorder(),
+      'startOrder',
+      EntKeys.billing,
+    ),
+    RouteNames.restaurantOrder: _guard(
+      const Order(),
+      'startOrder',
+      EntKeys.billing,
+    ),
+    RouteNames.restaurantActiveOrders: _guard(
+      const Activeorder(),
+      'startOrder',
+      EntKeys.billing,
+    ),
+    RouteNames.restaurantPastOrders: _guard(
+      const Pastorder(),
+      'startOrder',
+      EntKeys.billing,
+    ),
+    RouteNames.restaurantOrderDetails: _guard(
+      const Orderdetails(),
+      'startOrder',
+      EntKeys.billing,
+    ),
 
     // Restaurant - Tables
-    RouteNames.restaurantTables: _guard(const TableScreen(), 'startOrder', EntKeys.billingTables),
+    RouteNames.restaurantTables: _guard(
+      const TableScreen(),
+      'startOrder',
+      EntKeys.billingTables,
+    ),
 
     // Restaurant - Menu
     RouteNames.restaurantAdminWelcome: _guard(const AdminWelcome()),
-    RouteNames.restaurantManageMenu: _guard(const Managemenu(), 'manageMenu', EntKeys.manageMenu),
-    RouteNames.restaurantAddItem: _guard(const SetupAddItemScreen(), 'manageMenu', EntKeys.manageMenuItems),
-    RouteNames.restaurantCategoryManagement: _guard(const CategoryManagementScreen(), 'manageMenu', EntKeys.manageMenuCategories),
+    RouteNames.restaurantManageMenu: _guard(
+      const Managemenu(),
+      'manageMenu',
+      EntKeys.manageMenu,
+    ),
+    RouteNames.restaurantAddItem: _guard(
+      const SetupAddItemScreen(),
+      'manageMenu',
+      EntKeys.manageMenuItems,
+    ),
+    RouteNames.restaurantCategoryManagement: _guard(
+      const CategoryManagementScreen(),
+      'manageMenu',
+      EntKeys.manageMenuCategories,
+    ),
 
     // Restaurant - Customers
-    RouteNames.restaurantCustomers: _guard(const CustomerListScreen(), 'customers', EntKeys.customers),
-    RouteNames.restaurantManageCustomers: _guard(const ManageCustomersScreen(), 'customers', EntKeys.customers),
-    RouteNames.restaurantAddEditCustomer: _guard(const AddEditCustomerScreen(), 'customers', EntKeys.customers),
+    RouteNames.restaurantCustomers: _guard(
+      const CustomerListScreen(),
+      'customers',
+      EntKeys.customers,
+    ),
+    RouteNames.restaurantManageCustomers: _guard(
+      const ManageCustomersScreen(),
+      'customers',
+      EntKeys.customers,
+    ),
 
-/*
+    /*
     // Restaurant - Online Orders
     RouteNames.restaurantOnlineOrders: (_) => const OnlineOrders(),
     RouteNames.restaurantOnlineInProgress: (_) => const InProgressOnline(),
@@ -175,66 +221,205 @@ class RestaurantRoutes {
 */
 
     // Restaurant - Inventory
-    RouteNames.restaurantInventory: _guard(const ManageInventory(), 'inventory', EntKeys.inventory),
+    RouteNames.restaurantInventory: _guard(
+      const ManageInventory(),
+      'inventory',
+      EntKeys.inventory,
+    ),
 
     // Restaurant - Staff
-    RouteNames.restaurantStaff: _guard(const ManageStaffScreen(), 'manageStaff', EntKeys.users),
+    RouteNames.restaurantStaff: _guard(
+      const ManageStaffScreen(),
+      'manageStaff',
+      EntKeys.users,
+    ),
 
     // Restaurant - Expenses
-    RouteNames.restaurantExpenses: _guard(const ExpenseScreen(), 'expenses', EntKeys.expenses),
-    RouteNames.restaurantAddExpense: _guard(const Addexpence(), 'expenses', EntKeys.expenses),
-    RouteNames.restaurantViewExpense: _guard(const ViewExpense(), 'expenses', EntKeys.expenses),
-    RouteNames.restaurantExpenseCategory: _guard(const ManageCategory(), 'expenses', EntKeys.expenses),
+    RouteNames.restaurantExpenses: _guard(
+      const ExpenseScreen(),
+      'expenses',
+      EntKeys.expenses,
+    ),
+    RouteNames.restaurantAddExpense: _guard(
+      const Addexpence(),
+      'expenses',
+      EntKeys.expenses,
+    ),
+    RouteNames.restaurantViewExpense: _guard(
+      const ViewExpense(),
+      'expenses',
+      EntKeys.expenses,
+    ),
+    RouteNames.restaurantExpenseCategory: _guard(
+      const ManageCategory(),
+      'expenses',
+      EntKeys.expenses,
+    ),
 
     // Restaurant - Reports
-    RouteNames.restaurantReports: _guard(const ReportsScreen(), 'reports', EntKeys.reports),
-    RouteNames.restaurantPerformanceStats: _guard(const PerformanceStatisticsReport(), 'reports', EntKeys.reportsPerformanceStatistics),
-    RouteNames.restaurantReportsTotalSales: _guard(const Totalsales(), 'reports', EntKeys.reportsTotalSale),
-    RouteNames.restaurantReportsSalesBYItem: _guard(Salesbyitem(), 'reports', EntKeys.reportsSaleByItem),
-    RouteNames.restaurantReportsSalesByCategory: _guard(SalesByCategory(), 'reports', EntKeys.reportsSaleByCategory),
-    RouteNames.restaurantReportsDailyClosingReport: _guard(DailyClosingReport(), 'reports', EntKeys.reportsDailyClosing),
-    RouteNames.restaurantReportsCustomerList: _guard(CustomerListReport(), 'reports', EntKeys.reportsCustomerList),
+    RouteNames.restaurantReports: _guard(
+      const ReportsScreen(),
+      'reports',
+      EntKeys.reports,
+    ),
+    RouteNames.restaurantPerformanceStats: _guard(
+      const PerformanceStatisticsReport(),
+      'reports',
+      EntKeys.reportsPerformanceStatistics,
+    ),
+    RouteNames.restaurantReportsTotalSales: _guard(
+      const Totalsales(),
+      'reports',
+      EntKeys.reportsTotalSale,
+    ),
+    RouteNames.restaurantReportsSalesBYItem: _guard(
+      Salesbyitem(),
+      'reports',
+      EntKeys.reportsSaleByItem,
+    ),
+    RouteNames.restaurantReportsSalesByCategory: _guard(
+      SalesByCategory(),
+      'reports',
+      EntKeys.reportsSaleByCategory,
+    ),
+    RouteNames.restaurantReportsDailyClosingReport: _guard(
+      DailyClosingReport(),
+      'reports',
+      EntKeys.reportsDailyClosing,
+    ),
+    RouteNames.restaurantReportsCustomerList: _guard(
+      CustomerListReport(),
+      'reports',
+      EntKeys.reportsCustomerList,
+    ),
     // Periods gate themselves inside the screen; the route opens if any is granted.
     RouteNames.restaurantReportsSalesComparison: (_) => RestaurantGuard(
-          permissionKey: 'reports',
-          entitlementAnyOf: kComparisonPeriodEntitlements,
-          child: const SalesComparison(),
-        ),
-    RouteNames.restaurantReportsComparisionByProduct: _guard(ComparisonByProduct(), 'reports', EntKeys.reportsComparisonProduct),
-    RouteNames.restaurantReportsRefundDetails: _guard(RefundDetails(), 'reports', EntKeys.reportsRefundDetails),
-    RouteNames.restaurantReportsDiscountOrderReport: _guard(DiscountOrderReport(), 'reports', EntKeys.reportsDiscountOrders),
-    RouteNames.restaurantReportsPosOrder: _guard(Posenddayreport(), 'reports', EntKeys.reportsPosEndDay),
-    RouteNames.restaurantReportsCustomerListByRevenue: _guard(CustomerListByRevenue(), 'reports', EntKeys.reportsCustomerRevenue),
-    RouteNames.restaurantReportsExpense: _guard(ExpenseReport(), 'reports', EntKeys.reportsExpense),
-    RouteNames.restaurantReportsPaymentMode: _guard(const PaymentModeReport(), 'reports', EntKeys.reportsPaymentMode),
-    RouteNames.restaurantReportsVoidOrderReport: _guard(VoidOrderReport(), 'reports', EntKeys.reportsVoidOrders),
-    RouteNames.restaurantReportsItemCancellation: _guard(const ItemCancellationReport(), 'reports', EntKeys.reportsItemCancellation),
-    RouteNames.restaurantShiftReport: _guard(const ShiftReportScreen(), 'reports', EntKeys.reportsShift),
-    RouteNames.restaurantStaffPerformance: _guard(const StaffPerformanceScreen(), 'reports', EntKeys.reportsStaffPerformance),
-    RouteNames.restaurantCashDrawer: _guard(const CashDrawerScreen(), 'cashDrawer', EntKeys.cashDrawer),
-    RouteNames.restaurantCashDrawerHistory: _guard(const CashDrawerHistoryScreen(), 'reports', EntKeys.reportsCashDrawerHistory),
+      permissionKey: 'reports',
+      entitlementAnyOf: kComparisonPeriodEntitlements,
+      child: const SalesComparison(),
+    ),
+    RouteNames.restaurantReportsComparisionByProduct: _guard(
+      ComparisonByProduct(),
+      'reports',
+      EntKeys.reportsComparisonProduct,
+    ),
+    RouteNames.restaurantReportsRefundDetails: _guard(
+      RefundDetails(),
+      'reports',
+      EntKeys.reportsRefundDetails,
+    ),
+    RouteNames.restaurantReportsDiscountOrderReport: _guard(
+      DiscountOrderReport(),
+      'reports',
+      EntKeys.reportsDiscountOrders,
+    ),
+    RouteNames.restaurantReportsPosOrder: _guard(
+      Posenddayreport(),
+      'reports',
+      EntKeys.reportsPosEndDay,
+    ),
+    RouteNames.restaurantReportsCustomerListByRevenue: _guard(
+      CustomerListByRevenue(),
+      'reports',
+      EntKeys.reportsCustomerRevenue,
+    ),
+    RouteNames.restaurantReportsExpense: _guard(
+      ExpenseReport(),
+      'reports',
+      EntKeys.reportsExpense,
+    ),
+    RouteNames.restaurantReportsPaymentMode: _guard(
+      const PaymentModeReport(),
+      'reports',
+      EntKeys.reportsPaymentMode,
+    ),
+    RouteNames.restaurantReportsVoidOrderReport: _guard(
+      VoidOrderReport(),
+      'reports',
+      EntKeys.reportsVoidOrders,
+    ),
+    RouteNames.restaurantReportsItemCancellation: _guard(
+      const ItemCancellationReport(),
+      'reports',
+      EntKeys.reportsItemCancellation,
+    ),
+    RouteNames.restaurantShiftReport: _guard(
+      const ShiftReportScreen(),
+      'reports',
+      EntKeys.reportsShift,
+    ),
+    RouteNames.restaurantStaffPerformance: _guard(
+      const StaffPerformanceScreen(),
+      'reports',
+      EntKeys.reportsStaffPerformance,
+    ),
+    RouteNames.restaurantCashDrawer: _guard(
+      const CashDrawerScreen(),
+      'cashDrawer',
+      EntKeys.cashDrawer,
+    ),
+    RouteNames.restaurantCashDrawerHistory: _guard(
+      const CashDrawerHistoryScreen(),
+      'reports',
+      EntKeys.reportsCashDrawerHistory,
+    ),
 
     // Restaurant - Settings
-    RouteNames.restaurantSettings: _guard(const Settingsscreen(), 'settings', EntKeys.settings),
-    RouteNames.restaurantUsageLimit: _guard(const UsageLimitScreen(), 'settings'),
+    RouteNames.restaurantSettings: _guard(
+      const Settingsscreen(),
+      'settings',
+      EntKeys.settings,
+    ),
+    RouteNames.restaurantUsageLimit: _guard(
+      const UsageLimitScreen(),
+      'settings',
+    ),
     // Licensing is the RECOVERY path (renew / reactivate / view) — it must never
     // be entitlement-gated, or a plan without `settings` (e.g. trial) could not
     // reach it to fix its own license. Role check only.
     RouteNames.restaurantLicensing: _guard(const LicensingScreen(), 'settings'),
-    RouteNames.restaurantOrderSettings: _guard(Ordersettings(), 'settings', EntKeys.settings),
-    RouteNames.restaurantPaymentMethods: _guard(Paymentsmethods(), 'settings', EntKeys.settings),
-    RouteNames.restaurantChangePassword: _guard(Changepassword(), 'settings', EntKeys.settings),
+    RouteNames.restaurantOrderSettings: _guard(
+      Ordersettings(),
+      'settings',
+      EntKeys.settings,
+    ),
+    RouteNames.restaurantPaymentMethods: _guard(
+      Paymentsmethods(),
+      'settings',
+      EntKeys.settings,
+    ),
+    RouteNames.restaurantChangePassword: _guard(
+      Changepassword(),
+      'settings',
+      EntKeys.settings,
+    ),
 
     // Restaurant - Tax — opens the tax management screen directly (the old
     // single-card "Tax Settings" menu screen was a redundant hop, now removed).
-    RouteNames.restaurantTaxSettings: _guard(Addtax(), 'taxSettings', EntKeys.settings),
+    RouteNames.restaurantTaxSettings: _guard(
+      Addtax(),
+      'taxSettings',
+      EntKeys.settings,
+    ),
 
     // Restaurant - Printer
     // Printer setup is required to actually operate (KOT/bill printing), so it
     // follows billing — a plan that can sell can configure its printer.
-    RouteNames.restaurantPrinterSettings: _guard(const Printersetting(), 'settings', EntKeys.billing),
-    RouteNames.restaurantPrinterCustomization: _guard(const CustomizationPrinter(), 'settings', EntKeys.billing),
-    RouteNames.restaurantAddPrinter: _guard(const AddPrinter(), 'settings', EntKeys.billing),
+    RouteNames.restaurantPrinterSettings: _guard(
+      const Printersetting(),
+      'settings',
+      EntKeys.billing,
+    ),
+    RouteNames.restaurantPrinterCustomization: _guard(
+      const CustomizationPrinter(),
+      'settings',
+      EntKeys.billing,
+    ),
+    RouteNames.restaurantAddPrinter: _guard(
+      const AddPrinter(),
+      'settings',
+      EntKeys.billing,
+    ),
 
     // Restaurant - End Day
     // End Day is the CLOSE half of the day lifecycle. A day auto-starts on the
@@ -243,19 +428,38 @@ class RestaurantRoutes {
     RouteNames.restaurantEndDay: _guard(const EndDayDrawer(), 'endDay'),
 
     // Restaurant - Attendance
-    RouteNames.restaurantAttendance: _guard(const StaffAttendanceScreen(), null, EntKeys.attendance),
-    RouteNames.restaurantAttendanceReport: _guard(const AttendanceReportScreen(), 'reports', EntKeys.reportsAttendance),
+    RouteNames.restaurantAttendance: _guard(
+      const StaffAttendanceScreen(),
+      null,
+      EntKeys.attendance,
+    ),
+    RouteNames.restaurantAttendanceReport: _guard(
+      const AttendanceReportScreen(),
+      'reports',
+      EntKeys.reportsAttendance,
+    ),
 
     // Restaurant - Other
     // Support/Help must stay reachable WITHOUT login — it's the escape hatch
     // from the license-lock screen, the upgrade blocker, and the setup wizard.
     // Guarding it bounced un-logged-in users to the PIN screen (a dead end).
     RouteNames.restaurantNeedHelp: (_) => const NeedhelpDrawer(),
-    RouteNames.restaurantCustomizationDrawer: _guard(const CustomizationDrawer(), 'settings'),
+    RouteNames.restaurantCustomizationDrawer: _guard(
+      const CustomizationDrawer(),
+      'settings',
+    ),
     RouteNames.restaurantTestData: _guard(const TestDataScreen(), 'settings'),
-    RouteNames.restaurantBulkImport: _guard(const RestaurantBulkImportScreen(), 'settings'),
-    RouteNames.restaurantDataGenratorScreen: _guard(const DataGeneratorScreen(), 'settings'),
-    RouteNames.restaurantSplashPreview: _guard(const AnimatedSplashScreen(), 'settings'),
-
+    RouteNames.restaurantBulkImport: _guard(
+      const RestaurantBulkImportScreen(),
+      'settings',
+    ),
+    RouteNames.restaurantDataGenratorScreen: _guard(
+      const DataGeneratorScreen(),
+      'settings',
+    ),
+    RouteNames.restaurantSplashPreview: _guard(
+      const AnimatedSplashScreen(),
+      'settings',
+    ),
   };
 }

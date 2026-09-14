@@ -18,14 +18,30 @@ class DataGeneratorScreen extends StatefulWidget {
 
 class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
   // Controllers for input fields
-  final TextEditingController _categoriesController = TextEditingController(text: '20');
-  final TextEditingController _itemsController = TextEditingController(text: '500');
-  final TextEditingController _tablesController = TextEditingController(text: '50');
-  final TextEditingController _staffController = TextEditingController(text: '20');
-  final TextEditingController _taxRatesController = TextEditingController(text: '6');
-  final TextEditingController _activeOrdersController = TextEditingController(text: '100');
-  final TextEditingController _pastOrdersController = TextEditingController(text: '50000');
-  final TextEditingController _eodReportsController = TextEditingController(text: '30');
+  final TextEditingController _categoriesController = TextEditingController(
+    text: '20',
+  );
+  final TextEditingController _itemsController = TextEditingController(
+    text: '500',
+  );
+  final TextEditingController _tablesController = TextEditingController(
+    text: '50',
+  );
+  final TextEditingController _staffController = TextEditingController(
+    text: '20',
+  );
+  final TextEditingController _taxRatesController = TextEditingController(
+    text: '6',
+  );
+  final TextEditingController _activeOrdersController = TextEditingController(
+    text: '100',
+  );
+  final TextEditingController _pastOrdersController = TextEditingController(
+    text: '50000',
+  );
+  final TextEditingController _eodReportsController = TextEditingController(
+    text: '30',
+  );
 
   bool _isGenerating = false;
   bool _isClearing = false;
@@ -87,7 +103,10 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
           isError: false,
         );
       } else {
-        _showSnackBar('❌ Generation failed: ${results['error']}', isError: true);
+        _showSnackBar(
+          '❌ Generation failed: ${results['error']}',
+          isError: true,
+        );
       }
     } catch (e) {
       _showSnackBar('Error: $e', isError: true);
@@ -152,50 +171,52 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
       ),
       body: _isGenerating || _isClearing
           ? Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(color: AppColors.primary),
-            const SizedBox(height: 20),
-            Text(
-              _isGenerating
-                  ? 'Generating data...\nThis may take a while for large datasets'
-                  : 'Clearing all data...',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                fontSize: isTablet ? 18 : 16,
-                color: Colors.black87,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(color: AppColors.primary),
+                  const SizedBox(height: 20),
+                  Text(
+                    _isGenerating
+                        ? 'Generating data...\nThis may take a while for large datasets'
+                        : 'Clearing all data...',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      fontSize: isTablet ? 18 : 16,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : SingleChildScrollView(
+              padding: EdgeInsets.all(isTablet ? 20 : 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildInfoCard(),
+                  const SizedBox(height: 20),
+                  _buildInputSection(),
+                  const SizedBox(height: 20),
+                  _buildImageOptionsCard(),
+                  const SizedBox(height: 20),
+                  _buildActionButtons(),
+                  const SizedBox(height: 20),
+                  if (_lastGenerationResults != null) _buildResultsCard(),
+                  if (_lastGenerationResults != null)
+                    const SizedBox(height: 20),
+                  _buildStatsCard(),
+                  const SizedBox(height: 20),
+                  _buildFileSizesCard(),
+                ],
               ),
             ),
-          ],
-        ),
-      )
-          : SingleChildScrollView(
-        padding: EdgeInsets.all(isTablet ? 20 : 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildInfoCard(),
-            const SizedBox(height: 20),
-            _buildInputSection(),
-            const SizedBox(height: 20),
-            _buildImageOptionsCard(),
-            const SizedBox(height: 20),
-            _buildActionButtons(),
-            const SizedBox(height: 20),
-            if (_lastGenerationResults != null) _buildResultsCard(),
-            if (_lastGenerationResults != null) const SizedBox(height: 20),
-            _buildStatsCard(),
-            const SizedBox(height: 20),
-            _buildFileSizesCard(),
-          ],
-        ),
-      ),
     );
   }
 
   Widget _buildOverallReportsCard() {
-    final totalOrders = (_stats['activeOrders'] ?? 0) + (_stats['pastOrders'] ?? 0);
+    final totalOrders =
+        (_stats['activeOrders'] ?? 0) + (_stats['pastOrders'] ?? 0);
     final totalRecords = _stats.values.fold(0, (sum, count) => sum + count);
 
     return Card(
@@ -222,68 +243,112 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
             const SizedBox(height: 16),
 
             // Summary Section
-            _buildReportSection(
-              '📋 Data Summary',
-              [
-                _buildReportRow('Total Records in Database', _formatNumber(totalRecords), icon: Icons.storage),
-                _buildReportRow('Total Orders (Active + Past)', _formatNumber(totalOrders), icon: Icons.shopping_bag),
-                _buildReportRow('Total Past Orders Completed', _formatNumber(_stats['pastOrders'] ?? 0), icon: Icons.check_circle),
-                _buildReportRow('Total Active Orders', _formatNumber(_stats['activeOrders'] ?? 0), icon: Icons.pending),
-                _buildReportRow('Total EOD Reports Generated', _formatNumber(_stats['eodReports'] ?? 0), icon: Icons.assessment),
-              ],
-            ),
+            _buildReportSection('📋 Data Summary', [
+              _buildReportRow(
+                'Total Records in Database',
+                _formatNumber(totalRecords),
+                icon: Icons.storage,
+              ),
+              _buildReportRow(
+                'Total Orders (Active + Past)',
+                _formatNumber(totalOrders),
+                icon: Icons.shopping_bag,
+              ),
+              _buildReportRow(
+                'Total Past Orders Completed',
+                _formatNumber(_stats['pastOrders'] ?? 0),
+                icon: Icons.check_circle,
+              ),
+              _buildReportRow(
+                'Total Active Orders',
+                _formatNumber(_stats['activeOrders'] ?? 0),
+                icon: Icons.pending,
+              ),
+              _buildReportRow(
+                'Total EOD Reports Generated',
+                _formatNumber(_stats['eodReports'] ?? 0),
+                icon: Icons.assessment,
+              ),
+            ]),
 
             const Divider(height: 32),
 
             // Inventory Section
-            _buildReportSection(
-              '📦 Inventory & Products',
-              [
-                _buildReportRow('Total Categories', _formatNumber(_stats['categories'] ?? 0), icon: Icons.category),
-                _buildReportRow('Total Items/Products', _formatNumber(_stats['items'] ?? 0), icon: Icons.restaurant_menu),
-                _buildReportRow('Total Variants (Sizes)', _formatNumber(_stats['variants'] ?? 0), icon: Icons.format_size),
-                _buildReportRow('Total Extras/Toppings', _formatNumber(_stats['extras'] ?? 0), icon: Icons.add_circle),
-              ],
-            ),
+            _buildReportSection('📦 Inventory & Products', [
+              _buildReportRow(
+                'Total Categories',
+                _formatNumber(_stats['categories'] ?? 0),
+                icon: Icons.category,
+              ),
+              _buildReportRow(
+                'Total Items/Products',
+                _formatNumber(_stats['items'] ?? 0),
+                icon: Icons.restaurant_menu,
+              ),
+              _buildReportRow(
+                'Total Variants (Sizes)',
+                _formatNumber(_stats['variants'] ?? 0),
+                icon: Icons.format_size,
+              ),
+              _buildReportRow(
+                'Total Extras/Toppings',
+                _formatNumber(_stats['extras'] ?? 0),
+                icon: Icons.add_circle,
+              ),
+            ]),
 
             const Divider(height: 32),
 
             // Operations Section
-            _buildReportSection(
-              '🏢 Operations',
-              [
-                _buildReportRow('Total Tables', _formatNumber(_stats['tables'] ?? 0), icon: Icons.table_restaurant),
-                _buildReportRow('Total Staff Members', _formatNumber(_stats['staff'] ?? 0), icon: Icons.people),
-                _buildReportRow('Total Tax Rates', _formatNumber(_stats['taxRates'] ?? 0), icon: Icons.percent),
-                _buildReportRow('Items in Cart', _formatNumber(_stats['cart'] ?? 0), icon: Icons.shopping_cart),
-              ],
-            ),
+            _buildReportSection('🏢 Operations', [
+              _buildReportRow(
+                'Total Tables',
+                _formatNumber(_stats['tables'] ?? 0),
+                icon: Icons.table_restaurant,
+              ),
+              _buildReportRow(
+                'Total Staff Members',
+                _formatNumber(_stats['staff'] ?? 0),
+                icon: Icons.people,
+              ),
+              _buildReportRow(
+                'Total Tax Rates',
+                _formatNumber(_stats['taxRates'] ?? 0),
+                icon: Icons.percent,
+              ),
+              _buildReportRow(
+                'Items in Cart',
+                _formatNumber(_stats['cart'] ?? 0),
+                icon: Icons.shopping_cart,
+              ),
+            ]),
 
             const Divider(height: 32),
 
             // Performance Insights
-            _buildReportSection(
-              '⚡ Performance Insights',
-              [
-                _buildReportRow(
-                  'Database Health',
-                  totalRecords > 0 ? 'Active' : 'Empty',
-                  icon: Icons.health_and_safety,
-                  valueColor: totalRecords > 0 ? Colors.green : AppColors.textSecondary,
-                ),
-                _buildReportRow(
-                  'Large Dataset Test',
-                  (_stats['pastOrders'] ?? 0) >= 50000 ? 'Passed ✓' : 'Pending',
-                  icon: Icons.verified,
-                  valueColor: (_stats['pastOrders'] ?? 0) >= 50000 ? Colors.green : Colors.orange,
-                ),
-                _buildReportRow(
-                  'Total Storage Used',
-                  _getTotalStorageUsed(),
-                  icon: Icons.sd_card,
-                ),
-              ],
-            ),
+            _buildReportSection('⚡ Performance Insights', [
+              _buildReportRow(
+                'Database Health',
+                totalRecords > 0 ? 'Active' : 'Empty',
+                icon: Icons.health_and_safety,
+                valueColor: totalRecords > 0
+                    ? Colors.green
+                    : AppColors.textSecondary,
+              ),
+              _buildReportRow(
+                'Large Dataset Test',
+                (_stats['pastOrders'] ?? 0) >= 50000 ? 'Passed ✓' : 'Pending',
+                icon: Icons.verified,
+                valueColor: (_stats['pastOrders'] ?? 0) >= 50000
+                    ? Colors.green
+                    : Colors.orange,
+              ),
+              _buildReportRow(
+                'Total Storage Used',
+                _getTotalStorageUsed(),
+                icon: Icons.sd_card,
+              ),
+            ]),
 
             if ((_stats['pastOrders'] ?? 0) > 0) ...[
               const Divider(height: 32),
@@ -301,10 +366,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
       children: [
         Text(
           title,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
         ...children,
@@ -312,7 +374,12 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
     );
   }
 
-  Widget _buildReportRow(String label, String value, {IconData? icon, Color? valueColor}) {
+  Widget _buildReportRow(
+    String label,
+    String value, {
+    IconData? icon,
+    Color? valueColor,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
@@ -321,12 +388,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
             Icon(icon, size: 20, color: AppColors.textSecondary),
             const SizedBox(width: 8),
           ],
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 14))),
           Text(
             value,
             style: TextStyle(
@@ -367,7 +429,10 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          _buildTestResultRow('✓ Past orders generated', _formatNumber(pastOrders)),
+          _buildTestResultRow(
+            '✓ Past orders generated',
+            _formatNumber(pastOrders),
+          ),
           _buildTestResultRow('✓ Data persistence', 'Verified'),
           _buildTestResultRow('✓ No corruption detected', 'Passed'),
           _buildTestResultRow('✓ Query performance', 'Operational'),
@@ -420,8 +485,11 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
         } else if (size.endsWith('MB')) {
           totalBytes += double.parse(size.replaceAll(' MB', '')) * 1024 * 1024;
         } else if (size.endsWith('GB')) {
-          totalBytes += double.parse(size.replaceAll(' GB', '')) * 1024 * 1024 * 1024;
-        } else if (size.endsWith('B') && !size.contains('K') && !size.contains('M')) {
+          totalBytes +=
+              double.parse(size.replaceAll(' GB', '')) * 1024 * 1024 * 1024;
+        } else if (size.endsWith('B') &&
+            !size.contains('K') &&
+            !size.contains('M')) {
           totalBytes += double.parse(size.replaceAll(' B', ''));
         }
       } catch (e) {
@@ -482,11 +550,15 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
           const SizedBox(height: 12),
           Text(
             '• Generate test data for all Hive boxes\n'
-                '• Configure the amount of data for each box\n'
-                '• Monitor insertion speed and file sizes\n'
-                '• Test performance with large datasets (50,000+ records)\n'
-                '• Verify data integrity and query performance',
-            style: GoogleFonts.poppins(fontSize: 14, height: 1.5, color: Colors.black87),
+            '• Configure the amount of data for each box\n'
+            '• Monitor insertion speed and file sizes\n'
+            '• Test performance with large datasets (50,000+ records)\n'
+            '• Verify data integrity and query performance',
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              height: 1.5,
+              color: Colors.black87,
+            ),
           ),
         ],
       ),
@@ -518,31 +590,39 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
               color: Colors.black87,
             ),
           ),
-            const SizedBox(height: 16),
-            _buildInputField('Categories', _categoriesController, Icons.category),
-            _buildInputField('Items', _itemsController, Icons.restaurant_menu),
-            _buildInputField('Tables', _tablesController, Icons.table_restaurant),
-            _buildInputField('Staff', _staffController, Icons.people),
-            _buildInputField('Tax Rates', _taxRatesController, Icons.percent),
-            _buildInputField('Active Orders', _activeOrdersController, Icons.shopping_cart),
-            _buildInputField(
-              'Past Orders (50K recommended)',
-              _pastOrdersController,
-              Icons.history,
-              highlight: true,
-            ),
-            _buildInputField('EOD Reports', _eodReportsController, Icons.assessment),
-          ],
-        ),
-      );
+          const SizedBox(height: 16),
+          _buildInputField('Categories', _categoriesController, Icons.category),
+          _buildInputField('Items', _itemsController, Icons.restaurant_menu),
+          _buildInputField('Tables', _tablesController, Icons.table_restaurant),
+          _buildInputField('Staff', _staffController, Icons.people),
+          _buildInputField('Tax Rates', _taxRatesController, Icons.percent),
+          _buildInputField(
+            'Active Orders',
+            _activeOrdersController,
+            Icons.shopping_cart,
+          ),
+          _buildInputField(
+            'Past Orders (50K recommended)',
+            _pastOrdersController,
+            Icons.history,
+            highlight: true,
+          ),
+          _buildInputField(
+            'EOD Reports',
+            _eodReportsController,
+            Icons.assessment,
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildInputField(
-      String label,
-      TextEditingController controller,
-      IconData icon, {
-        bool highlight = false,
-      }) {
+    String label,
+    TextEditingController controller,
+    IconData icon, {
+    bool highlight = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: AppTextField(
@@ -593,68 +673,72 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
               ),
             ],
           ),
-            const SizedBox(height: 12),
-            SwitchListTile(
-              title: const Text('Include Images for Items'),
-              subtitle: Text(
-                _includeImages
-                    ? 'All items will have 400x400px placeholder images with vibrant colors and gradients'
-                    : 'Items will be generated without images',
-                style: const TextStyle(fontSize: 12),
-              ),
-              value: _includeImages,
-              onChanged: (value) {
-                setState(() {
-                  _includeImages = value;
-                });
-              },
-              activeColor: Colors.orange,
-              contentPadding: EdgeInsets.zero,
+          const SizedBox(height: 12),
+          SwitchListTile(
+            title: const Text('Include Images for Items'),
+            subtitle: Text(
+              _includeImages
+                  ? 'All items will have 400x400px placeholder images with vibrant colors and gradients'
+                  : 'Items will be generated without images',
+              style: const TextStyle(fontSize: 12),
             ),
-            if (_includeImages) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.shade300),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.info_outline, size: 20, color: Colors.orange.shade700),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Image Details',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.orange.shade700,
-                            ),
+            value: _includeImages,
+            onChanged: (value) {
+              setState(() {
+                _includeImages = value;
+              });
+            },
+            activeColor: Colors.orange,
+            contentPadding: EdgeInsets.zero,
+          ),
+          if (_includeImages) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade100,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade300),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 20,
+                        color: Colors.orange.shade700,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Image Details',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange.shade700,
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      '• 400x400px high-quality images\n'
-                          '• 15 vibrant color variations\n'
-                          '• Gradient backgrounds\n'
-                          '• Decorative shapes and borders\n'
-                          '• Tests app performance with image data\n'
-                          '• Tests import/export with larger file sizes',
-                      style: TextStyle(fontSize: 13, height: 1.4),
-                    ),
-                  ],
-                ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '• 400x400px high-quality images\n'
+                    '• 15 vibrant color variations\n'
+                    '• Gradient backgrounds\n'
+                    '• Decorative shapes and borders\n'
+                    '• Tests app performance with image data\n'
+                    '• Tests import/export with larger file sizes',
+                    style: TextStyle(fontSize: 13, height: 1.4),
+                  ),
+                ],
               ),
-            ],
+            ),
           ],
-        ),
-      );
+        ],
+      ),
+    );
   }
 
   Widget _buildActionButtons() {
@@ -733,20 +817,29 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: success ? Colors.green.shade700 : Colors.red.shade700,
+                    color: success
+                        ? Colors.green.shade700
+                        : Colors.red.shade700,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             if (success) ...[
-              _buildResultRow('⏱️ Total Time', '${results['totalTime']}ms (${(results['totalTime'] / 1000).toStringAsFixed(2)}s)'),
+              _buildResultRow(
+                '⏱️ Total Time',
+                '${results['totalTime']}ms (${(results['totalTime'] / 1000).toStringAsFixed(2)}s)',
+              ),
               _buildResultRow('📁 Categories', '${results['categories']}'),
               _buildResultRow('📁 Items', '${results['items']}'),
               _buildResultRow('📁 Tables', '${results['tables']}'),
               _buildResultRow('📁 Staff', '${results['staff']}'),
               _buildResultRow('📁 Active Orders', '${results['activeOrders']}'),
-              _buildResultRow('📁 Past Orders', '${results['pastOrders']}', highlight: true),
+              _buildResultRow(
+                '📁 Past Orders',
+                '${results['pastOrders']}',
+                highlight: true,
+              ),
               _buildResultRow('📁 EOD Reports', '${results['eodReports']}'),
               const Divider(height: 24),
               _buildPerformanceMetrics(results),
@@ -788,7 +881,8 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
   }
 
   Widget _buildPerformanceMetrics(Map<String, dynamic> results) {
-    final totalRecords = (results['categories'] ?? 0) +
+    final totalRecords =
+        (results['categories'] ?? 0) +
         (results['items'] ?? 0) +
         (results['tables'] ?? 0) +
         (results['staff'] ?? 0) +
@@ -797,7 +891,9 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
         (results['eodReports'] ?? 0);
 
     final timeInSeconds = (results['totalTime'] ?? 0) / 1000;
-    final recordsPerSecond = timeInSeconds > 0 ? (totalRecords / timeInSeconds).toStringAsFixed(0) : 'N/A';
+    final recordsPerSecond = timeInSeconds > 0
+        ? (totalRecords / timeInSeconds).toStringAsFixed(0)
+        : 'N/A';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -809,7 +905,10 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
         const SizedBox(height: 8),
         _buildResultRow('Total Records', '$totalRecords'),
         _buildResultRow('Records/Second', recordsPerSecond),
-        _buildResultRow('Average per Record', '${(timeInSeconds * 1000 / totalRecords).toStringAsFixed(2)}ms'),
+        _buildResultRow(
+          'Average per Record',
+          '${(timeInSeconds * 1000 / totalRecords).toStringAsFixed(2)}ms',
+        ),
       ],
     );
   }
@@ -895,7 +994,10 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
           Text(displayName),
           Text(
             size,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontFamily: 'monospace',
+            ),
           ),
         ],
       ),
@@ -910,8 +1012,11 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
       } else if (size.endsWith('MB')) {
         totalBytes += double.parse(size.replaceAll(' MB', '')) * 1024 * 1024;
       } else if (size.endsWith('GB')) {
-        totalBytes += double.parse(size.replaceAll(' GB', '')) * 1024 * 1024 * 1024;
-      } else if (size.endsWith('B') && !size.contains('K') && !size.contains('M')) {
+        totalBytes +=
+            double.parse(size.replaceAll(' GB', '')) * 1024 * 1024 * 1024;
+      } else if (size.endsWith('B') &&
+          !size.contains('K') &&
+          !size.contains('M')) {
         totalBytes += double.parse(size.replaceAll(' B', ''));
       }
     }
@@ -924,7 +1029,8 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
     } else if (totalBytes < 1024 * 1024 * 1024) {
       totalSize = '${(totalBytes / (1024 * 1024)).toStringAsFixed(2)} MB';
     } else {
-      totalSize = '${(totalBytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+      totalSize =
+          '${(totalBytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
     }
 
     return Row(

@@ -24,8 +24,7 @@ class AddPurchaseOrderScreen extends StatefulWidget {
   const AddPurchaseOrderScreen({super.key});
 
   @override
-  State<AddPurchaseOrderScreen> createState() =>
-      _AddPurchaseOrderScreenState();
+  State<AddPurchaseOrderScreen> createState() => _AddPurchaseOrderScreenState();
 }
 
 class _POLine {
@@ -70,8 +69,9 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
       return;
     }
     if (_lines.isEmpty) {
-      NotificationService.instance
-          .showError('Please add at least one raw material line');
+      NotificationService.instance.showError(
+        'Please add at least one raw material line',
+      );
       return;
     }
 
@@ -97,8 +97,9 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
 
       if (!mounted) return;
       Navigator.pop(context, true);
-      NotificationService.instance
-          .showSuccess('Purchase order ${po.poNumber} created');
+      NotificationService.instance.showSuccess(
+        'Purchase order ${po.poNumber} created',
+      );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -129,13 +130,14 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                     itemBuilder: (context, index) {
                       final supplier =
                           restaurantPurchaseOrderStore.suppliers[index];
-                      final isSelected = _selectedSupplier?.supplierId ==
-                          supplier.supplierId;
+                      final isSelected =
+                          _selectedSupplier?.supplierId == supplier.supplierId;
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: CircleAvatar(
-                          backgroundColor:
-                              AppColors.primary.withValues(alpha: 0.1),
+                          backgroundColor: AppColors.primary.withValues(
+                            alpha: 0.1,
+                          ),
                           child: Text(
                             supplier.name.trim().isEmpty
                                 ? '?'
@@ -150,17 +152,27 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                           supplier.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                         subtitle: supplier.phone?.isNotEmpty == true
-                            ? Text(supplier.phone!,
+                            ? Text(
+                                supplier.phone!,
                                 style: GoogleFonts.poppins(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary))
+                                  fontSize: AppResponsive.smallFontSize(
+                                    context,
+                                  ),
+                                  color: AppColors.textSecondary,
+                                ),
+                              )
                             : null,
                         trailing: isSelected
-                            ? const Icon(Icons.check_circle_rounded,
-                                color: AppColors.primary, size: 20)
+                            ? const Icon(
+                                Icons.check_circle_rounded,
+                                color: AppColors.primary,
+                                size: 20,
+                              )
                             : null,
                         onTap: () {
                           setState(() => _selectedSupplier = supplier);
@@ -232,7 +244,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                   Text(
                     'Add New Supplier',
                     style: GoogleFonts.poppins(
-                      fontSize: 18,
+                      fontSize: AppResponsive.subheadingFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
                     ),
@@ -281,45 +293,52 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                       onPressed: () async {
                         final name = nameController.text.trim();
                         if (name.isEmpty) {
-                          NotificationService.instance
-                              .showError('Supplier name is required');
+                          NotificationService.instance.showError(
+                            'Supplier name is required',
+                          );
                           return;
                         }
                         final phone = phoneController.text.trim();
-                        final phoneError =
-                            PhoneRule.validate(phone, required: false);
+                        final phoneError = PhoneRule.validate(
+                          phone,
+                          required: false,
+                        );
                         if (phoneError != null) {
                           NotificationService.instance.showError(phoneError);
                           return;
                         }
 
-                        final supplier =
-                            await restaurantPurchaseOrderStore.addSupplier(
-                          name: name,
-                          phone: phone.isEmpty ? null : phone,
-                          address: addressController.text.trim().isEmpty
-                              ? null
-                              : addressController.text.trim(),
-                          gstNumber: gstController.text.trim().isEmpty
-                              ? null
-                              : gstController.text.trim().toUpperCase(),
-                        );
+                        final supplier = await restaurantPurchaseOrderStore
+                            .addSupplier(
+                              name: name,
+                              phone: phone.isEmpty ? null : phone,
+                              address: addressController.text.trim().isEmpty
+                                  ? null
+                                  : addressController.text.trim(),
+                              gstNumber: gstController.text.trim().isEmpty
+                                  ? null
+                                  : gstController.text.trim().toUpperCase(),
+                            );
 
                         if (!mounted || !sheetContext.mounted) return;
                         setState(() => _selectedSupplier = supplier);
                         Navigator.pop(sheetContext);
-                        NotificationService.instance
-                            .showSuccess('"${supplier.name}" added and selected');
+                        NotificationService.instance.showSuccess(
+                          '"${supplier.name}" added and selected',
+                        );
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: AppColors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
-                      child: Text('Add Supplier',
-                          style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                      child: Text(
+                        'Add Supplier',
+                        style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ),
                 ],
@@ -336,17 +355,18 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _AddLineSheet(
-        onAdd: (line) => setState(() => _lines.add(line)),
-      ),
+      builder: (_) =>
+          _AddLineSheet(onAdd: (line) => setState(() => _lines.add(line))),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final totalQty = _lines.fold<double>(0, (sum, l) => sum + l.qty);
-    final estimatedTotal =
-        _lines.fold<double>(0, (sum, l) => sum + (l.qty * (l.price ?? 0)));
+    final estimatedTotal = _lines.fold<double>(
+      0,
+      (sum, l) => sum + (l.qty * (l.price ?? 0)),
+    );
 
     return MoneyScope(
       child: Scaffold(
@@ -373,151 +393,211 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
               child: Container(
                 color: AppColors.white,
                 padding: AppResponsive.padding(context),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    InkWell(
-                      onTap: _showSupplierPicker,
-                      child: Container(
-                        padding: EdgeInsets.all(
-                            AppResponsive.mediumSpacing(context)),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: AppColors.divider),
-                          borderRadius: BorderRadius.circular(
-                              AppResponsive.smallBorderRadius(context)),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.storefront,
+                child: AppResponsive.constrainedContent(
+                  context: context,
+                  maxWidth: AppResponsive.maxFormWidth(context),
+                  heightFactor: 1,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      InkWell(
+                        onTap: _showSupplierPicker,
+                        child: Container(
+                          padding: EdgeInsets.all(
+                            AppResponsive.mediumSpacing(context),
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: AppColors.divider),
+                            borderRadius: BorderRadius.circular(
+                              AppResponsive.smallBorderRadius(context),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.storefront,
                                 color: AppColors.textSecondary,
-                                size: AppResponsive.iconSize(context)),
-                            SizedBox(
-                                width: AppResponsive.mediumSpacing(context)),
-                            Expanded(
-                              child: Text(
-                                _selectedSupplier?.name ?? 'Select Supplier *',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: AppResponsive.bodyFontSize(context),
-                                  color: _selectedSupplier == null
-                                      ? AppColors.textSecondary
-                                      : AppColors.textPrimary,
+                                size: AppResponsive.iconSize(context),
+                              ),
+                              SizedBox(
+                                width: AppResponsive.mediumSpacing(context),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  _selectedSupplier?.name ??
+                                      'Select Supplier *',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
+                                    color: _selectedSupplier == null
+                                        ? AppColors.textSecondary
+                                        : AppColors.textPrimary,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const Icon(Icons.arrow_drop_down,
-                                color: AppColors.textSecondary),
-                          ],
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: AppResponsive.mediumSpacing(context)),
-                    InkWell(
-                      onTap: _pickDeliveryDate,
-                      child: Container(
-                        padding: EdgeInsets.all(
-                            AppResponsive.mediumSpacing(context)),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: AppColors.divider),
-                          borderRadius: BorderRadius.circular(
-                              AppResponsive.smallBorderRadius(context)),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.calendar_today,
+                              const Icon(
+                                Icons.arrow_drop_down,
                                 color: AppColors.textSecondary,
-                                size: AppResponsive.iconSize(context)),
-                            SizedBox(
-                                width: AppResponsive.mediumSpacing(context)),
-                            Expanded(
-                              child: Text(
-                                'Expected: ${_formatDate(_expectedDeliveryDate)}',
-                                style: TextStyle(
-                                    fontSize:
-                                        AppResponsive.bodyFontSize(context)),
                               ),
-                            ),
-                            Icon(Icons.edit,
-                                color: AppColors.textSecondary,
-                                size: AppResponsive.smallIconSize(context)),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    SizedBox(height: AppResponsive.mediumSpacing(context)),
-                    AppTextField(
-                      controller: _notesController,
-                      label: 'Notes (Optional)',
-                      icon: Icons.notes,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SliverToBoxAdapter(
-              child: Container(
-                color: AppColors.white,
-                margin: EdgeInsets.only(top: AppResponsive.smallSpacing(context)),
-                padding: AppResponsive.padding(context),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Total Qty',
-                            style: TextStyle(
-                                fontSize: AppResponsive.smallFontSize(context),
-                                color: AppColors.textSecondary)),
-                        Text(totalQty.toStringAsFixed(
-                                totalQty.truncateToDouble() == totalQty ? 0 : 2),
-                            style: TextStyle(
-                                fontSize:
-                                    AppResponsive.subheadingFontSize(context),
-                                fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text('Estimated Total',
-                            style: TextStyle(
-                                fontSize: AppResponsive.smallFontSize(context),
-                                color: AppColors.textSecondary)),
-                        Text(
-                          estimatedTotal > 0 ? formatMoney(estimatedTotal) : '--',
-                          style: TextStyle(
-                              fontSize: AppResponsive.subheadingFontSize(context),
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.success),
+                      SizedBox(height: AppResponsive.mediumSpacing(context)),
+                      InkWell(
+                        onTap: _pickDeliveryDate,
+                        child: Container(
+                          padding: EdgeInsets.all(
+                            AppResponsive.mediumSpacing(context),
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: AppColors.divider),
+                            borderRadius: BorderRadius.circular(
+                              AppResponsive.smallBorderRadius(context),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.calendar_today,
+                                color: AppColors.textSecondary,
+                                size: AppResponsive.iconSize(context),
+                              ),
+                              SizedBox(
+                                width: AppResponsive.mediumSpacing(context),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  'Expected: ${_formatDate(_expectedDeliveryDate)}',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Icon(
+                                Icons.edit,
+                                color: AppColors.textSecondary,
+                                size: AppResponsive.smallIconSize(context),
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      SizedBox(height: AppResponsive.mediumSpacing(context)),
+                      AppTextField(
+                        controller: _notesController,
+                        label: 'Notes (Optional)',
+                        icon: Icons.notes,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
             SliverToBoxAdapter(
               child: Container(
                 color: AppColors.white,
-                margin: EdgeInsets.only(top: AppResponsive.smallSpacing(context)),
+                margin: EdgeInsets.only(
+                  top: AppResponsive.smallSpacing(context),
+                ),
+                padding: AppResponsive.padding(context),
+                child: AppResponsive.constrainedContent(
+                  context: context,
+                  maxWidth: AppResponsive.maxFormWidth(context),
+                  heightFactor: 1,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Total Qty',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.smallFontSize(context),
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          Text(
+                            totalQty.toStringAsFixed(
+                              totalQty.truncateToDouble() == totalQty ? 0 : 2,
+                            ),
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.subheadingFontSize(
+                                context,
+                              ),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            'Estimated Total',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.smallFontSize(context),
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          Text(
+                            estimatedTotal > 0
+                                ? formatMoney(estimatedTotal)
+                                : '--',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.subheadingFontSize(
+                                context,
+                              ),
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.success,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Container(
+                color: AppColors.white,
+                margin: EdgeInsets.only(
+                  top: AppResponsive.smallSpacing(context),
+                ),
                 padding: EdgeInsets.symmetric(
                   horizontal: AppResponsive.padding(context).left,
                   vertical: AppResponsive.mediumSpacing(context),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Raw Material Lines',
-                        style: TextStyle(
-                            fontSize: AppResponsive.subheadingFontSize(context),
-                            fontWeight: FontWeight.w600)),
-                    Text('${_lines.length} items',
-                        style: TextStyle(
-                            fontSize: AppResponsive.bodyFontSize(context),
-                            color: AppColors.textSecondary)),
-                  ],
+                child: AppResponsive.constrainedContent(
+                  context: context,
+                  maxWidth: AppResponsive.maxFormWidth(context),
+                  heightFactor: 1,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Raw Material Lines',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.subheadingFontSize(context),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        '${_lines.length} items',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -534,7 +614,12 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                     padding: AppResponsive.padding(context),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
-                        (context, index) => _buildLineCard(index),
+                        (context, index) => AppResponsive.constrainedContent(
+                          context: context,
+                          maxWidth: AppResponsive.maxFormWidth(context),
+                          heightFactor: 1,
+                          child: _buildLineCard(index),
+                        ),
                         childCount: _lines.length,
                       ),
                     ),
@@ -556,8 +641,9 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
       margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius:
-            BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider, width: 0.5),
       ),
       child: Padding(
@@ -568,12 +654,15 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(line.item.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          fontSize: AppResponsive.bodyFontSize(context),
-                          fontWeight: FontWeight.w600)),
+                  Text(
+                    line.item.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   SizedBox(height: AppResponsive.smallSpacing(context)),
                   Wrap(
                     spacing: AppResponsive.mediumSpacing(context),
@@ -582,24 +671,30 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.info.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           'Qty: ${line.qty} ${line.item.unit ?? ''}',
-                          style: TextStyle(
-                              fontSize: AppResponsive.smallFontSize(context),
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.info),
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.info,
+                          ),
                         ),
                       ),
                       if (line.price != null)
-                        Text('@ ${formatMoney(line.price!)}',
-                            style: TextStyle(
-                                fontSize: AppResponsive.smallFontSize(context),
-                                color: AppColors.textSecondary)),
+                        Text(
+                          '@ ${formatMoney(line.price!)}',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
                     ],
                   ),
                 ],
@@ -609,15 +704,20 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
             Column(
               children: [
                 if (line.price != null)
-                  Text(formatMoney(line.qty * line.price!),
-                      style: TextStyle(
-                          fontSize: AppResponsive.bodyFontSize(context),
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.success)),
+                  Text(
+                    formatMoney(line.qty * line.price!),
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.success,
+                    ),
+                  ),
                 IconButton(
-                  icon: Icon(Icons.delete_outline,
-                      color: AppColors.danger,
-                      size: AppResponsive.iconSize(context)),
+                  icon: Icon(
+                    Icons.delete_outline,
+                    color: AppColors.danger,
+                    size: AppResponsive.iconSize(context),
+                  ),
                   onPressed: () => setState(() => _lines.removeAt(index)),
                 ),
               ],
@@ -674,7 +774,9 @@ class _AddLineSheetState extends State<_AddLineSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: const BoxDecoration(
@@ -697,18 +799,23 @@ class _AddLineSheetState extends State<_AddLineSheet> {
                   ),
                 ),
               ),
-              Text('Add Raw Material',
-                  style: GoogleFonts.poppins(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary)),
+              Text(
+                'Add Raw Material',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.subheadingFontSize(context),
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
               const SizedBox(height: 16),
               InkWell(
                 onTap: _rawMaterials.isEmpty ? null : _pickItem,
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.surfaceLight,
                     border: Border.all(
@@ -721,11 +828,13 @@ class _AddLineSheetState extends State<_AddLineSheet> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.grain_outlined,
-                          size: 20,
-                          color: _selectedItem != null
-                              ? AppColors.primary
-                              : AppColors.textSecondary),
+                      Icon(
+                        Icons.grain_outlined,
+                        size: 20,
+                        color: _selectedItem != null
+                            ? AppColors.primary
+                            : AppColors.textSecondary,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -736,7 +845,7 @@ class _AddLineSheetState extends State<_AddLineSheet> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.poppins(
-                            fontSize: 14,
+                            fontSize: AppResponsive.bodyFontSize(context),
                             fontWeight: _selectedItem != null
                                 ? FontWeight.w500
                                 : FontWeight.w400,
@@ -746,8 +855,10 @@ class _AddLineSheetState extends State<_AddLineSheet> {
                           ),
                         ),
                       ),
-                      const Icon(Icons.arrow_drop_down,
-                          color: AppColors.textSecondary),
+                      const Icon(
+                        Icons.arrow_drop_down,
+                        color: AppColors.textSecondary,
+                      ),
                     ],
                   ),
                 ),
@@ -758,7 +869,9 @@ class _AddLineSheetState extends State<_AddLineSheet> {
                 label: 'Quantity',
                 required: true,
                 icon: Icons.numbers_rounded,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
                 ],
@@ -770,7 +883,9 @@ class _AddLineSheetState extends State<_AddLineSheet> {
                 label: 'Estimated Price (per unit)',
                 hint: 'Leave empty if unknown',
                 icon: Icons.sell_outlined,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
                 ],
@@ -782,33 +897,43 @@ class _AddLineSheetState extends State<_AddLineSheet> {
                 child: ElevatedButton(
                   onPressed: () {
                     if (_selectedItem == null) {
-                      NotificationService.instance
-                          .showError('Please select a raw material');
+                      NotificationService.instance.showError(
+                        'Please select a raw material',
+                      );
                       return;
                     }
-                    final qty = double.tryParse(_qtyController.text.trim()) ?? 0;
+                    final qty =
+                        double.tryParse(_qtyController.text.trim()) ?? 0;
                     if (qty <= 0) {
-                      NotificationService.instance
-                          .showError('Please enter a valid quantity');
+                      NotificationService.instance.showError(
+                        'Please enter a valid quantity',
+                      );
                       return;
                     }
                     final priceText = _priceController.text.trim();
-                    widget.onAdd(_POLine(
-                      item: _selectedItem!,
-                      qty: qty,
-                      price: priceText.isEmpty ? null : double.tryParse(priceText),
-                    ));
+                    widget.onAdd(
+                      _POLine(
+                        item: _selectedItem!,
+                        qty: qty,
+                        price: priceText.isEmpty
+                            ? null
+                            : double.tryParse(priceText),
+                      ),
+                    );
                     Navigator.pop(context);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: AppColors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape:
-                        RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
-                  child: Text('Add Line',
-                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                  child: Text(
+                    'Add Line',
+                    style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
             ],
@@ -845,8 +970,8 @@ class _RawMaterialPickerDialogState extends State<_RawMaterialPickerDialog> {
     final filtered = _query.isEmpty
         ? widget.items
         : widget.items
-            .where((i) => i.name.toLowerCase().contains(_query.toLowerCase()))
-            .toList();
+              .where((i) => i.name.toLowerCase().contains(_query.toLowerCase()))
+              .toList();
 
     return AppDialogShell(
       title: 'Select Raw Material',
@@ -879,15 +1004,21 @@ class _RawMaterialPickerDialogState extends State<_RawMaterialPickerDialog> {
                         final item = filtered[index];
                         return ListTile(
                           contentPadding: EdgeInsets.zero,
-                          title: Text(item.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w600, fontSize: 14)),
+                          title: Text(
+                            item.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w600,
+                              fontSize: AppResponsive.bodyFontSize(context),
+                            ),
+                          ),
                           subtitle: Text(
                             'Stock: ${item.stockQuantity} ${item.unit ?? ''}',
                             style: GoogleFonts.poppins(
-                                fontSize: 12, color: AppColors.textSecondary),
+                              fontSize: AppResponsive.smallFontSize(context),
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                           onTap: () => Navigator.pop(context, item),
                         );

@@ -73,22 +73,25 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
   }
 
   void _loadLines() {
-    final poItems = restaurantPurchaseOrderItemRepository
-        .getItemsByPOId(widget.purchaseOrder.poId);
+    final poItems = restaurantPurchaseOrderItemRepository.getItemsByPOId(
+      widget.purchaseOrder.poId,
+    );
 
     final lines = <_ReceiveLine>[];
     for (final poItem in poItems) {
-      final alreadyReceived =
-          restaurantGrnItemRepository.getTotalReceivedQtyForPOItem(poItem.poItemId);
+      final alreadyReceived = restaurantGrnItemRepository
+          .getTotalReceivedQtyForPOItem(poItem.poItemId);
       final remainingQty = poItem.orderedQty - alreadyReceived;
       if (remainingQty <= 0) continue;
 
-      lines.add(_ReceiveLine(
-        poItem: poItem,
-        receivedQty: remainingQty,
-        damagedQty: 0,
-        costPrice: poItem.estimatedPrice ?? 0,
-      ));
+      lines.add(
+        _ReceiveLine(
+          poItem: poItem,
+          receivedQty: remainingQty,
+          damagedQty: 0,
+          costPrice: poItem.estimatedPrice ?? 0,
+        ),
+      );
     }
 
     setState(() {
@@ -114,10 +117,15 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
 
   void _editLine(int index) {
     final line = _lines[index];
-    final receivedController =
-        TextEditingController(text: _fmt(line.receivedQty));
-    final damagedController = TextEditingController(text: _fmt(line.damagedQty));
-    final priceController = TextEditingController(text: line.costPrice.toStringAsFixed(2));
+    final receivedController = TextEditingController(
+      text: _fmt(line.receivedQty),
+    );
+    final damagedController = TextEditingController(
+      text: _fmt(line.damagedQty),
+    );
+    final priceController = TextEditingController(
+      text: line.costPrice.toStringAsFixed(2),
+    );
     String? selectedHandling = line.damagedHandling;
 
     showDialog<void>(
@@ -144,9 +152,13 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
                     controller: receivedController,
                     label: 'Received Quantity',
                     icon: Icons.local_shipping_outlined,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'^\d*\.?\d{0,2}'),
+                      ),
                     ],
                     onChanged: (_) => setDialogState(() {}),
                   ),
@@ -155,9 +167,13 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
                     controller: damagedController,
                     label: 'Damaged Quantity',
                     icon: Icons.report_gmailerrorred_outlined,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'^\d*\.?\d{0,2}'),
+                      ),
                     ],
                     onChanged: (_) => setDialogState(() {}),
                     validator: (_) =>
@@ -168,7 +184,7 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
                     Text(
                       'WHAT HAPPENS TO THE DAMAGED UNITS',
                       style: GoogleFonts.poppins(
-                        fontSize: 11,
+                        fontSize: AppResponsive.captionFontSize(context),
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0.6,
                         color: AppColors.textSecondary,
@@ -210,9 +226,13 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
                     controller: priceController,
                     label: 'Cost Price per Unit',
                     icon: Icons.sell_outlined,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'^\d*\.?\d{0,2}'),
+                      ),
                     ],
                     onChanged: (_) => setDialogState(() {}),
                   ),
@@ -229,9 +249,11 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
                     child: Text(
                       'Accepted (to stock): ${_fmt(accepted)}',
                       style: GoogleFonts.poppins(
-                        fontSize: 13,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
-                        color: overDamaged ? AppColors.danger : AppColors.success,
+                        color: overDamaged
+                            ? AppColors.danger
+                            : AppColors.success,
                       ),
                     ),
                   ),
@@ -245,19 +267,24 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
                   onPressed: () {
                     if (damaged > received) {
                       NotificationService.instance.showError(
-                          'Damaged quantity cannot exceed received quantity');
+                        'Damaged quantity cannot exceed received quantity',
+                      );
                       return;
                     }
                     if (damaged > 0 && selectedHandling == null) {
                       NotificationService.instance.showError(
-                          'Please select handling method for damaged units');
+                        'Please select handling method for damaged units',
+                      );
                       return;
                     }
                     setState(() {
                       line.receivedQty = received;
                       line.damagedQty = damaged;
-                      line.damagedHandling = damaged > 0 ? selectedHandling : null;
-                      line.costPrice = double.tryParse(priceController.text) ?? 0;
+                      line.damagedHandling = damaged > 0
+                          ? selectedHandling
+                          : null;
+                      line.costPrice =
+                          double.tryParse(priceController.text) ?? 0;
                     });
                     Navigator.pop(dialogContext);
                   },
@@ -289,7 +316,9 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.07) : Colors.transparent,
+          color: isSelected
+              ? color.withValues(alpha: 0.07)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isSelected ? color : AppColors.divider,
@@ -313,7 +342,7 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
                   Text(
                     label,
                     style: GoogleFonts.poppins(
-                      fontSize: 13,
+                      fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: isSelected ? color : AppColors.textPrimary,
                     ),
@@ -321,7 +350,7 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
                   Text(
                     caption,
                     style: GoogleFonts.poppins(
-                      fontSize: 11,
+                      fontSize: AppResponsive.captionFontSize(context),
                       color: AppColors.textSecondary,
                     ),
                   ),
@@ -340,20 +369,21 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
   Future<void> _confirm() async {
     final hasReceived = _lines.any((l) => l.receivedQty > 0);
     if (!hasReceived) {
-      NotificationService.instance
-          .showError('Please enter received quantities for at least one item');
+      NotificationService.instance.showError(
+        'Please enter received quantities for at least one item',
+      );
       return;
     }
 
     // Every damaged line needs a handling method chosen — it's what decides
     // whether a purchase return, supplier claim or write-off is raised.
     final hasUnhandledDamage = _lines.any(
-      (l) =>
-          l.receivedQty > 0 && l.damagedQty > 0 && l.damagedHandling == null,
+      (l) => l.receivedQty > 0 && l.damagedQty > 0 && l.damagedHandling == null,
     );
     if (hasUnhandledDamage) {
-      NotificationService.instance
-          .showError('Please select handling method for damaged units');
+      NotificationService.instance.showError(
+        'Please select handling method for damaged units',
+      );
       return;
     }
 
@@ -382,7 +412,9 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
               acceptedQty: line.acceptedQty,
               damagedQty: line.damagedQty > 0 ? line.damagedQty : null,
               costPrice: line.costPrice > 0 ? line.costPrice : null,
-              damagedHandling: line.damagedQty > 0 ? line.damagedHandling : null,
+              damagedHandling: line.damagedQty > 0
+                  ? line.damagedHandling
+                  : null,
             ),
         ],
       );
@@ -391,7 +423,8 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
       // whatever was marked damaged. confirmGRN only returns the line items;
       // the GRN header it just saved is looked up by id so recordFromGRN gets
       // both without confirmGRN's signature having to change.
-      RestaurantDamagedGoodsOutcome outcome = const RestaurantDamagedGoodsOutcome();
+      RestaurantDamagedGoodsOutcome outcome =
+          const RestaurantDamagedGoodsOutcome();
       if (grnItems.isNotEmpty) {
         final grn = restaurantGrnRepository.getGRNById(grnItems.first.grnId);
         if (grn != null) {
@@ -416,10 +449,18 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final totalOrdered =
-        _lines.fold<double>(0, (sum, l) => sum + l.poItem.orderedQty);
-    final totalReceived = _lines.fold<double>(0, (sum, l) => sum + l.receivedQty);
-    final totalAccepted = _lines.fold<double>(0, (sum, l) => sum + l.acceptedQty);
+    final totalOrdered = _lines.fold<double>(
+      0,
+      (sum, l) => sum + l.poItem.orderedQty,
+    );
+    final totalReceived = _lines.fold<double>(
+      0,
+      (sum, l) => sum + l.receivedQty,
+    );
+    final totalAccepted = _lines.fold<double>(
+      0,
+      (sum, l) => sum + l.acceptedQty,
+    );
     final totalDamaged = _lines.fold<double>(0, (sum, l) => sum + l.damagedQty);
 
     return MoneyScope(
@@ -430,147 +471,220 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Goods Receiving',
-                  style: GoogleFonts.poppins(
-                      fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
-              Text(widget.purchaseOrder.poNumber,
-                  style: GoogleFonts.poppins(
-                      fontSize: 12, color: Colors.white.withValues(alpha: 0.75))),
+              Text(
+                'Goods Receiving',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.subheadingFontSize(context),
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+              Text(
+                widget.purchaseOrder.poNumber,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  color: Colors.white.withValues(alpha: 0.75),
+                ),
+              ),
             ],
           ),
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _lines.isEmpty
-                ? const AppEmptyState(
-                    icon: Icons.check_circle,
-                    title: 'All items received!',
-                    message: 'No pending items to receive for this PO.',
-                  )
-                : Column(
-                    children: [
-                      Container(
-                        color: AppColors.white,
-                        padding: AppResponsive.padding(context),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.storefront,
-                                    size: AppResponsive.smallIconSize(context),
-                                    color: AppColors.textSecondary),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    widget.purchaseOrder.supplierName ??
-                                        'Unknown Supplier',
-                                    style: TextStyle(
-                                        fontSize:
-                                            AppResponsive.bodyFontSize(context)),
-                                  ),
-                                ),
-                                InkWell(
-                                  onTap: _pickReceivedDate,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      border: Border.all(color: AppColors.divider),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.calendar_today,
-                                            size: 14, color: AppColors.textSecondary),
-                                        const SizedBox(width: 6),
-                                        Text(_formatDate(_receivedDate),
-                                            style: const TextStyle(fontSize: 12)),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: AppResponsive.mediumSpacing(context)),
-                            AppTextField(
-                              controller: _invoiceController,
-                              label: 'Supplier Invoice Number (Optional)',
-                              icon: Icons.receipt_long_outlined,
-                              textCapitalization: TextCapitalization.characters,
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        color: AppColors.white,
-                        margin: EdgeInsets.only(
-                            top: AppResponsive.smallSpacing(context)),
-                        padding: AppResponsive.padding(context),
-                        child: Row(
-                          children: [
-                            Expanded(
-                                child: _summaryItem('Ordered', totalOrdered,
-                                    AppColors.textSecondary)),
-                            Expanded(
-                                child: _summaryItem(
-                                    'Received', totalReceived, AppColors.success)),
-                            Expanded(
-                                child: _summaryItem(
-                                    'To Stock', totalAccepted, AppColors.info)),
-                            Expanded(
-                              child: _summaryItem(
-                                'Damaged',
-                                totalDamaged,
-                                totalDamaged > 0
-                                    ? AppColors.danger
-                                    : AppColors.textSecondary,
+            ? const AppEmptyState(
+                icon: Icons.check_circle,
+                title: 'All items received!',
+                message: 'No pending items to receive for this PO.',
+              )
+            : Column(
+                children: [
+                  Container(
+                    color: AppColors.white,
+                    padding: AppResponsive.padding(context),
+                    child: AppResponsive.constrainedContent(
+                      context: context,
+                      maxWidth: AppResponsive.maxFormWidth(context),
+                      heightFactor: 1,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.storefront,
+                                size: AppResponsive.smallIconSize(context),
+                                color: AppColors.textSecondary,
                               ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  widget.purchaseOrder.supplierName ??
+                                      'Unknown Supplier',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              InkWell(
+                                onTap: _pickReceivedDate,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color: AppColors.divider,
+                                    ),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.calendar_today,
+                                        size: 14,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        _formatDate(_receivedDate),
+                                        style: GoogleFonts.poppins(
+                                          fontSize: AppResponsive.smallFontSize(
+                                            context,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(
+                            height: AppResponsive.mediumSpacing(context),
+                          ),
+                          AppTextField(
+                            controller: _invoiceController,
+                            label: 'Supplier Invoice Number (Optional)',
+                            icon: Icons.receipt_long_outlined,
+                            textCapitalization: TextCapitalization.characters,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Container(
+                    color: AppColors.white,
+                    margin: EdgeInsets.only(
+                      top: AppResponsive.smallSpacing(context),
+                    ),
+                    padding: AppResponsive.padding(context),
+                    child: AppResponsive.constrainedContent(
+                      context: context,
+                      maxWidth: AppResponsive.maxFormWidth(context),
+                      heightFactor: 1,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _summaryItem(
+                              'Ordered',
+                              totalOrdered,
+                              AppColors.textSecondary,
                             ),
-                          ],
-                        ),
+                          ),
+                          Expanded(
+                            child: _summaryItem(
+                              'Received',
+                              totalReceived,
+                              AppColors.success,
+                            ),
+                          ),
+                          Expanded(
+                            child: _summaryItem(
+                              'To Stock',
+                              totalAccepted,
+                              AppColors.info,
+                            ),
+                          ),
+                          Expanded(
+                            child: _summaryItem(
+                              'Damaged',
+                              totalDamaged,
+                              totalDamaged > 0
+                                  ? AppColors.danger
+                                  : AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
-                      Expanded(
-                        child: ListView.builder(
-                          padding: AppResponsive.padding(context),
-                          itemCount: _lines.length,
-                          itemBuilder: (context, index) =>
-                              _buildLineCard(index),
-                        ),
-                      ),
-                      Container(
-                        color: AppColors.white,
+                    ),
+                  ),
+                  Expanded(
+                    child: AppResponsive.constrainedContent(
+                      context: context,
+                      maxWidth: AppResponsive.maxFormWidth(context),
+                      alignment: Alignment.topCenter,
+                      child: ListView.builder(
                         padding: AppResponsive.padding(context),
-                        child: AppTextField(
-                          controller: _notesController,
-                          label: 'Notes (Optional)',
-                          icon: Icons.notes_rounded,
-                          maxLines: 2,
-                          minLines: 2,
-                        ),
+                        itemCount: _lines.length,
+                        itemBuilder: (context, index) => _buildLineCard(index),
                       ),
-                      Container(
-                        color: AppColors.white,
-                        padding: AppResponsive.padding(context),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: _saving ? null : _confirm,
-                            icon: const Icon(Icons.check_circle),
-                            label: Text(
-                                _saving ? 'Saving...' : 'Confirm Receipt & Update Stock'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(
-                                  vertical: AppResponsive.largeSpacing(context)),
+                    ),
+                  ),
+                  Container(
+                    color: AppColors.white,
+                    padding: AppResponsive.padding(context),
+                    child: AppResponsive.constrainedContent(
+                      context: context,
+                      maxWidth: AppResponsive.maxFormWidth(context),
+                      heightFactor: 1,
+                      child: AppTextField(
+                        controller: _notesController,
+                        label: 'Notes (Optional)',
+                        icon: Icons.notes_rounded,
+                        maxLines: 2,
+                        minLines: 2,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    color: AppColors.white,
+                    padding: AppResponsive.padding(context),
+                    child: AppResponsive.constrainedContent(
+                      context: context,
+                      maxWidth: AppResponsive.maxFormWidth(context),
+                      heightFactor: 1,
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _saving ? null : _confirm,
+                          icon: const Icon(Icons.check_circle),
+                          label: Text(
+                            _saving
+                                ? 'Saving...'
+                                : 'Confirm Receipt & Update Stock',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.buttonFontSize(context),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(
+                              vertical: AppResponsive.largeSpacing(context),
                             ),
                           ),
                         ),
                       ),
-                    ],
+                    ),
                   ),
+                ],
+              ),
       ),
     );
   }
@@ -578,15 +692,21 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
   Widget _summaryItem(String label, double value, Color color) {
     return Column(
       children: [
-        Text(_fmt(value),
-            style: TextStyle(
-                fontSize: AppResponsive.subheadingFontSize(context),
-                fontWeight: FontWeight.w600,
-                color: color)),
-        Text(label,
-            style: TextStyle(
-                fontSize: AppResponsive.captionFontSize(context),
-                color: AppColors.textSecondary)),
+        Text(
+          _fmt(value),
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.subheadingFontSize(context),
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.captionFontSize(context),
+            color: AppColors.textSecondary,
+          ),
+        ),
       ],
     );
   }
@@ -603,7 +723,9 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
         color: AppColors.white,
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(
-          color: isShortage || hasDamage ? AppColors.warning : AppColors.divider,
+          color: isShortage || hasDamage
+              ? AppColors.warning
+              : AppColors.divider,
           width: isShortage || hasDamage ? 1.5 : 0.5,
         ),
       ),
@@ -622,14 +744,17 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
                       line.poItem.itemName ?? 'Unknown Item',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          fontSize: AppResponsive.bodyFontSize(context),
-                          fontWeight: FontWeight.w600),
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                  Icon(Icons.edit,
-                      size: AppResponsive.smallIconSize(context),
-                      color: AppColors.textSecondary),
+                  Icon(
+                    Icons.edit,
+                    size: AppResponsive.smallIconSize(context),
+                    color: AppColors.textSecondary,
+                  ),
                 ],
               ),
               SizedBox(height: AppResponsive.mediumSpacing(context)),
@@ -638,32 +763,41 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
                 runSpacing: 6,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  _qtyChip('Ordered', line.poItem.orderedQty, AppColors.textSecondary),
+                  _qtyChip(
+                    'Ordered',
+                    line.poItem.orderedQty,
+                    AppColors.textSecondary,
+                  ),
                   _qtyChip('Received', line.receivedQty, AppColors.success),
                   if (hasDamage)
                     _qtyChip('Damaged', line.damagedQty, AppColors.danger),
                   if (hasDamage && line.damagedHandling != null)
                     Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.warning.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
                         _handlingLabel(line.damagedHandling!),
-                        style: TextStyle(
+                        style: GoogleFonts.poppins(
                           fontSize: AppResponsive.captionFontSize(context),
                           fontWeight: FontWeight.w500,
                           color: AppColors.warning,
                         ),
                       ),
                     ),
-                  Text(formatMoney(line.acceptedQty * line.costPrice),
-                      style: TextStyle(
-                          fontSize: AppResponsive.bodyFontSize(context),
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.success)),
+                  Text(
+                    formatMoney(line.acceptedQty * line.costPrice),
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.success,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -693,11 +827,14 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Text('$label: ${_fmt(qty)}',
-          style: TextStyle(
-              fontSize: AppResponsive.captionFontSize(context),
-              fontWeight: FontWeight.w500,
-              color: color)),
+      child: Text(
+        '$label: ${_fmt(qty)}',
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.captionFontSize(context),
+          fontWeight: FontWeight.w500,
+          color: color,
+        ),
+      ),
     );
   }
 }

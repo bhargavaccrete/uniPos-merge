@@ -8,6 +8,7 @@ import 'package:billberrylite/core/constants/hive_box_names.dart';
 // Common Models
 import 'package:billberrylite/models/payment_method.dart' as pm;
 import 'package:billberrylite/models/tax_details.dart';
+import 'package:billberrylite/models/legacy/legacy_tax_rate_item.dart';
 import 'package:billberrylite/data/models/common/business_type.dart';
 import 'package:billberrylite/data/models/common/business_details.dart';
 
@@ -123,7 +124,13 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.businessDetails)) {
       Hive.registerAdapter(BusinessDetailsAdapter());
     }
-    // typeId 5 (TaxRateItem) retired — see hive_type_ids.dart, don't reuse.
+    // TaxRateItem - typeId: 5. Retired as a model, but pre-retirement taxBox
+    // records still hold a List<TaxRateItem> in TaxDetails field 7, and Hive
+    // resolves every field on disk before discarding unknown ones. This
+    // read-only adapter lets those boxes open; the data is dropped on read.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.legacyTaxRateItem)) {
+      Hive.registerAdapter(LegacyTaxRateItemAdapter());
+    }
     // PaymentMethod - typeId: 6
     if (!Hive.isAdapterRegistered(HiveTypeIds.paymentMethod)) {
       Hive.registerAdapter(pm.PaymentMethodAdapter());

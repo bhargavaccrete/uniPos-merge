@@ -10,6 +10,7 @@ import 'package:billberrylite/presentation/widget/componets/common/app_dialog.da
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 
 const _paymentModes = ['Cash', 'UPI', 'Bank', 'Cheque'];
@@ -78,7 +79,9 @@ class _RestaurantSupplierPaymentDialogState
 
     // Sign convention: positive owes the supplier more, negative owes less.
     // A payment always reduces the payable; an adjustment can go either way.
-    final signed = _isAdjustment ? (_increasesPayable ? amount : -amount) : -amount;
+    final signed = _isAdjustment
+        ? (_increasesPayable ? amount : -amount)
+        : -amount;
 
     try {
       await restaurantSupplierStore.recordBalanceMovement(
@@ -87,7 +90,9 @@ class _RestaurantSupplierPaymentDialogState
         type: _isAdjustment
             ? RestaurantSupplierLedgerType.adjustment
             : RestaurantSupplierLedgerType.payment,
-        description: _isAdjustment ? 'Balance adjustment' : 'Payment to supplier',
+        description: _isAdjustment
+            ? 'Balance adjustment'
+            : 'Payment to supplier',
         paymentMode: _isAdjustment ? null : _mode,
         referenceNo: _referenceController.text.trim().isEmpty
             ? null
@@ -97,8 +102,9 @@ class _RestaurantSupplierPaymentDialogState
             : _noteController.text.trim(),
         date: _date.toIso8601String(),
       );
-      NotificationService.instance
-          .showSuccess(_isAdjustment ? 'Adjustment recorded' : 'Payment recorded');
+      NotificationService.instance.showSuccess(
+        _isAdjustment ? 'Adjustment recorded' : 'Payment recorded',
+      );
       navigator.pop(true);
     } catch (e) {
       if (mounted) {
@@ -134,7 +140,9 @@ class _RestaurantSupplierPaymentDialogState
               label: 'Amount ($symbol)',
               icon: Icons.currency_rupee_rounded,
               autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
               ],
@@ -147,7 +155,7 @@ class _RestaurantSupplierPaymentDialogState
               Text(
                 'Payment mode',
                 style: GoogleFonts.poppins(
-                  fontSize: 12,
+                  fontSize: AppResponsive.smallFontSize(context),
                   fontWeight: FontWeight.w500,
                   color: AppColors.textSecondary,
                 ),
@@ -214,7 +222,7 @@ class _RestaurantSupplierPaymentDialogState
           Text(
             isAdvance ? 'Advance paid' : 'Currently owed',
             style: GoogleFonts.poppins(
-              fontSize: 12,
+              fontSize: AppResponsive.smallFontSize(context),
               color: AppColors.textSecondary,
             ),
           ),
@@ -222,7 +230,7 @@ class _RestaurantSupplierPaymentDialogState
           Text(
             '$symbol${balance.abs().toStringAsFixed(2)}',
             style: GoogleFonts.poppins(
-              fontSize: 15,
+              fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.w600,
               color: isAdvance ? AppColors.info : AppColors.danger,
             ),
@@ -288,13 +296,16 @@ class _RestaurantSupplierPaymentDialogState
         ),
         child: Row(
           children: [
-            const Icon(Icons.calendar_today_rounded,
-                size: 18, color: AppColors.textSecondary),
+            const Icon(
+              Icons.calendar_today_rounded,
+              size: 18,
+              color: AppColors.textSecondary,
+            ),
             const SizedBox(width: 10),
             Text(
               'Date',
               style: GoogleFonts.poppins(
-                fontSize: 13,
+                fontSize: AppResponsive.smallFontSize(context),
                 color: AppColors.textSecondary,
               ),
             ),
@@ -303,7 +314,7 @@ class _RestaurantSupplierPaymentDialogState
               '${_date.day.toString().padLeft(2, '0')}/'
               '${_date.month.toString().padLeft(2, '0')}/${_date.year}',
               style: GoogleFonts.poppins(
-                fontSize: 13,
+                fontSize: AppResponsive.smallFontSize(context),
                 fontWeight: FontWeight.w500,
                 color: AppColors.textPrimary,
               ),
@@ -337,7 +348,7 @@ class _RestaurantSupplierPaymentDialogState
         child: Text(
           label,
           style: GoogleFonts.poppins(
-            fontSize: 12.5,
+            fontSize: AppResponsive.smallFontSize(context),
             fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
             color: selected ? AppColors.primary : AppColors.textSecondary,
           ),
@@ -368,7 +379,7 @@ class _RestaurantSupplierPaymentDialogState
         child: Text(
           label,
           style: GoogleFonts.poppins(
-            fontSize: 12.5,
+            fontSize: AppResponsive.smallFontSize(context),
             fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
             color: selected ? AppColors.primary : AppColors.textSecondary,
           ),

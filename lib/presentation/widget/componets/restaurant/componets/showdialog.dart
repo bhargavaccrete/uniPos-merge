@@ -17,7 +17,7 @@ class Showdialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, double.infinity)
         : 24.0;
     return AlertDialog(
       insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),

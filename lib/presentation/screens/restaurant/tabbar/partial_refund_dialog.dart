@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -13,7 +12,8 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 
 // Export PartialRefundResult so UI screens can use it
-export '../../../../domain/services/restaurant/refund_service.dart' show PartialRefundResult;
+export '../../../../domain/services/restaurant/refund_service.dart'
+    show PartialRefundResult;
 
 class PartialRefundDialog extends StatefulWidget {
   final List<CartItem> orderItems; // Refundable items only
@@ -88,7 +88,8 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
         itemDiscountShare = widget.orderDiscount * itemProportion;
       }
 
-      final priceAfterOrderDiscount = priceAfterItemDiscount - itemDiscountShare;
+      final priceAfterOrderDiscount =
+          priceAfterItemDiscount - itemDiscountShare;
 
       if (widget.isTaxInclusive) {
         // Price already includes tax — only apply the discount share, no tax addition
@@ -98,8 +99,6 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
       return priceAfterOrderDiscount + taxAmount;
     }
   }
-
-
 
   void _updateRefundTotal() {
     // Check if all remaining items are selected for full refund
@@ -145,8 +144,11 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
       });
       // For full refund, use the exact order total that was paid
       // Check if all items are selected for refund
-      bool isFullRefund = _refundQuantities.values.every((qty) => qty > 0) &&
-          _refundQuantities.entries.every((entry) => entry.value == _maxRefundableQuantity(entry.key));
+      bool isFullRefund =
+          _refundQuantities.values.every((qty) => qty > 0) &&
+          _refundQuantities.entries.every(
+            (entry) => entry.value == _maxRefundableQuantity(entry.key),
+          );
 
       if (isFullRefund) {
         _totalRefundAmount = widget.orderTotalPrice;
@@ -156,7 +158,8 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
 
       // Suggest a default reason if empty
       if (_refundReasonController.text.trim().isEmpty) {
-        _refundReasonController.text = 'Full order refund requested by customer';
+        _refundReasonController.text =
+            'Full order refund requested by customer';
       }
 
       // Clear error state if shown
@@ -173,165 +176,202 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
       body: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.receipt_long, size: 18),
-                  label: const Text('Refund Entire Bill'),
-                  onPressed: _selectAllForFullRefund,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              icon: Icon(
+                Icons.receipt_long,
+                size: AppResponsive.smallIconSize(context),
+              ),
+              label: Text(
+                'Refund Entire Bill',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              onPressed: _selectAllForFullRefund,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.smallBorderRadius(context),
                   ),
                 ),
               ),
-              const Divider(height: 24),
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: widget.orderItems.length,
-                itemBuilder: (context, index) {
-                  final item = widget.orderItems[index];
-                  final maxQty = _maxRefundableQuantity(item);
-                  final currentRefundQty = _refundQuantities[item]!;
-                  final bool isStockManaged = item.isStockManaged ?? false;
+            ),
+          ),
+          const Divider(height: 24),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: widget.orderItems.length,
+            itemBuilder: (context, index) {
+              final item = widget.orderItems[index];
+              final maxQty = _maxRefundableQuantity(item);
+              final currentRefundQty = _refundQuantities[item]!;
+              final bool isStockManaged = item.isStockManaged ?? false;
 
-                  if (maxQty == 0) return const SizedBox.shrink();
+              if (maxQty == 0) return const SizedBox.shrink();
 
-                  return Card(
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                child: Padding(
+                  padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.variantName != null && item.variantName!.isNotEmpty
+                            ? '${item.title} (${item.variantName})'
+                            : item.title,
+                        style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                      ),
+                      Text(
+                        'Ordered: $maxQty | Price: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_calculateItemPriceWithTax(item))}/item',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.smallFontSize(context),
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      SizedBox(height: AppResponsive.smallSpacing(context)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            item.variantName != null && item.variantName!.isNotEmpty
-                                ? '${item.title} (${item.variantName})'
-                                : item.title,
-                            style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline),
+                            onPressed: currentRefundQty > 0
+                                ? () {
+                                    setState(() {
+                                      _refundQuantities[item] =
+                                          currentRefundQty - 1;
+                                      _updateRefundTotal();
+                                    });
+                                  }
+                                : null,
                           ),
                           Text(
-                            'Ordered: $maxQty | Price: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_calculateItemPriceWithTax(item))}/item',
-                            style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade600),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.remove_circle_outline),
-                                onPressed: currentRefundQty > 0
-                                    ? () {
-                                  setState(() {
-                                    _refundQuantities[item] = currentRefundQty - 1;
-                                    _updateRefundTotal();
-                                  });
-                                }
-                                    : null,
+                            '$currentRefundQty',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.subheadingFontSize(
+                                context,
                               ),
-                              Text(
-                                '$currentRefundQty',
-                                style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.add_circle_outline),
-                                onPressed: currentRefundQty < maxQty
-                                    ? () {
-                                  setState(() {
-                                    _refundQuantities[item] = currentRefundQty + 1;
-                                    _updateRefundTotal();
-                                  });
-                                }
-                                    : null,
-                              ),
-                            ],
-                          ),
-                          if (isStockManaged && currentRefundQty > 0)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8.0),
-                              child: SwitchListTile(
-                                title: Text("Add to Stock?", style: GoogleFonts.poppins(fontSize: 14)),
-                                value: _restockStatus[item]!,
-                                onChanged: (newValue) {
-                                  setState(() {
-                                    _restockStatus[item] = newValue;
-                                  });
-                                },
-                                dense: true,
-                                contentPadding: EdgeInsets.zero,
-                              ),
+                              fontWeight: FontWeight.bold,
                             ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.add_circle_outline),
+                            onPressed: currentRefundQty < maxQty
+                                ? () {
+                                    setState(() {
+                                      _refundQuantities[item] =
+                                          currentRefundQty + 1;
+                                      _updateRefundTotal();
+                                    });
+                                  }
+                                : null,
+                          ),
                         ],
                       ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 16),
-              // Required indicator
-              Row(
-                children: [
-                  Text(
-                    'Reason for Refund',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
+                      if (isStockManaged && currentRefundQty > 0)
+                        Padding(
+                          padding: EdgeInsets.only(
+                            top: AppResponsive.smallSpacing(context),
+                          ),
+                          child: SwitchListTile(
+                            title: Text(
+                              "Add to Stock?",
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.bodyFontSize(context),
+                              ),
+                            ),
+                            value: _restockStatus[item]!,
+                            onChanged: (newValue) {
+                              setState(() {
+                                _restockStatus[item] = newValue;
+                              });
+                            },
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                    ],
                   ),
-                  Text(
-                    ' *',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.red,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              AppTextField(
-                controller: _refundReasonController,
-                hint: 'e.g., Customer complaint, wrong order, quality issue...',
-                icon: Icons.note_alt_outlined,
-                maxLines: 3,
-                minLines: 2,
-                onChanged: (value) {
-                  if (_showReasonError && value.trim().isNotEmpty) {
-                    setState(() => _showReasonError = false);
-                  }
-                },
-                validator: (_) => _showReasonError ? 'This field is required' : null,
-              ),
-              const SizedBox(height: 16),
+                ),
+              );
+            },
+          ),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
+          // Required indicator
+          Row(
+            children: [
               Text(
-                'Total Refund: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalRefundAmount)}',
-                style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold),
+                'Reason for Refund',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              Text(
+                ' *',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w600,
+                  color: Colors.red,
+                ),
               ),
             ],
           ),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+          AppTextField(
+            controller: _refundReasonController,
+            hint: 'e.g., Customer complaint, wrong order, quality issue...',
+            icon: Icons.note_alt_outlined,
+            maxLines: 3,
+            minLines: 2,
+            onChanged: (value) {
+              if (_showReasonError && value.trim().isNotEmpty) {
+                setState(() => _showReasonError = false);
+              }
+            },
+            validator: (_) =>
+                _showReasonError ? 'This field is required' : null,
+          ),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
+          Text(
+            'Total Refund: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalRefundAmount)}',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.subheadingFontSize(context),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
       actions: [
         appDialogCancelButton(context),
-        const SizedBox(width: 12),
+        SizedBox(width: AppResponsive.mediumSpacing(context)),
         appDialogPrimaryButton(
           label: 'Confirm Refund',
           color: Colors.orange,
           onPressed: () {
             if (_totalRefundAmount <= 0) {
-              NotificationService.instance.showError('Please select at least one item to refund');
+              NotificationService.instance.showError(
+                'Please select at least one item to refund',
+              );
               return;
             }
             if (_refundReasonController.text.trim().isEmpty) {
               setState(() => _showReasonError = true);
-              NotificationService.instance.showError('Reason is required! Please enter a reason for this refund.');
+              NotificationService.instance.showError(
+                'Reason is required! Please enter a reason for this refund.',
+              );
               return;
             }
 
-            final itemsToRefund = Map.of(_refundQuantities)..removeWhere((key, value) => value == 0);
+            final itemsToRefund = Map.of(_refundQuantities)
+              ..removeWhere((key, value) => value == 0);
 
             final Map<CartItem, int> itemsToRestock = {};
             itemsToRefund.forEach((item, quantity) {

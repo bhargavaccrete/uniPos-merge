@@ -119,13 +119,13 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
           final startOfWeek = DateTime(monday.year, monday.month, monday.day);
           return !s.startTime.isBefore(startOfWeek);
         case 'Month':
-          return s.startTime.year == now.year &&
-              s.startTime.month == now.month;
+          return s.startTime.year == now.year && s.startTime.month == now.month;
         case 'Custom':
           if (_customFrom == null) return true;
           // FIX 2: Inclusive boundary — !isBefore is correct for same-day starts.
           final after = !s.startTime.isBefore(_customFrom!);
-          final before = _customTo == null ||
+          final before =
+              _customTo == null ||
               s.startTime.isBefore(_customTo!.add(const Duration(days: 1)));
           return after && before;
         default:
@@ -194,12 +194,12 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
 
       // Shift-level aggregates
       final totalShifts = shifts.length;
-      final totalOrders =
-          shifts.fold<int>(0, (s, sh) => s + sh.orderCount);
-      final totalSales =
-          shifts.fold<double>(0.0, (s, sh) => s + sh.totalSales);
-      final totalMinutes =
-          shifts.fold<int>(0, (s, sh) => s + sh.duration.inMinutes);
+      final totalOrders = shifts.fold<int>(0, (s, sh) => s + sh.orderCount);
+      final totalSales = shifts.fold<double>(0.0, (s, sh) => s + sh.totalSales);
+      final totalMinutes = shifts.fold<int>(
+        0,
+        (s, sh) => s + sh.duration.inMinutes,
+      );
 
       // Expense aggregates: sum expenses during each shift's time window
       double totalExpenses = 0;
@@ -320,25 +320,39 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
   Future<void> _doExport(BuildContext context) async {
     final currency = CurrencyHelper.currentSymbol;
     final headers = [
-      'Rank', 'Staff', 'Role', 'Shifts', 'Hours', 'Orders',
-      'Orders/Hr', 'Sales', 'Avg Order', 'Discounts', 'Refunds',
-      'Expenses', 'Net Revenue',
+      'Rank',
+      'Staff',
+      'Role',
+      'Shifts',
+      'Hours',
+      'Orders',
+      'Orders/Hr',
+      'Sales',
+      'Avg Order',
+      'Discounts',
+      'Refunds',
+      'Expenses',
+      'Net Revenue',
     ];
-    final data = _perfList.map((p) => <dynamic>[
-      p.rank,
-      p.staffName,
-      p.role,
-      p.totalShifts,
-      p.durationLabel,
-      p.totalOrders,
-      p.ordersPerHour.toStringAsFixed(2),
-      p.totalSales,
-      p.avgOrderValue,
-      p.totalDiscounts,
-      p.totalRefunds,
-      p.totalExpenses,
-      p.totalSales - p.totalExpenses,
-    ]).toList();
+    final data = _perfList
+        .map(
+          (p) => <dynamic>[
+            p.rank,
+            p.staffName,
+            p.role,
+            p.totalShifts,
+            p.durationLabel,
+            p.totalOrders,
+            p.ordersPerHour.toStringAsFixed(2),
+            p.totalSales,
+            p.avgOrderValue,
+            p.totalDiscounts,
+            p.totalRefunds,
+            p.totalExpenses,
+            p.totalSales - p.totalExpenses,
+          ],
+        )
+        .toList();
 
     await ReportExportService.showExportDialog(
       context: context,
@@ -351,7 +365,8 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
         'Total Staff': '${_perfList.length}',
         'Total Shifts': '$_totalShifts',
         'Total Orders': '$_totalOrders',
-        'Total Revenue': '$currency${DecimalSettings.formatAmount(_totalRevenue)}',
+        'Total Revenue':
+            '$currency${DecimalSettings.formatAmount(_totalRevenue)}',
       },
     );
   }
@@ -367,7 +382,9 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
           colorScheme: const ColorScheme.light(
-              primary: AppColors.primary, onPrimary: Colors.white),
+            primary: AppColors.primary,
+            onPrimary: Colors.white,
+          ),
         ),
         child: child!,
       ),
@@ -387,7 +404,9 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
           colorScheme: const ColorScheme.light(
-              primary: AppColors.primary, onPrimary: Colors.white),
+            primary: AppColors.primary,
+            onPrimary: Colors.white,
+          ),
         ),
         child: child!,
       ),
@@ -402,9 +421,15 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
 
   Color _avatarColor(String name) {
     const palette = [
-      Color(0xFF1565C0), Color(0xFF00695C), Color(0xFF6A1B9A),
-      Color(0xFFD84315), Color(0xFF2E7D32), Color(0xFF0277BD),
-      Color(0xFF4527A0), Color(0xFFC62828), Color(0xFF00838F),
+      Color(0xFF1565C0),
+      Color(0xFF00695C),
+      Color(0xFF6A1B9A),
+      Color(0xFFD84315),
+      Color(0xFF2E7D32),
+      Color(0xFF0277BD),
+      Color(0xFF4527A0),
+      Color(0xFFC62828),
+      Color(0xFF00838F),
       Color(0xFF558B2F),
     ];
     final idx = name.codeUnits.fold(0, (a, b) => a + b) % palette.length;
@@ -441,15 +466,21 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Staff Performance',
-                style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 20)),
             Text(
-                '${_perfList.length} staff member${_perfList.length != 1 ? 's' : ''}',
-                style: GoogleFonts.poppins(
-                    color: Colors.white70, fontSize: 12)),
+              'Staff Performance',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: AppResponsive.headingFontSize(context),
+              ),
+            ),
+            Text(
+              '${_perfList.length} staff member${_perfList.length != 1 ? 's' : ''}',
+              style: GoogleFonts.poppins(
+                color: Colors.white70,
+                fontSize: AppResponsive.smallFontSize(context),
+              ),
+            ),
           ],
         ),
         actions: [
@@ -463,19 +494,26 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildFilterRow(context),
-          if (_filterPeriod == 'Custom') _buildCustomDateRow(context),
-          _buildSortRow(context),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _perfList.isEmpty
-                    ? _buildEmpty(context)
-                    : _buildBody(context, currency),
-          ),
-        ],
+      // Filter/sort rows are plain Padding, not full-bleed strips, so the
+      // whole body caps together. The Scaffold background still spans.
+      body: AppResponsive.constrainedContent(
+        context: context,
+        maxWidth: AppResponsive.maxFormWidth(context),
+        alignment: Alignment.topCenter,
+        child: Column(
+          children: [
+            _buildFilterRow(context),
+            if (_filterPeriod == 'Custom') _buildCustomDateRow(context),
+            _buildSortRow(context),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _perfList.isEmpty
+                  ? _buildEmpty(context)
+                  : _buildBody(context, currency),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -498,8 +536,9 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
           children: _periods.map((p) {
             final isSelected = _filterPeriod == p;
             return Padding(
-              padding:
-                  EdgeInsets.only(right: AppResponsive.smallSpacing(context)),
+              padding: EdgeInsets.only(
+                right: AppResponsive.smallSpacing(context),
+              ),
               child: GestureDetector(
                 onTap: () {
                   setState(() {
@@ -514,32 +553,37 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
                   padding: EdgeInsets.symmetric(
-                      horizontal: AppResponsive.largeSpacing(context),
-                      vertical: AppResponsive.smallSpacing(context)),
+                    horizontal: AppResponsive.largeSpacing(context),
+                    vertical: AppResponsive.smallSpacing(context),
+                  ),
                   decoration: BoxDecoration(
                     color: isSelected ? AppColors.primary : AppColors.white,
                     borderRadius: BorderRadius.circular(
-                        AppResponsive.borderRadius(context)),
+                      AppResponsive.borderRadius(context),
+                    ),
                     border: Border.all(
-                        color:
-                            isSelected ? AppColors.primary : AppColors.divider),
+                      color: isSelected ? AppColors.primary : AppColors.divider,
+                    ),
                     boxShadow: isSelected
                         ? [
                             BoxShadow(
-                                color: AppColors.primary.withValues(alpha: 0.25),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2))
+                              color: AppColors.primary.withValues(alpha: 0.25),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
                           ]
                         : [],
                   ),
-                  child: Text(p,
-                      style: GoogleFonts.poppins(
-                          fontSize: AppResponsive.smallFontSize(context),
-                          fontWeight:
-                              isSelected ? FontWeight.w600 : FontWeight.w500,
-                          color: isSelected
-                              ? Colors.white
-                              : AppColors.textPrimary)),
+                  child: Text(
+                    p,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                      color: isSelected ? Colors.white : AppColors.textPrimary,
+                    ),
+                  ),
                 ),
               ),
             );
@@ -560,50 +604,77 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
         AppResponsive.largeSpacing(context),
         0,
       ),
-      child: Row(children: [
-        Expanded(child: _datePicker(context, 'From',
-            _customFrom != null ? fmt.format(_customFrom!) : null, _pickFrom)),
-        SizedBox(width: AppResponsive.mediumSpacing(context)),
-        Expanded(child: _datePicker(context, 'To',
-            _customTo != null ? fmt.format(_customTo!) : null, _pickTo)),
-      ]),
+      child: Row(
+        children: [
+          Expanded(
+            child: _datePicker(
+              context,
+              'From',
+              _customFrom != null ? fmt.format(_customFrom!) : null,
+              _pickFrom,
+            ),
+          ),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
+          Expanded(
+            child: _datePicker(
+              context,
+              'To',
+              _customTo != null ? fmt.format(_customTo!) : null,
+              _pickTo,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _datePicker(
-      BuildContext context, String label, String? value, VoidCallback onTap) {
+    BuildContext context,
+    String label,
+    String? value,
+    VoidCallback onTap,
+  ) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: EdgeInsets.symmetric(
-            horizontal: AppResponsive.mediumSpacing(context),
-            vertical: AppResponsive.smallSpacing(context) + 2),
+          horizontal: AppResponsive.mediumSpacing(context),
+          vertical: AppResponsive.smallSpacing(context) + 2,
+        ),
         decoration: BoxDecoration(
           color: AppColors.white,
           border: Border.all(
-              color: value != null ? AppColors.primary : AppColors.divider,
-              width: value != null ? 1.5 : 1),
-          borderRadius:
-              BorderRadius.circular(AppResponsive.borderRadius(context)),
-        ),
-        child: Row(children: [
-          Icon(Icons.calendar_today,
-              size: AppResponsive.smallIconSize(context),
-              color:
-                  value != null ? AppColors.primary : AppColors.textSecondary),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(value ?? label,
-                style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.smallFontSize(context),
-                    color: value != null
-                        ? AppColors.textPrimary
-                        : AppColors.textSecondary,
-                    fontWeight: value != null
-                        ? FontWeight.w500
-                        : FontWeight.w400)),
+            color: value != null ? AppColors.primary : AppColors.divider,
+            width: value != null ? 1.5 : 1,
           ),
-        ]),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.borderRadius(context),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.calendar_today,
+              size: AppResponsive.smallIconSize(context),
+              color: value != null
+                  ? AppColors.primary
+                  : AppColors.textSecondary,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                value ?? label,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  color: value != null
+                      ? AppColors.textPrimary
+                      : AppColors.textSecondary,
+                  fontWeight: value != null ? FontWeight.w500 : FontWeight.w400,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -613,143 +684,204 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
   Widget _buildSortRow(BuildContext context) {
     return Padding(
       padding: EdgeInsets.symmetric(
-          horizontal: AppResponsive.largeSpacing(context),
-          vertical: AppResponsive.mediumSpacing(context)),
-      child: Row(children: [
-        Text('Sort by:',
+        horizontal: AppResponsive.largeSpacing(context),
+        vertical: AppResponsive.mediumSpacing(context),
+      ),
+      child: Row(
+        children: [
+          Text(
+            'Sort by:',
             style: GoogleFonts.poppins(
-                fontSize: AppResponsive.smallFontSize(context),
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w500)),
-        SizedBox(width: AppResponsive.smallSpacing(context)),
-        ...[
-          ('sales', Icons.attach_money, 'Revenue'),
-          ('orders', Icons.receipt_long, 'Orders'),
-          ('hours', Icons.timer_outlined, 'Hours'),
-        ].map((t) {
-          final isActive = _sortBy == t.$1;
-          return Padding(
-            padding:
-                EdgeInsets.only(right: AppResponsive.smallSpacing(context)),
-            child: GestureDetector(
-              onTap: () {
-                setState(() => _sortBy = t.$1);
-                _compute();
-              },
-              child: Container(
-                padding: EdgeInsets.symmetric(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
+          ...[
+            ('sales', Icons.attach_money, 'Revenue'),
+            ('orders', Icons.receipt_long, 'Orders'),
+            ('hours', Icons.timer_outlined, 'Hours'),
+          ].map((t) {
+            final isActive = _sortBy == t.$1;
+            return Padding(
+              padding: EdgeInsets.only(
+                right: AppResponsive.smallSpacing(context),
+              ),
+              child: GestureDetector(
+                onTap: () {
+                  setState(() => _sortBy = t.$1);
+                  _compute();
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(
                     horizontal: AppResponsive.mediumSpacing(context),
-                    vertical: 5),
-                decoration: BoxDecoration(
-                  color:
-                      isActive ? AppColors.primary.withValues(alpha: 0.1) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                      color: isActive ? AppColors.primary : AppColors.divider),
-                ),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(t.$2,
-                      size: AppResponsive.smallIconSize(context),
-                      color: isActive
-                          ? AppColors.primary
-                          : AppColors.textSecondary),
-                  const SizedBox(width: 4),
-                  Text(t.$3,
-                      style: GoogleFonts.poppins(
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isActive
+                        ? AppColors.primary.withValues(alpha: 0.1)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isActive ? AppColors.primary : AppColors.divider,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        t.$2,
+                        size: AppResponsive.smallIconSize(context),
+                        color: isActive
+                            ? AppColors.primary
+                            : AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        t.$3,
+                        style: GoogleFonts.poppins(
                           fontSize: AppResponsive.captionFontSize(context),
-                          fontWeight:
-                              isActive ? FontWeight.w600 : FontWeight.w500,
+                          fontWeight: isActive
+                              ? FontWeight.w600
+                              : FontWeight.w500,
                           color: isActive
                               ? AppColors.primary
-                              : AppColors.textSecondary)),
-                ]),
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          );
-        }),
-      ]),
+            );
+          }),
+        ],
+      ),
     );
   }
 
   // ── Body ──────────────────────────────────────────────────────────────────
 
   Widget _buildBody(BuildContext context, String currency) {
-
-    return Column(children: [
-      // ── Team summary bar ──────────────────────────────────────────────────
-      Padding(
-        padding: EdgeInsets.fromLTRB(
-          AppResponsive.largeSpacing(context),
-          0,
-          AppResponsive.largeSpacing(context),
-          AppResponsive.mediumSpacing(context),
-        ),
-        child: Container(
-          padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [AppColors.primary, const Color(0xFF1565C0)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius:
-                BorderRadius.circular(AppResponsive.borderRadius(context)),
-            boxShadow: [
-              BoxShadow(
+    return Column(
+      children: [
+        // ── Team summary bar ──────────────────────────────────────────────────
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppResponsive.largeSpacing(context),
+            0,
+            AppResponsive.largeSpacing(context),
+            AppResponsive.mediumSpacing(context),
+          ),
+          child: Container(
+            padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppColors.primary, const Color(0xFF1565C0)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.borderRadius(context),
+              ),
+              boxShadow: [
+                BoxShadow(
                   color: AppColors.primary.withValues(alpha: 0.3),
                   blurRadius: 12,
-                  offset: const Offset(0, 4))
-            ],
-          ),
-          child: Row(
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _summaryTile(context, '${_perfList.length}', 'Staff',
-                    Icons.people_outline, Colors.white),
-                _summaryTile(context, '$_totalShifts', 'Shifts',
-                    Icons.badge_outlined, Colors.white),
-                _summaryTile(context, '$_totalOrders', 'Orders',
-                    Icons.receipt_long, Colors.white),
                 _summaryTile(
-                    context,
-                    '$currency${DecimalSettings.formatAmount(_totalRevenue)}',
-                    'Revenue',
-                    Icons.attach_money,
-                    Colors.white),
-              ]),
+                  context,
+                  '${_perfList.length}',
+                  'Staff',
+                  Icons.people_outline,
+                  Colors.white,
+                ),
+                _summaryTile(
+                  context,
+                  '$_totalShifts',
+                  'Shifts',
+                  Icons.badge_outlined,
+                  Colors.white,
+                ),
+                _summaryTile(
+                  context,
+                  '$_totalOrders',
+                  'Orders',
+                  Icons.receipt_long,
+                  Colors.white,
+                ),
+                _summaryTile(
+                  context,
+                  '$currency${DecimalSettings.formatAmount(_totalRevenue)}',
+                  'Revenue',
+                  Icons.attach_money,
+                  Colors.white,
+                ),
+              ],
+            ),
+          ),
         ),
-      ),
 
-      // ── Staff leaderboard ──────────────────────────────────────────────────
-      Expanded(
-        child: ListView.builder(
-          padding: EdgeInsets.symmetric(
-              horizontal: AppResponsive.largeSpacing(context)),
-          itemCount: _perfList.length,
-          itemBuilder: (context, index) =>
-              _StaffCard(_perfList[index], currency, _avatarColor, _initials,
-                  _rankColor, _rankIcon),
+        // ── Staff leaderboard ──────────────────────────────────────────────────
+        Expanded(
+          child: ListView.builder(
+            padding: EdgeInsets.symmetric(
+              horizontal: AppResponsive.largeSpacing(context),
+            ),
+            itemCount: _perfList.length,
+            itemBuilder: (context, index) => _StaffCard(
+              _perfList[index],
+              currency,
+              _avatarColor,
+              _initials,
+              _rankColor,
+              _rankIcon,
+            ),
+          ),
         ),
-      ),
-    ]);
+      ],
+    );
   }
 
-  Widget _summaryTile(BuildContext context, String value, String label,
-      IconData icon, Color color) {
-    return Column(children: [
-      Icon(icon, color: color.withValues(alpha: 0.8),
-          size: AppResponsive.iconSize(context)),
-      const SizedBox(height: 4),
-      Text(value,
+  Widget _summaryTile(
+    BuildContext context,
+    String value,
+    String label,
+    IconData icon,
+    Color color,
+  ) {
+    return Column(
+      children: [
+        Icon(
+          icon,
+          color: color.withValues(alpha: 0.8),
+          size: AppResponsive.iconSize(context),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
           style: GoogleFonts.poppins(
-              fontWeight: FontWeight.w700,
-              fontSize: AppResponsive.bodyFontSize(context),
-              color: color)),
-      Text(label,
+            fontWeight: FontWeight.w700,
+            fontSize: AppResponsive.bodyFontSize(context),
+            color: color,
+          ),
+        ),
+        Text(
+          label,
           style: GoogleFonts.poppins(
-              fontSize: AppResponsive.captionFontSize(context),
-              color: color.withValues(alpha: 0.8))),
-    ]);
+            fontSize: AppResponsive.captionFontSize(context),
+            color: color.withValues(alpha: 0.8),
+          ),
+        ),
+      ],
+    );
   }
 
   // ── Empty state ───────────────────────────────────────────────────────────
@@ -758,31 +890,42 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
     final msg = _filterPeriod == 'Today'
         ? 'No staff shifts recorded today'
         : _filterPeriod == 'Week'
-            ? 'No shifts this week'
-            : _filterPeriod == 'Month'
-                ? 'No shifts this month'
-                : _filterPeriod == 'Custom'
-                    ? 'No shifts in selected range'
-                    : 'No shift data available yet';
+        ? 'No shifts this week'
+        : _filterPeriod == 'Month'
+        ? 'No shifts this month'
+        : _filterPeriod == 'Custom'
+        ? 'No shifts in selected range'
+        : 'No shift data available yet';
 
     return Center(
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(Icons.bar_chart,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.bar_chart,
             size: AppResponsive.largeIconSize(context) * 1.5,
-            color: Colors.grey.shade300),
-        SizedBox(height: AppResponsive.mediumSpacing(context)),
-        Text(msg,
+            color: Colors.grey.shade300,
+          ),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
+          Text(
+            msg,
             textAlign: TextAlign.center,
             style: GoogleFonts.poppins(
-                fontSize: AppResponsive.bodyFontSize(context),
-                color: AppColors.textSecondary)),
-        SizedBox(height: AppResponsive.smallSpacing(context)),
-        Text('Shifts appear here once staff members log out',
+              fontSize: AppResponsive.bodyFontSize(context),
+              color: AppColors.textSecondary,
+            ),
+          ),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+          Text(
+            'Shifts appear here once staff members log out',
             textAlign: TextAlign.center,
             style: GoogleFonts.poppins(
-                fontSize: AppResponsive.smallFontSize(context),
-                color: AppColors.textSecondary.withValues(alpha: 0.6))),
-      ]),
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary.withValues(alpha: 0.6),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -797,8 +940,14 @@ class _StaffCard extends StatefulWidget {
   final Color Function(int) rankColor;
   final IconData Function(int) rankIcon;
 
-  const _StaffCard(this.perf, this.currency, this.avatarColor, this.initials,
-      this.rankColor, this.rankIcon);
+  const _StaffCard(
+    this.perf,
+    this.currency,
+    this.avatarColor,
+    this.initials,
+    this.rankColor,
+    this.rankIcon,
+  );
 
   @override
   State<_StaffCard> createState() => _StaffCardState();
@@ -814,9 +963,13 @@ class _StaffCardState extends State<_StaffCard>
   void initState() {
     super.initState();
     _animController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 220));
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    );
     _expandAnim = CurvedAnimation(
-        parent: _animController, curve: Curves.easeInOut);
+      parent: _animController,
+      curve: Curves.easeInOut,
+    );
   }
 
   @override
@@ -843,127 +996,189 @@ class _StaffCardState extends State<_StaffCard>
         margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius:
-              BorderRadius.circular(AppResponsive.largeBorderRadius(context)),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.largeBorderRadius(context),
+          ),
           border: Border.all(
-              color: isTop3
-                  ? rankCol.withValues(alpha: 0.4)
-                  : AppColors.divider,
-              width: isTop3 ? 1.5 : 1),
+            color: isTop3 ? rankCol.withValues(alpha: 0.4) : AppColors.divider,
+            width: isTop3 ? 1.5 : 1,
+          ),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: AppResponsive.shadowBlurRadius(context),
-                offset: const Offset(0, 2)),
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: AppResponsive.shadowBlurRadius(context),
+              offset: const Offset(0, 2),
+            ),
           ],
         ),
         child: Padding(
           padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // ── Top row ──────────────────────────────────────────────────────
-            Row(children: [
-              // Rank badge
-              Container(
-                width: AppResponsive.getValue<double>(context,
-                    mobile: 32, tablet: 36, desktop: 40),
-                height: AppResponsive.getValue<double>(context,
-                    mobile: 32, tablet: 36, desktop: 40),
-                decoration: BoxDecoration(
-                  color: rankCol.withValues(alpha: isTop3 ? 0.15 : 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                alignment: Alignment.center,
-                child: isTop3
-                    ? Icon(widget.rankIcon(p.rank),
-                        size: AppResponsive.smallIconSize(context),
-                        color: rankCol)
-                    : Text('#${p.rank}',
-                        style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.captionFontSize(context),
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textSecondary)),
-              ),
-              SizedBox(width: AppResponsive.mediumSpacing(context)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Top row ──────────────────────────────────────────────────────
+              Row(
+                children: [
+                  // Rank badge
+                  Container(
+                    width: AppResponsive.getValue<double>(
+                      context,
+                      mobile: 32,
+                      tablet: 36,
+                      desktop: 40,
+                    ),
+                    height: AppResponsive.getValue<double>(
+                      context,
+                      mobile: 32,
+                      tablet: 36,
+                      desktop: 40,
+                    ),
+                    decoration: BoxDecoration(
+                      color: rankCol.withValues(alpha: isTop3 ? 0.15 : 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    alignment: Alignment.center,
+                    child: isTop3
+                        ? Icon(
+                            widget.rankIcon(p.rank),
+                            size: AppResponsive.smallIconSize(context),
+                            color: rankCol,
+                          )
+                        : Text(
+                            '#${p.rank}',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.captionFontSize(context),
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                  ),
+                  SizedBox(width: AppResponsive.mediumSpacing(context)),
 
-              // Avatar
-              Container(
-                width: AppResponsive.getValue<double>(context,
-                    mobile: 40, tablet: 44, desktop: 48),
-                height: AppResponsive.getValue<double>(context,
-                    mobile: 40, tablet: 44, desktop: 48),
-                decoration: BoxDecoration(
-                  color: aColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                alignment: Alignment.center,
-                child: Text(widget.initials(p.staffName),
-                    style: GoogleFonts.poppins(
+                  // Avatar
+                  Container(
+                    width: AppResponsive.getValue<double>(
+                      context,
+                      mobile: 40,
+                      tablet: 44,
+                      desktop: 48,
+                    ),
+                    height: AppResponsive.getValue<double>(
+                      context,
+                      mobile: 40,
+                      tablet: 44,
+                      desktop: 48,
+                    ),
+                    decoration: BoxDecoration(
+                      color: aColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      widget.initials(p.staffName),
+                      style: GoogleFonts.poppins(
                         fontSize: AppResponsive.smallFontSize(context),
                         fontWeight: FontWeight.w700,
-                        color: aColor)),
-              ),
-              SizedBox(width: AppResponsive.mediumSpacing(context)),
+                        color: aColor,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: AppResponsive.mediumSpacing(context)),
 
-              // Name + role
-              Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  // Name + role
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          p.staffName,
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          p.role,
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.captionFontSize(context),
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Revenue (key metric always visible)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text(p.staffName,
-                          style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.bodyFontSize(context),
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary)),
-                      Text(p.role,
-                          style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.captionFontSize(context),
-                              color: AppColors.textSecondary)),
-                    ]),
+                      Text(
+                        '${widget.currency}${DecimalSettings.formatAmount(p.totalSales)}',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      Text(
+                        '${p.totalOrders} orders',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.captionFontSize(context),
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
+                  Icon(
+                    _expanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    color: AppColors.textSecondary,
+                    size: AppResponsive.iconSize(context),
+                  ),
+                ],
               ),
 
-              // Revenue (key metric always visible)
-              Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Text(
-                    '${widget.currency}${DecimalSettings.formatAmount(p.totalSales)}',
-                    style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.bodyFontSize(context),
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary)),
-                Text('${p.totalOrders} orders',
-                    style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.captionFontSize(context),
-                        color: AppColors.textSecondary)),
-              ]),
+              SizedBox(height: AppResponsive.smallSpacing(context)),
 
-              SizedBox(width: AppResponsive.smallSpacing(context)),
-              Icon(
-                _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                color: AppColors.textSecondary,
-                size: AppResponsive.iconSize(context),
+              // ── Quick KPI chips ───────────────────────────────────────────────
+              Wrap(
+                spacing: AppResponsive.smallSpacing(context),
+                children: [
+                  _chip(
+                    context,
+                    Icons.badge_outlined,
+                    '${p.totalShifts} shift${p.totalShifts != 1 ? 's' : ''}',
+                    Colors.indigo,
+                  ),
+                  _chip(
+                    context,
+                    Icons.timer_outlined,
+                    p.durationLabel,
+                    Colors.blue,
+                  ),
+                  _chip(
+                    context,
+                    Icons.trending_up,
+                    'Avg ${widget.currency}${DecimalSettings.formatAmount(p.avgOrderValue)}/order',
+                    Colors.green,
+                  ),
+                  _chip(
+                    context,
+                    Icons.speed,
+                    '${p.ordersPerHour.toStringAsFixed(1)}/hr',
+                    Colors.orange,
+                  ),
+                ],
               ),
-            ]),
 
-            SizedBox(height: AppResponsive.smallSpacing(context)),
-
-            // ── Quick KPI chips ───────────────────────────────────────────────
-            Wrap(spacing: AppResponsive.smallSpacing(context), children: [
-              _chip(context, Icons.badge_outlined,
-                  '${p.totalShifts} shift${p.totalShifts != 1 ? 's' : ''}',
-                  Colors.indigo),
-              _chip(context, Icons.timer_outlined, p.durationLabel,
-                  Colors.blue),
-              _chip(context, Icons.trending_up,
-                  'Avg ${widget.currency}${DecimalSettings.formatAmount(p.avgOrderValue)}/order',
-                  Colors.green),
-              _chip(context, Icons.speed,
-                  '${p.ordersPerHour.toStringAsFixed(1)}/hr',
-                  Colors.orange),
-            ]),
-
-            // ── Expanded detail ───────────────────────────────────────────────
-            SizeTransition(
-              sizeFactor: _expandAnim,
-              child: Column(
+              // ── Expanded detail ───────────────────────────────────────────────
+              SizeTransition(
+                sizeFactor: _expandAnim,
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     SizedBox(height: AppResponsive.mediumSpacing(context)),
@@ -973,38 +1188,72 @@ class _StaffCardState extends State<_StaffCard>
                     // Revenue breakdown
                     _sectionTitle(context, 'Revenue Breakdown'),
                     SizedBox(height: AppResponsive.smallSpacing(context)),
-                    _detailRow(context, 'Total Sales',
-                        '${widget.currency}${p.totalSales.toStringAsFixed(2)}',
-                        Colors.green),
-                    _detailRow(context, 'Expenses',
-                        '- ${widget.currency}${p.totalExpenses.toStringAsFixed(2)}',
-                        Colors.red),
-                    _detailRow(context, 'Net Revenue',
-                        '${widget.currency}${(p.totalSales - p.totalExpenses).toStringAsFixed(2)}',
-                        Colors.teal),
-                    _detailRow(context, 'Avg Order Value',
-                        '${widget.currency}${p.avgOrderValue.toStringAsFixed(2)}',
-                        Colors.teal),
-                    _detailRow(context, 'Discounts Given',
-                        '${widget.currency}${p.totalDiscounts.toStringAsFixed(2)}',
-                        Colors.orange),
-                    _detailRow(context, 'Refunds Handled',
-                        '${widget.currency}${p.totalRefunds.toStringAsFixed(2)}',
-                        Colors.red),
+                    _detailRow(
+                      context,
+                      'Total Sales',
+                      '${widget.currency}${p.totalSales.toStringAsFixed(2)}',
+                      Colors.green,
+                    ),
+                    _detailRow(
+                      context,
+                      'Expenses',
+                      '- ${widget.currency}${p.totalExpenses.toStringAsFixed(2)}',
+                      Colors.red,
+                    ),
+                    _detailRow(
+                      context,
+                      'Net Revenue',
+                      '${widget.currency}${(p.totalSales - p.totalExpenses).toStringAsFixed(2)}',
+                      Colors.teal,
+                    ),
+                    _detailRow(
+                      context,
+                      'Avg Order Value',
+                      '${widget.currency}${p.avgOrderValue.toStringAsFixed(2)}',
+                      Colors.teal,
+                    ),
+                    _detailRow(
+                      context,
+                      'Discounts Given',
+                      '${widget.currency}${p.totalDiscounts.toStringAsFixed(2)}',
+                      Colors.orange,
+                    ),
+                    _detailRow(
+                      context,
+                      'Refunds Handled',
+                      '${widget.currency}${p.totalRefunds.toStringAsFixed(2)}',
+                      Colors.red,
+                    ),
 
                     SizedBox(height: AppResponsive.mediumSpacing(context)),
 
                     // Productivity
                     _sectionTitle(context, 'Productivity'),
                     SizedBox(height: AppResponsive.smallSpacing(context)),
-                    _detailRow(context, 'Total Shifts', '${p.totalShifts}',
-                        Colors.indigo),
-                    _detailRow(context, 'Total Hours Worked', p.durationLabel,
-                        Colors.blue),
-                    _detailRow(context, 'Total Orders', '${p.totalOrders}',
-                        AppColors.primary),
-                    _detailRow(context, 'Orders / Hour',
-                        p.ordersPerHour.toStringAsFixed(2), Colors.purple),
+                    _detailRow(
+                      context,
+                      'Total Shifts',
+                      '${p.totalShifts}',
+                      Colors.indigo,
+                    ),
+                    _detailRow(
+                      context,
+                      'Total Hours Worked',
+                      p.durationLabel,
+                      Colors.blue,
+                    ),
+                    _detailRow(
+                      context,
+                      'Total Orders',
+                      '${p.totalOrders}',
+                      AppColors.primary,
+                    ),
+                    _detailRow(
+                      context,
+                      'Orders / Hour',
+                      p.ordersPerHour.toStringAsFixed(2),
+                      Colors.purple,
+                    ),
 
                     // Order type breakdown
                     if (p.orderTypes.isNotEmpty) ...[
@@ -1018,92 +1267,139 @@ class _StaffCardState extends State<_StaffCard>
                         return _orderTypeBar(context, e.key, e.value, pct);
                       }),
                     ],
-                  ]),
-            ),
-          ]),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _chip(BuildContext context, IconData icon, String text, Color color) {
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon,
-          size: AppResponsive.smallIconSize(context) * 0.85, color: color),
-      const SizedBox(width: 3),
-      Text(text,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          size: AppResponsive.smallIconSize(context) * 0.85,
+          color: color,
+        ),
+        const SizedBox(width: 3),
+        Text(
+          text,
           style: GoogleFonts.poppins(
-              fontSize: AppResponsive.smallFontSize(context),
-              color: AppColors.textSecondary)),
-    ]);
+            fontSize: AppResponsive.smallFontSize(context),
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _sectionTitle(BuildContext context, String title) {
-    return Text(title,
-        style: GoogleFonts.poppins(
-            fontSize: AppResponsive.smallFontSize(context),
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-            letterSpacing: 0.3));
+    return Text(
+      title,
+      style: GoogleFonts.poppins(
+        fontSize: AppResponsive.smallFontSize(context),
+        fontWeight: FontWeight.w600,
+        color: AppColors.textPrimary,
+        letterSpacing: 0.3,
+      ),
+    );
   }
 
   Widget _detailRow(
-      BuildContext context, String label, String value, Color accent) {
+    BuildContext context,
+    String label,
+    String value,
+    Color accent,
+  ) {
     return Padding(
       padding: EdgeInsets.symmetric(
-          vertical: AppResponsive.smallSpacing(context) * 0.4),
+        vertical: AppResponsive.smallSpacing(context) * 0.4,
+      ),
       child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(mainAxisSize: MainAxisSize.min, children: [
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
               Container(
-                  width: 3,
-                  height: 14,
-                  decoration: BoxDecoration(
-                      color: accent,
-                      borderRadius: BorderRadius.circular(2))),
+                width: 3,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: accent,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
               const SizedBox(width: 8),
-              Text(label,
-                  style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.smallFontSize(context),
-                      color: AppColors.textSecondary)),
-            ]),
-            Text(value,
+              Text(
+                label,
                 style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.smallFontSize(context),
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary)),
-          ]),
+                  fontSize: AppResponsive.smallFontSize(context),
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _orderTypeBar(
-      BuildContext context, String label, int count, double pct) {
+    BuildContext context,
+    String label,
+    int count,
+    double pct,
+  ) {
     return Padding(
       padding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text(label,
-              style: GoogleFonts.poppins(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.poppins(
                   fontSize: AppResponsive.smallFontSize(context),
-                  color: AppColors.textSecondary)),
-          Text('$count  (${pct.toStringAsFixed(0)}%)',
-              style: GoogleFonts.poppins(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              Text(
+                '$count  (${pct.toStringAsFixed(0)}%)',
+                style: GoogleFonts.poppins(
                   fontSize: AppResponsive.smallFontSize(context),
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary)),
-        ]),
-        const SizedBox(height: 4),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(
-            value: pct / 100,
-            minHeight: 6,
-            backgroundColor: AppColors.divider,
-            color: AppColors.primary.withValues(alpha: 0.7),
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
           ),
-        ),
-      ]),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: pct / 100,
+              minHeight: 6,
+              backgroundColor: AppColors.divider,
+              color: AppColors.primary.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

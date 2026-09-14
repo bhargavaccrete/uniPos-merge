@@ -15,7 +15,9 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 
 /// Colour for a return status — shared with the detail screen so both agree.
-Color restaurantPurchaseReturnStatusColor(RestaurantPurchaseReturnStatus status) {
+Color restaurantPurchaseReturnStatusColor(
+  RestaurantPurchaseReturnStatus status,
+) {
   switch (status) {
     case RestaurantPurchaseReturnStatus.pending:
       return AppColors.warning;
@@ -81,7 +83,8 @@ class _RestaurantPurchaseReturnListScreenState
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => RestaurantPurchaseReturnDetailScreen(purchaseReturn: model),
+        builder: (_) =>
+            RestaurantPurchaseReturnDetailScreen(purchaseReturn: model),
       ),
     );
     if (mounted) setState(() {});
@@ -104,13 +107,13 @@ class _RestaurantPurchaseReturnListScreenState
   /// only what you read is constrained.
   Widget _capped(BuildContext context, Widget child) {
     final maxWidth = AppResponsive.maxContentWidth(context);
+    // Mobile is uncapped — returning early keeps two widgets out of the tree.
     if (maxWidth == double.infinity) return child;
-    return Align(
+    return AppResponsive.constrainedContent(
+      context: context,
+      maxWidth: maxWidth,
       alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
-      ),
+      child: child,
     );
   }
 

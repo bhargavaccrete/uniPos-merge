@@ -121,38 +121,46 @@ class _RestaurantInventoryLossListScreenState
         ),
         _buildSourceFilter(context),
         Expanded(
-          child: Observer(
-            builder: (context) {
-              if (restaurantDamagedGoodsStore.isLoading) {
-                return const Center(
-                  child: CircularProgressIndicator(color: AppColors.primary),
-                );
-              }
+          child: AppResponsive.constrainedContent(
+            context: context,
+            maxWidth: AppResponsive.maxFormWidth(context),
+            alignment: Alignment.topCenter,
+            child: Observer(
+              builder: (context) {
+                if (restaurantDamagedGoodsStore.isLoading) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: AppColors.primary),
+                  );
+                }
 
-              final losses = _visibleLosses;
-              if (losses.isEmpty) {
-                final filtering = _searchController.text.trim().isNotEmpty ||
-                    _sourceFilter != null;
-                return AppEmptyState(
-                  icon: filtering
-                      ? Icons.search_off_rounded
-                      : Icons.money_off_rounded,
-                  title: filtering ? 'No losses match' : 'No inventory losses',
-                  message: filtering
-                      ? 'Try a different search or filter.'
-                      : 'Losses are recorded automatically when goods are '
-                          'written off on receipt, a supplier claim is '
-                          'rejected, or stock is manually removed for '
-                          'wastage, theft or samples.',
-                );
-              }
+                final losses = _visibleLosses;
+                if (losses.isEmpty) {
+                  final filtering =
+                      _searchController.text.trim().isNotEmpty ||
+                      _sourceFilter != null;
+                  return AppEmptyState(
+                    icon: filtering
+                        ? Icons.search_off_rounded
+                        : Icons.money_off_rounded,
+                    title: filtering
+                        ? 'No losses match'
+                        : 'No inventory losses',
+                    message: filtering
+                        ? 'Try a different search or filter.'
+                        : 'Losses are recorded automatically when goods are '
+                              'written off on receipt, a supplier claim is '
+                              'rejected, or stock is manually removed for '
+                              'wastage, theft or samples.',
+                  );
+                }
 
-              return ListView.builder(
-                padding: AppResponsive.padding(context),
-                itemCount: losses.length,
-                itemBuilder: (context, index) => _buildCard(losses[index]),
-              );
-            },
+                return ListView.builder(
+                  padding: AppResponsive.padding(context),
+                  itemCount: losses.length,
+                  itemBuilder: (context, index) => _buildCard(losses[index]),
+                );
+              },
+            ),
           ),
         ),
       ],
@@ -179,12 +187,20 @@ class _RestaurantInventoryLossListScreenState
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            _filterChip(context, 'All', _sourceFilter == null,
-                () => setState(() => _sourceFilter = null)),
+            _filterChip(
+              context,
+              'All',
+              _sourceFilter == null,
+              () => setState(() => _sourceFilter = null),
+            ),
             for (final s in sources) ...[
               const SizedBox(width: 8),
-              _filterChip(context, _sourceLabel(s), _sourceFilter == s,
-                  () => setState(() => _sourceFilter = s)),
+              _filterChip(
+                context,
+                _sourceLabel(s),
+                _sourceFilter == s,
+                () => setState(() => _sourceFilter = s),
+              ),
             ],
           ],
         ),
@@ -193,7 +209,11 @@ class _RestaurantInventoryLossListScreenState
   }
 
   Widget _filterChip(
-      BuildContext context, String label, bool selected, VoidCallback onTap) {
+    BuildContext context,
+    String label,
+    bool selected,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(9),
@@ -374,7 +394,7 @@ class _RestaurantInventoryLossListScreenState
           text,
           maxLines: 1,
           style: GoogleFonts.poppins(
-            fontSize: 11.5,
+            fontSize: AppResponsive.captionFontSize(context),
             color: AppColors.textSecondary,
           ),
         ),

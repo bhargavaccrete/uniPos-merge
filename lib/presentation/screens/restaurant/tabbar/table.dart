@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
@@ -38,13 +37,19 @@ class _TableScreenState extends State<TableScreen> {
 
   void _addTable() {
     // Plan gate — table creation flag + table cap (shows the upgrade sheet).
-    if (!PlanGuard.allowedOr(context, EntKeys.billingTablesCreate,
-        featureName: 'Table creation')) {
+    if (!PlanGuard.allowedOr(
+      context,
+      EntKeys.billingTablesCreate,
+      featureName: 'Table creation',
+    )) {
       return;
     }
     if (!PlanGuard.withinLimitOr(
-        context, EntKeys.billingTablesMax, tableStore.tables.length,
-        unit: 'tables')) {
+      context,
+      EntKeys.billingTablesMax,
+      tableStore.tables.length,
+      unit: 'tables',
+    )) {
       return;
     }
     final controller = TextEditingController();
@@ -62,7 +67,7 @@ class _TableScreenState extends State<TableScreen> {
         ),
         actions: [
           appDialogCancelButton(ctx),
-          const SizedBox(width: 12),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           appDialogPrimaryButton(
             label: 'Add',
             onPressed: () async {
@@ -80,7 +85,8 @@ class _TableScreenState extends State<TableScreen> {
   // ── Long-press action sheet ─────────────────────────────────────────────────
 
   void _showTableActions(TableModel table) {
-    final isOccupied = table.status != 'Available' && table.status != 'Reserved';
+    final isOccupied =
+        table.status != 'Available' && table.status != 'Reserved';
 
     // Resolve status color for the chip in the header
     Color statusColor;
@@ -104,8 +110,12 @@ class _TableScreenState extends State<TableScreen> {
           children: [
             // Handle
             Container(
-              width: 40, height: 4,
-              margin: EdgeInsets.only(top: 12, bottom: 8),
+              width: 40,
+              height: 4,
+              margin: EdgeInsets.only(
+                top: AppResponsive.mediumSpacing(context),
+                bottom: AppResponsive.smallSpacing(context),
+              ),
               decoration: BoxDecoration(
                 color: AppColors.divider,
                 borderRadius: BorderRadius.circular(2),
@@ -113,24 +123,35 @@ class _TableScreenState extends State<TableScreen> {
             ),
             // Header
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.largeSpacing(context),
+                vertical: AppResponsive.smallSpacing(context),
+              ),
               child: Row(
                 children: [
                   Text(
                     'Table ${table.id}',
-                    style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w700),
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.subheadingFontSize(context),
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   Spacer(),
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppResponsive.smallSpacing(context),
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: statusColor.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.smallBorderRadius(context),
+                      ),
                     ),
                     child: Text(
                       table.status,
                       style: GoogleFonts.poppins(
-                        fontSize: 12,
+                        fontSize: AppResponsive.smallFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: statusColor,
                       ),
@@ -151,12 +172,16 @@ class _TableScreenState extends State<TableScreen> {
                   color: AppColors.warning,
                 ),
                 title: Text(
-                  table.status == 'Reserved' ? 'Mark as Available' : 'Reserve Table',
+                  table.status == 'Reserved'
+                      ? 'Mark as Available'
+                      : 'Reserve Table',
                   style: GoogleFonts.poppins(),
                 ),
                 onTap: () async {
                   Navigator.pop(ctx);
-                  final newStatus = table.status == 'Reserved' ? 'Available' : 'Reserved';
+                  final newStatus = table.status == 'Reserved'
+                      ? 'Available'
+                      : 'Reserved';
                   await tableStore.updateTableStatus(table.id, newStatus);
                   NotificationService.instance.showSuccess(
                     'Table ${table.id} is now $newStatus',
@@ -184,13 +209,18 @@ class _TableScreenState extends State<TableScreen> {
               title: Text(
                 'Delete Table',
                 style: GoogleFonts.poppins(
-                  color: isOccupied ? AppColors.textSecondary : AppColors.danger,
+                  color: isOccupied
+                      ? AppColors.textSecondary
+                      : AppColors.danger,
                 ),
               ),
               subtitle: isOccupied
                   ? Text(
                       'Cannot delete an occupied table',
-                      style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary),
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.captionFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
                     )
                   : null,
               onTap: isOccupied
@@ -200,7 +230,7 @@ class _TableScreenState extends State<TableScreen> {
                       _deleteTable(table);
                     },
             ),
-            SizedBox(height: 8),
+            SizedBox(height: AppResponsive.smallSpacing(context)),
           ],
         ),
       ),
@@ -225,7 +255,7 @@ class _TableScreenState extends State<TableScreen> {
         ),
         actions: [
           appDialogCancelButton(ctx),
-          const SizedBox(width: 12),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           appDialogPrimaryButton(
             label: 'Rename',
             onPressed: () async {
@@ -237,7 +267,9 @@ class _TableScreenState extends State<TableScreen> {
               final exists = await tableStore.tableExists(newName);
               if (exists) {
                 if (ctx.mounted) {
-                  NotificationService.instance.showError('Table "$newName" already exists.');
+                  NotificationService.instance.showError(
+                    'Table "$newName" already exists.',
+                  );
                 }
                 return;
               }
@@ -251,7 +283,9 @@ class _TableScreenState extends State<TableScreen> {
                 ),
               );
               if (ctx.mounted) Navigator.pop(ctx);
-              NotificationService.instance.showSuccess('Table renamed to "$newName"');
+              NotificationService.instance.showSuccess(
+                'Table renamed to "$newName"',
+              );
             },
           ),
         ],
@@ -283,337 +317,445 @@ class _TableScreenState extends State<TableScreen> {
     final isTablet = !AppResponsive.isMobile(context);
 
     return Scaffold(
-        backgroundColor: AppColors.surfaceLight,
+      backgroundColor: AppColors.surfaceLight,
 
-        appBar: widget.isfromcart == true
-            ? buildPrimaryAppBar(
-                title: 'Select Table',
-                titleFontSize: AppResponsive.getValue(context, mobile: 18, tablet: 20),
-                centerTitle: false,
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              )
-            : null,
-        body: Column(
-          children: [
-            // Header: Title + Add Table + Legend
-            Container(
-              padding: AppResponsive.padding(context),
-              color: AppColors.white,
-              child: Column(
-                children: [
-                  // Title row with table count and Add button
-                  if (widget.isfromcart != true)
-                    Padding(
-                      padding: EdgeInsets.only(
-                        bottom: AppResponsive.getValue(context, mobile: 12, tablet: 16),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.table_restaurant,
-                            color: AppColors.tablesTab,
-                            size: AppResponsive.getValue(context, mobile: 22, tablet: 26),
-                          ),
-                          AppResponsive.horizontalSpace(context, size: SpacingSize.small),
-                          Text(
-                            'Tables',
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w700,
-                              fontSize: AppResponsive.getValue(context, mobile: 18, tablet: 22),
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          AppResponsive.horizontalSpace(context, size: SpacingSize.small),
-                          Observer(
-                            builder: (_) => Container(
-                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppColors.tablesTab.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                '${tableStore.tables.length}',
-                                style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: AppResponsive.smallFontSize(context),
-                                  color: AppColors.tablesTab,
-                                ),
-                              ),
-                            ),
-                          ),
-                          Spacer(),
-                          GestureDetector(
-                            onTap: _addTable,
-                            child: Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: AppResponsive.getValue(context, mobile: 14, tablet: 18),
-                                vertical: AppResponsive.getValue(context, mobile: 8, tablet: 10),
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.tablesTab,
-                                borderRadius: BorderRadius.circular(10),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.tablesTab.withOpacity(0.3),
-                                    blurRadius: 6,
-                                    offset: Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.add, color: AppColors.white, size: 18),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'Add Table',
-                                    style: GoogleFonts.poppins(
-                                      color: AppColors.white,
-                                      fontSize: AppResponsive.getValue(context, mobile: 13, tablet: 14),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
+      appBar: widget.isfromcart == true
+          ? buildPrimaryAppBar(
+              title: 'Select Table',
+              titleFontSize: AppResponsive.getValue(
+                context,
+                mobile: 18,
+                tablet: 20,
+              ),
+              centerTitle: false,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.pop(context),
+              ),
+            )
+          : null,
+      body: Column(
+        children: [
+          // Header: Title + Add Table + Legend
+          Container(
+            padding: AppResponsive.padding(context),
+            color: AppColors.white,
+            child: Column(
+              children: [
+                // Title row with table count and Add button
+                if (widget.isfromcart != true)
+                  Padding(
+                    padding: EdgeInsets.only(
+                      bottom: AppResponsive.getValue(
+                        context,
+                        mobile: 12,
+                        tablet: 16,
                       ),
                     ),
-                  // Full-width Add Table button when opened from cart (no title row)
-                  if (widget.isfromcart == true)
-                    Padding(
-                      padding: EdgeInsets.only(
-                        bottom: AppResponsive.getValue(context, mobile: 12, tablet: 16),
-                      ),
-                      child: GestureDetector(
-                        onTap: _addTable,
-                        child: Container(
-                          width: double.infinity,
-                          padding: EdgeInsets.symmetric(
-                            vertical: AppResponsive.getValue(context, mobile: 14, tablet: 16),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.table_restaurant,
+                          color: AppColors.tablesTab,
+                          size: AppResponsive.getValue(
+                            context,
+                            mobile: 22,
+                            tablet: 26,
                           ),
-                          decoration: BoxDecoration(
-                            color: AppColors.tablesTab,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.tablesTab.withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: Offset(0, 4),
+                        ),
+                        AppResponsive.horizontalSpace(
+                          context,
+                          size: SpacingSize.small,
+                        ),
+                        Text(
+                          'Tables',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w700,
+                            fontSize: AppResponsive.getValue(
+                              context,
+                              mobile: 18,
+                              tablet: 22,
+                            ),
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        AppResponsive.horizontalSpace(
+                          context,
+                          size: SpacingSize.small,
+                        ),
+                        Observer(
+                          builder: (_) => Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: AppResponsive.smallSpacing(context),
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.tablesTab.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(
+                                AppResponsive.borderRadius(context),
                               ),
-                            ],
+                            ),
+                            child: Text(
+                              '${tableStore.tables.length}',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w600,
+                                fontSize: AppResponsive.smallFontSize(context),
+                                color: AppColors.tablesTab,
+                              ),
+                            ),
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.add, color: AppColors.white, size: 20),
-                              SizedBox(width: 6),
-                              Text(
-                                'Add Table',
-                                style: GoogleFonts.poppins(
-                                  color: AppColors.white,
-                                  fontSize: AppResponsive.getValue(context, mobile: 15, tablet: 16),
-                                  fontWeight: FontWeight.w600,
+                        ),
+                        Spacer(),
+                        GestureDetector(
+                          onTap: _addTable,
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: AppResponsive.getValue(
+                                context,
+                                mobile: 14,
+                                tablet: 18,
+                              ),
+                              vertical: AppResponsive.getValue(
+                                context,
+                                mobile: 8,
+                                tablet: 10,
+                              ),
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.tablesTab,
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.tablesTab.withOpacity(0.3),
+                                  blurRadius: 6,
+                                  offset: Offset(0, 2),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.add,
+                                  color: AppColors.white,
+                                  size: AppResponsive.smallIconSize(context),
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Add Table',
+                                  style: GoogleFonts.poppins(
+                                    color: AppColors.white,
+                                    fontSize: AppResponsive.getValue(
+                                      context,
+                                      mobile: 13,
+                                      tablet: 14,
+                                    ),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
+                        ),
+                      ],
+                    ),
+                  ),
+                // Full-width Add Table button when opened from cart (no title row)
+                if (widget.isfromcart == true)
+                  Padding(
+                    padding: EdgeInsets.only(
+                      bottom: AppResponsive.getValue(
+                        context,
+                        mobile: 12,
+                        tablet: 16,
+                      ),
+                    ),
+                    child: GestureDetector(
+                      onTap: _addTable,
+                      child: Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.symmetric(
+                          vertical: AppResponsive.getValue(
+                            context,
+                            mobile: 14,
+                            tablet: 16,
+                          ),
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.tablesTab,
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.borderRadius(context),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.tablesTab.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.add,
+                              color: AppColors.white,
+                              size: AppResponsive.iconSize(context),
+                            ),
+                            SizedBox(width: 6),
+                            Text(
+                              'Add Table',
+                              style: GoogleFonts.poppins(
+                                color: AppColors.white,
+                                fontSize: AppResponsive.getValue(
+                                  context,
+                                  mobile: 15,
+                                  tablet: 16,
+                                ),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildLegendItem(AppColors.success, 'Available', isTablet),
-                      _buildLegendItem(AppColors.warning, 'Reserved', isTablet),
-                      _buildLegendItem(AppColors.danger, 'Occupied', isTablet),
-                    ],
                   ),
-                ],
-              ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildLegendItem(AppColors.success, 'Available', isTablet),
+                    _buildLegendItem(AppColors.warning, 'Reserved', isTablet),
+                    _buildLegendItem(AppColors.danger, 'Occupied', isTablet),
+                  ],
+                ),
+              ],
             ),
-      
-            // Tables Grid
-            Expanded(
-              child: Observer(
-                builder: (_) {
-                  if (tableStore.isLoading && tableStore.tables.isEmpty) {
-                    return Center(child: CircularProgressIndicator());
-                  }
-      
-                  if (tableStore.tables.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.table_restaurant_outlined, size: 64, color: AppColors.divider),
-                          SizedBox(height: 16),
-                          Text(
-                            'No tables found.',
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w500,
-                              fontSize: 16,
-                              color: AppColors.textSecondary,
-                            ),
+          ),
+
+          // Tables Grid
+          Expanded(
+            child: Observer(
+              builder: (_) {
+                if (tableStore.isLoading && tableStore.tables.isEmpty) {
+                  return Center(child: CircularProgressIndicator());
+                }
+
+                if (tableStore.tables.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.table_restaurant_outlined,
+                          size: AppResponsive.getValue(
+                            context,
+                            mobile: 64.0,
+                            tablet: 76.0,
+                            desktop: 88.0,
                           ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Add one to get started.',
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w400,
-                              fontSize: 14,
-                              color: AppColors.textSecondary,
-                            ),
+                          color: AppColors.divider,
+                        ),
+                        SizedBox(height: AppResponsive.largeSpacing(context)),
+                        Text(
+                          'No tables found.',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w500,
+                            fontSize: AppResponsive.subheadingFontSize(context),
+                            color: AppColors.textSecondary,
                           ),
-                        ],
-                      ),
-                    );
-                  }
-      
-                  final allTables = tableStore.tables;
-                  final crossAxisCount = AppResponsive.gridColumns(context, mobile: 2, tablet: 4, desktop: 4);
-      
-                  return GridView.builder(
-                    padding: AppResponsive.padding(context),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: crossAxisCount,
-                      crossAxisSpacing: AppResponsive.gridSpacing(context),
-                      mainAxisSpacing: AppResponsive.gridSpacing(context),
-                      childAspectRatio: AppResponsive.getValue(context, mobile: 1.0, tablet: 1.0, desktop: 1.0),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Add one to get started.',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w400,
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
-                    itemCount: allTables.length,
-                    itemBuilder: (context, index) {
-                      final table = allTables[index];
-      
-                      // Show customer name from the linked active order (if any)
-                      final activeOrder = orderStore.getActiveOrderByTableId(table.id);
-                      final customerName = activeOrder?.customerName?.isNotEmpty == true
-                          ? activeOrder!.customerName!
-                          : null;
-      
-                      return TableCard(
-                        table: table,
-                        customerName: customerName,
-                        onLongPress: () => _showTableActions(table),
-                        onTap: () {
-                          final isOccupied = table.status == 'Processing' ||
-                              table.status == 'Cooking' ||
-                              table.status == 'Running' ||
-                              table.status == 'Ready' ||
-                              table.status == 'Served';
-      
-                          if (isOccupied) {
-                            // Open active order in cart
-                            if (activeOrder != null) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => CartScreen(
-                                    existingOrder: activeOrder,
-                                    selectedTableNo: table.id,
-                                  ),
+                  );
+                }
+
+                final allTables = tableStore.tables;
+                final crossAxisCount = AppResponsive.gridColumns(
+                  context,
+                  mobile: 2,
+                  tablet: 4,
+                  desktop: 4,
+                );
+
+                return GridView.builder(
+                  padding: AppResponsive.padding(context),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: AppResponsive.gridSpacing(context),
+                    mainAxisSpacing: AppResponsive.gridSpacing(context),
+                    childAspectRatio: AppResponsive.getValue(
+                      context,
+                      mobile: 1.0,
+                      tablet: 1.0,
+                      desktop: 1.0,
+                    ),
+                  ),
+                  itemCount: allTables.length,
+                  itemBuilder: (context, index) {
+                    final table = allTables[index];
+
+                    // Show customer name from the linked active order (if any)
+                    final activeOrder = orderStore.getActiveOrderByTableId(
+                      table.id,
+                    );
+                    final customerName =
+                        activeOrder?.customerName?.isNotEmpty == true
+                        ? activeOrder!.customerName!
+                        : null;
+
+                    return TableCard(
+                      table: table,
+                      customerName: customerName,
+                      onLongPress: () => _showTableActions(table),
+                      onTap: () {
+                        final isOccupied =
+                            table.status == 'Processing' ||
+                            table.status == 'Cooking' ||
+                            table.status == 'Running' ||
+                            table.status == 'Ready' ||
+                            table.status == 'Served';
+
+                        if (isOccupied) {
+                          // Open active order in cart
+                          if (activeOrder != null) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => CartScreen(
+                                  existingOrder: activeOrder,
+                                  selectedTableNo: table.id,
                                 ),
-                              );
-                            } else {
-                              // Orphaned table — status is occupied but no order exists
-                              showDialog(
-                                context: context,
-                                builder: (ctx) => AppDialogShell(
-                                  title: 'No Active Order',
-                                  subtitle:
-                                      'Table "${table.id}" is marked ${table.status} but has no linked order.',
-                                  accent: AppColors.warning,
-                                  icon: Icons.warning_amber_rounded,
-                                  body: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'This can happen if an order was cleared unexpectedly. Reset the table to free it for new orders, or delete it.',
-                                        style: GoogleFonts.poppins(
-                                          fontSize: 13,
-                                          height: 1.5,
-                                          color: AppColors.textSecondary,
+                              ),
+                            );
+                          } else {
+                            // Orphaned table — status is occupied but no order exists
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AppDialogShell(
+                                title: 'No Active Order',
+                                subtitle:
+                                    'Table "${table.id}" is marked ${table.status} but has no linked order.',
+                                accent: AppColors.warning,
+                                icon: Icons.warning_amber_rounded,
+                                body: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'This can happen if an order was cleared unexpectedly. Reset the table to free it for new orders, or delete it.',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: AppResponsive.smallFontSize(
+                                          context,
                                         ),
+                                        height: 1.5,
+                                        color: AppColors.textSecondary,
                                       ),
-                                      const SizedBox(height: 14),
-                                      SizedBox(
-                                        width: double.infinity,
-                                        child: OutlinedButton.icon(
-                                          onPressed: () async {
-                                            Navigator.pop(ctx);
-                                            await tableStore
-                                                .deleteTable(table.id);
-                                            NotificationService.instance
-                                                .showSuccess(
-                                                    'Table "${table.id}" deleted.');
-                                          },
-                                          icon: Icon(Icons.delete_outline,
-                                              size: 18,
-                                              color: AppColors.danger),
-                                          label: Text('Delete Table',
-                                              style: GoogleFonts.poppins(
-                                                  fontWeight: FontWeight.w600,
-                                                  color: AppColors.danger)),
-                                          style: OutlinedButton.styleFrom(
-                                            side: BorderSide(
-                                                color: AppColors.danger
-                                                    .withOpacity(0.4)),
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 12),
-                                            shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(10)),
+                                    ),
+                                    SizedBox(
+                                      height: AppResponsive.mediumSpacing(
+                                        context,
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: OutlinedButton.icon(
+                                        onPressed: () async {
+                                          Navigator.pop(ctx);
+                                          await tableStore.deleteTable(
+                                            table.id,
+                                          );
+                                          NotificationService.instance
+                                              .showSuccess(
+                                                'Table "${table.id}" deleted.',
+                                              );
+                                        },
+                                        icon: Icon(
+                                          Icons.delete_outline,
+                                          size: AppResponsive.smallIconSize(
+                                            context,
+                                          ),
+                                          color: AppColors.danger,
+                                        ),
+                                        label: Text(
+                                          'Delete Table',
+                                          style: GoogleFonts.poppins(
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.danger,
+                                          ),
+                                        ),
+                                        style: OutlinedButton.styleFrom(
+                                          side: BorderSide(
+                                            color: AppColors.danger.withOpacity(
+                                              0.4,
+                                            ),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 12,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                  actions: [
-                                    appDialogCancelButton(ctx),
-                                    const SizedBox(width: 12),
-                                    appDialogPrimaryButton(
-                                      label: 'Reset to Available',
-                                      onPressed: () async {
-                                        Navigator.pop(ctx);
-                                        await tableStore.updateTableStatus(
-                                            table.id, 'Available');
-                                        NotificationService.instance.showSuccess(
-                                            'Table "${table.id}" reset to Available.');
-                                      },
                                     ),
                                   ],
                                 ),
-                              );
-                            }
-                          } else {
-                            // Available or Reserved — start a new order
-                            if (widget.isfromcart == true) {
-                              Navigator.pop(context, table.id);
-                            } else {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      Startorder(newOrderForTableId: table.id),
-                                ),
-                              );
-                            }
+                                actions: [
+                                  appDialogCancelButton(ctx),
+                                  SizedBox(
+                                    width: AppResponsive.mediumSpacing(context),
+                                  ),
+                                  appDialogPrimaryButton(
+                                    label: 'Reset to Available',
+                                    onPressed: () async {
+                                      Navigator.pop(ctx);
+                                      await tableStore.updateTableStatus(
+                                        table.id,
+                                        'Available',
+                                      );
+                                      NotificationService.instance.showSuccess(
+                                        'Table "${table.id}" reset to Available.',
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            );
                           }
-                        },
-                      );
-                    },
-                  );
-                },
-              ),
+                        } else {
+                          // Available or Reserved — start a new order
+                          if (widget.isfromcart == true) {
+                            Navigator.pop(context, table.id);
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    Startorder(newOrderForTableId: table.id),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    );
+                  },
+                );
+              },
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -695,7 +837,9 @@ class TableCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.borderRadius(context),
+          ),
           border: Border.all(color: statusColor, width: 2),
           boxShadow: [
             BoxShadow(
@@ -714,10 +858,16 @@ class TableCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppResponsive.smallSpacing(context),
+                    ),
                     child: SizedBox(
                       width: double.infinity,
-                      height: AppResponsive.getValue(context, mobile: 32, tablet: 36),
+                      height: AppResponsive.getValue(
+                        context,
+                        mobile: 32,
+                        tablet: 36,
+                      ),
                       child: Center(
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
@@ -727,7 +877,11 @@ class TableCard extends StatelessWidget {
                             softWrap: false,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.getValue(context, mobile: 20, tablet: 24),
+                              fontSize: AppResponsive.getValue(
+                                context,
+                                mobile: 20,
+                                tablet: 24,
+                              ),
                               fontWeight: FontWeight.w700,
                               color: AppColors.textPrimary,
                             ),
@@ -737,16 +891,32 @@ class TableCard extends StatelessWidget {
                     ),
                   ),
                   if (table.status != 'Available') ...[
-                    SizedBox(height: AppResponsive.getValue(context, mobile: 8.0, tablet: 12.0)),
+                    SizedBox(
+                      height: AppResponsive.getValue(
+                        context,
+                        mobile: 8.0,
+                        tablet: 12.0,
+                      ),
+                    ),
                     Text(
                       '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(table.currentOrderTotal ?? 0.0)}',
                       style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.getValue(context, mobile: 16, tablet: 18),
+                        fontSize: AppResponsive.getValue(
+                          context,
+                          mobile: 16,
+                          tablet: 18,
+                        ),
                         fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    SizedBox(height: AppResponsive.getValue(context, mobile: 4.0, tablet: 8.0)),
+                    SizedBox(
+                      height: AppResponsive.getValue(
+                        context,
+                        mobile: 4.0,
+                        tablet: 8.0,
+                      ),
+                    ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -755,7 +925,10 @@ class TableCard extends StatelessWidget {
                           size: AppResponsive.smallIconSize(context),
                           color: AppColors.textSecondary,
                         ),
-                        AppResponsive.horizontalSpace(context, size: SpacingSize.small),
+                        AppResponsive.horizontalSpace(
+                          context,
+                          size: SpacingSize.small,
+                        ),
                         Text(
                           customerName ?? 'Guest',
                           maxLines: 1,
@@ -767,8 +940,15 @@ class TableCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    if (table.timeStamp != null && table.timeStamp!.isNotEmpty) ...[
-                      SizedBox(height: AppResponsive.getValue(context, mobile: 4.0, tablet: 8.0)),
+                    if (table.timeStamp != null &&
+                        table.timeStamp!.isNotEmpty) ...[
+                      SizedBox(
+                        height: AppResponsive.getValue(
+                          context,
+                          mobile: 4.0,
+                          tablet: 8.0,
+                        ),
+                      ),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -777,7 +957,10 @@ class TableCard extends StatelessWidget {
                             size: AppResponsive.smallIconSize(context),
                             color: AppColors.textSecondary,
                           ),
-                          AppResponsive.horizontalSpace(context, size: SpacingSize.small),
+                          AppResponsive.horizontalSpace(
+                            context,
+                            size: SpacingSize.small,
+                          ),
                           Text(
                             _formatOrderTime(table.timeStamp),
                             style: GoogleFonts.poppins(
@@ -800,12 +983,22 @@ class TableCard extends StatelessWidget {
               left: 20,
               child: Container(
                 padding: EdgeInsets.symmetric(
-                  horizontal: AppResponsive.getValue(context, mobile: 10, tablet: 12),
-                  vertical: AppResponsive.getValue(context, mobile: 4, tablet: 6),
+                  horizontal: AppResponsive.getValue(
+                    context,
+                    mobile: 10,
+                    tablet: 12,
+                  ),
+                  vertical: AppResponsive.getValue(
+                    context,
+                    mobile: 4,
+                    tablet: 6,
+                  ),
                 ),
                 decoration: BoxDecoration(
                   color: statusColor,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.smallBorderRadius(context),
+                  ),
                   boxShadow: [
                     BoxShadow(
                       color: statusColor.withOpacity(0.3),

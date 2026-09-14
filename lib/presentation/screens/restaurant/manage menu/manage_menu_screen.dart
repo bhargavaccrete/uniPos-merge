@@ -57,7 +57,8 @@ class _ManagemenuState extends State<Managemenu>
     final screenWidth = MediaQuery.of(context).size.width;
 
     // Calculate scroll offset to center the selected tab
-    final targetScroll = _tabScrollController.offset +
+    final targetScroll =
+        _tabScrollController.offset +
         tabOffset -
         (screenWidth / 2) +
         (tabWidth / 2);
@@ -76,8 +77,11 @@ class _ManagemenuState extends State<Managemenu>
       onTap: () => tabController.animateTo(index),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        margin: EdgeInsets.only(right: AppResponsive.smallSpacing(context)),
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.largeSpacing(context),
+          vertical: 9,
+        ),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary : AppColors.white,
           borderRadius: BorderRadius.circular(10),
@@ -88,7 +92,7 @@ class _ManagemenuState extends State<Managemenu>
         child: Text(
           count > 0 ? '$label · $count' : label,
           style: GoogleFonts.poppins(
-            fontSize: 13,
+            fontSize: AppResponsive.bodyFontSize(context),
             fontWeight: FontWeight.w600,
             color: isSelected ? Colors.white : AppColors.textPrimary,
           ),
@@ -106,13 +110,18 @@ class _ManagemenuState extends State<Managemenu>
       backgroundColor: Colors.grey.shade50,
       appBar: buildPrimaryAppBar(
         title: 'Menu Management',
-        titleFontSize: isTablet ? 22 : 20,
+        titleFontSize: AppResponsive.headingFontSize(context),
         actions: [
           IconButton(
             icon: Icon(Icons.upload_file),
             tooltip: 'Import',
             onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const RestaurantBulkImportScreen()));
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const RestaurantBulkImportScreen(),
+                ),
+              );
             },
           ),
           SizedBox(width: 4),
@@ -123,14 +132,15 @@ class _ManagemenuState extends State<Managemenu>
           // Modern Tab Bar
           Container(
             width: double.infinity,
-            padding: EdgeInsets.all(isTablet ? 20 : 16),
+            padding: AppResponsive.padding(context),
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
             ),
             child: Observer(
               builder: (_) {
-                final totalCount = categoryStore.categoryCount +
+                final totalCount =
+                    categoryStore.categoryCount +
                     itemStore.itemCount +
                     variantStore.totalVariants +
                     choiceStore.totalChoices +
@@ -149,11 +159,36 @@ class _ManagemenuState extends State<Managemenu>
                           alignment: WrapAlignment.center,
                           children: [
                             _buildTabButton(0, 'All', totalCount, isTablet),
-                            _buildTabButton(1, 'Items', itemStore.itemCount, isTablet),
-                            _buildTabButton(2, 'Categories', categoryStore.categoryCount, isTablet),
-                            _buildTabButton(3, 'Variants', variantStore.totalVariants, isTablet),
-                            _buildTabButton(4, 'Choices', choiceStore.totalChoices, isTablet),
-                            _buildTabButton(5, 'Extras', extraStore.totalExtras, isTablet),
+                            _buildTabButton(
+                              1,
+                              'Items',
+                              itemStore.itemCount,
+                              isTablet,
+                            ),
+                            _buildTabButton(
+                              2,
+                              'Categories',
+                              categoryStore.categoryCount,
+                              isTablet,
+                            ),
+                            _buildTabButton(
+                              3,
+                              'Variants',
+                              variantStore.totalVariants,
+                              isTablet,
+                            ),
+                            _buildTabButton(
+                              4,
+                              'Choices',
+                              choiceStore.totalChoices,
+                              isTablet,
+                            ),
+                            _buildTabButton(
+                              5,
+                              'Extras',
+                              extraStore.totalExtras,
+                              isTablet,
+                            ),
                           ],
                         ),
                       );
@@ -166,11 +201,36 @@ class _ManagemenuState extends State<Managemenu>
                       child: Row(
                         children: [
                           _buildTabButton(0, 'All', totalCount, isTablet),
-                          _buildTabButton(1, 'Items', itemStore.itemCount, isTablet),
-                          _buildTabButton(2, 'Categories', categoryStore.categoryCount, isTablet),
-                          _buildTabButton(3, 'Variants', variantStore.totalVariants, isTablet),
-                          _buildTabButton(4, 'Choices', choiceStore.totalChoices, isTablet),
-                          _buildTabButton(5, 'Extras', extraStore.totalExtras, isTablet),
+                          _buildTabButton(
+                            1,
+                            'Items',
+                            itemStore.itemCount,
+                            isTablet,
+                          ),
+                          _buildTabButton(
+                            2,
+                            'Categories',
+                            categoryStore.categoryCount,
+                            isTablet,
+                          ),
+                          _buildTabButton(
+                            3,
+                            'Variants',
+                            variantStore.totalVariants,
+                            isTablet,
+                          ),
+                          _buildTabButton(
+                            4,
+                            'Choices',
+                            choiceStore.totalChoices,
+                            isTablet,
+                          ),
+                          _buildTabButton(
+                            5,
+                            'Extras',
+                            extraStore.totalExtras,
+                            isTablet,
+                          ),
                         ],
                       ),
                     );
@@ -185,7 +245,9 @@ class _ManagemenuState extends State<Managemenu>
             child: isDesktop
                 ? Center(
                     child: Container(
-                      constraints: BoxConstraints(maxWidth: 1400),
+                      constraints: BoxConstraints(
+                        maxWidth: AppResponsive.maxContentWidth(context),
+                      ),
                       child: TabBarView(
                         controller: tabController,
                         children: [

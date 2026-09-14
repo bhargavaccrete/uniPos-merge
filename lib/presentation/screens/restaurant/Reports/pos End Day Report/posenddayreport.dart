@@ -159,8 +159,12 @@ class _PosenddayreportState extends State<Posenddayreport> {
         ReportExportService.formatCurrency(report.totalDiscount),
         ReportExportService.formatCurrency(report.openingBalance),
         ReportExportService.formatCurrency(report.closingBalance),
-        ReportExportService.formatCurrency(report.cashReconciliation.actualCash),
-        ReportExportService.formatCurrency(report.cashReconciliation.difference),
+        ReportExportService.formatCurrency(
+          report.cashReconciliation.actualCash,
+        ),
+        ReportExportService.formatCurrency(
+          report.cashReconciliation.difference,
+        ),
         ReportExportService.formatCurrency(cashAmount),
         ReportExportService.formatCurrency(cardAmount),
         ReportExportService.formatCurrency(onlineAmount),
@@ -185,7 +189,8 @@ class _PosenddayreportState extends State<Posenddayreport> {
 
     await ReportExportService.showExportDialog(
       context: context,
-      fileName: 'eod_reports_${_selectedDate != null ? DateFormat('yyyyMMdd').format(_selectedDate!) : 'all'}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
+      fileName:
+          'eod_reports_${_selectedDate != null ? DateFormat('yyyyMMdd').format(_selectedDate!) : 'all'}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
       reportTitle: 'End of Day Reports - $periodDisplay',
       headers: headers,
       data: data,
@@ -206,176 +211,195 @@ class _PosenddayreportState extends State<Posenddayreport> {
   }
 
   Widget _buildContent(BuildContext context) {
-    final isTablet = !AppResponsive.isMobile(context);
-    final isDesktop = AppResponsive.isDesktop(context);
-
     return ReportBody(
       child: Column(
         children: [
-            // Date Filter Card
-            ReportCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Filter by Date',
-                              style: GoogleFonts.poppins(
-                                fontSize: isDesktop ? 18 : (isTablet ? 16 : 15),
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
+          // Date Filter Card
+          ReportCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Filter by Date',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.getValue(
+                                context,
+                                mobile: 15.0,
+                                tablet: 16.0,
+                                desktop: 18.0,
                               ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Select a date to filter reports or view all',
-                              style: GoogleFonts.poppins(
-                                fontSize: AppResponsive.smallFontSize(context),
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => _loadAllReports(forceReload: true),
-                        icon: Icon(Icons.refresh),
-                        color: AppColors.primary,
-                        tooltip: 'Refresh',
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: InkWell(
-                          onTap: () => _selectDate(context),
-                          borderRadius: BorderRadius.circular(10),
-                          child: Container(
-                            padding: EdgeInsets.all(isTablet ? 14 : 12),
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceLight,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: AppColors.divider),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  _selectedDate != null
-                                      ? DateFormat('dd MMM, yyyy').format(_selectedDate!)
-                                      : 'All Dates',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: isTablet ? 14 : 13,
-                                    color: _selectedDate != null ? AppColors.textPrimary : AppColors.textSecondary,
-                                  ),
-                                ),
-                                Icon(Icons.calendar_today, size: isTablet ? 20 : 18, color: AppColors.primary),
-                              ],
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
                             ),
                           ),
-                        ),
-                      ),
-                      if (_selectedDate != null) ...[
-                        SizedBox(width: 12),
-                        ElevatedButton(
-                          onPressed: () {
-                            _selectedDate = null;
-                            _filterReports();
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.surfaceLight,
-                            foregroundColor: AppColors.textSecondary,
-                            padding: EdgeInsets.symmetric(
-                              horizontal: isTablet ? 16 : 12,
-                              vertical: isTablet ? 14 : 12,
-                            ),
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              side: BorderSide(color: AppColors.divider),
-                            ),
-                          ),
-                          child: Text(
-                            'Clear',
+                          SizedBox(height: 4),
+                          Text(
+                            'Select a date to filter reports or view all',
                             style: GoogleFonts.poppins(
                               fontSize: AppResponsive.smallFontSize(context),
-                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
                             ),
                           ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => _loadAllReports(forceReload: true),
+                      icon: Icon(Icons.refresh),
+                      color: AppColors.primary,
+                      tooltip: 'Refresh',
+                    ),
+                  ],
+                ),
+                SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => _selectDate(context),
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: EdgeInsets.all(
+                            AppResponsive.mediumSpacing(context),
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceLight,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppColors.divider),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                _selectedDate != null
+                                    ? DateFormat(
+                                        'dd MMM, yyyy',
+                                      ).format(_selectedDate!)
+                                    : 'All Dates',
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.smallFontSize(
+                                    context,
+                                  ),
+                                  color: _selectedDate != null
+                                      ? AppColors.textPrimary
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
+                              Icon(
+                                Icons.calendar_today,
+                                size: AppResponsive.smallIconSize(context),
+                                color: AppColors.primary,
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
+                      ),
+                    ),
+                    if (_selectedDate != null) ...[
+                      SizedBox(width: 12),
+                      ElevatedButton(
+                        onPressed: () {
+                          _selectedDate = null;
+                          _filterReports();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.surfaceLight,
+                          foregroundColor: AppColors.textSecondary,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: AppResponsive.mediumSpacing(context),
+                            vertical: AppResponsive.mediumSpacing(context),
+                          ),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            side: BorderSide(color: AppColors.divider),
+                          ),
+                        ),
+                        child: Text(
+                          'Clear',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     ],
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ),
+          ),
 
-            SizedBox(height: 16),
+          SizedBox(height: 16),
 
-            if (_isLoading)
-              const Padding(padding: EdgeInsets.all(50), child: ReportLoading())
-            else if (_filteredReports.isEmpty)
-              const ReportEmptyState(
-                icon: Icons.event_available,
-                title: 'No EOD Reports',
-                message: 'No End of Day Report found for selected date',
-              )
-            else ...[
-              _buildSummaryCards(context),
-              AppResponsive.verticalSpace(context),
-              ReportExportButton(onPressed: _exportReport),
-              AppResponsive.verticalSpace(context),
-              _buildReportsTable(context, isTablet),
-              ReportPagination(
-                currentPage: _currentPage,
-                rowsPerPage: _rowsPerPage,
-                totalCount: _filteredReports.length,
-                onPageChanged: (page) => setState(() => _currentPage = page),
-                unit: 'reports',
-              ),
-            ],
+          if (_isLoading)
+            const Padding(padding: EdgeInsets.all(50), child: ReportLoading())
+          else if (_filteredReports.isEmpty)
+            const ReportEmptyState(
+              icon: Icons.event_available,
+              title: 'No EOD Reports',
+              message: 'No End of Day Report found for selected date',
+            )
+          else ...[
+            _buildSummaryCards(context),
+            AppResponsive.verticalSpace(context),
+            ReportExportButton(onPressed: _exportReport),
+            AppResponsive.verticalSpace(context),
+            _buildReportsTable(context),
+            ReportPagination(
+              currentPage: _currentPage,
+              rowsPerPage: _rowsPerPage,
+              totalCount: _filteredReports.length,
+              onPageChanged: (page) => setState(() => _currentPage = page),
+              unit: 'reports',
+            ),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildSummaryCards(BuildContext context) {
-    return ReportSummaryRow(cards: [
-      ReportSummaryCard(
-        title: 'Reports',
-        value: _filteredReports.length.toString(),
-        icon: Icons.event_note,
-        color: AppColors.primary,
-      ),
-      ReportSummaryCard(
-        title: 'Opening Bal.',
-        value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalOpeningBalance)}',
-        icon: Icons.account_balance_wallet,
-        color: Colors.blue,
-      ),
-      ReportSummaryCard(
-        title: 'Closing Bal.',
-        value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalClosingBalance)}',
-        icon: Icons.monetization_on,
-        color: Colors.green,
-      ),
-      ReportSummaryCard(
-        title: 'Discount',
-        value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalDiscount)}',
-        icon: Icons.percent_rounded,
-        color: Colors.orange,
-      ),
-    ]);
+    return ReportSummaryRow(
+      cards: [
+        ReportSummaryCard(
+          title: 'Reports',
+          value: _filteredReports.length.toString(),
+          icon: Icons.event_note,
+          color: AppColors.primary,
+        ),
+        ReportSummaryCard(
+          title: 'Opening Bal.',
+          value:
+              '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalOpeningBalance)}',
+          icon: Icons.account_balance_wallet,
+          color: Colors.blue,
+        ),
+        ReportSummaryCard(
+          title: 'Closing Bal.',
+          value:
+              '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalClosingBalance)}',
+          icon: Icons.monetization_on,
+          color: Colors.green,
+        ),
+        ReportSummaryCard(
+          title: 'Discount',
+          value:
+              '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalDiscount)}',
+          icon: Icons.percent_rounded,
+          color: Colors.orange,
+        ),
+      ],
+    );
   }
 
-  Widget _buildReportsTable(BuildContext context, bool isTablet) {
+  Widget _buildReportsTable(BuildContext context) {
     final cellFontSize = AppResponsive.smallFontSize(context);
 
     return ReportTable(
@@ -391,147 +415,206 @@ class _PosenddayreportState extends State<Posenddayreport> {
         ReportTable.column(context, 'Card', numeric: true),
         ReportTable.column(context, 'Online', numeric: true),
       ],
-      rows: ReportPagination.pageSlice(_filteredReports, _currentPage, _rowsPerPage).map((report) {
-                final dateFormatter = DateFormat('dd/MM/yyyy');
-                final timeFormatter = DateFormat('HH:mm');
+      rows: ReportPagination.pageSlice(_filteredReports, _currentPage, _rowsPerPage).map((
+        report,
+      ) {
+        final dateFormatter = DateFormat('dd/MM/yyyy');
+        final timeFormatter = DateFormat('HH:mm');
 
-                double cashAmount = 0.0;
-                double cardAmount = 0.0;
-                double onlineAmount = 0.0;
+        double cashAmount = 0.0;
+        double cardAmount = 0.0;
+        double onlineAmount = 0.0;
 
-                // FIX 2: Use += to accumulate all entries of the same payment type.
-                for (var payment in report.paymentSummaries) {
-                  if (payment.paymentType.toLowerCase() == 'cash') {
-                    cashAmount += payment.totalAmount;
-                  } else if (payment.paymentType.toLowerCase() == 'card') {
-                    cardAmount += payment.totalAmount;
-                  } else if (payment.paymentType.toLowerCase() == 'online' ||
-                      payment.paymentType.toLowerCase() == 'upi') {
-                    onlineAmount += payment.totalAmount;
-                  }
-                }
+        // FIX 2: Use += to accumulate all entries of the same payment type.
+        for (var payment in report.paymentSummaries) {
+          if (payment.paymentType.toLowerCase() == 'cash') {
+            cashAmount += payment.totalAmount;
+          } else if (payment.paymentType.toLowerCase() == 'card') {
+            cardAmount += payment.totalAmount;
+          } else if (payment.paymentType.toLowerCase() == 'online' ||
+              payment.paymentType.toLowerCase() == 'upi') {
+            onlineAmount += payment.totalAmount;
+          }
+        }
 
-                return DataRow(
-                  cells: [
-                    // FIX 1: Show report date; 'Closing Date' col replaced with 'Total Sales'.
-                    DataCell(
-                      Text(
-                        '${dateFormatter.format(report.date)}\n${timeFormatter.format(report.date)}',
-                        style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary),
-                      ),
-                    ),
-                    DataCell(
-                      Text(
-                        '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(report.totalSales)}',
-                        style: GoogleFonts.poppins(fontSize: cellFontSize, color: Colors.green.shade700, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    DataCell(
-                      Text(
-                        '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(report.openingBalance)}',
-                        style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    DataCell(
-                      Text(
-                        '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(report.closingBalance)}',
-                        style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    DataCell(
-                      Text(
-                        '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(report.cashReconciliation.actualCash)}',
-                        style: GoogleFonts.poppins(fontSize: cellFontSize, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    // Difference (discrepancy)
-                    DataCell(
-                      () {
-                        final diff = report.cashReconciliation.difference;
-                        final isShortage = diff < -0.01;
-                        final isOverage = diff > 0.01;
-                        final color = isShortage ? Colors.red.shade700 : (isOverage ? Colors.green.shade700 : AppColors.textPrimary);
-                        final prefix = isOverage ? '+' : '';
-                        return Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: AppResponsive.getValue(context, mobile: 6.0, desktop: 10.0),
-                            vertical: AppResponsive.getValue(context, mobile: 3.0, desktop: 5.0),
-                          ),
-                          decoration: BoxDecoration(
-                            color: isShortage
-                                ? Colors.red.withValues(alpha: 0.1)
-                                : (isOverage ? Colors.green.withValues(alpha: 0.1) : Colors.transparent),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            '$prefix${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(diff.abs())}',
-                            style: GoogleFonts.poppins(fontSize: cellFontSize, color: color, fontWeight: FontWeight.w600),
-                          ),
-                        );
-                      }(),
-                    ),
-                    DataCell(
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: AppResponsive.getValue(context, mobile: 8.0, desktop: 12.0),
-                          vertical: AppResponsive.getValue(context, mobile: 4.0, desktop: 6.0),
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(cashAmount)}',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.captionFontSize(context),
-                            color: Colors.green,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    DataCell(
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: AppResponsive.getValue(context, mobile: 8.0, desktop: 12.0),
-                          vertical: AppResponsive.getValue(context, mobile: 4.0, desktop: 6.0),
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(cardAmount)}',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.captionFontSize(context),
-                            color: Colors.blue,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    DataCell(
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: AppResponsive.getValue(context, mobile: 8.0, desktop: 12.0),
-                          vertical: AppResponsive.getValue(context, mobile: 4.0, desktop: 6.0),
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(onlineAmount)}',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.captionFontSize(context),
-                            color: Colors.orange,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
+        return DataRow(
+          cells: [
+            // FIX 1: Show report date; 'Closing Date' col replaced with 'Total Sales'.
+            DataCell(
+              Text(
+                '${dateFormatter.format(report.date)}\n${timeFormatter.format(report.date)}',
+                style: GoogleFonts.poppins(
+                  fontSize: cellFontSize,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            DataCell(
+              Text(
+                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(report.totalSales)}',
+                style: GoogleFonts.poppins(
+                  fontSize: cellFontSize,
+                  color: Colors.green.shade700,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            DataCell(
+              Text(
+                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(report.openingBalance)}',
+                style: GoogleFonts.poppins(
+                  fontSize: cellFontSize,
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            DataCell(
+              Text(
+                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(report.closingBalance)}',
+                style: GoogleFonts.poppins(
+                  fontSize: cellFontSize,
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            DataCell(
+              Text(
+                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(report.cashReconciliation.actualCash)}',
+                style: GoogleFonts.poppins(
+                  fontSize: cellFontSize,
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            // Difference (discrepancy)
+            DataCell(() {
+              final diff = report.cashReconciliation.difference;
+              final isShortage = diff < -0.01;
+              final isOverage = diff > 0.01;
+              final color = isShortage
+                  ? Colors.red.shade700
+                  : (isOverage ? Colors.green.shade700 : AppColors.textPrimary);
+              final prefix = isOverage ? '+' : '';
+              return Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.getValue(
+                    context,
+                    mobile: 6.0,
+                    desktop: 10.0,
+                  ),
+                  vertical: AppResponsive.getValue(
+                    context,
+                    mobile: 3.0,
+                    desktop: 5.0,
+                  ),
+                ),
+                decoration: BoxDecoration(
+                  color: isShortage
+                      ? Colors.red.withValues(alpha: 0.1)
+                      : (isOverage
+                            ? Colors.green.withValues(alpha: 0.1)
+                            : Colors.transparent),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '$prefix${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(diff.abs())}',
+                  style: GoogleFonts.poppins(
+                    fontSize: cellFontSize,
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              );
+            }()),
+            DataCell(
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.getValue(
+                    context,
+                    mobile: 8.0,
+                    desktop: 12.0,
+                  ),
+                  vertical: AppResponsive.getValue(
+                    context,
+                    mobile: 4.0,
+                    desktop: 6.0,
+                  ),
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(cashAmount)}',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.captionFontSize(context),
+                    color: Colors.green,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            DataCell(
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.getValue(
+                    context,
+                    mobile: 8.0,
+                    desktop: 12.0,
+                  ),
+                  vertical: AppResponsive.getValue(
+                    context,
+                    mobile: 4.0,
+                    desktop: 6.0,
+                  ),
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(cardAmount)}',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.captionFontSize(context),
+                    color: Colors.blue,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            DataCell(
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.getValue(
+                    context,
+                    mobile: 8.0,
+                    desktop: 12.0,
+                  ),
+                  vertical: AppResponsive.getValue(
+                    context,
+                    mobile: 4.0,
+                    desktop: 6.0,
+                  ),
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(onlineAmount)}',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.captionFontSize(context),
+                    color: Colors.orange,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
       }).toList(),
     );
   }

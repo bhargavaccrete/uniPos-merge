@@ -84,8 +84,12 @@ class _LicensingScreenState extends State<LicensingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isTablet = !AppResponsive.isMobile(context);
-    final pad = isTablet ? 24.0 : 20.0;
+    final pad = AppResponsive.getValue(
+      context,
+      mobile: 20.0,
+      tablet: 24.0,
+      desktop: 28.0,
+    );
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
@@ -97,17 +101,23 @@ class _LicensingScreenState extends State<LicensingScreen> {
         child: Observer(
           builder: (_) => SingleChildScrollView(
             padding: EdgeInsets.all(pad),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _licenseStatusCard(isTablet),
-                const SizedBox(height: 16),
-                if (_store.licenseInfo?.deviceInfo != null) ...[
-                  _deviceInfoCard(_store.licenseInfo!.deviceInfo!, isTablet),
+            child: AppResponsive.constrainedContent(
+              context: context,
+              maxWidth: AppResponsive.maxFormWidth(context),
+              alignment: Alignment.topCenter,
+              heightFactor: 1,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _licenseStatusCard(),
                   const SizedBox(height: 16),
+                  if (_store.licenseInfo?.deviceInfo != null) ...[
+                    _deviceInfoCard(_store.licenseInfo!.deviceInfo!),
+                    const SizedBox(height: 16),
+                  ],
+                  _actionsCard(),
                 ],
-                _actionsCard(isTablet),
-              ],
+              ),
             ),
           ),
         ),
@@ -115,16 +125,15 @@ class _LicensingScreenState extends State<LicensingScreen> {
     );
   }
 
-  Widget _licenseStatusCard(bool isTablet) {
+  Widget _licenseStatusCard() {
     final info = _store.licenseInfo;
     final status = _store.status;
 
     return _card(
-      isTablet: isTablet,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _cardHeader(Icons.verified_rounded, 'License Status', isTablet),
+          _cardHeader(Icons.verified_rounded, 'License Status'),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -175,13 +184,12 @@ class _LicensingScreenState extends State<LicensingScreen> {
     );
   }
 
-  Widget _deviceInfoCard(DeviceInfo device, bool isTablet) {
+  Widget _deviceInfoCard(DeviceInfo device) {
     return _card(
-      isTablet: isTablet,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _cardHeader(Icons.devices_rounded, 'Device Information', isTablet),
+          _cardHeader(Icons.devices_rounded, 'Device Information'),
           const SizedBox(height: 16),
           _infoRow('Device ID', device.deviceId, copyable: true),
           _infoRow('Device Name', device.deviceName),
@@ -193,15 +201,14 @@ class _LicensingScreenState extends State<LicensingScreen> {
     );
   }
 
-  Widget _actionsCard(bool isTablet) {
+  Widget _actionsCard() {
     final hasLicense = _store.licenseInfo != null;
 
     return _card(
-      isTablet: isTablet,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _cardHeader(Icons.settings_outlined, 'Actions', isTablet),
+          _cardHeader(Icons.settings_outlined, 'Actions'),
           const SizedBox(height: 16),
           if (!hasLicense)
             _actionButton(
@@ -376,7 +383,7 @@ class _LicensingScreenState extends State<LicensingScreen> {
     );
   }
 
-  Widget _cardHeader(IconData icon, String title, bool isTablet) {
+  Widget _cardHeader(IconData icon, String title) {
     return Row(
       children: [
         Container(
@@ -385,7 +392,16 @@ class _LicensingScreenState extends State<LicensingScreen> {
             color: AppColors.primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, size: isTablet ? 22 : 18, color: AppColors.primary),
+          child: Icon(
+            icon,
+            size: AppResponsive.getValue(
+              context,
+              mobile: 18.0,
+              tablet: 22.0,
+              desktop: 26.0,
+            ),
+            color: AppColors.primary,
+          ),
         ),
         const SizedBox(width: 10),
         Text(
@@ -400,10 +416,10 @@ class _LicensingScreenState extends State<LicensingScreen> {
     );
   }
 
-  Widget _card({required Widget child, required bool isTablet}) {
+  Widget _card({required Widget child}) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(isTablet ? 20 : 16),
+      padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(14),
@@ -467,7 +483,6 @@ class _ActivateSheetState extends State<_ActivateSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomPad = MediaQuery.of(context).viewInsets.bottom;
-    final isTablet = !AppResponsive.isMobile(context);
 
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomPad),
@@ -523,7 +538,12 @@ class _ActivateSheetState extends State<_ActivateSheet> {
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
-            height: isTablet ? 54 : 50,
+            height: AppResponsive.getValue(
+              context,
+              mobile: 50.0,
+              tablet: 54.0,
+              desktop: 58.0,
+            ),
             child: ElevatedButton(
               onPressed: _loading ? null : _activate,
               style: ElevatedButton.styleFrom(

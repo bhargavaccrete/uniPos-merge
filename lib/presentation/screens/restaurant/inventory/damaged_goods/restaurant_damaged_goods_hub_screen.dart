@@ -132,12 +132,13 @@ class _RestaurantDamagedGoodsHubScreenState
             );
 
             final maxWidth = AppResponsive.maxContentWidth(context);
+            // Mobile is uncapped — returning early keeps two widgets out of
+            // the tree. Centred on both axes, as the tab row was before.
             if (maxWidth == double.infinity) return row;
-            return Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxWidth),
-                child: row,
-              ),
+            return AppResponsive.constrainedContent(
+              context: context,
+              maxWidth: maxWidth,
+              child: row,
             );
           },
         ),

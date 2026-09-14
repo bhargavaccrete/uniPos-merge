@@ -517,6 +517,8 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
 
     showDialog(
       context: context,
+      // Nearest navigator — stays inside the setup wizard's pane.
+      useRootNavigator: false,
       builder: (BuildContext dialogContext) {
         return AppDialogShell(
           title: 'Add New Variant',
@@ -631,6 +633,8 @@ class _VariantSelectionScreenState extends State<VariantSelectionScreen> {
 
     showDialog(
       context: context,
+      // Nearest navigator — stays inside the setup wizard's pane.
+      useRootNavigator: false,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: Text(
@@ -793,6 +797,7 @@ Future<void> showAddVariantDialog(BuildContext context,
     {required VoidCallback onAdded}) {
   return showDialog(
     context: context,
+    useRootNavigator: false, // stays inside the setup wizard's pane
     builder: (_) => _AddVariantDialog(onAdded: onAdded),
   );
 }
@@ -849,7 +854,7 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
   Widget build(BuildContext context) {
     final hInset = !AppResponsive.isMobile(context)
         ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2)
-            .clamp(40.0, 200.0)
+            .clamp(40.0, double.infinity)
         : 24.0;
     return AlertDialog(
       insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),

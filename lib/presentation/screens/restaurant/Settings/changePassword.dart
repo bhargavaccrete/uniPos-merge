@@ -47,8 +47,9 @@ class _ChangepasswordState extends State<Changepassword> {
     if (!_formKey.currentState!.validate()) return;
 
     if (_newPasswordController.text != _confirmPasswordController.text) {
-      setState(() => _errorMessage =
-          'New password and confirm password do not match');
+      setState(
+        () => _errorMessage = 'New password and confirm password do not match',
+      );
       return;
     }
 
@@ -59,13 +60,16 @@ class _ChangepasswordState extends State<Changepassword> {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final storedPassword = prefs.getString(_passwordKey) ??
+      final storedPassword =
+          prefs.getString(_passwordKey) ??
           RestaurantAuthHelper.hashPassword(_defaultPassword);
       final currentPassword = _currentPasswordController.text;
       final newPassword = _newPasswordController.text;
 
       if (!RestaurantAuthHelper.verifyPassword(
-          currentPassword, storedPassword)) {
+        currentPassword,
+        storedPassword,
+      )) {
         setState(() {
           _errorMessage = 'Current password is incorrect';
           _isLoading = false;
@@ -83,7 +87,9 @@ class _ChangepasswordState extends State<Changepassword> {
       }
 
       await prefs.setString(
-          _passwordKey, RestaurantAuthHelper.hashPassword(newPassword));
+        _passwordKey,
+        RestaurantAuthHelper.hashPassword(newPassword),
+      );
 
       _currentPasswordController.clear();
       _newPasswordController.clear();
@@ -114,329 +120,406 @@ class _ChangepasswordState extends State<Changepassword> {
 
   @override
   Widget build(BuildContext context) {
-    final isTablet = !AppResponsive.isMobile(context);
-
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Change Password',
-        titleFontSize: isTablet ? 22 : 20,
+        titleFontSize: AppResponsive.headingFontSize(context),
         actions: [
           Padding(
             padding: EdgeInsets.symmetric(
-                horizontal: isTablet ? 16 : 12, vertical: 8),
+              horizontal: AppResponsive.mediumSpacing(context),
+              vertical: 8,
+            ),
             child: Container(
-              padding: EdgeInsets.all(isTablet ? 10 : 8),
+              padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(Icons.person_rounded,
-                  size: isTablet ? 22 : 20, color: AppColors.primary),
+              child: Icon(
+                Icons.person_rounded,
+                size: AppResponsive.iconSize(context),
+                color: AppColors.primary,
+              ),
             ),
           ),
         ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.all(isTablet ? 24 : 20),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-
-                // ── Header card ──────────────────────────────────────────
-                Container(
-                  padding: EdgeInsets.all(isTablet ? 18 : 16),
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border:
-                        Border.all(color: Colors.blue.withValues(alpha: 0.3)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(Icons.shield_outlined,
-                          color: Colors.blue.shade700,
-                          size: isTablet ? 26 : 22),
+          padding: EdgeInsets.all(
+            AppResponsive.getValue(
+              context,
+              mobile: 20.0,
+              tablet: 24.0,
+              desktop: 28.0,
+            ),
+          ),
+          child: AppResponsive.constrainedContent(
+            context: context,
+            maxWidth: AppResponsive.maxFormWidth(context),
+            alignment: Alignment.topCenter,
+            heightFactor: 1,
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Header card ──────────────────────────────────────────
+                  Container(
+                    padding: EdgeInsets.all(
+                      AppResponsive.largeSpacing(context),
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Secure your account',
-                              style: GoogleFonts.poppins(
-                                  fontSize: isTablet ? 14 : 13,
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Colors.blue.withValues(alpha: 0.3),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            Icons.shield_outlined,
+                            color: Colors.blue.shade700,
+                            size: AppResponsive.getValue(
+                              context,
+                              mobile: 22.0,
+                              tablet: 26.0,
+                              desktop: 30.0,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Secure your account',
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.bodyFontSize(context),
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.blue.shade800)),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Use a 4–6 digit PIN to protect admin access.',
-                            style: GoogleFonts.poppins(
-                                fontSize: isTablet ? 13 : 12,
-                                color: Colors.blue.shade600),
+                                  color: Colors.blue.shade800,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Use a 4–6 digit PIN to protect admin access.',
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.smallFontSize(
+                                    context,
+                                  ),
+                                  color: Colors.blue.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // ── Error banner ─────────────────────────────────────────
+                  if (_errorMessage != null) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.red.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.error_outline_rounded,
+                            color: Colors.red,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _errorMessage!,
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.smallFontSize(context),
+                                color: Colors.red.shade700,
+                              ),
+                            ),
+                          ),
+                          InkWell(
+                            onTap: () => setState(() => _errorMessage = null),
+                            child: const Icon(
+                              Icons.close_rounded,
+                              size: 16,
+                              color: Colors.red,
+                            ),
                           ),
                         ],
                       ),
                     ),
-                  ]),
-                ),
+                    const SizedBox(height: 16),
+                  ],
 
-                const SizedBox(height: 24),
-
-                // ── Error banner ─────────────────────────────────────────
-                if (_errorMessage != null) ...[
+                  // ── Fields card ──────────────────────────────────────────
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
+                    padding: EdgeInsets.all(
+                      AppResponsive.largeSpacing(context),
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                          color: Colors.red.withValues(alpha: 0.3)),
-                    ),
-                    child: Row(children: [
-                      const Icon(Icons.error_outline_rounded,
-                          color: Colors.red, size: 18),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(_errorMessage!,
-                            style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                color: Colors.red.shade700)),
-                      ),
-                      InkWell(
-                        onTap: () =>
-                            setState(() => _errorMessage = null),
-                        child: const Icon(Icons.close_rounded,
-                            size: 16, color: Colors.red),
-                      ),
-                    ]),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-
-                // ── Fields card ──────────────────────────────────────────
-                Container(
-                  padding: EdgeInsets.all(isTablet ? 20 : 16),
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.divider),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(children: [
-                    AppTextField(
-                      controller: _currentPasswordController,
-                      focusNode: _currentFocus,
-                      label: 'Current Password',
-                      hint: 'Enter current PIN',
-                      icon: Icons.lock_outline_rounded,
-                      required: true,
-                      obscureText: _obscureCurrentPass,
-                      keyboardType: TextInputType.number,
-                      maxLength: 6,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly
-                      ],
-                      textInputAction: TextInputAction.next,
-                      onFieldSubmitted: (_) => _newFocus.requestFocus(),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscureCurrentPass
-                              ? Icons.visibility_off_rounded
-                              : Icons.visibility_rounded,
-                          size: 20,
-                          color: AppColors.textSecondary,
+                      color: AppColors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.divider),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
-                        onPressed: () => setState(
-                            () => _obscureCurrentPass =
-                                !_obscureCurrentPass),
-                      ),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty)
-                          return 'PIN is required';
-                        if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim()))
-                          return 'PIN must be 4–6 digits';
-                        return null;
-                      },
-                    ),
-
-                    const SizedBox(height: 16),
-                    Divider(height: 1, color: AppColors.divider),
-                    const SizedBox(height: 16),
-
-                    AppTextField(
-                      controller: _newPasswordController,
-                      focusNode: _newFocus,
-                      label: 'New Password',
-                      hint: 'Enter new PIN',
-                      icon: Icons.lock_reset_rounded,
-                      required: true,
-                      obscureText: _obscureNewPass,
-                      keyboardType: TextInputType.number,
-                      maxLength: 6,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly
                       ],
-                      textInputAction: TextInputAction.next,
-                      onFieldSubmitted: (_) => _confirmFocus.requestFocus(),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscureNewPass
-                              ? Icons.visibility_off_rounded
-                              : Icons.visibility_rounded,
-                          size: 20,
-                          color: AppColors.textSecondary,
-                        ),
-                        onPressed: () => setState(
-                            () => _obscureNewPass = !_obscureNewPass),
-                      ),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty)
-                          return 'PIN is required';
-                        if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim()))
-                          return 'PIN must be 4–6 digits';
-                        return null;
-                      },
                     ),
-
-                    const SizedBox(height: 16),
-                    Divider(height: 1, color: AppColors.divider),
-                    const SizedBox(height: 16),
-
-                    AppTextField(
-                      controller: _confirmPasswordController,
-                      focusNode: _confirmFocus,
-                      label: 'Confirm New Password',
-                      hint: 'Re-enter new PIN',
-                      icon: Icons.lock_rounded,
-                      required: true,
-                      obscureText: _obscureConfirmPass,
-                      keyboardType: TextInputType.number,
-                      maxLength: 6,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly
-                      ],
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _handleChangePassword(),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscureConfirmPass
-                              ? Icons.visibility_off_rounded
-                              : Icons.visibility_rounded,
-                          size: 20,
-                          color: AppColors.textSecondary,
-                        ),
-                        onPressed: () => setState(() =>
-                            _obscureConfirmPass = !_obscureConfirmPass),
-                      ),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty)
-                          return 'PIN is required';
-                        if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim()))
-                          return 'PIN must be 4–6 digits';
-                        return null;
-                      },
-                    ),
-                  ]),
-                ),
-
-                const SizedBox(height: 24),
-
-                // ── Submit button ────────────────────────────────────────
-                SizedBox(
-                  width: double.infinity,
-                  height: isTablet ? 54 : 50,
-                  child: ElevatedButton.icon(
-                    onPressed:
-                        _isLoading ? null : _handleChangePassword,
-                    icon: _isLoading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white))
-                        : const Icon(Icons.check_circle_outline_rounded,
-                            color: Colors.white),
-                    label: Text(
-                      _isLoading ? 'Updating…' : 'Change Password',
-                      style: GoogleFonts.poppins(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      disabledBackgroundColor:
-                          AppColors.primary.withValues(alpha: 0.5),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // ── Requirements card ────────────────────────────────────
-                Container(
-                  padding: EdgeInsets.all(isTablet ? 16 : 14),
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.divider),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [
-                        Container(
-                          padding: const EdgeInsets.all(7),
-                          decoration: BoxDecoration(
-                            color:
-                                AppColors.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
+                    child: Column(
+                      children: [
+                        AppTextField(
+                          controller: _currentPasswordController,
+                          focusNode: _currentFocus,
+                          label: 'Current Password',
+                          hint: 'Enter current PIN',
+                          icon: Icons.lock_outline_rounded,
+                          required: true,
+                          obscureText: _obscureCurrentPass,
+                          keyboardType: TextInputType.number,
+                          maxLength: 6,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) => _newFocus.requestFocus(),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureCurrentPass
+                                  ? Icons.visibility_off_rounded
+                                  : Icons.visibility_rounded,
+                              size: 20,
+                              color: AppColors.textSecondary,
+                            ),
+                            onPressed: () => setState(
+                              () => _obscureCurrentPass = !_obscureCurrentPass,
+                            ),
                           ),
-                          child: Icon(Icons.security_rounded,
-                              color: AppColors.primary, size: 16),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty)
+                              return 'PIN is required';
+                            if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim()))
+                              return 'PIN must be 4–6 digits';
+                            return null;
+                          },
                         ),
-                        const SizedBox(width: 10),
-                        Text('PIN Requirements',
-                            style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary)),
-                      ]),
-                      const SizedBox(height: 12),
-                      _req('4–6 digits, numbers only'),
-                      _req('Must differ from current password'),
-                      _req('New PIN and confirm PIN must match'),
-                    ],
+
+                        const SizedBox(height: 16),
+                        Divider(height: 1, color: AppColors.divider),
+                        const SizedBox(height: 16),
+
+                        AppTextField(
+                          controller: _newPasswordController,
+                          focusNode: _newFocus,
+                          label: 'New Password',
+                          hint: 'Enter new PIN',
+                          icon: Icons.lock_reset_rounded,
+                          required: true,
+                          obscureText: _obscureNewPass,
+                          keyboardType: TextInputType.number,
+                          maxLength: 6,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) => _confirmFocus.requestFocus(),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureNewPass
+                                  ? Icons.visibility_off_rounded
+                                  : Icons.visibility_rounded,
+                              size: 20,
+                              color: AppColors.textSecondary,
+                            ),
+                            onPressed: () => setState(
+                              () => _obscureNewPass = !_obscureNewPass,
+                            ),
+                          ),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty)
+                              return 'PIN is required';
+                            if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim()))
+                              return 'PIN must be 4–6 digits';
+                            return null;
+                          },
+                        ),
+
+                        const SizedBox(height: 16),
+                        Divider(height: 1, color: AppColors.divider),
+                        const SizedBox(height: 16),
+
+                        AppTextField(
+                          controller: _confirmPasswordController,
+                          focusNode: _confirmFocus,
+                          label: 'Confirm New Password',
+                          hint: 'Re-enter new PIN',
+                          icon: Icons.lock_rounded,
+                          required: true,
+                          obscureText: _obscureConfirmPass,
+                          keyboardType: TextInputType.number,
+                          maxLength: 6,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => _handleChangePassword(),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureConfirmPass
+                                  ? Icons.visibility_off_rounded
+                                  : Icons.visibility_rounded,
+                              size: 20,
+                              color: AppColors.textSecondary,
+                            ),
+                            onPressed: () => setState(
+                              () => _obscureConfirmPass = !_obscureConfirmPass,
+                            ),
+                          ),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty)
+                              return 'PIN is required';
+                            if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim()))
+                              return 'PIN must be 4–6 digits';
+                            return null;
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+
+                  const SizedBox(height: 24),
+
+                  // ── Submit button ────────────────────────────────────────
+                  SizedBox(
+                    width: double.infinity,
+                    height: AppResponsive.getValue(
+                      context,
+                      mobile: 50.0,
+                      tablet: 54.0,
+                      desktop: 58.0,
+                    ),
+                    child: ElevatedButton.icon(
+                      onPressed: _isLoading ? null : _handleChangePassword,
+                      icon: _isLoading
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.check_circle_outline_rounded,
+                              color: Colors.white,
+                            ),
+                      label: Text(
+                        _isLoading ? 'Updating…' : 'Change Password',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.buttonFontSize(context),
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        disabledBackgroundColor: AppColors.primary.withValues(
+                          alpha: 0.5,
+                        ),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // ── Requirements card ────────────────────────────────────
+                  Container(
+                    padding: EdgeInsets.all(
+                      AppResponsive.getValue(
+                        context,
+                        mobile: 14.0,
+                        tablet: 16.0,
+                        desktop: 18.0,
+                      ),
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.divider),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(7),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.security_rounded,
+                                color: AppColors.primary,
+                                size: 16,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'PIN Requirements',
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.bodyFontSize(context),
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _req('4–6 digits, numbers only'),
+                        _req('Must differ from current password'),
+                        _req('New PIN and confirm PIN must match'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -447,16 +530,25 @@ class _ChangepasswordState extends State<Changepassword> {
   Widget _req(String text) {
     return Padding(
       padding: const EdgeInsets.only(top: 6),
-      child: Row(children: [
-        Icon(Icons.check_circle_outline_rounded,
-            size: 15, color: AppColors.primary),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(text,
+      child: Row(
+        children: [
+          Icon(
+            Icons.check_circle_outline_rounded,
+            size: 15,
+            color: AppColors.primary,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
               style: GoogleFonts.poppins(
-                  fontSize: 12, color: AppColors.textSecondary)),
-        ),
-      ]),
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

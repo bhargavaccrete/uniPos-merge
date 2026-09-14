@@ -1,5 +1,4 @@
-import
-'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -42,7 +41,10 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
 
   void _syncUsernameFromFirstName() {
     if (_usernameManuallyEdited) return;
-    final generated = firstNameController.text.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+    final generated = firstNameController.text.trim().toLowerCase().replaceAll(
+      RegExp(r'\s+'),
+      '_',
+    );
     if (userNameController.text != generated) {
       userNameController.value = userNameController.value.copyWith(
         text: generated,
@@ -50,6 +52,7 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
       );
     }
   }
+
   TextEditingController lastNameController = TextEditingController();
   TextEditingController mobileController = TextEditingController();
   TextEditingController mailController = TextEditingController();
@@ -100,14 +103,18 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
             final color = StaffRoles.colorFor(role);
             return Expanded(
               child: Padding(
-                padding: EdgeInsets.only(right: role != _roleLabels.last ? 8 : 0),
+                padding: EdgeInsets.only(
+                  right: role != _roleLabels.last ? 8 : 0,
+                ),
                 child: GestureDetector(
                   onTap: () => onSelect(role),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
-                      color: isSelected ? color.withValues(alpha: 0.1) : AppColors.surfaceLight,
+                      color: isSelected
+                          ? color.withValues(alpha: 0.1)
+                          : AppColors.surfaceLight,
                       border: Border.all(
                         color: isSelected ? color : AppColors.divider,
                         width: isSelected ? 1.5 : 1,
@@ -117,15 +124,22 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(StaffRoles.iconFor(role), size: 20,
-                            color: isSelected ? color : AppColors.textSecondary),
+                        Icon(
+                          StaffRoles.iconFor(role),
+                          size: 20,
+                          color: isSelected ? color : AppColors.textSecondary,
+                        ),
                         const SizedBox(height: 4),
-                        Text(role,
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                              color: isSelected ? color : AppColors.textSecondary,
-                            )),
+                        Text(
+                          role,
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.captionFontSize(context),
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.w400,
+                            color: isSelected ? color : AppColors.textSecondary,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -139,8 +153,15 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
   }
 
   Future<void> _addStaff() async {
-    if (!PlanGuard.allowedOr(context, ModeKeys.users, featureName: 'Staff')) return;
-    if (!PlanGuard.withinLimitOr(context, ModeKeys.usersMax, staffStore.staff.length, unit: 'users')) return;
+    if (!PlanGuard.allowedOr(context, ModeKeys.users, featureName: 'Staff'))
+      return;
+    if (!PlanGuard.withinLimitOr(
+      context,
+      ModeKeys.usersMax,
+      staffStore.staff.length,
+      unit: 'users',
+    ))
+      return;
     final newstaff = StaffModel(
       id: Uuid().v4().toString(),
       userName: userNameController.text.trim(),
@@ -161,9 +182,11 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
   /// the admin. Returns true if [pin] is already taken. [excludeStaffId] skips
   /// the staff being edited.
   Future<bool> _isPinTaken(String pin, {String? excludeStaffId}) async {
-    final staffClash = staffStore.staff.any((s) =>
-        s.id != excludeStaffId &&
-        RestaurantAuthHelper.verifyPassword(pin, s.pinNo));
+    final staffClash = staffStore.staff.any(
+      (s) =>
+          s.id != excludeStaffId &&
+          RestaurantAuthHelper.verifyPassword(pin, s.pinNo),
+    );
     if (staffClash) return true;
     // Check the admin PIN too. If nothing is stored yet, the admin is still on
     // the login default ('123456') — so compare against that, otherwise a staff
@@ -219,19 +242,15 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isTablet = !AppResponsive.isMobile(context);
-
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: buildPrimaryAppBar(
-        title: 'Staff Management',
-      ),
+      appBar: buildPrimaryAppBar(title: 'Staff Management'),
       body: Column(
         children: [
           // Search & Add Button Section
           Container(
             color: Colors.white,
-            padding: EdgeInsets.all(isTablet ? 20 : 16),
+            padding: AppResponsive.padding(context),
             child: Column(
               children: [
                 // Search Bar
@@ -241,16 +260,16 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
                   icon: Icons.search_rounded,
                   onChanged: _searchStaff,
                 ),
-                SizedBox(height: isTablet ? 16 : 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 // Add Staff Button
                 SizedBox(
                   width: double.infinity,
-                  height: isTablet ? 50 : 46,
+                  height: AppResponsive.buttonHeight(context),
                   child: ElevatedButton.icon(
                     onPressed: () {
                       selectedrole = StaffRoles.unselected;
                       _clear();
-                      _showAddStaffDialog(context, isTablet);
+                      _showAddStaffDialog(context);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
@@ -260,11 +279,14 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    icon: Icon(Icons.person_add_rounded, size: isTablet ? 22 : 20),
+                    icon: Icon(
+                      Icons.person_add_rounded,
+                      size: AppResponsive.iconSize(context),
+                    ),
                     label: Text(
                       'Add New Staff',
                       style: GoogleFonts.poppins(
-                        fontSize: isTablet ? 16 : 15,
+                        fontSize: AppResponsive.buttonFontSize(context),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -300,7 +322,7 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
                               ? 'No staff members yet'
                               : 'No staff found',
                           style: GoogleFonts.poppins(
-                            fontSize: isTablet ? 18 : 16,
+                            fontSize: AppResponsive.subheadingFontSize(context),
                             color: AppColors.textSecondary,
                             fontWeight: FontWeight.w500,
                           ),
@@ -310,7 +332,7 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
                           Text(
                             'Add your first staff member',
                             style: GoogleFonts.poppins(
-                              fontSize: isTablet ? 14 : 13,
+                              fontSize: AppResponsive.smallFontSize(context),
                               color: AppColors.textSecondary,
                             ),
                           ),
@@ -321,11 +343,11 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
                 }
 
                 return ListView.builder(
-                  padding: EdgeInsets.all(isTablet ? 20 : 16),
+                  padding: AppResponsive.padding(context),
                   itemCount: filteredStaff.length,
                   itemBuilder: (context, index) {
                     final staff = filteredStaff[index];
-                    return _buildStaffCard(context, staff, isTablet);
+                    return _buildStaffCard(context, staff);
                   },
                 );
               },
@@ -336,9 +358,9 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
     );
   }
 
-  Widget _buildStaffCard(BuildContext context, StaffModel staff, bool isTablet) {
+  Widget _buildStaffCard(BuildContext context, StaffModel staff) {
     return Padding(
-      padding: EdgeInsets.only(bottom: isTablet ? 12 : 10),
+      padding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
       child: Slidable(
         key: ValueKey(staff.id),
         endActionPane: ActionPane(
@@ -358,7 +380,9 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
                   );
                 }
               },
-              backgroundColor: (staff.isActive ?? true) ? Colors.orange : Colors.green,
+              backgroundColor: (staff.isActive ?? true)
+                  ? Colors.orange
+                  : Colors.green,
               foregroundColor: Colors.white,
               icon: (staff.isActive ?? true) ? Icons.block : Icons.check_circle,
               label: (staff.isActive ?? true) ? 'Disable' : 'Enable',
@@ -391,19 +415,30 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
               ),
             ],
           ),
-          padding: EdgeInsets.all(isTablet ? 14 : 12),
+          padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
           child: Row(
             children: [
               // Avatar
               CircleAvatar(
-                radius: isTablet ? 22 : 20,
+                radius: AppResponsive.getValue(
+                  context,
+                  mobile: 20.0,
+                  tablet: 22.0,
+                  desktop: 24.0,
+                ),
                 backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                 child: Text(
-                  staff.firstName.isNotEmpty ? staff.firstName[0].toUpperCase() : '?',
-                  style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w500, color: AppColors.primary),
+                  staff.firstName.isNotEmpty
+                      ? staff.firstName[0].toUpperCase()
+                      : '?',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.subheadingFontSize(context),
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.primary,
+                  ),
                 ),
               ),
-              SizedBox(width: isTablet ? 14 : 10),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               // Staff Info
               Expanded(
                 child: Column(
@@ -412,7 +447,7 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
                     Text(
                       staff.userName,
                       style: GoogleFonts.poppins(
-                        fontSize: isTablet ? 16 : 15,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
@@ -421,7 +456,7 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
                     Text(
                       "${staff.firstName} ${staff.lastName}",
                       style: GoogleFonts.poppins(
-                        fontSize: isTablet ? 14 : 13,
+                        fontSize: AppResponsive.smallFontSize(context),
                         color: AppColors.textSecondary,
                       ),
                     ),
@@ -429,7 +464,10 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
                     Row(
                       children: [
                         Container(
-                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.primary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(6),
@@ -437,7 +475,7 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
                           child: Text(
                             staff.isCashier,
                             style: GoogleFonts.poppins(
-                              fontSize: isTablet ? 12 : 11,
+                              fontSize: AppResponsive.captionFontSize(context),
                               color: AppColors.primary,
                               fontWeight: FontWeight.w600,
                             ),
@@ -446,7 +484,10 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
                         if ((staff.isActive ?? true) == false) ...[
                           SizedBox(width: 8),
                           Container(
-                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.red,
                               borderRadius: BorderRadius.circular(6),
@@ -454,7 +495,12 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
                             child: Text(
                               'DISABLED',
                               style: GoogleFonts.poppins(
-                                fontSize: isTablet ? 11 : 10,
+                                fontSize: AppResponsive.getValue(
+                                  context,
+                                  mobile: 10.0,
+                                  tablet: 11.0,
+                                  desktop: 12.0,
+                                ),
                                 color: Colors.white,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -470,7 +516,7 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
               Row(
                 children: [
                   IconButton(
-                    onPressed: () => _showStaffDetails(context, staff, isTablet),
+                    onPressed: () => _showStaffDetails(context, staff),
                     icon: Icon(Icons.visibility_rounded),
                     color: AppColors.info,
                     style: IconButton.styleFrom(
@@ -479,7 +525,7 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
                   ),
                   SizedBox(width: 8),
                   IconButton(
-                    onPressed: () => _showEditStaffDialog(context, staff, isTablet),
+                    onPressed: () => _showEditStaffDialog(context, staff),
                     icon: Icon(Icons.edit_rounded),
                     color: AppColors.primary,
                     style: IconButton.styleFrom(
@@ -495,7 +541,7 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
     );
   }
 
-  void _showAddStaffDialog(BuildContext context, bool isTablet) {
+  void _showAddStaffDialog(BuildContext context) {
     bool pinVisible = false;
     // Local form key per dialog open (see edit dialog note).
     final formKey = GlobalKey<FormState>();
@@ -513,160 +559,198 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
               return;
             }
             final username = userNameController.text.trim().toLowerCase();
-            if (staffStore.staff
-                .any((s) => s.userName.toLowerCase() == username)) {
-              NotificationService.instance.showError('Username already exists.');
+            if (staffStore.staff.any(
+              (s) => s.userName.toLowerCase() == username,
+            )) {
+              NotificationService.instance.showError(
+                'Username already exists.',
+              );
               return;
             }
             if (await _isPinTaken(pinNoController.text.trim())) {
               NotificationService.instance.showError(
-                  'This PIN is already in use. Choose a different one.');
+                'This PIN is already in use. Choose a different one.',
+              );
               return;
             }
             _addStaff();
             if (ctx.mounted) Navigator.pop(ctx);
-            NotificationService.instance.showSuccess('Staff added successfully');
+            NotificationService.instance.showSuccess(
+              'Staff added successfully',
+            );
           }
 
           return AppDialogShell(
-          title: 'Add New Staff',
-          accent: AppColors.primary,
-          icon: Icons.person_add_rounded,
-          body: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── First + Last Name ────────────────────────────
-                Row(children: [
-                  Expanded(child: AppTextField(
-                    controller: firstNameController,
-                    focusNode: _addFirstNameFocus,
-                    label: 'First Name',
-                    hint: 'John',
-                    icon: Icons.person_outline,
-                    required: true,
-                    textInputAction: TextInputAction.next,
-                    onFieldSubmitted: (_) => _addLastNameFocus.requestFocus(),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                  )),
-                  const SizedBox(width: 12),
-                  Expanded(child: AppTextField(
-                    controller: lastNameController,
-                    focusNode: _addLastNameFocus,
-                    label: 'Last Name',
-                    hint: 'Doe',
-                    icon: Icons.person_outline,
-                    textInputAction: TextInputAction.next,
-                    // Skip the Role buttons (not text fields) → jump to Mobile.
-                    onFieldSubmitted: (_) => _addMobileFocus.requestFocus(),
-                  )),
-                ]),
-                const SizedBox(height: 14),
-
-                // Username field hidden — auto-generated from first name.
-
-                // ── Role ─────────────────────────────────────────
-                _buildRoleSelector(selectedrole,
-                    (role) => setS(() => selectedrole = role)),
-                const SizedBox(height: 14),
-
-                // ── Mobile + Email ───────────────────────────────
-                Row(children: [
-                  Expanded(child: AppTextField(
-                    controller: mobileController,
-                    focusNode: _addMobileFocus,
-                    label: 'Mobile (optional)',
-                    hint: '9876543210',
-                    icon: Icons.phone_outlined,
-                    keyboardType: TextInputType.phone,
-                    maxLength: 10,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    textInputAction: TextInputAction.next,
-                    onFieldSubmitted: (_) => _addMailFocus.requestFocus(),
-                    validator: (v) {
-                      if (v != null && v.trim().isNotEmpty && v.trim().length != 10) {
-                        return 'Must be 10 digits';
-                      }
-                      return null;
-                    },
-                  )),
-                  const SizedBox(width: 12),
-                  Expanded(child: AppTextField(
-                    controller: mailController,
-                    focusNode: _addMailFocus,
-                    label: 'Email',
-                    hint: 'john@email.com',
-                    icon: Icons.mail_outline,
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    onFieldSubmitted: (_) => _addPinFocus.requestFocus(),
-                    validator: (v) {
-                      if (v != null && v.trim().isNotEmpty) {
-                        if (!RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$').hasMatch(v.trim()))
-                          return 'Invalid email';
-                      }
-                      return null;
-                    },
-                  )),
-                ]),
-                const SizedBox(height: 14),
-
-                // ── PIN ──────────────────────────────────────────
-                AppTextField(
-                  controller: pinNoController,
-                  focusNode: _addPinFocus,
-                  label: 'PIN (4–6 digits)',
-                  hint: '••••••',
-                  icon: Icons.lock_outline_rounded,
-                  required: true,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  obscureText: !pinVisible,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  textInputAction: TextInputAction.done,
-                  onFieldSubmitted: (_) => submitAdd(),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      pinVisible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                      size: 18, color: Colors.grey.shade500),
-                    onPressed: () => setS(() => pinVisible = !pinVisible),
+            title: 'Add New Staff',
+            accent: AppColors.primary,
+            icon: Icons.person_add_rounded,
+            body: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── First + Last Name ────────────────────────────
+                  Row(
+                    children: [
+                      Expanded(
+                        child: AppTextField(
+                          controller: firstNameController,
+                          focusNode: _addFirstNameFocus,
+                          label: 'First Name',
+                          hint: 'John',
+                          icon: Icons.person_outline,
+                          required: true,
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) =>
+                              _addLastNameFocus.requestFocus(),
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? 'Required'
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: AppTextField(
+                          controller: lastNameController,
+                          focusNode: _addLastNameFocus,
+                          label: 'Last Name',
+                          hint: 'Doe',
+                          icon: Icons.person_outline,
+                          textInputAction: TextInputAction.next,
+                          // Skip the Role buttons (not text fields) → jump to Mobile.
+                          onFieldSubmitted: (_) =>
+                              _addMobileFocus.requestFocus(),
+                        ),
+                      ),
+                    ],
                   ),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'PIN is required';
-                    if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim())) return 'PIN must be 4–6 digits';
-                    return null;
-                  },
-                ),
-              ],
+                  const SizedBox(height: 14),
+
+                  // Username field hidden — auto-generated from first name.
+
+                  // ── Role ─────────────────────────────────────────
+                  _buildRoleSelector(
+                    selectedrole,
+                    (role) => setS(() => selectedrole = role),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // ── Mobile + Email ───────────────────────────────
+                  Row(
+                    children: [
+                      Expanded(
+                        child: AppTextField(
+                          controller: mobileController,
+                          focusNode: _addMobileFocus,
+                          label: 'Mobile (optional)',
+                          hint: '9876543210',
+                          icon: Icons.phone_outlined,
+                          keyboardType: TextInputType.phone,
+                          maxLength: 10,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) => _addMailFocus.requestFocus(),
+                          validator: (v) {
+                            if (v != null &&
+                                v.trim().isNotEmpty &&
+                                v.trim().length != 10) {
+                              return 'Must be 10 digits';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: AppTextField(
+                          controller: mailController,
+                          focusNode: _addMailFocus,
+                          label: 'Email',
+                          hint: 'john@email.com',
+                          icon: Icons.mail_outline,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) => _addPinFocus.requestFocus(),
+                          validator: (v) {
+                            if (v != null && v.trim().isNotEmpty) {
+                              if (!RegExp(
+                                r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$',
+                              ).hasMatch(v.trim()))
+                                return 'Invalid email';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // ── PIN ──────────────────────────────────────────
+                  AppTextField(
+                    controller: pinNoController,
+                    focusNode: _addPinFocus,
+                    label: 'PIN (4–6 digits)',
+                    hint: '••••••',
+                    icon: Icons.lock_outline_rounded,
+                    required: true,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    obscureText: !pinVisible,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => submitAdd(),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        pinVisible
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        size: 18,
+                        color: Colors.grey.shade500,
+                      ),
+                      onPressed: () => setS(() => pinVisible = !pinVisible),
+                    ),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty)
+                        return 'PIN is required';
+                      if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim()))
+                        return 'PIN must be 4–6 digits';
+                      return null;
+                    },
+                  ),
+                ],
+              ),
             ),
-          ),
-          actions: [
-            appDialogCancelButton(ctx),
-            const SizedBox(width: 12),
-            appDialogPrimaryButton(
-              label: 'Add Staff',
-              onPressed: submitAdd,
-            ),
-          ],
-        );
+            actions: [
+              appDialogCancelButton(ctx),
+              const SizedBox(width: 12),
+              appDialogPrimaryButton(label: 'Add Staff', onPressed: submitAdd),
+            ],
+          );
         },
       ),
     );
   }
 
-  void _showEditStaffDialog(BuildContext context, StaffModel staff, bool isTablet) {
-    TextEditingController editUserNameController =
-        TextEditingController(text: staff.userName);
-    TextEditingController editFirstNameController =
-        TextEditingController(text: staff.firstName);
-    TextEditingController editLastNameController =
-        TextEditingController(text: staff.lastName);
-    TextEditingController editMobileController =
-        TextEditingController(text: staff.mobileNo);
-    TextEditingController editEmailController =
-        TextEditingController(text: staff.emailId);
+  void _showEditStaffDialog(BuildContext context, StaffModel staff) {
+    TextEditingController editUserNameController = TextEditingController(
+      text: staff.userName,
+    );
+    TextEditingController editFirstNameController = TextEditingController(
+      text: staff.firstName,
+    );
+    TextEditingController editLastNameController = TextEditingController(
+      text: staff.lastName,
+    );
+    TextEditingController editMobileController = TextEditingController(
+      text: staff.mobileNo,
+    );
+    TextEditingController editEmailController = TextEditingController(
+      text: staff.emailId,
+    );
     // FIX: Never pre-fill with the stored hash — re-hash only if user types a new PIN.
     TextEditingController editPinController = TextEditingController();
     String editSelectedRole = staff.isCashier;
@@ -702,233 +786,278 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
             editPinFocus,
           ],
           child: StatefulBuilder(
-          builder: (context, setState) {
-            // Shared by the PIN field's done key and the Update Staff button.
-            Future<void> submitUpdate() async {
-              if (!editFormKey.currentState!.validate()) return;
-              final newUsername =
-                  editUserNameController.text.trim().toLowerCase();
-              final isDuplicate = staffStore.staff.any(
-                (s) =>
-                    s.id != staff.id && s.userName.toLowerCase() == newUsername,
-              );
-              if (isDuplicate) {
-                NotificationService.instance
-                    .showError('Username already exists.');
-                return;
+            builder: (context, setState) {
+              // Shared by the PIN field's done key and the Update Staff button.
+              Future<void> submitUpdate() async {
+                if (!editFormKey.currentState!.validate()) return;
+                final newUsername = editUserNameController.text
+                    .trim()
+                    .toLowerCase();
+                final isDuplicate = staffStore.staff.any(
+                  (s) =>
+                      s.id != staff.id &&
+                      s.userName.toLowerCase() == newUsername,
+                );
+                if (isDuplicate) {
+                  NotificationService.instance.showError(
+                    'Username already exists.',
+                  );
+                  return;
+                }
+                final newPin = editPinController.text.trim();
+                if (newPin.isNotEmpty &&
+                    await _isPinTaken(newPin, excludeStaffId: staff.id)) {
+                  NotificationService.instance.showError(
+                    'This PIN is already in use. Choose a different one.',
+                  );
+                  return;
+                }
+                final updatedStaff = staff.copyWith(
+                  userName: editUserNameController.text.trim(),
+                  firstName: editFirstNameController.text.trim(),
+                  lastName: editLastNameController.text.trim(),
+                  isCashier: editSelectedRole,
+                  mobileNo: editMobileController.text.trim(),
+                  emailId: editEmailController.text.trim(),
+                  // Only re-hash if the user typed a new PIN; keep existing otherwise.
+                  pinNo: newPin.isNotEmpty
+                      ? RestaurantAuthHelper.hashPassword(newPin)
+                      : staff.pinNo,
+                  isActive: isActive,
+                );
+                await _updateStaff(updatedStaff);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  NotificationService.instance.showSuccess(
+                    'Staff updated successfully',
+                  );
+                }
               }
-              final newPin = editPinController.text.trim();
-              if (newPin.isNotEmpty &&
-                  await _isPinTaken(newPin, excludeStaffId: staff.id)) {
-                NotificationService.instance.showError(
-                    'This PIN is already in use. Choose a different one.');
-                return;
-              }
-              final updatedStaff = staff.copyWith(
-                userName: editUserNameController.text.trim(),
-                firstName: editFirstNameController.text.trim(),
-                lastName: editLastNameController.text.trim(),
-                isCashier: editSelectedRole,
-                mobileNo: editMobileController.text.trim(),
-                emailId: editEmailController.text.trim(),
-                // Only re-hash if the user typed a new PIN; keep existing otherwise.
-                pinNo: newPin.isNotEmpty
-                    ? RestaurantAuthHelper.hashPassword(newPin)
-                    : staff.pinNo,
-                isActive: isActive,
-              );
-              await _updateStaff(updatedStaff);
-              if (context.mounted) {
-                Navigator.pop(context);
-                NotificationService.instance
-                    .showSuccess('Staff updated successfully');
-              }
-            }
 
-            return AppDialogShell(
-              title: 'Edit Staff',
-              subtitle: 'Update staff member details',
-              accent: AppColors.primary,
-              icon: Icons.edit_rounded,
-              body: Form(
-                key: editFormKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ── First / Last Name ────────────────────────────────
-                    Row(
-                      children: [
-                        Expanded(child: AppTextField(
-                          controller: editFirstNameController,
-                          focusNode: editFirstNameFocus,
-                          label: 'First Name',
-                          hint: 'John',
-                          icon: Icons.person_outline,
-                          required: true,
-                          textInputAction: TextInputAction.next,
-                          onFieldSubmitted: (_) => editLastNameFocus.requestFocus(),
-                          validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                        )),
-                        const SizedBox(width: 12),
-                        Expanded(child: AppTextField(
-                          controller: editLastNameController,
-                          focusNode: editLastNameFocus,
-                          label: 'Last Name',
-                          hint: 'Doe',
-                          icon: Icons.person_outline,
-                          textInputAction: TextInputAction.next,
-                          // Skip the Role buttons (not text fields) → jump to Mobile.
-                          onFieldSubmitted: (_) => editMobileFocus.requestFocus(),
-                        )),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Username field hidden — kept as-is, not editable.
-
-                    // ── Role ─────────────────────────────────────────────
-                    _buildRoleSelector(
-                      ['Manager', 'Cashier', 'Waiter'].contains(editSelectedRole)
-                          ? editSelectedRole
-                          : 'Cashier',
-                      (role) => setState(() => editSelectedRole = role),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // ── Mobile / Email ───────────────────────────────────
-                    Row(
-                      children: [
-                        Expanded(child: AppTextField(
-                          controller: editMobileController,
-                          focusNode: editMobileFocus,
-                          label: 'Mobile (optional)',
-                          hint: '9876543210',
-                          icon: Icons.phone_outlined,
-                          keyboardType: TextInputType.phone,
-                          maxLength: 10,
-                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                          textInputAction: TextInputAction.next,
-                          onFieldSubmitted: (_) => editEmailFocus.requestFocus(),
-                          validator: (v) {
-                            if (v != null && v.trim().isNotEmpty && v.trim().length != 10) {
-                              return 'Must be 10 digits';
-                            }
-                            return null;
-                          },
-                        )),
-                        const SizedBox(width: 12),
-                        Expanded(child: AppTextField(
-                          controller: editEmailController,
-                          focusNode: editEmailFocus,
-                          label: 'Email',
-                          hint: 'john@email.com',
-                          icon: Icons.mail_outline,
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.next,
-                          onFieldSubmitted: (_) => editPinFocus.requestFocus(),
-                          validator: (v) {
-                            if (v != null && v.trim().isNotEmpty) {
-                              if (!RegExp(r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$').hasMatch(v.trim()))
-                                return 'Invalid email';
-                            }
-                            return null;
-                          },
-                        )),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-
-                    // ── New PIN ──────────────────────────────────────────
-                    AppTextField(
-                      controller: editPinController,
-                      focusNode: editPinFocus,
-                      label: 'New PIN (leave blank to keep current)',
-                      hint: '4–6 digits',
-                      icon: Icons.lock_outline_rounded,
-                      obscureText: !editPinVisible,
-                      keyboardType: TextInputType.number,
-                      maxLength: 6,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => submitUpdate(),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          editPinVisible ? Icons.visibility_off : Icons.visibility,
-                          size: 20, color: Colors.grey.shade500,
-                        ),
-                        onPressed: () => setState(() => editPinVisible = !editPinVisible),
-                      ),
-                      validator: (v) {
-                        if (v != null && v.trim().isNotEmpty) {
-                          if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim())) return 'PIN must be 4–6 digits';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 14),
-
-                    // ── Account Status toggle ────────────────────────────
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceLight,
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              return AppDialogShell(
+                title: 'Edit Staff',
+                subtitle: 'Update staff member details',
+                accent: AppColors.primary,
+                icon: Icons.edit_rounded,
+                body: Form(
+                  key: editFormKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ── First / Last Name ────────────────────────────────
+                      Row(
                         children: [
-                          Text(
-                            'Account Status',
-                            style: GoogleFonts.poppins(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.grey.shade700,
+                          Expanded(
+                            child: AppTextField(
+                              controller: editFirstNameController,
+                              focusNode: editFirstNameFocus,
+                              label: 'First Name',
+                              hint: 'John',
+                              icon: Icons.person_outline,
+                              required: true,
+                              textInputAction: TextInputAction.next,
+                              onFieldSubmitted: (_) =>
+                                  editLastNameFocus.requestFocus(),
+                              validator: (v) => (v == null || v.trim().isEmpty)
+                                  ? 'Required'
+                                  : null,
                             ),
                           ),
-                          Row(
-                            children: [
-                              Text(
-                                isActive ? 'Active' : 'Disabled',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: isActive ? Colors.green.shade700 : Colors.red.shade400,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Switch(
-                                value: isActive,
-                                activeColor: AppColors.primary,
-                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                onChanged: (v) => setState(() => isActive = v),
-                              ),
-                            ],
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: AppTextField(
+                              controller: editLastNameController,
+                              focusNode: editLastNameFocus,
+                              label: 'Last Name',
+                              hint: 'Doe',
+                              icon: Icons.person_outline,
+                              textInputAction: TextInputAction.next,
+                              // Skip the Role buttons (not text fields) → jump to Mobile.
+                              onFieldSubmitted: (_) =>
+                                  editMobileFocus.requestFocus(),
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 14),
+
+                      // Username field hidden — kept as-is, not editable.
+
+                      // ── Role ─────────────────────────────────────────────
+                      _buildRoleSelector(
+                        [
+                              'Manager',
+                              'Cashier',
+                              'Waiter',
+                            ].contains(editSelectedRole)
+                            ? editSelectedRole
+                            : 'Cashier',
+                        (role) => setState(() => editSelectedRole = role),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // ── Mobile / Email ───────────────────────────────────
+                      Row(
+                        children: [
+                          Expanded(
+                            child: AppTextField(
+                              controller: editMobileController,
+                              focusNode: editMobileFocus,
+                              label: 'Mobile (optional)',
+                              hint: '9876543210',
+                              icon: Icons.phone_outlined,
+                              keyboardType: TextInputType.phone,
+                              maxLength: 10,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                              textInputAction: TextInputAction.next,
+                              onFieldSubmitted: (_) =>
+                                  editEmailFocus.requestFocus(),
+                              validator: (v) {
+                                if (v != null &&
+                                    v.trim().isNotEmpty &&
+                                    v.trim().length != 10) {
+                                  return 'Must be 10 digits';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: AppTextField(
+                              controller: editEmailController,
+                              focusNode: editEmailFocus,
+                              label: 'Email',
+                              hint: 'john@email.com',
+                              icon: Icons.mail_outline,
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                              onFieldSubmitted: (_) =>
+                                  editPinFocus.requestFocus(),
+                              validator: (v) {
+                                if (v != null && v.trim().isNotEmpty) {
+                                  if (!RegExp(
+                                    r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$',
+                                  ).hasMatch(v.trim()))
+                                    return 'Invalid email';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      // ── New PIN ──────────────────────────────────────────
+                      AppTextField(
+                        controller: editPinController,
+                        focusNode: editPinFocus,
+                        label: 'New PIN (leave blank to keep current)',
+                        hint: '4–6 digits',
+                        icon: Icons.lock_outline_rounded,
+                        obscureText: !editPinVisible,
+                        keyboardType: TextInputType.number,
+                        maxLength: 6,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) => submitUpdate(),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            editPinVisible
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            size: 20,
+                            color: Colors.grey.shade500,
+                          ),
+                          onPressed: () =>
+                              setState(() => editPinVisible = !editPinVisible),
+                        ),
+                        validator: (v) {
+                          if (v != null && v.trim().isNotEmpty) {
+                            if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim()))
+                              return 'PIN must be 4–6 digits';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 14),
+
+                      // ── Account Status toggle ────────────────────────────
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceLight,
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Account Status',
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.bodyFontSize(context),
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                            Row(
+                              children: [
+                                Text(
+                                  isActive ? 'Active' : 'Disabled',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
+                                    fontWeight: FontWeight.w600,
+                                    color: isActive
+                                        ? Colors.green.shade700
+                                        : Colors.red.shade400,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Switch(
+                                  value: isActive,
+                                  activeColor: AppColors.primary,
+                                  materialTapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  onChanged: (v) =>
+                                      setState(() => isActive = v),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              actions: [
-                appDialogCancelButton(context),
-                const SizedBox(width: 12),
-                appDialogPrimaryButton(
-                  label: 'Update Staff',
-                  onPressed: submitUpdate,
-                ),
-              ],
-            );
-          },
+                actions: [
+                  appDialogCancelButton(context),
+                  const SizedBox(width: 12),
+                  appDialogPrimaryButton(
+                    label: 'Update Staff',
+                    onPressed: submitUpdate,
+                  ),
+                ],
+              );
+            },
           ),
         );
       },
     );
   }
 
-  void _showStaffDetails(BuildContext context, StaffModel staff, bool isTablet) {
+  void _showStaffDetails(BuildContext context, StaffModel staff) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -940,12 +1069,15 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildDetailRow('Name', "${staff.firstName} ${staff.lastName}", isTablet),
-              _buildDetailRow('Username', staff.userName, isTablet),
-              _buildDetailRow('Role', staff.isCashier, isTablet),
-              _buildDetailRow('Mobile', staff.mobileNo, isTablet),
-              _buildDetailRow('Email', staff.emailId, isTablet),
-              _buildDetailRow('Status', (staff.isActive ?? true) ? 'Active' : 'Disabled', isTablet),
+              _buildDetailRow('Name', "${staff.firstName} ${staff.lastName}"),
+              _buildDetailRow('Username', staff.userName),
+              _buildDetailRow('Role', staff.isCashier),
+              _buildDetailRow('Mobile', staff.mobileNo),
+              _buildDetailRow('Email', staff.emailId),
+              _buildDetailRow(
+                'Status',
+                (staff.isActive ?? true) ? 'Active' : 'Disabled',
+              ),
             ],
           ),
           actions: [
@@ -959,18 +1091,23 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, bool isTablet) {
+  Widget _buildDetailRow(String label, String value) {
     return Padding(
-      padding: EdgeInsets.only(bottom: isTablet ? 16 : 12),
+      padding: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: isTablet ? 110 : 80,
+            width: AppResponsive.getValue(
+              context,
+              mobile: 80.0,
+              tablet: 110.0,
+              desktop: 130.0,
+            ),
             child: Text(
               '$label:',
               style: GoogleFonts.poppins(
-                fontSize: isTablet ? 15 : 13,
+                fontSize: AppResponsive.bodyFontSize(context),
                 color: Colors.grey.shade600,
                 fontWeight: FontWeight.w500,
               ),
@@ -980,7 +1117,7 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
             child: Text(
               value,
               style: GoogleFonts.poppins(
-                fontSize: isTablet ? 15 : 13,
+                fontSize: AppResponsive.bodyFontSize(context),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -993,15 +1130,21 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
   // ── Shared field helpers ─────────────────────────────────────────────────
 
   Widget _label(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Text(text,
-            style: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade600)),
-      );
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Text(
+      text,
+      style: GoogleFonts.poppins(
+        fontSize: AppResponsive.smallFontSize(context),
+        fontWeight: FontWeight.w600,
+        color: Colors.grey.shade600,
+      ),
+    ),
+  );
 
-  Future<void> _showDeleteConfirmation(BuildContext context, String staffId) async {
+  Future<void> _showDeleteConfirmation(
+    BuildContext context,
+    String staffId,
+  ) async {
     final ok = await showAppConfirmDialog(
       context: context,
       title: 'Delete Staff?',
@@ -1017,4 +1160,3 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
     }
   }
 }
-

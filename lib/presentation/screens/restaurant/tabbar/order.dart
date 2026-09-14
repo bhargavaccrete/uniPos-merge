@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/presentation/screens/restaurant/tabbar/pastorder.dart';
@@ -27,23 +26,19 @@ class _OrderState extends State<Order> {
       case "Past Order":
         return Pastorder();
       default:
-        return Center(
-          child: Text('NO DATA'),
-        );
+        return Center(child: Text('NO DATA'));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isTablet = !AppResponsive.isMobile(context);
-
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       body: Column(
         children: [
           // Tab Buttons
           Container(
-            padding: EdgeInsets.all(isTablet ? 20 : 16),
+            padding: AppResponsive.padding(context),
             color: AppColors.white,
             child: Row(
               children: [
@@ -55,12 +50,27 @@ class _OrderState extends State<Order> {
                       });
                     },
                     child: Container(
-                      padding: EdgeInsets.symmetric(vertical: isTablet ? 16 : 14),
+                      // 14/16 falls between named steps — a raw ladder keeps
+                      // mobile and tablet exact and adds the missing desktop rung.
+                      padding: EdgeInsets.symmetric(
+                        vertical: AppResponsive.getValue(
+                          context,
+                          mobile: 14.0,
+                          tablet: 16.0,
+                          desktop: 18.0,
+                        ),
+                      ),
                       decoration: BoxDecoration(
-                        color: selectedFilter == 'Active Order' ? AppColors.primary : AppColors.white,
-                        borderRadius: BorderRadius.circular(12),
+                        color: selectedFilter == 'Active Order'
+                            ? AppColors.primary
+                            : AppColors.white,
+                        borderRadius: BorderRadius.circular(
+                          AppResponsive.borderRadius(context),
+                        ),
                         border: Border.all(
-                          color: selectedFilter == 'Active Order' ? AppColors.primary : AppColors.divider,
+                          color: selectedFilter == 'Active Order'
+                              ? AppColors.primary
+                              : AppColors.divider,
                           width: 2,
                         ),
                       ),
@@ -69,16 +79,20 @@ class _OrderState extends State<Order> {
                         children: [
                           Icon(
                             Icons.receipt_long_rounded,
-                            size: isTablet ? 22 : 20,
-                            color: selectedFilter == 'Active Order' ? AppColors.white : AppColors.textSecondary,
+                            size: AppResponsive.iconSize(context),
+                            color: selectedFilter == 'Active Order'
+                                ? AppColors.white
+                                : AppColors.textSecondary,
                           ),
-                          SizedBox(width: isTablet ? 10 : 8),
+                          SizedBox(width: AppResponsive.smallSpacing(context)),
                           Text(
                             'Active Orders',
                             style: GoogleFonts.poppins(
-                              fontSize: isTablet ? 16 : 15,
+                              fontSize: AppResponsive.buttonFontSize(context),
                               fontWeight: FontWeight.w600,
-                              color: selectedFilter == 'Active Order' ? AppColors.white : AppColors.textSecondary,
+                              color: selectedFilter == 'Active Order'
+                                  ? AppColors.white
+                                  : AppColors.textSecondary,
                             ),
                           ),
                         ],
@@ -86,7 +100,7 @@ class _OrderState extends State<Order> {
                     ),
                   ),
                 ),
-                SizedBox(width: isTablet ? 16 : 12),
+                SizedBox(width: AppResponsive.mediumSpacing(context)),
                 Expanded(
                   child: GestureDetector(
                     onTap: () {
@@ -95,12 +109,27 @@ class _OrderState extends State<Order> {
                       });
                     },
                     child: Container(
-                      padding: EdgeInsets.symmetric(vertical: isTablet ? 16 : 14),
+                      // 14/16 falls between named steps — a raw ladder keeps
+                      // mobile and tablet exact and adds the missing desktop rung.
+                      padding: EdgeInsets.symmetric(
+                        vertical: AppResponsive.getValue(
+                          context,
+                          mobile: 14.0,
+                          tablet: 16.0,
+                          desktop: 18.0,
+                        ),
+                      ),
                       decoration: BoxDecoration(
-                        color: selectedFilter == 'Past Order' ? AppColors.primary : AppColors.white,
-                        borderRadius: BorderRadius.circular(12),
+                        color: selectedFilter == 'Past Order'
+                            ? AppColors.primary
+                            : AppColors.white,
+                        borderRadius: BorderRadius.circular(
+                          AppResponsive.borderRadius(context),
+                        ),
                         border: Border.all(
-                          color: selectedFilter == 'Past Order' ? AppColors.primary : AppColors.divider,
+                          color: selectedFilter == 'Past Order'
+                              ? AppColors.primary
+                              : AppColors.divider,
                           width: 2,
                         ),
                       ),
@@ -109,16 +138,20 @@ class _OrderState extends State<Order> {
                         children: [
                           Icon(
                             Icons.history_rounded,
-                            size: isTablet ? 22 : 20,
-                            color: selectedFilter == 'Past Order' ? AppColors.white : AppColors.textSecondary,
+                            size: AppResponsive.iconSize(context),
+                            color: selectedFilter == 'Past Order'
+                                ? AppColors.white
+                                : AppColors.textSecondary,
                           ),
-                          SizedBox(width: isTablet ? 10 : 8),
+                          SizedBox(width: AppResponsive.smallSpacing(context)),
                           Text(
                             'Past Orders',
                             style: GoogleFonts.poppins(
-                              fontSize: isTablet ? 16 : 15,
+                              fontSize: AppResponsive.buttonFontSize(context),
                               fontWeight: FontWeight.w600,
-                              color: selectedFilter == 'Past Order' ? AppColors.white : AppColors.textSecondary,
+                              color: selectedFilter == 'Past Order'
+                                  ? AppColors.white
+                                  : AppColors.textSecondary,
                             ),
                           ),
                         ],

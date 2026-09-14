@@ -54,8 +54,9 @@ class _ProductionScreenState extends State<ProductionScreen> {
       itemStore.items.where((i) => i.isSemiFinished).toList()
         ..sort((a, b) => a.name.compareTo(b.name));
 
-  RecipeModel? get _recipe =>
-      _selectedItem == null ? null : recipeRepository.getRecipeForItem(_selectedItem!.id);
+  RecipeModel? get _recipe => _selectedItem == null
+      ? null
+      : recipeRepository.getRecipeForItem(_selectedItem!.id);
 
   double get _batchQty => double.tryParse(_batchQtyController.text.trim()) ?? 0;
 
@@ -148,28 +149,33 @@ class _ProductionScreenState extends State<ProductionScreen> {
                 ],
               ),
               Expanded(
-                child: semiFinishedItems.isEmpty
-                    ? const AppEmptyState(
-                        icon: Icons.outdoor_grill_rounded,
-                        title: 'No semi-finished items yet',
-                        message:
-                            'Mark an item Semi-Finished to start producing batches here.',
-                      )
-                    : SingleChildScrollView(
-                        padding: AppResponsive.padding(context),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildItemPicker(context),
-                            if (_selectedItem != null) ...[
-                              const SizedBox(height: 16),
-                              _buildRecipeCard(context),
-                              const SizedBox(height: 20),
-                              _buildRecentBatches(context),
+                child: AppResponsive.constrainedContent(
+                  context: context,
+                  maxWidth: AppResponsive.maxFormWidth(context),
+                  alignment: Alignment.topCenter,
+                  child: semiFinishedItems.isEmpty
+                      ? const AppEmptyState(
+                          icon: Icons.outdoor_grill_rounded,
+                          title: 'No semi-finished items yet',
+                          message:
+                              'Mark an item Semi-Finished to start producing batches here.',
+                        )
+                      : SingleChildScrollView(
+                          padding: AppResponsive.padding(context),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildItemPicker(context),
+                              if (_selectedItem != null) ...[
+                                const SizedBox(height: 16),
+                                _buildRecipeCard(context),
+                                const SizedBox(height: 20),
+                                _buildRecentBatches(context),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
-                      ),
+                ),
               ),
             ],
           );
@@ -186,9 +192,13 @@ class _ProductionScreenState extends State<ProductionScreen> {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.borderRadius(context),
+          ),
           border: Border.all(
-            color: _selectedItem != null ? AppColors.primary : AppColors.divider,
+            color: _selectedItem != null
+                ? AppColors.primary
+                : AppColors.divider,
             width: _selectedItem != null ? 1.5 : 1,
           ),
         ),
@@ -214,7 +224,7 @@ class _ProductionScreenState extends State<ProductionScreen> {
                   Text(
                     'Semi-Finished item',
                     style: GoogleFonts.poppins(
-                      fontSize: 11,
+                      fontSize: AppResponsive.captionFontSize(context),
                       color: AppColors.textSecondary,
                     ),
                   ),
@@ -224,7 +234,7 @@ class _ProductionScreenState extends State<ProductionScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.poppins(
-                      fontSize: 15,
+                      fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: _selectedItem != null
                           ? AppColors.textPrimary
@@ -250,7 +260,9 @@ class _ProductionScreenState extends State<ProductionScreen> {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColors.danger.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.borderRadius(context),
+          ),
           border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
         ),
         child: Row(
@@ -260,7 +272,10 @@ class _ProductionScreenState extends State<ProductionScreen> {
             Expanded(
               child: Text(
                 '${item.name} has no recipe configured. Add one from the Recipes screen before producing a batch.',
-                style: GoogleFonts.poppins(fontSize: 13, color: AppColors.danger),
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  color: AppColors.danger,
+                ),
               ),
             ),
           ],
@@ -283,13 +298,17 @@ class _ProductionScreenState extends State<ProductionScreen> {
           ),
           child: Row(
             children: [
-              const Icon(Icons.blender_rounded, size: 18, color: AppColors.info),
+              const Icon(
+                Icons.blender_rounded,
+                size: 18,
+                color: AppColors.info,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   'Makes ${_fmt(yieldQty)} ${recipe.yieldUnit ?? item.unit ?? 'units'} per batch',
                   style: GoogleFonts.poppins(
-                    fontSize: 13,
+                    fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: AppColors.info,
                   ),
@@ -302,7 +321,8 @@ class _ProductionScreenState extends State<ProductionScreen> {
         AppTextField(
           controller: _batchQtyController,
           label: 'Batch Quantity',
-          hint: 'How many ${recipe.yieldUnit ?? item.unit ?? 'units'} to produce',
+          hint:
+              'How many ${recipe.yieldUnit ?? item.unit ?? 'units'} to produce',
           icon: Icons.numbers_rounded,
           required: true,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -315,7 +335,7 @@ class _ProductionScreenState extends State<ProductionScreen> {
         Text(
           'Ingredients Required',
           style: GoogleFonts.poppins(
-            fontSize: 14,
+            fontSize: AppResponsive.bodyFontSize(context),
             fontWeight: FontWeight.w600,
             color: AppColors.textPrimary,
           ),
@@ -365,7 +385,9 @@ class _ProductionScreenState extends State<ProductionScreen> {
   ) {
     Items? ingredient;
     try {
-      ingredient = itemStore.items.firstWhere((i) => i.id == line.ingredientItemId);
+      ingredient = itemStore.items.firstWhere(
+        (i) => i.id == line.ingredientItemId,
+      );
     } catch (_) {
       ingredient = null;
     }
@@ -399,7 +421,7 @@ class _ProductionScreenState extends State<ProductionScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
-                    fontSize: 13.5,
+                    fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
@@ -408,7 +430,7 @@ class _ProductionScreenState extends State<ProductionScreen> {
                 Text(
                   'Need ${_fmt(required)} $unit  ·  Have ${_fmt(available)} $unit',
                   style: GoogleFonts.poppins(
-                    fontSize: 11.5,
+                    fontSize: AppResponsive.captionFontSize(context),
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -427,7 +449,9 @@ class _ProductionScreenState extends State<ProductionScreen> {
                 Icon(
                   ingredient == null
                       ? Icons.help_outline_rounded
-                      : (hasEnough ? Icons.check_circle_rounded : Icons.warning_rounded),
+                      : (hasEnough
+                            ? Icons.check_circle_rounded
+                            : Icons.warning_rounded),
                   size: 13,
                   color: color,
                 ),
@@ -437,7 +461,7 @@ class _ProductionScreenState extends State<ProductionScreen> {
                       ? 'Missing'
                       : (hasEnough ? 'Sufficient' : 'Short'),
                   style: GoogleFonts.poppins(
-                    fontSize: 11,
+                    fontSize: AppResponsive.captionFontSize(context),
                     fontWeight: FontWeight.w700,
                     color: color,
                   ),
@@ -451,8 +475,9 @@ class _ProductionScreenState extends State<ProductionScreen> {
   }
 
   Widget _buildRecentBatches(BuildContext context) {
-    final productions =
-        recipeProductionRepository.getProductionsForItem(_selectedItem!.id);
+    final productions = recipeProductionRepository.getProductionsForItem(
+      _selectedItem!.id,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -460,7 +485,7 @@ class _ProductionScreenState extends State<ProductionScreen> {
         Text(
           'Recent Batches',
           style: GoogleFonts.poppins(
-            fontSize: 14,
+            fontSize: AppResponsive.bodyFontSize(context),
             fontWeight: FontWeight.w600,
             color: AppColors.textPrimary,
           ),
@@ -478,7 +503,7 @@ class _ProductionScreenState extends State<ProductionScreen> {
             child: Text(
               'No batches produced yet.',
               style: GoogleFonts.poppins(
-                fontSize: 12.5,
+                fontSize: AppResponsive.smallFontSize(context),
                 color: AppColors.textSecondary,
               ),
             ),
@@ -521,7 +546,7 @@ class _ProductionScreenState extends State<ProductionScreen> {
                 Text(
                   '+${_fmt(p.batchQty)} $unit',
                   style: GoogleFonts.poppins(
-                    fontSize: 13.5,
+                    fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w700,
                     color: AppColors.success,
                   ),
@@ -530,7 +555,7 @@ class _ProductionScreenState extends State<ProductionScreen> {
                 Text(
                   DateFormat('dd MMM yyyy · hh:mm a').format(p.producedTime),
                   style: GoogleFonts.poppins(
-                    fontSize: 11.5,
+                    fontSize: AppResponsive.captionFontSize(context),
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -541,7 +566,7 @@ class _ProductionScreenState extends State<ProductionScreen> {
             Text(
               p.producedBy!,
               style: GoogleFonts.poppins(
-                fontSize: 11.5,
+                fontSize: AppResponsive.captionFontSize(context),
                 fontWeight: FontWeight.w500,
                 color: AppColors.textSecondary,
               ),
@@ -579,8 +604,8 @@ class _SemiFinishedPickerDialogState extends State<_SemiFinishedPickerDialog> {
     final filtered = _query.isEmpty
         ? widget.items
         : widget.items
-            .where((i) => i.name.toLowerCase().contains(_query.toLowerCase()))
-            .toList();
+              .where((i) => i.name.toLowerCase().contains(_query.toLowerCase()))
+              .toList();
 
     return AppDialogShell(
       title: 'Select Semi-Finished Item',
@@ -619,13 +644,13 @@ class _SemiFinishedPickerDialogState extends State<_SemiFinishedPickerDialog> {
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.poppins(
                               fontWeight: FontWeight.w600,
-                              fontSize: 14,
+                              fontSize: AppResponsive.bodyFontSize(context),
                             ),
                           ),
                           subtitle: Text(
                             'Stock: ${item.stockQuantity} ${item.unit ?? ''}',
                             style: GoogleFonts.poppins(
-                              fontSize: 12,
+                              fontSize: AppResponsive.smallFontSize(context),
                               color: AppColors.textSecondary,
                             ),
                           ),

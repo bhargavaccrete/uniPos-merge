@@ -13,6 +13,7 @@ import 'package:billberrylite/domain/services/restaurant/notification_service.da
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/expensel_316.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+
 class ViewExpense extends StatefulWidget {
   const ViewExpense({super.key});
 
@@ -57,17 +58,13 @@ class _ViewExpenseState extends State<ViewExpense> {
     }
   }
 
-
   Future<void> _pickDateRange(BuildContext context) async {
     final picked = await showDateRangePicker(
       context: context,
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
       initialDateRange: _fromDatee != null
-          ? DateTimeRange(
-              start: _fromDatee!,
-              end: _toDate ?? _fromDatee!,
-            )
+          ? DateTimeRange(start: _fromDatee!, end: _toDate ?? _fromDatee!)
           : null,
       builder: (context, child) {
         return Theme(
@@ -93,8 +90,12 @@ class _ViewExpenseState extends State<ViewExpense> {
 
   void _showEditExpenseBottomSheet(Expense expense) {
     final isTablet = !AppResponsive.isMobile(context);
-    final TextEditingController amountController = TextEditingController(text: expense.amount.toString());
-    final TextEditingController reasonController = TextEditingController(text: expense.reason ?? '');
+    final TextEditingController amountController = TextEditingController(
+      text: expense.amount.toString(),
+    );
+    final TextEditingController reasonController = TextEditingController(
+      text: expense.reason ?? '',
+    );
     // Focus chain: amount → reason. Disposed alongside the controllers in .then().
     final amountFocus = FocusNode();
     final reasonFocus = FocusNode();
@@ -109,14 +110,34 @@ class _ViewExpenseState extends State<ViewExpense> {
         children: [
           Row(
             children: [
-              Expanded(child: Text('Edit Expense', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0), fontWeight: FontWeight.w600))),
-              IconButton(onPressed: () => Navigator.pop(context), icon: Icon(Icons.close, size: 20, color: Colors.grey)),
+              Expanded(
+                child: Text(
+                  'Edit Expense',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.getValue(
+                      context,
+                      mobile: 16.0,
+                      tablet: 20.0,
+                      desktop: 24.0,
+                    ),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: Icon(Icons.close, size: 20, color: Colors.grey),
+              ),
             ],
           ),
           SizedBox(height: 20),
           Text(
             'Date',
-            style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
           ),
           SizedBox(height: 10),
           GestureDetector(
@@ -128,7 +149,9 @@ class _ViewExpenseState extends State<ViewExpense> {
                 lastDate: DateTime(2100),
               );
               if (pickedDate != null) {
-                setModalState(() { selectedDate = pickedDate; });
+                setModalState(() {
+                  selectedDate = pickedDate;
+                });
               }
             },
             child: Container(
@@ -140,19 +163,33 @@ class _ViewExpenseState extends State<ViewExpense> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.calendar_today, size: 18, color: AppColors.primary),
+                  Icon(
+                    Icons.calendar_today,
+                    size: 18,
+                    color: AppColors.primary,
+                  ),
                   SizedBox(width: 12),
                   Text(
                     DateFormat('dd MMM yyyy').format(selectedDate),
-                    style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                 ],
               ),
             ),
           ),
           SizedBox(height: 16),
-          Text('Amount (${CurrencyHelper.currentSymbol})',
-              style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+          Text(
+            'Amount (${CurrencyHelper.currentSymbol})',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
           SizedBox(height: 10),
           AppTextField(
             controller: amountController,
@@ -160,13 +197,21 @@ class _ViewExpenseState extends State<ViewExpense> {
             hint: 'Enter amount',
             icon: Icons.attach_money,
             keyboardType: TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))],
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+            ],
             textInputAction: TextInputAction.next,
             onFieldSubmitted: (_) => reasonFocus.requestFocus(),
           ),
           SizedBox(height: 16),
-          Text('Category',
-              style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+          Text(
+            'Category',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
           SizedBox(height: 10),
           Observer(
             builder: (context) {
@@ -184,21 +229,48 @@ class _ViewExpenseState extends State<ViewExpense> {
                     value: selectedCategoryId,
                     borderRadius: BorderRadius.circular(12),
                     dropdownColor: AppColors.white,
-                    icon: Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary),
-                    hint: Text('Select Category', style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey.shade400)),
-                    items: categories.map((category) => DropdownMenuItem<String>(
-                      value: category.id,
-                      child: Text(category.name, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w500)),
-                    )).toList(),
-                    onChanged: (String? value) => setModalState(() { selectedCategoryId = value; }),
+                    icon: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: AppColors.textSecondary,
+                    ),
+                    hint: Text(
+                      'Select Category',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        color: Colors.grey.shade400,
+                      ),
+                    ),
+                    items: categories
+                        .map(
+                          (category) => DropdownMenuItem<String>(
+                            value: category.id,
+                            child: Text(
+                              category.name,
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.bodyFontSize(context),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (String? value) => setModalState(() {
+                      selectedCategoryId = value;
+                    }),
                   ),
                 ),
               );
             },
           ),
           SizedBox(height: 16),
-          Text('Reason',
-              style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+          Text(
+            'Reason',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
           SizedBox(height: 10),
           AppTextField(
             controller: reasonController,
@@ -209,8 +281,14 @@ class _ViewExpenseState extends State<ViewExpense> {
             onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
           ),
           SizedBox(height: 16),
-          Text('Payment Type',
-              style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+          Text(
+            'Payment Type',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
           SizedBox(height: 10),
           Container(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -225,12 +303,27 @@ class _ViewExpenseState extends State<ViewExpense> {
                 value: selectedPaymentType,
                 borderRadius: BorderRadius.circular(12),
                 dropdownColor: AppColors.white,
-                icon: Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary),
-                items: ['Cash', 'Card/Online', 'Other'].map((String item) => DropdownMenuItem<String>(
-                  value: item,
-                  child: Text(item, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w500)),
-                )).toList(),
-                onChanged: (String? value) => setModalState(() { selectedPaymentType = value!; }),
+                icon: Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: AppColors.textSecondary,
+                ),
+                items: ['Cash', 'Card/Online', 'Other']
+                    .map(
+                      (String item) => DropdownMenuItem<String>(
+                        value: item,
+                        child: Text(
+                          item,
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (String? value) => setModalState(() {
+                  selectedPaymentType = value!;
+                }),
               ),
             ),
           ),
@@ -255,7 +348,9 @@ class _ViewExpenseState extends State<ViewExpense> {
                         await expenseStore.deleteExpense(expense.id);
                         Navigator.pop(context);
                         _loadExpenses();
-                        NotificationService.instance.showSuccess('Expense deleted successfully');
+                        NotificationService.instance.showSuccess(
+                          'Expense deleted successfully',
+                        );
                       } finally {
                         if (mounted) setState(() => _isSubmitting = false);
                       }
@@ -266,9 +361,17 @@ class _ViewExpenseState extends State<ViewExpense> {
                     foregroundColor: Colors.white,
                     elevation: 0,
                     padding: EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                  child: Text('Delete', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600)),
+                  child: Text(
+                    'Delete',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.buttonFontSize(context),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
               SizedBox(width: 12),
@@ -277,31 +380,46 @@ class _ViewExpenseState extends State<ViewExpense> {
                 child: ElevatedButton(
                   onPressed: () async {
                     if (_isSubmitting) return;
-                    final amount = double.tryParse(amountController.text.trim());
+                    final amount = double.tryParse(
+                      amountController.text.trim(),
+                    );
                     if (amount == null || amount <= 0) {
-                      NotificationService.instance.showError('Please enter a valid amount greater than 0');
+                      NotificationService.instance.showError(
+                        'Please enter a valid amount greater than 0',
+                      );
                       return;
                     }
                     setState(() => _isSubmitting = true);
                     try {
                       final now = DateTime.now();
                       final expenseDateTime = DateTime(
-                        selectedDate.year, selectedDate.month, selectedDate.day,
-                        now.hour, now.minute, now.second, now.millisecond,
+                        selectedDate.year,
+                        selectedDate.month,
+                        selectedDate.day,
+                        now.hour,
+                        now.minute,
+                        now.second,
+                        now.millisecond,
                       );
                       final updatedExpense = expense.copyWith(
                         dateandTime: expenseDateTime,
                         amount: amount,
                         categoryOfExpense: selectedCategoryId,
-                        reason: reasonController.text.trim().isEmpty ? null : reasonController.text.trim(),
+                        reason: reasonController.text.trim().isEmpty
+                            ? null
+                            : reasonController.text.trim(),
                         paymentType: selectedPaymentType,
                       );
                       await expenseStore.updateExpense(updatedExpense);
                       Navigator.pop(context);
                       _loadExpenses();
-                      NotificationService.instance.showSuccess('Expense updated successfully');
+                      NotificationService.instance.showSuccess(
+                        'Expense updated successfully',
+                      );
                     } catch (e) {
-                      NotificationService.instance.showError('Failed to update expense. Please try again.');
+                      NotificationService.instance.showError(
+                        'Failed to update expense. Please try again.',
+                      );
                     } finally {
                       if (mounted) setState(() => _isSubmitting = false);
                     }
@@ -311,9 +429,17 @@ class _ViewExpenseState extends State<ViewExpense> {
                     foregroundColor: Colors.white,
                     elevation: 0,
                     padding: EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                  child: Text('Update Expense', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600)),
+                  child: Text(
+                    'Update Expense',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.buttonFontSize(context),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -326,203 +452,315 @@ class _ViewExpenseState extends State<ViewExpense> {
       showDialog(
         context: context,
         builder: (context) => DialogDisposeScope(
-          disposables: [amountController, reasonController, amountFocus, reasonFocus],
+          disposables: [
+            amountController,
+            reasonController,
+            amountFocus,
+            reasonFocus,
+          ],
           child: StatefulBuilder(
-          builder: (context, setModalState) => AppDialogShell(
-            title: 'Edit Expense',
-            accent: AppColors.primary,
-            icon: Icons.edit_note_rounded,
-            body: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Date',
-                  style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                ),
-                SizedBox(height: 10),
-                GestureDetector(
-                  onTap: () async {
-                    DateTime? pickedDate = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDate,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime(2100),
-                    );
-                    if (pickedDate != null) {
-                      setModalState(() { selectedDate = pickedDate; });
-                    }
-                  },
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceLight,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.primary, width: 2),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.calendar_today, size: 18, color: AppColors.primary),
-                        SizedBox(width: 12),
-                        Text(
-                          DateFormat('dd MMM yyyy').format(selectedDate),
-                          style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
-                        ),
-                      ],
+            builder: (context, setModalState) => AppDialogShell(
+              title: 'Edit Expense',
+              accent: AppColors.primary,
+              icon: Icons.edit_note_rounded,
+              body: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Date',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
                     ),
                   ),
-                ),
-                SizedBox(height: 16),
-                Text('Amount (${CurrencyHelper.currentSymbol})',
-                    style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                SizedBox(height: 10),
-                AppTextField(
-                  controller: amountController,
-                  focusNode: amountFocus,
-                  hint: 'Enter amount',
-                  icon: Icons.attach_money,
-                  keyboardType: TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))],
-                  textInputAction: TextInputAction.next,
-                  onFieldSubmitted: (_) => reasonFocus.requestFocus(),
-                ),
-                SizedBox(height: 16),
-                Text('Category',
-                    style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                SizedBox(height: 10),
-                Observer(
-                  builder: (context) {
-                    final categories = expenseCategoryStore.enabledCategories;
-                    return Container(
-                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  SizedBox(height: 10),
+                  GestureDetector(
+                    onTap: () async {
+                      DateTime? pickedDate = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                      );
+                      if (pickedDate != null) {
+                        setModalState(() {
+                          selectedDate = pickedDate;
+                        });
+                      }
+                    },
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.surfaceLight,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.divider),
+                        border: Border.all(color: AppColors.primary, width: 2),
                       ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          isExpanded: true,
-                          value: selectedCategoryId,
-                          borderRadius: BorderRadius.circular(12),
-                          dropdownColor: AppColors.white,
-                          icon: Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary),
-                          hint: Text('Select Category', style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey.shade400)),
-                          items: categories.map((category) => DropdownMenuItem<String>(
-                            value: category.id,
-                            child: Text(category.name, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w500)),
-                          )).toList(),
-                          onChanged: (String? value) => setModalState(() { selectedCategoryId = value; }),
-                        ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today,
+                            size: 18,
+                            color: AppColors.primary,
+                          ),
+                          SizedBox(width: 12),
+                          Text(
+                            DateFormat('dd MMM yyyy').format(selectedDate),
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.bodyFontSize(context),
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
                       ),
-                    );
-                  },
-                ),
-                SizedBox(height: 16),
-                Text('Reason',
-                    style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                SizedBox(height: 10),
-                AppTextField(
-                  controller: reasonController,
-                  focusNode: reasonFocus,
-                  hint: 'Enter reason (optional)',
-                  icon: Icons.note_alt_outlined,
-                  textInputAction: TextInputAction.done,
-                  onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
-                ),
-                SizedBox(height: 16),
-                Text('Payment Type',
-                    style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                SizedBox(height: 10),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceLight,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.divider),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      isExpanded: true,
-                      value: selectedPaymentType,
-                      borderRadius: BorderRadius.circular(12),
-                      dropdownColor: AppColors.white,
-                      icon: Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary),
-                      items: ['Cash', 'Card/Online', 'Other'].map((String item) => DropdownMenuItem<String>(
-                        value: item,
-                        child: Text(item, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w500)),
-                      )).toList(),
-                      onChanged: (String? value) => setModalState(() { selectedPaymentType = value!; }),
                     ),
                   ),
+                  SizedBox(height: 16),
+                  Text(
+                    'Amount (${CurrencyHelper.currentSymbol})',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  AppTextField(
+                    controller: amountController,
+                    focusNode: amountFocus,
+                    hint: 'Enter amount',
+                    icon: Icons.attach_money,
+                    keyboardType: TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'^\d*\.?\d{0,2}'),
+                      ),
+                    ],
+                    textInputAction: TextInputAction.next,
+                    onFieldSubmitted: (_) => reasonFocus.requestFocus(),
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'Category',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  Observer(
+                    builder: (context) {
+                      final categories = expenseCategoryStore.enabledCategories;
+                      return Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceLight,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.divider),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            isExpanded: true,
+                            value: selectedCategoryId,
+                            borderRadius: BorderRadius.circular(12),
+                            dropdownColor: AppColors.white,
+                            icon: Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: AppColors.textSecondary,
+                            ),
+                            hint: Text(
+                              'Select Category',
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.bodyFontSize(context),
+                                color: Colors.grey.shade400,
+                              ),
+                            ),
+                            items: categories
+                                .map(
+                                  (category) => DropdownMenuItem<String>(
+                                    value: category.id,
+                                    child: Text(
+                                      category.name,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: AppResponsive.bodyFontSize(
+                                          context,
+                                        ),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (String? value) => setModalState(() {
+                              selectedCategoryId = value;
+                            }),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'Reason',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  AppTextField(
+                    controller: reasonController,
+                    focusNode: reasonFocus,
+                    hint: 'Enter reason (optional)',
+                    icon: Icons.note_alt_outlined,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'Payment Type',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceLight,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.divider),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: selectedPaymentType,
+                        borderRadius: BorderRadius.circular(12),
+                        dropdownColor: AppColors.white,
+                        icon: Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: AppColors.textSecondary,
+                        ),
+                        items: ['Cash', 'Card/Online', 'Other']
+                            .map(
+                              (String item) => DropdownMenuItem<String>(
+                                value: item,
+                                child: Text(
+                                  item,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (String? value) => setModalState(() {
+                          selectedPaymentType = value!;
+                        }),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                appDialogPrimaryButton(
+                  label: 'Delete',
+                  color: Colors.red,
+                  onPressed: () async {
+                    if (_isSubmitting) return;
+                    final confirm = await showAppConfirmDialog(
+                      context: context,
+                      title: 'Delete this expense?',
+                      message: 'This action cannot be undone.',
+                      confirmLabel: 'Delete',
+                      accent: AppColors.danger,
+                      icon: Icons.delete_outline,
+                    );
+                    if (confirm) {
+                      setState(() => _isSubmitting = true);
+                      try {
+                        await expenseStore.deleteExpense(expense.id);
+                        Navigator.pop(context);
+                        _loadExpenses();
+                        NotificationService.instance.showSuccess(
+                          'Expense deleted successfully',
+                        );
+                      } finally {
+                        if (mounted) setState(() => _isSubmitting = false);
+                      }
+                    }
+                  },
                 ),
-              ],
-            ),
-            actions: [
-              appDialogPrimaryButton(
-                label: 'Delete',
-                color: Colors.red,
-                onPressed: () async {
-                  if (_isSubmitting) return;
-                  final confirm = await showAppConfirmDialog(
-                    context: context,
-                    title: 'Delete this expense?',
-                    message: 'This action cannot be undone.',
-                    confirmLabel: 'Delete',
-                    accent: AppColors.danger,
-                    icon: Icons.delete_outline,
-                  );
-                  if (confirm) {
+                const SizedBox(width: 12),
+                appDialogPrimaryButton(
+                  label: 'Update Expense',
+                  onPressed: () async {
+                    if (_isSubmitting) return;
+                    final amount = double.tryParse(
+                      amountController.text.trim(),
+                    );
+                    if (amount == null || amount <= 0) {
+                      NotificationService.instance.showError(
+                        'Please enter a valid amount greater than 0',
+                      );
+                      return;
+                    }
                     setState(() => _isSubmitting = true);
                     try {
-                      await expenseStore.deleteExpense(expense.id);
+                      final now = DateTime.now();
+                      final expenseDateTime = DateTime(
+                        selectedDate.year,
+                        selectedDate.month,
+                        selectedDate.day,
+                        now.hour,
+                        now.minute,
+                        now.second,
+                        now.millisecond,
+                      );
+                      final updatedExpense = expense.copyWith(
+                        dateandTime: expenseDateTime,
+                        amount: amount,
+                        categoryOfExpense: selectedCategoryId,
+                        reason: reasonController.text.trim().isEmpty
+                            ? null
+                            : reasonController.text.trim(),
+                        paymentType: selectedPaymentType,
+                      );
+                      await expenseStore.updateExpense(updatedExpense);
                       Navigator.pop(context);
                       _loadExpenses();
-                      NotificationService.instance.showSuccess('Expense deleted successfully');
+                      NotificationService.instance.showSuccess(
+                        'Expense updated successfully',
+                      );
+                    } catch (e) {
+                      NotificationService.instance.showError(
+                        'Failed to update expense. Please try again.',
+                      );
                     } finally {
                       if (mounted) setState(() => _isSubmitting = false);
                     }
-                  }
-                },
-              ),
-              const SizedBox(width: 12),
-              appDialogPrimaryButton(
-                label: 'Update Expense',
-                onPressed: () async {
-                  if (_isSubmitting) return;
-                  final amount = double.tryParse(amountController.text.trim());
-                  if (amount == null || amount <= 0) {
-                    NotificationService.instance.showError('Please enter a valid amount greater than 0');
-                    return;
-                  }
-                  setState(() => _isSubmitting = true);
-                  try {
-                    final now = DateTime.now();
-                    final expenseDateTime = DateTime(
-                      selectedDate.year, selectedDate.month, selectedDate.day,
-                      now.hour, now.minute, now.second, now.millisecond,
-                    );
-                    final updatedExpense = expense.copyWith(
-                      dateandTime: expenseDateTime,
-                      amount: amount,
-                      categoryOfExpense: selectedCategoryId,
-                      reason: reasonController.text.trim().isEmpty ? null : reasonController.text.trim(),
-                      paymentType: selectedPaymentType,
-                    );
-                    await expenseStore.updateExpense(updatedExpense);
-                    Navigator.pop(context);
-                    _loadExpenses();
-                    NotificationService.instance.showSuccess('Expense updated successfully');
-                  } catch (e) {
-                    NotificationService.instance.showError('Failed to update expense. Please try again.');
-                  } finally {
-                    if (mounted) setState(() => _isSubmitting = false);
-                  }
-                },
-              ),
-            ],
+                  },
+                ),
+              ],
+            ),
           ),
-        ),
         ),
       );
       return;
@@ -536,43 +774,48 @@ class _ViewExpenseState extends State<ViewExpense> {
       ),
       builder: (BuildContext context) {
         return DialogDisposeScope(
-          disposables: [amountController, reasonController, amountFocus, reasonFocus],
+          disposables: [
+            amountController,
+            reasonController,
+            amountFocus,
+            reasonFocus,
+          ],
           child: StatefulBuilder(
-          builder: (context, setModalState) {
-            return Container(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 0,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        margin: EdgeInsets.only(top: 12, bottom: 16),
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
+            builder: (context, setModalState) {
+              return Container(
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 0,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          margin: EdgeInsets.only(top: 12, bottom: 16),
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
                       ),
-                    ),
-                    buildContent(setModalState),
-                  ],
+                      buildContent(setModalState),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
-        ),
+              );
+            },
+          ),
         );
       },
     );
@@ -588,7 +831,11 @@ class _ViewExpenseState extends State<ViewExpense> {
           Container(
             color: AppColors.white,
             child: Padding(
-                padding: EdgeInsets.fromLTRB(16, 8, 16, 12),
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: AppResponsive.constrainedContent(
+                context: context,
+                maxWidth: AppResponsive.maxFormWidth(context),
+                heightFactor: 1,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -598,11 +845,16 @@ class _ViewExpenseState extends State<ViewExpense> {
                         const Spacer(),
                         Observer(
                           builder: (context) {
-                            final total = expenseStore.filteredExpenses.fold<double>(
-                              0, (sum, expense) => sum + expense.amount,
-                            );
+                            final total = expenseStore.filteredExpenses
+                                .fold<double>(
+                                  0,
+                                  (sum, expense) => sum + expense.amount,
+                                );
                             return Container(
-                              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.red.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
@@ -610,7 +862,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                               child: Text(
                                 '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(total)}',
                                 style: GoogleFonts.poppins(
-                                  fontSize: 14,
+                                  fontSize: AppResponsive.bodyFontSize(context),
                                   fontWeight: FontWeight.w600,
                                   color: Colors.red.shade700,
                                 ),
@@ -628,30 +880,47 @@ class _ViewExpenseState extends State<ViewExpense> {
                           child: GestureDetector(
                             onTap: () => _pickDateRange(context),
                             child: Container(
-                              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
                               decoration: BoxDecoration(
                                 color: AppColors.surfaceLight,
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
-                                  color: _fromDatee != null ? AppColors.primary : AppColors.divider,
+                                  color: _fromDatee != null
+                                      ? AppColors.primary
+                                      : AppColors.divider,
                                 ),
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.date_range_rounded, size: 18,
-                                    color: _fromDatee != null ? AppColors.primary : AppColors.textSecondary),
+                                  Icon(
+                                    Icons.date_range_rounded,
+                                    size: 18,
+                                    color: _fromDatee != null
+                                        ? AppColors.primary
+                                        : AppColors.textSecondary,
+                                  ),
                                   SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
                                       _fromDatee == null
                                           ? 'Select date range'
-                                          : _fromDatee == _toDate || _toDate == null
-                                              ? DateFormat('dd MMM yyyy').format(_fromDatee!)
-                                              : '${DateFormat('dd MMM').format(_fromDatee!)} — ${DateFormat('dd MMM yyyy').format(_toDate!)}',
+                                          : _fromDatee == _toDate ||
+                                                _toDate == null
+                                          ? DateFormat(
+                                              'dd MMM yyyy',
+                                            ).format(_fromDatee!)
+                                          : '${DateFormat('dd MMM').format(_fromDatee!)} — ${DateFormat('dd MMM yyyy').format(_toDate!)}',
                                       style: GoogleFonts.poppins(
-                                        fontSize: 13,
+                                        fontSize: AppResponsive.bodyFontSize(
+                                          context,
+                                        ),
                                         fontWeight: FontWeight.w500,
-                                        color: _fromDatee != null ? AppColors.textPrimary : AppColors.textSecondary,
+                                        color: _fromDatee != null
+                                            ? AppColors.textPrimary
+                                            : AppColors.textSecondary,
                                       ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -677,7 +946,11 @@ class _ViewExpenseState extends State<ViewExpense> {
                                 color: AppColors.surfaceLight,
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: Icon(Icons.close, size: 18, color: AppColors.textSecondary),
+                              child: Icon(
+                                Icons.close,
+                                size: 18,
+                                color: AppColors.textSecondary,
+                              ),
                             ),
                           ),
                         ],
@@ -685,124 +958,168 @@ class _ViewExpenseState extends State<ViewExpense> {
                     ),
                   ],
                 ),
+              ),
             ),
           ),
 
           SizedBox(height: 4),
-          // Expense List
+          // Expense List — capped so cards do not span a 1440px laptop.
           Expanded(
-            child: Observer(
-              builder: (context) {
-                final filteredExpenses = expenseStore.filteredExpenses;
+            child: AppResponsive.constrainedContent(
+              context: context,
+              maxWidth: AppResponsive.maxFormWidth(context),
+              alignment: Alignment.topCenter,
+              child: Observer(
+                builder: (context) {
+                  final filteredExpenses = expenseStore.filteredExpenses;
 
-                if (filteredExpenses.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.receipt_long_outlined, size: 48, color: AppColors.divider),
-                        SizedBox(height: 12),
-                        Text('No expenses found', style: GoogleFonts.poppins(fontSize: 15, color: AppColors.textSecondary)),
-                      ],
-                    ),
-                  );
-                }
+                  if (filteredExpenses.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.receipt_long_outlined,
+                            size: 48,
+                            color: AppColors.divider,
+                          ),
+                          SizedBox(height: 12),
+                          Text(
+                            'No expenses found',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.bodyFontSize(context),
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
 
-                return ListView.builder(
-                  padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 12.0, tablet: 16.0, desktop: 20.0)),
-                  itemCount: filteredExpenses.length,
-                  itemBuilder: (context, index) {
-                    final expense = filteredExpenses[index];
-                    return GestureDetector(
-                      onTap: () => _showEditExpenseBottomSheet(expense),
-                      child: Container(
-                        margin: EdgeInsets.only(bottom: 8),
-                        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: AppColors.white,
-                          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-                          border: Border.all(color: AppColors.divider),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                  return ListView.builder(
+                    padding: EdgeInsets.all(AppResponsive.gridSpacing(context)),
+                    itemCount: filteredExpenses.length,
+                    itemBuilder: (context, index) {
+                      final expense = filteredExpenses[index];
+                      return GestureDetector(
+                        onTap: () => _showEditExpenseBottomSheet(expense),
+                        child: Container(
+                          margin: EdgeInsets.only(bottom: 8),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.white,
+                            borderRadius: BorderRadius.circular(
+                              AppResponsive.borderRadius(context),
+                            ),
+                            border: Border.all(color: AppColors.divider),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _getCategoryName(
+                                        expense.categoryOfExpense,
+                                      ),
+                                      style: GoogleFonts.poppins(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize:
+                                            AppResponsive.subheadingFontSize(
+                                              context,
+                                            ),
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      DateFormat(
+                                        'dd MMM yyyy',
+                                      ).format(expense.dateandTime),
+                                      style: GoogleFonts.poppins(
+                                        fontSize: AppResponsive.smallFontSize(
+                                          context,
+                                        ),
+                                        color: AppColors.textSecondary,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    if (expense.reason != null &&
+                                        expense.reason!.isNotEmpty) ...[
+                                      SizedBox(height: 2),
+                                      Text(
+                                        expense.reason!,
+                                        style: GoogleFonts.poppins(
+                                          fontSize: AppResponsive.smallFontSize(
+                                            context,
+                                          ),
+                                          color: AppColors.textSecondary,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                    SizedBox(height: 6),
+                                    Container(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.info.withValues(
+                                          alpha: 0.1,
+                                        ),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        expense.paymentType ?? 'Cash',
+                                        style: GoogleFonts.poppins(
+                                          fontSize:
+                                              AppResponsive.captionFontSize(
+                                                context,
+                                              ),
+                                          color: AppColors.info,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   Text(
-                                    _getCategoryName(expense.categoryOfExpense),
+                                    '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(expense.amount)}',
                                     style: GoogleFonts.poppins(
                                       fontWeight: FontWeight.w600,
-                                      fontSize: 16,
-                                      color: AppColors.textPrimary,
+                                      fontSize:
+                                          AppResponsive.subheadingFontSize(
+                                            context,
+                                          ),
+                                      color: Colors.red.shade600,
                                     ),
                                   ),
                                   SizedBox(height: 4),
-                                  Text(
-                                    DateFormat('dd MMM yyyy').format(expense.dateandTime),
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 13,
-                                      color: AppColors.textSecondary,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  if (expense.reason != null && expense.reason!.isNotEmpty) ...[
-                                    SizedBox(height: 2),
-                                    Text(
-                                      expense.reason!,
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 12,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                  SizedBox(height: 6),
-                                  Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.info.withValues(alpha:0.1),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      expense.paymentType ?? 'Cash',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 11,
-                                        color: AppColors.info,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
+                                  Icon(
+                                    Icons.arrow_forward_ios_rounded,
+                                    size: 14,
+                                    color: AppColors.textSecondary,
                                   ),
                                 ],
                               ),
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(expense.amount)}',
-                                  style: GoogleFonts.poppins(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 18,
-                                    color: Colors.red.shade600,
-                                  ),
-                                ),
-                                SizedBox(height: 4),
-                                Icon(
-                                  Icons.arrow_forward_ios_rounded,
-                                  size: 14,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ],
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                );
-              },
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ),
         ],
@@ -810,4 +1127,3 @@ class _ViewExpenseState extends State<ViewExpense> {
     );
   }
 }
-

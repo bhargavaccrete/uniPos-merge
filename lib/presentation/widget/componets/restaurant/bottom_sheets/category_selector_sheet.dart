@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 import '../../../../../data/models/common/categorymodel_300.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
@@ -136,7 +137,8 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
       _loadData();
     } else if (mounted) {
       NotificationService.instance.showError(
-          categoryStore.errorMessage ?? 'Could not delete this category.');
+        categoryStore.errorMessage ?? 'Could not delete this category.',
+      );
     }
   }
 
@@ -177,20 +179,31 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
                     color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.category_outlined,
-                      color: AppColors.primary, size: 20),
+                  child: Icon(
+                    Icons.category_outlined,
+                    color: AppColors.primary,
+                    size: AppResponsive.iconSize(context),
+                  ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: AppResponsive.mediumSpacing(context)),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Select Category',
-                          style: GoogleFonts.poppins(
-                              fontSize: 16, fontWeight: FontWeight.w600)),
-                      Text('${_categories.length} categories available',
-                          style: GoogleFonts.poppins(
-                              fontSize: 12, color: Colors.grey.shade500)),
+                      Text(
+                        'Select Category',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.subheadingFontSize(context),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        '${_categories.length} categories available',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.smallFontSize(context),
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -209,7 +222,9 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
             child: Container(
               decoration: BoxDecoration(
                 color: AppColors.surfaceLight,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.borderRadius(context),
+                ),
                 border: Border.all(color: AppColors.divider),
               ),
               child: AppTextField(
@@ -218,8 +233,11 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
                 icon: Icons.search,
                 suffixIcon: _query.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear,
-                            size: 18, color: Colors.grey),
+                        icon: Icon(
+                          Icons.clear,
+                          size: AppResponsive.smallIconSize(context),
+                          color: Colors.grey,
+                        ),
                         onPressed: () => _searchCtrl.clear(),
                       )
                     : null,
@@ -239,27 +257,49 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
             _buildEmptyState()
           else if (_filtered.isEmpty)
             Padding(
-              padding: const EdgeInsets.all(32),
+              padding: EdgeInsets.all(AppResponsive.extraLargeSpacing(context)),
               child: Column(
                 children: [
-                  Icon(Icons.search_off, size: 40, color: Colors.grey.shade300),
-                  const SizedBox(height: 8),
-                  Text('No categories match "$_query"',
-                      style: GoogleFonts.poppins(
-                          fontSize: 13, color: Colors.grey.shade500),
-                      textAlign: TextAlign.center),
+                  Icon(
+                    Icons.search_off,
+                    size: AppResponsive.getValue(
+                      context,
+                      mobile: 40.0,
+                      tablet: 46.0,
+                      desktop: 52.0,
+                    ),
+                    color: Colors.grey.shade300,
+                  ),
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
+                  Text(
+                    'No categories match "$_query"',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      color: Colors.grey.shade500,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
                 ],
               ),
             )
           else
             Flexible(
               child: ListView.separated(
+                // Without this the list reports its maximum height, so the
+                // sheet filled the 75% cap even with two categories in it. The
+                // maxHeight constraint still clamps and re-enables scrolling
+                // once the list outgrows it.
+                shrinkWrap: true,
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 8),
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 itemCount: _filtered.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 6),
-                itemBuilder: (_, i) =>
-                    _buildCategoryItem(_filtered[i], _getItemCount(_filtered[i].id)),
+                itemBuilder: (_, i) => _buildCategoryItem(
+                  _filtered[i],
+                  _getItemCount(_filtered[i].id),
+                ),
               ),
             ),
 
@@ -270,16 +310,28 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: widget.onAddCategory,
-                icon: const Icon(Icons.add_circle_outline, size: 18),
-                label: Text('Add New Category',
-                    style: GoogleFonts.poppins(
-                        fontSize: 14, fontWeight: FontWeight.w600)),
+                icon: Icon(
+                  Icons.add_circle_outline,
+                  size: AppResponsive.smallIconSize(context),
+                ),
+                label: Text(
+                  'Add New Category',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  padding: EdgeInsets.symmetric(
+                    vertical: AppResponsive.mediumSpacing(context),
+                  ),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.borderRadius(context),
+                    ),
+                  ),
                   elevation: 0,
                 ),
               ),
@@ -292,7 +344,7 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
 
   Widget _buildEmptyState() {
     return Padding(
-      padding: const EdgeInsets.all(32),
+      padding: EdgeInsets.all(AppResponsive.extraLargeSpacing(context)),
       child: Column(
         children: [
           Container(
@@ -301,18 +353,34 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
               color: AppColors.primary.withValues(alpha: 0.07),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.category_outlined,
-                size: 40, color: AppColors.primary),
+            child: Icon(
+              Icons.category_outlined,
+              size: AppResponsive.getValue(
+                context,
+                mobile: 40.0,
+                tablet: 46.0,
+                desktop: 52.0,
+              ),
+              color: AppColors.primary,
+            ),
           ),
-          const SizedBox(height: 16),
-          Text('No Categories Yet',
-              style: GoogleFonts.poppins(
-                  fontSize: 15, fontWeight: FontWeight.w600)),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
+          Text(
+            'No Categories Yet',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 6),
-          Text('Add a category to organise your ${AppConfig.isRetail ? "products" : "menu items"}.',
-              style: GoogleFonts.poppins(
-                  fontSize: 13, color: Colors.grey.shade500),
-              textAlign: TextAlign.center),
+          Text(
+            'Add a category to organise your ${AppConfig.isRetail ? "products" : "menu items"}.',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: Colors.grey.shade500,
+            ),
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );
@@ -325,7 +393,7 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
       onTap: () => widget.onCategorySelected(
         CategorySelectionResult(id: category.id, name: category.name),
       ),
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -333,7 +401,9 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
           color: isSelected
               ? AppColors.primary.withValues(alpha: 0.07)
               : AppColors.surfaceLight,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.borderRadius(context),
+          ),
           border: Border.all(
             color: isSelected ? AppColors.primary : AppColors.divider,
             width: isSelected ? 1.5 : 1,
@@ -354,11 +424,11 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
               ),
               child: Icon(
                 isSelected ? Icons.check_rounded : Icons.category_outlined,
-                size: 18,
+                size: AppResponsive.smallIconSize(context),
                 color: isSelected ? Colors.white : AppColors.primary,
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
 
             // Name + count
             Expanded(
@@ -368,17 +438,17 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
                   Text(
                     category.name,
                     style: GoogleFonts.poppins(
-                      fontSize: 14,
+                      fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
-                      color: isSelected
-                          ? AppColors.primary
-                          : Colors.black87,
+                      color: isSelected ? AppColors.primary : Colors.black87,
                     ),
                   ),
                   Text(
                     '$itemCount item${itemCount == 1 ? '' : 's'}',
                     style: GoogleFonts.poppins(
-                        fontSize: 12, color: Colors.grey.shade500),
+                      fontSize: AppResponsive.smallFontSize(context),
+                      color: Colors.grey.shade500,
+                    ),
                   ),
                 ],
               ),
@@ -423,15 +493,23 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(
+        AppResponsive.smallBorderRadius(context),
+      ),
       child: Container(
         width: 34,
         height: 34,
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.smallBorderRadius(context),
+          ),
         ),
-        child: Icon(icon, size: 16, color: color),
+        child: Icon(
+          icon,
+          size: AppResponsive.smallIconSize(context),
+          color: color,
+        ),
       ),
     );
   }

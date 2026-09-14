@@ -29,6 +29,8 @@ Future<List<String>?> showDefaultChoicePicker(
 
   return showModalBottomSheet<List<String>>(
     context: context,
+    // Nearest navigator — keeps the sheet inside the setup wizard's pane.
+    useRootNavigator: false,
     isScrollControlled: true,
     backgroundColor: Colors.white,
     shape: const RoundedRectangleBorder(

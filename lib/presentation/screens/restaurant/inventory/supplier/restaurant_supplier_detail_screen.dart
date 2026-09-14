@@ -48,15 +48,17 @@ class _RestaurantSupplierDetailScreenState
   }
 
   Future<void> _load() async {
-    final supplier =
-        restaurantSupplierRepository.getSupplierById(widget.supplierId);
+    final supplier = restaurantSupplierRepository.getSupplierById(
+      widget.supplierId,
+    );
     if (supplier == null) {
       if (mounted) setState(() => _loading = false);
       return;
     }
     final ledger = await restaurantSupplierStore.getLedger(widget.supplierId);
-    final references =
-        await restaurantSupplierStore.referencesFor(widget.supplierId);
+    final references = await restaurantSupplierStore.referencesFor(
+      widget.supplierId,
+    );
 
     if (!mounted) return;
     setState(() {
@@ -69,8 +71,10 @@ class _RestaurantSupplierDetailScreenState
   }
 
   Future<void> _edit() async {
-    final updated =
-        await showRestaurantSupplierFormSheet(context, existing: _supplier);
+    final updated = await showRestaurantSupplierFormSheet(
+      context,
+      existing: _supplier,
+    );
     if (updated != null) await _load();
   }
 
@@ -171,10 +175,12 @@ class _RestaurantSupplierDetailScreenState
               labelColor: Colors.white,
               unselectedLabelColor: Colors.white70,
               labelStyle: GoogleFonts.poppins(
-                fontSize: 13,
+                fontSize: AppResponsive.bodyFontSize(context),
                 fontWeight: FontWeight.w600,
               ),
-              unselectedLabelStyle: GoogleFonts.poppins(fontSize: 13),
+              unselectedLabelStyle: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+              ),
               tabs: const [
                 Tab(text: 'Overview'),
                 Tab(text: 'Ledger'),
@@ -192,11 +198,13 @@ class _RestaurantSupplierDetailScreenState
               style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
             ),
           ),
+          // Capping here covers all three tabs at once; the app bar and its
+          // TabBar stay full-bleed above it.
           body: TabBarView(
             children: [
-              _overviewTab(),
-              _ledgerTab(),
-              _documentsTab(),
+              _capped(_overviewTab()),
+              _capped(_ledgerTab()),
+              _capped(_documentsTab()),
             ],
           ),
         ),
@@ -204,12 +212,21 @@ class _RestaurantSupplierDetailScreenState
     );
   }
 
+  /// Delegates to `AppResponsive.constrainedContent` — this is a local alias
+  /// for the three tab bodies, not a re-implementation of the cap.
+  Widget _capped(Widget child) => AppResponsive.constrainedContent(
+    context: context,
+    maxWidth: AppResponsive.maxFormWidth(context),
+    alignment: Alignment.topCenter,
+    child: child,
+  );
+
   EdgeInsets get _pagePadding => EdgeInsets.fromLTRB(
-        AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0),
-        16,
-        AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0),
-        96,
-      );
+    AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0),
+    16,
+    AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0),
+    96,
+  );
 
   // ──────────────────────────── Overview ────────────────────────────
 
@@ -249,7 +266,7 @@ class _RestaurantSupplierDetailScreenState
                 ? 'Account settled'
                 : (isAdvance ? 'Advance with supplier' : 'Currently owed'),
             style: GoogleFonts.poppins(
-              fontSize: 12.5,
+              fontSize: AppResponsive.smallFontSize(context),
               color: AppColors.textSecondary,
             ),
           ),
@@ -257,8 +274,12 @@ class _RestaurantSupplierDetailScreenState
           Text(
             formatMoney(balance.abs()),
             style: GoogleFonts.poppins(
-              fontSize: AppResponsive.getValue(context,
-                  mobile: 26.0, tablet: 28.0, desktop: 30.0),
+              fontSize: AppResponsive.getValue(
+                context,
+                mobile: 26.0,
+                tablet: 28.0,
+                desktop: 30.0,
+              ),
               fontWeight: FontWeight.w700,
               color: settled
                   ? AppColors.textPrimary
@@ -271,7 +292,7 @@ class _RestaurantSupplierDetailScreenState
                 ? 'You have paid more than was billed.'
                 : 'Positive balance means money is owed to this supplier.',
             style: GoogleFonts.poppins(
-              fontSize: 11.5,
+              fontSize: AppResponsive.captionFontSize(context),
               color: AppColors.textSecondary,
             ),
           ),
@@ -298,7 +319,7 @@ class _RestaurantSupplierDetailScreenState
           ? Text(
               'No contact details recorded.',
               style: GoogleFonts.poppins(
-                fontSize: 12.5,
+                fontSize: AppResponsive.smallFontSize(context),
                 color: AppColors.textSecondary,
               ),
             )
@@ -310,13 +331,16 @@ class _RestaurantSupplierDetailScreenState
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(row.icon,
-                            size: 17, color: AppColors.textSecondary),
+                        Icon(
+                          row.icon,
+                          size: 17,
+                          color: AppColors.textSecondary,
+                        ),
                         const SizedBox(width: 10),
                         Text(
                           row.label,
                           style: GoogleFonts.poppins(
-                            fontSize: 12.5,
+                            fontSize: AppResponsive.smallFontSize(context),
                             color: AppColors.textSecondary,
                           ),
                         ),
@@ -326,7 +350,7 @@ class _RestaurantSupplierDetailScreenState
                             row.value,
                             textAlign: TextAlign.right,
                             style: GoogleFonts.poppins(
-                              fontSize: 12.5,
+                              fontSize: AppResponsive.smallFontSize(context),
                               fontWeight: FontWeight.w500,
                               color: AppColors.textPrimary,
                             ),
@@ -370,15 +394,18 @@ class _RestaurantSupplierDetailScreenState
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.warning_amber_rounded,
-                      size: 17, color: AppColors.danger),
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    size: 17,
+                    color: AppColors.danger,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Ledger does not reconcile — off by ${formatMoney(drift)}. '
                       'A balance movement bypassed the journal.',
                       style: GoogleFonts.poppins(
-                        fontSize: 11.5,
+                        fontSize: AppResponsive.captionFontSize(context),
                         color: AppColors.danger,
                       ),
                     ),
@@ -400,7 +427,7 @@ class _RestaurantSupplierDetailScreenState
           Text(
             label,
             style: GoogleFonts.poppins(
-              fontSize: 12.5,
+              fontSize: AppResponsive.smallFontSize(context),
               fontWeight: bold ? FontWeight.w600 : FontWeight.w400,
               color: bold ? AppColors.textPrimary : AppColors.textSecondary,
             ),
@@ -409,7 +436,7 @@ class _RestaurantSupplierDetailScreenState
           Text(
             formatMoney(value),
             style: GoogleFonts.poppins(
-              fontSize: 12.5,
+              fontSize: AppResponsive.smallFontSize(context),
               fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
               color: value < 0 ? AppColors.success : AppColors.textPrimary,
             ),
@@ -425,14 +452,30 @@ class _RestaurantSupplierDetailScreenState
       icon: Icons.folder_open_rounded,
       child: Row(
         children: [
-          _exposureTile('POs', _references.purchaseOrders.length,
-              Icons.receipt_long_rounded, AppColors.info),
-          _exposureTile('GRNs', _references.grns.length,
-              Icons.inventory_2_rounded, AppColors.success),
-          _exposureTile('Returns', _references.purchaseReturns.length,
-              Icons.assignment_return_rounded, AppColors.orange),
-          _exposureTile('Claims', _references.claims.length,
-              Icons.gavel_rounded, AppColors.accent),
+          _exposureTile(
+            'POs',
+            _references.purchaseOrders.length,
+            Icons.receipt_long_rounded,
+            AppColors.info,
+          ),
+          _exposureTile(
+            'GRNs',
+            _references.grns.length,
+            Icons.inventory_2_rounded,
+            AppColors.success,
+          ),
+          _exposureTile(
+            'Returns',
+            _references.purchaseReturns.length,
+            Icons.assignment_return_rounded,
+            AppColors.orange,
+          ),
+          _exposureTile(
+            'Claims',
+            _references.claims.length,
+            Icons.gavel_rounded,
+            AppColors.accent,
+          ),
         ],
       ),
     );
@@ -447,7 +490,7 @@ class _RestaurantSupplierDetailScreenState
           Text(
             '$count',
             style: GoogleFonts.poppins(
-              fontSize: 16,
+              fontSize: AppResponsive.subheadingFontSize(context),
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
             ),
@@ -455,7 +498,7 @@ class _RestaurantSupplierDetailScreenState
           Text(
             label,
             style: GoogleFonts.poppins(
-              fontSize: 11,
+              fontSize: AppResponsive.captionFontSize(context),
               color: AppColors.textSecondary,
             ),
           ),
@@ -505,8 +548,7 @@ class _RestaurantSupplierDetailScreenState
           Row(
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(6),
@@ -514,7 +556,7 @@ class _RestaurantSupplierDetailScreenState
                 child: Text(
                   entry.typeDisplay,
                   style: GoogleFonts.poppins(
-                    fontSize: 10.5,
+                    fontSize: AppResponsive.captionFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: color,
                   ),
@@ -524,7 +566,7 @@ class _RestaurantSupplierDetailScreenState
               Text(
                 '${isDebit ? '+' : '−'}${formatMoney(entry.amount.abs())}',
                 style: GoogleFonts.poppins(
-                  fontSize: 14,
+                  fontSize: AppResponsive.bodyFontSize(context),
                   fontWeight: FontWeight.w600,
                   color: color,
                 ),
@@ -535,7 +577,7 @@ class _RestaurantSupplierDetailScreenState
           Text(
             entry.description,
             style: GoogleFonts.poppins(
-              fontSize: 12.5,
+              fontSize: AppResponsive.smallFontSize(context),
               fontWeight: FontWeight.w500,
               color: AppColors.textPrimary,
             ),
@@ -546,28 +588,32 @@ class _RestaurantSupplierDetailScreenState
               Text(
                 _formatDate(entry.date),
                 style: GoogleFonts.poppins(
-                  fontSize: 11,
+                  fontSize: AppResponsive.captionFontSize(context),
                   color: AppColors.textSecondary,
                 ),
               ),
               if (entry.docNumber != null) ...[
-                const Text('  ·  ',
-                    style: TextStyle(color: AppColors.textSecondary)),
+                Text(
+                  '  ·  ',
+                  style: GoogleFonts.poppins(color: AppColors.textSecondary),
+                ),
                 Text(
                   entry.docNumber!,
                   style: GoogleFonts.poppins(
-                    fontSize: 11,
+                    fontSize: AppResponsive.captionFontSize(context),
                     color: AppColors.textSecondary,
                   ),
                 ),
               ],
               if (entry.paymentMode != null) ...[
-                const Text('  ·  ',
-                    style: TextStyle(color: AppColors.textSecondary)),
+                Text(
+                  '  ·  ',
+                  style: GoogleFonts.poppins(color: AppColors.textSecondary),
+                ),
                 Text(
                   entry.paymentMode!,
                   style: GoogleFonts.poppins(
-                    fontSize: 11,
+                    fontSize: AppResponsive.captionFontSize(context),
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -576,7 +622,7 @@ class _RestaurantSupplierDetailScreenState
               Text(
                 'Bal ${formatMoney(entry.balanceAfter)}',
                 style: GoogleFonts.poppins(
-                  fontSize: 11,
+                  fontSize: AppResponsive.captionFontSize(context),
                   fontWeight: FontWeight.w500,
                   color: AppColors.textSecondary,
                 ),
@@ -593,7 +639,7 @@ class _RestaurantSupplierDetailScreenState
                 if ((entry.note ?? '').isNotEmpty) entry.note!,
               ].join('  ·  '),
               style: GoogleFonts.poppins(
-                fontSize: 11,
+                fontSize: AppResponsive.captionFontSize(context),
                 color: AppColors.textSecondary,
               ),
             ),
@@ -708,7 +754,7 @@ class _RestaurantSupplierDetailScreenState
                           Text(
                             row.number,
                             style: GoogleFonts.poppins(
-                              fontSize: 12.5,
+                              fontSize: AppResponsive.smallFontSize(context),
                               fontWeight: FontWeight.w600,
                               color: AppColors.textPrimary,
                             ),
@@ -717,7 +763,7 @@ class _RestaurantSupplierDetailScreenState
                           Text(
                             '${row.subtitle}  ·  ${_formatDate(row.date)}',
                             style: GoogleFonts.poppins(
-                              fontSize: 11,
+                              fontSize: AppResponsive.captionFontSize(context),
                               color: AppColors.textSecondary,
                             ),
                           ),
@@ -727,7 +773,7 @@ class _RestaurantSupplierDetailScreenState
                     Text(
                       formatMoney(row.amount),
                       style: GoogleFonts.poppins(
-                        fontSize: 12.5,
+                        fontSize: AppResponsive.smallFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
@@ -767,7 +813,7 @@ class _RestaurantSupplierDetailScreenState
               Text(
                 title,
                 style: GoogleFonts.poppins(
-                  fontSize: 13.5,
+                  fontSize: AppResponsive.bodyFontSize(context),
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
                 ),

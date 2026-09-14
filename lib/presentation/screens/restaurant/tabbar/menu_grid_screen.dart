@@ -32,6 +32,18 @@ import 'package:billberrylite/util/common/decimal_settings.dart';
 /// (`ItemOptionsDialog`, `restaurantCartStore.addToCart`, `showWeightItemDialog`)
 /// — only the thin add-to-cart dispatch is duplicated for now; if grid is
 /// adopted, extract that into a shared mixin used by both screens.
+/// Absolute height of an item card on DESKTOP.
+///
+/// Desktop must NOT size these cells with `childAspectRatio`: the card's
+/// content floor is constant (image, an up-to-two-line name, the price row)
+/// while a ratio derives height from column width — so one ratio overflowed at
+/// 1024 and left slack at 1440. `mainAxisExtent` pins the height so the card is
+/// identical at every desktop width and only the columns get wider.
+///
+/// Mirrors `kMenuItemCardHeightDesktop` in menu.dart. This screen is
+/// deliberately self-contained and doesn't import it — keep the two in step.
+const double kMenuGridItemCardHeightDesktop = 240.0;
+
 class MenuGridScreen extends StatefulWidget {
   final String? tableIdForNewOrder;
   final OrderModel? existingOrder;
@@ -164,7 +176,7 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
           builder: (_) => Dialog(
             backgroundColor: AppColors.white,
             insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 40),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppResponsive.largeBorderRadius(context))),
             clipBehavior: Clip.antiAlias,
             child: ItemOptionsDialog(item: item, categoryName: categoryName),
           ),
@@ -268,12 +280,12 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
             builder: (_) {
               final hasItems = restaurantCartStore.cartItems.isNotEmpty;
               return Padding(
-                padding: EdgeInsets.only(top: 10, bottom: hasItems ? 80 : 0),
+                padding: EdgeInsets.only(top: AppResponsive.smallSpacing(context), bottom: hasItems ? 80 : 0),
                 child: Column(
                   children: [
                     Padding(
                       padding:
-                          const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          EdgeInsets.symmetric(horizontal: AppResponsive.smallSpacing(context), vertical: 5),
                       child: AppTextField(
                         controller: _searchController,
                         hint: 'Search Items',
@@ -316,10 +328,10 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
           children: [
             CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary)),
-            const SizedBox(height: 16),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
             Text('Loading menu...',
                 style: GoogleFonts.poppins(
-                    fontSize: 14,
+                    fontSize: AppResponsive.bodyFontSize(context),
                     color: AppColors.textSecondary,
                     fontWeight: FontWeight.w500)),
           ],
@@ -346,7 +358,7 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
           height: 42,
           child: ListView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
+            padding: EdgeInsets.symmetric(horizontal: AppResponsive.smallSpacing(context)),
             children: chips,
           ),
         );
@@ -356,11 +368,11 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
 
   Widget _chip(String label, String id, IconData? icon) {
     return Padding(
-      padding: const EdgeInsets.only(right: 8),
+      padding: EdgeInsets.only(right: AppResponsive.smallSpacing(context)),
       child: GestureDetector(
         onTap: () => _scrollToSection(id),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: EdgeInsets.symmetric(horizontal: AppResponsive.mediumSpacing(context), vertical: AppResponsive.smallSpacing(context)),
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: AppColors.white,
@@ -371,12 +383,12 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 16, color: AppColors.textSecondary),
+                Icon(icon, size: AppResponsive.smallIconSize(context), color: AppColors.textSecondary),
                 const SizedBox(width: 4),
               ],
               Text(label,
                   style: GoogleFonts.poppins(
-                      fontSize: 13,
+                      fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w500,
                       color: AppColors.textPrimary)),
             ],
@@ -448,7 +460,7 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
 
         return SingleChildScrollView(
           controller: _scrollController,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          padding: EdgeInsets.symmetric(horizontal: AppResponsive.smallSpacing(context), vertical: 5),
           child: Column(
             children: [
               if (favItems.isNotEmpty)
@@ -522,48 +534,54 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
     _sectionKeys.putIfAbsent(id, () => GlobalKey());
     return Card(
       key: _sectionKeys[id],
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       elevation: 2,
       color: AppColors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context))),
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           controller: _expansionControllers[id],
           initiallyExpanded: query.isNotEmpty || AppSettings.keepCategoriesOpen,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+          tilePadding: EdgeInsets.symmetric(horizontal: AppResponsive.mediumSpacing(context)),
           leading: Container(
-            padding: const EdgeInsets.all(10),
+            padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
             decoration: BoxDecoration(
               color: AppColors.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: AppColors.primary, size: 24),
+            child: Icon(icon, color: AppColors.primary, size: AppResponsive.getValue(context, mobile: 24.0, tablet: 26.0, desktop: 28.0)),
           ),
           title: Text(
             title,
             style: GoogleFonts.poppins(
-                fontSize: 16,
+                fontSize: AppResponsive.subheadingFontSize(context),
                 fontWeight: FontWeight.w600,
                 color: Colors.black87),
           ),
           subtitle: Text(
             '${items.length} item${items.length == 1 ? '' : 's'}',
             style: GoogleFonts.poppins(
-                fontSize: 12, color: AppColors.textSecondary),
+                fontSize: AppResponsive.smallFontSize(context), color: AppColors.textSecondary),
           ),
           children: [
             GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              padding: EdgeInsets.fromLTRB(AppResponsive.mediumSpacing(context), 0, AppResponsive.mediumSpacing(context), AppResponsive.mediumSpacing(context)),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: AppResponsive.gridColumns(context,
                     mobile: 2, tablet: 3, desktop: 4),
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
+                crossAxisSpacing: AppResponsive.gridSpacing(context),
+                mainAxisSpacing: AppResponsive.gridSpacing(context),
+                // Absolute height on desktop — see the constant above.
+                mainAxisExtent: AppResponsive.isDesktop(context)
+                    ? kMenuGridItemCardHeightDesktop
+                    : null,
                 childAspectRatio: AppResponsive.getValue(context,
-                    mobile: 0.75, tablet: 0.70, desktop: 0.75),
+                    mobile: 0.75, tablet: 0.70,
+                    // Ignored on desktop — mainAxisExtent pins the height.
+                    desktop: 0.75),
               ),
               itemCount: items.length,
               itemBuilder: (_, i) => _buildGridItemCard(items[i], cartItems),
@@ -598,7 +616,7 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
                       : inCart
                           ? AppColors.primary.withOpacity(0.04)
                           : AppColors.white,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(AppResponsive.largeBorderRadius(context)),
                   border: Border.all(
                     color: inCart
                         ? AppColors.primary.withOpacity(0.45)
@@ -626,7 +644,7 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
                           decoration: BoxDecoration(
                             color: AppColors.surfaceMedium,
                             borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(16)),
+                                top: Radius.circular(AppResponsive.largeBorderRadius(context))),
                           ),
                           child: Center(child: _buildItemImageForGrid(item)),
                         ),
@@ -645,7 +663,7 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.poppins(
-                              fontSize: 14,
+                              fontSize: AppResponsive.bodyFontSize(context),
                               fontWeight: FontWeight.w600,
                               color: isDisabled
                                   ? AppColors.textSecondary
@@ -663,7 +681,7 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: GoogleFonts.poppins(
-                                        fontSize: 14,
+                                        fontSize: AppResponsive.bodyFontSize(context),
                                         fontWeight: FontWeight.w700,
                                         color: AppColors.primary),
                                   ),
@@ -677,10 +695,10 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
                                       decoration: BoxDecoration(
                                         color: AppColors.primary,
                                         borderRadius:
-                                            BorderRadius.circular(8),
+                                            BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
                                       ),
-                                      child: const Icon(Icons.add,
-                                          color: AppColors.white, size: 16),
+                                      child: Icon(Icons.add,
+                                          color: AppColors.white, size: AppResponsive.smallIconSize(context)),
                                     ),
                                     if (inCart)
                                       Positioned(
@@ -727,7 +745,7 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
                         const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
                       color: AppColors.success,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -770,7 +788,7 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
             fit: BoxFit.cover, width: double.infinity, height: double.infinity);
       }
     }
-    return Icon(Icons.fastfood_rounded, size: 48, color: AppColors.textSecondary);
+    return Icon(Icons.fastfood_rounded, size: AppResponsive.getValue(context, mobile: 48.0, tablet: 56.0, desktop: 64.0), color: AppColors.textSecondary);
   }
 
   String _getPriceDisplayForGrid(Items item) {
@@ -795,7 +813,7 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
         ),
         child: Icon(
           item.isFavorite ? Icons.star_rounded : Icons.star_border_rounded,
-          size: 18,
+          size: AppResponsive.smallIconSize(context),
           color: item.isFavorite ? Colors.amber : AppColors.textSecondary,
         ),
       ),
@@ -807,7 +825,7 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
   Widget _buildCartBar(BuildContext context, Size size) {
     return Container(
       width: size.width,
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+      padding: EdgeInsets.symmetric(horizontal: AppResponsive.mediumSpacing(context), vertical: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.primary,
         boxShadow: [
@@ -838,7 +856,7 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
                         textScaler: const TextScaler.linear(1),
                         style: GoogleFonts.poppins(
                             color: Colors.white70,
-                            fontSize: 11,
+                            fontSize: AppResponsive.captionFontSize(context),
                             fontWeight: FontWeight.w400),
                       ),
                       Text(
@@ -846,7 +864,7 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
                         textScaler: const TextScaler.linear(1),
                         style: GoogleFonts.poppins(
                             color: Colors.white,
-                            fontSize: 18,
+                            fontSize: AppResponsive.subheadingFontSize(context),
                             fontWeight: FontWeight.w700),
                       ),
                     ],
@@ -854,7 +872,7 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
                 },
               ),
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
             Expanded(
               flex: 2,
               child: CommonButton(
@@ -878,12 +896,12 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.shopping_cart_outlined,
-                        size: 18, color: AppColors.primary),
+                        size: AppResponsive.smallIconSize(context), color: AppColors.primary),
                     const SizedBox(width: 6),
                     Text(
                       'View Cart',
                       style: GoogleFonts.poppins(
-                          fontSize: 14,
+                          fontSize: AppResponsive.bodyFontSize(context),
                           fontWeight: FontWeight.w600,
                           color: AppColors.primary),
                       textScaler: const TextScaler.linear(1),

@@ -16,9 +16,7 @@ import 'package:billberrylite/util/common/decimal_settings.dart';
 
 class ApplyTaxScreen extends StatefulWidget {
   final Tax taxToApply;
-  const ApplyTaxScreen({super.key,
-    required this.taxToApply,
-  });
+  const ApplyTaxScreen({super.key, required this.taxToApply});
 
   @override
   State<ApplyTaxScreen> createState() => _ApplyTaxScreenState();
@@ -56,21 +54,32 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
 
     // 1. Category filter (null = All)
     if (_activeCategoryId != null) {
-      result = result.where((item) => item.categoryOfItem == _activeCategoryId).toList();
+      result = result
+          .where((item) => item.categoryOfItem == _activeCategoryId)
+          .toList();
     }
 
     // 2. Search filter (case-insensitive name match)
     if (_searchQuery.isNotEmpty) {
       final query = _searchQuery.toLowerCase();
-      result = result.where((item) =>
-          item.name.toLowerCase().contains(query) ||
-          (item.itemCode != null && item.itemCode!.toLowerCase().contains(query))).toList();
+      result = result
+          .where(
+            (item) =>
+                item.name.toLowerCase().contains(query) ||
+                (item.itemCode != null &&
+                    item.itemCode!.toLowerCase().contains(query)),
+          )
+          .toList();
     }
 
     return result;
   }
 
-  Widget _categoryChip({required String label, required String? id}) {
+  Widget _categoryChip(
+    BuildContext context, {
+    required String label,
+    required String? id,
+  }) {
     final selected = _activeCategoryId == id;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
@@ -84,16 +93,18 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
         labelStyle: GoogleFonts.poppins(
           color: selected ? Colors.white : AppColors.textPrimary,
           fontWeight: FontWeight.w500,
-          fontSize: 13,
+          // Chip is a tappable filter, so 13 snaps UP (Rule 2).
+          fontSize: AppResponsive.bodyFontSize(context),
         ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
-          side: BorderSide(color: selected ? AppColors.primary : AppColors.divider),
+          side: BorderSide(
+            color: selected ? AppColors.primary : AppColors.divider,
+          ),
         ),
       ),
     );
   }
-
 
   void _onItemChecked(bool? isChecked, Items item) {
     setState(() {
@@ -105,18 +116,17 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
     });
   }
 
-  void _onSelectedAllChecked(bool? isChecked, List<Items> visibleItems){
+  void _onSelectedAllChecked(bool? isChecked, List<Items> visibleItems) {
     setState(() {
       final visibleIds = visibleItems.map((item) => item.id);
-      if(isChecked ==true){
+      if (isChecked == true) {
         _selectedItemIds.addAll(visibleIds);
-      }else{
+      } else {
         // Only deselect what's currently visible — keep selections in other filters.
         _selectedItemIds.removeAll(visibleIds);
       }
     });
   }
-
 
   Future<void> _applyTaxToSelected() async {
     if (_selectedItemIds.isEmpty || _isLoading) return;
@@ -148,7 +158,7 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
       NotificationService.instance.showSuccess(
         skipped > 0
             ? '${tax.taxname} (${tax.taxperecentage}%) applied to $applied item(s). '
-                '$skipped skipped (already taxed or at the 2-tax limit).'
+                  '$skipped skipped (already taxed or at the 2-tax limit).'
             : '${tax.taxname} (${tax.taxperecentage}%) applied to $applied item(s).',
       );
     } finally {
@@ -182,9 +192,10 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
   @override
   Widget build(BuildContext context) {
-  return Scaffold(
+    return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: "Apply ${widget.taxToApply.taxname}",
@@ -193,7 +204,9 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
           Observer(
             builder: (context) {
               final items = _visibleItems(itemStore.items);
-              final isAllSelected = items.isNotEmpty && items.every((i) => _selectedItemIds.contains(i.id));
+              final isAllSelected =
+                  items.isNotEmpty &&
+                  items.every((i) => _selectedItemIds.contains(i.id));
 
               return Padding(
                 padding: EdgeInsets.only(right: 8),
@@ -202,7 +215,12 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                     Text(
                       isAllSelected ? "Deselect All" : "Select All",
                       style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0),
+                        fontSize: AppResponsive.getValue(
+                          context,
+                          mobile: 13.0,
+                          tablet: 14.0,
+                          desktop: 15.0,
+                        ),
                         fontWeight: FontWeight.w500,
                         color: Colors.white,
                       ),
@@ -225,9 +243,7 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
         builder: (context) {
           if (itemStore.isLoading) {
             return Center(
-              child: CircularProgressIndicator(
-                color: AppColors.primary,
-              ),
+              child: CircularProgressIndicator(color: AppColors.primary),
             );
           }
 
@@ -238,12 +254,21 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.inventory_2_outlined, size: AppResponsive.getValue(context, mobile: 64.0, tablet: 80.0, desktop: 96.0), color: AppColors.divider),
-                  SizedBox(height: AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0)),
+                  Icon(
+                    Icons.inventory_2_outlined,
+                    size: AppResponsive.getValue(
+                      context,
+                      mobile: 64.0,
+                      tablet: 80.0,
+                      desktop: 96.0,
+                    ),
+                    color: AppColors.divider,
+                  ),
+                  SizedBox(height: AppResponsive.largeSpacing(context)),
                   Text(
                     'No items available',
                     style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 18.0, desktop: 20.0),
+                      fontSize: AppResponsive.subheadingFontSize(context),
                       fontWeight: FontWeight.w500,
                       color: AppColors.textSecondary,
                     ),
@@ -252,7 +277,12 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                   Text(
                     'Add items to your menu first',
                     style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0),
+                      fontSize: AppResponsive.getValue(
+                        context,
+                        mobile: 13.0,
+                        tablet: 14.0,
+                        desktop: 15.0,
+                      ),
                       color: AppColors.textSecondary,
                     ),
                   ),
@@ -275,191 +305,269 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
               Container(
                 color: Colors.white,
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                child: Column(
-                  children: [
-                    AppTextField(
-                      controller: _searchController,
-                      hint: 'Search items…',
-                      icon: Icons.search_rounded,
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 38,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: [
-                          _categoryChip(label: 'All', id: null),
-                          ...categoryStore.categories
-                              .map((c) => _categoryChip(label: c.name, id: c.id)),
-                        ],
+                child: AppResponsive.constrainedContent(
+                  context: context,
+                  maxWidth: AppResponsive.maxFormWidth(context),
+                  heightFactor: 1,
+                  child: Column(
+                    children: [
+                      AppTextField(
+                        controller: _searchController,
+                        hint: 'Search items…',
+                        icon: Icons.search_rounded,
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: visibleItems.isEmpty
-                    ? Center(
-                        child: Text(
-                          'No items match your search',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      )
-                    : ListView.builder(
-                  padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 12.0, tablet: 16.0, desktop: 20.0)),
-                  itemCount: visibleItems.length,
-                  itemBuilder: (context, index) {
-                    final item = visibleItems[index];
-                    final isSelected = _selectedItemIds.contains(item.id);
-
-                    return Container(
-                      margin: EdgeInsets.only(bottom: AppResponsive.getValue(context, mobile: 8.0, tablet: 10.0, desktop: 12.0)),
-                      decoration: BoxDecoration(
-                        color: AppColors.white,
-                        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-                        border: Border.all(
-                          color: isSelected ? AppColors.primary : AppColors.divider,
-                          width: isSelected ? 2 : 1,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.03),
-                            blurRadius: AppResponsive.shadowBlurRadius(context),
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: CheckboxListTile(
-                        value: isSelected,
-                        onChanged: (bool? value) => _onItemChecked(value, item),
-                        activeColor: AppColors.primary,
-                        controlAffinity: ListTileControlAffinity.leading,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: AppResponsive.getValue(context, mobile: 12.0, tablet: 16.0, desktop: 20.0),
-                          vertical: AppResponsive.getValue(context, mobile: 8.0, tablet: 10.0, desktop: 12.0),
-                        ),
-                        title: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 38,
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
                           children: [
-                            Expanded(
-                              child: Text(
-                                item.name,
-                                style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0),
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              item.price == null
-                                  ? '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(0)}'
-                                  : AppSettings.isTaxInclusive
-                                      ? item.taxRate != null
-                                          ? '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.basePrice)}'
-                                          : '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.price!)}'
-                                      : '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.price!)}',
-                              style: GoogleFonts.poppins(
-                                fontSize: AppResponsive.getValue(context, mobile: 15.0, tablet: 16.0, desktop: 17.0),
-                                fontWeight: FontWeight.bold,
-                                color: item.taxRate != null ? AppColors.success : AppColors.textPrimary,
+                            _categoryChip(context, label: 'All', id: null),
+                            ...categoryStore.categories.map(
+                              (c) => _categoryChip(
+                                context,
+                                label: c.name,
+                                id: c.id,
                               ),
                             ),
                           ],
                         ),
-                        subtitle: item.taxRate != null
-                            ? Padding(
-                          padding: EdgeInsets.only(top: AppResponsive.getValue(context, mobile: 8.0, tablet: 10.0, desktop: 12.0)),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.info.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  "Tax Applied: ${item.taxRate! > 1 ? DecimalSettings.formatAmount(item.taxRate!) : DecimalSettings.formatAmount(item.taxRate! * 100)}%",
-                                  style: GoogleFonts.poppins(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0),
-                                    color: AppColors.info,
-                                  ),
-                                ),
-                              ),
-                              SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    "Tax Amount:",
-                                    style: GoogleFonts.poppins(
-                                      fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0),
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                  Text(
-                                    "Net Amount:",
-                                    style: GoogleFonts.poppins(
-                                      fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0),
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 4),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    item.price == null
-                                        ? '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(0)}'
-                                        : AppSettings.isTaxInclusive
-                                            ? '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.taxAmount)}'
-                                            : '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.price! * item.taxRate!)}',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: AppResponsive.getValue(context, mobile: 13.0, tablet: 14.0, desktop: 15.0),
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.success,
-                                    ),
-                                  ),
-                                  Text(
-                                    item.price == null
-                                        ? '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(0)}'
-                                        : AppSettings.isTaxInclusive
-                                            ? '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.price!)}'
-                                            : '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.price! * (1 + item.taxRate!))}',
-                                    style: GoogleFonts.poppins(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        )
-                            : Padding(
-                          padding: EdgeInsets.only(top: 6),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Expanded(
+                child: AppResponsive.constrainedContent(
+                  context: context,
+                  maxWidth: AppResponsive.maxFormWidth(context),
+                  alignment: Alignment.topCenter,
+                  child: visibleItems.isEmpty
+                      ? Center(
                           child: Text(
-                            "No tax applied",
+                            'No items match your search',
                             style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.getValue(context, mobile: 12.0, tablet: 13.0, desktop: 14.0),
+                              fontSize: AppResponsive.bodyFontSize(context),
                               color: AppColors.textSecondary,
                             ),
                           ),
+                        )
+                      : ListView.builder(
+                          padding: EdgeInsets.all(
+                            AppResponsive.gridSpacing(context),
+                          ),
+                          itemCount: visibleItems.length,
+                          itemBuilder: (context, index) {
+                            final item = visibleItems[index];
+                            final isSelected = _selectedItemIds.contains(
+                              item.id,
+                            );
+
+                            return Container(
+                              margin: EdgeInsets.only(
+                                bottom: AppResponsive.smallSpacing(context),
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.white,
+                                borderRadius: BorderRadius.circular(
+                                  AppResponsive.borderRadius(context),
+                                ),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? AppColors.primary
+                                      : AppColors.divider,
+                                  width: isSelected ? 2 : 1,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.03),
+                                    blurRadius: AppResponsive.shadowBlurRadius(
+                                      context,
+                                    ),
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: CheckboxListTile(
+                                value: isSelected,
+                                onChanged: (bool? value) =>
+                                    _onItemChecked(value, item),
+                                activeColor: AppColors.primary,
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: AppResponsive.gridSpacing(
+                                    context,
+                                  ),
+                                  vertical: AppResponsive.smallSpacing(context),
+                                ),
+                                title: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        item.name,
+                                        style: GoogleFonts.poppins(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: AppResponsive.getValue(
+                                            context,
+                                            mobile: 16.0,
+                                            tablet: 17.0,
+                                            desktop: 18.0,
+                                          ),
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      item.price == null
+                                          ? '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(0)}'
+                                          : AppSettings.isTaxInclusive
+                                          ? item.taxRate != null
+                                                ? '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.basePrice)}'
+                                                : '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.price!)}'
+                                          : '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.price!)}',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: AppResponsive.buttonFontSize(
+                                          context,
+                                        ),
+                                        fontWeight: FontWeight.bold,
+                                        color: item.taxRate != null
+                                            ? AppColors.success
+                                            : AppColors.textPrimary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                subtitle: item.taxRate != null
+                                    ? Padding(
+                                        padding: EdgeInsets.only(
+                                          top: AppResponsive.smallSpacing(
+                                            context,
+                                          ),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Container(
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: 8,
+                                                vertical: 4,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.info
+                                                    .withValues(alpha: 0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                "Tax Applied: ${item.taxRate! > 1 ? DecimalSettings.formatAmount(item.taxRate!) : DecimalSettings.formatAmount(item.taxRate! * 100)}%",
+                                                style: GoogleFonts.poppins(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize:
+                                                      AppResponsive.smallFontSize(
+                                                        context,
+                                                      ),
+                                                  color: AppColors.info,
+                                                ),
+                                              ),
+                                            ),
+                                            SizedBox(height: 8),
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [
+                                                Text(
+                                                  "Tax Amount:",
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize:
+                                                        AppResponsive.smallFontSize(
+                                                          context,
+                                                        ),
+                                                    color:
+                                                        AppColors.textSecondary,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  "Net Amount:",
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize:
+                                                        AppResponsive.smallFontSize(
+                                                          context,
+                                                        ),
+                                                    color:
+                                                        AppColors.textSecondary,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            SizedBox(height: 4),
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [
+                                                Text(
+                                                  item.price == null
+                                                      ? '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(0)}'
+                                                      : AppSettings
+                                                            .isTaxInclusive
+                                                      ? '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.taxAmount)}'
+                                                      : '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.price! * item.taxRate!)}',
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize:
+                                                        AppResponsive.getValue(
+                                                          context,
+                                                          mobile: 13.0,
+                                                          tablet: 14.0,
+                                                          desktop: 15.0,
+                                                        ),
+                                                    fontWeight: FontWeight.w600,
+                                                    color: AppColors.success,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  item.price == null
+                                                      ? '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(0)}'
+                                                      : AppSettings
+                                                            .isTaxInclusive
+                                                      ? '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.price!)}'
+                                                      : '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.price! * (1 + item.taxRate!))}',
+                                                  style: GoogleFonts.poppins(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize:
+                                                        AppResponsive.bodyFontSize(
+                                                          context,
+                                                        ),
+                                                    color:
+                                                        AppColors.textPrimary,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    : Padding(
+                                        padding: EdgeInsets.only(top: 6),
+                                        child: Text(
+                                          "No tax applied",
+                                          style: GoogleFonts.poppins(
+                                            fontSize:
+                                                AppResponsive.smallFontSize(
+                                                  context,
+                                                ),
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        ),
+                                      ),
+                              ),
+                            );
+                          },
                         ),
-                      ),
-                    );
-                  },
                 ),
               ),
               // Action buttons pinned at the bottom
@@ -475,74 +583,101 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
     return Container(
       color: Colors.white,
       padding: EdgeInsets.fromLTRB(
-        AppResponsive.getValue(context, mobile: 12.0, tablet: 16.0, desktop: 20.0),
-        AppResponsive.getValue(context, mobile: 12.0, tablet: 16.0, desktop: 20.0),
-        AppResponsive.getValue(context, mobile: 12.0, tablet: 16.0, desktop: 20.0),
-        AppResponsive.getValue(context, mobile: 12.0, tablet: 16.0, desktop: 20.0),
+        AppResponsive.gridSpacing(context),
+        AppResponsive.gridSpacing(context),
+        AppResponsive.gridSpacing(context),
+        AppResponsive.gridSpacing(context),
       ),
       child: SafeArea(
         top: false,
-        child: Row(
-          children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: (_selectedItemIds.isEmpty || _isLoading) ? null : _applyTaxToSelected,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: Colors.grey.shade300,
-                  elevation: 0,
-                  padding: EdgeInsets.symmetric(
-                    vertical: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0),
+        child: AppResponsive.constrainedContent(
+          context: context,
+          maxWidth: AppResponsive.maxFormWidth(context),
+          heightFactor: 1,
+          child: Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: (_selectedItemIds.isEmpty || _isLoading)
+                      ? null
+                      : _applyTaxToSelected,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.grey.shade300,
+                    elevation: 0,
+                    padding: EdgeInsets.symmetric(
+                      vertical: AppResponsive.mediumSpacing(context),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+                  icon: Icon(
+                    Icons.check_circle_rounded,
+                    size: AppResponsive.getValue(
+                      context,
+                      mobile: 18.0,
+                      tablet: 20.0,
+                      desktop: 22.0,
+                    ),
                   ),
-                ),
-                icon: Icon(Icons.check_circle_rounded, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
-                label: Text(
-                  "Apply ${widget.taxToApply.taxperecentage}% Tax",
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-            SizedBox(width: 12),
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: (_selectedItemIds.isEmpty || _isLoading || !hasTaxedSelection) ? null : _removeTaxFromSelected,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: Colors.grey.shade300,
-                  elevation: 0,
-                  padding: EdgeInsets.symmetric(
-                    vertical: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0),
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                icon: Icon(Icons.remove_circle_rounded, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
-                label: Text(
-                  "Remove Tax",
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.0, desktop: 16.0),
-                    fontWeight: FontWeight.w600,
+                  label: Text(
+                    "Apply ${widget.taxToApply.taxperecentage}% Tax",
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+              SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed:
+                      (_selectedItemIds.isEmpty ||
+                          _isLoading ||
+                          !hasTaxedSelection)
+                      ? null
+                      : _removeTaxFromSelected,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.grey.shade300,
+                    elevation: 0,
+                    padding: EdgeInsets.symmetric(
+                      vertical: AppResponsive.mediumSpacing(context),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: Icon(
+                    Icons.remove_circle_rounded,
+                    size: AppResponsive.getValue(
+                      context,
+                      mobile: 18.0,
+                      tablet: 20.0,
+                      desktop: 22.0,
+                    ),
+                  ),
+                  label: Text(
+                    "Remove Tax",
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-// double totalgst(double itemprice , double gstrate){
-//   return itemprice * gstrate / 100 ;
-// }
-
+  // double totalgst(double itemprice , double gstrate){
+  //   return itemprice * gstrate / 100 ;
+  // }
 }

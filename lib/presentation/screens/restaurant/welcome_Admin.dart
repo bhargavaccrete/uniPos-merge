@@ -34,7 +34,8 @@ class AdminWelcome extends StatefulWidget {
 class _AdminWelcomeState extends State<AdminWelcome> {
   String _storeName = '';
   bool _hasPendingEOD = false;
-  bool _dayNotStarted = false; // day closed/not started → show a non-blocking banner
+  bool _dayNotStarted =
+      false; // day closed/not started → show a non-blocking banner
   bool _isEodStrictlyPending = false;
   int _openTableCount = 0; // active orders awaiting resolution (locked state)
 
@@ -152,7 +153,8 @@ class _AdminWelcomeState extends State<AdminWelcome> {
     final staffId = RestaurantSession.isAdmin
         ? 'admin'
         : (RestaurantSession.staffName ?? 'staff');
-    final staffName = RestaurantSession.staffName ??
+    final staffName =
+        RestaurantSession.staffName ??
         (RestaurantSession.isAdmin ? 'Admin' : 'Staff');
 
     // Restore from Hive in case of hot-restart
@@ -175,8 +177,9 @@ class _AdminWelcomeState extends State<AdminWelcome> {
 
   @override
   Widget build(BuildContext context) {
+    // Still used by the notification bell and the card's `compact` flag; the
+    // grid tokens now come from AppResponsive directly.
     final isTablet = !AppResponsive.isMobile(context);
-    final isDesktop = AppResponsive.isDesktop(context);
 
     return PopScope(
       canPop: !_isEodStrictlyPending,
@@ -186,369 +189,579 @@ class _AdminWelcomeState extends State<AdminWelcome> {
         if (_isEodStrictlyPending) return;
       },
       child: Scaffold(
-      backgroundColor: AppColors.surfaceLight,
-      drawer: _isEodStrictlyPending
-          ? null
-          : const Drawerr(showClearCart: false, showGridDuplicates: false, showChangePin: true, showHome: false),
-      appBar: _isEodStrictlyPending
-          ? null
-          : buildPrimaryAppBar(
-        titleWidget: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Dashboard',
-              style: GoogleFonts.poppins(
-                fontSize: isTablet ? 22 : 20,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
+        backgroundColor: AppColors.surfaceLight,
+        drawer: _isEodStrictlyPending
+            ? null
+            : const Drawerr(
+                showClearCart: false,
+                showGridDuplicates: false,
+                showChangePin: true,
+                showHome: false,
               ),
-            ),
-            Text(
-              _storeName.isNotEmpty ? _storeName : 'Restaurant',
-              style: GoogleFonts.poppins(
-                fontSize: isTablet ? 14 : 13,
-                fontWeight: FontWeight.w500,
-                color: Colors.white70,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          NotificationBell(iconSize: isTablet ? 24 : 22),
-        ],
-      ),
-      body: Stack(children: [
-          Column(
-              children: [
-          // License expiry warning banner (7 days or less remaining)
-          Observer(
-            builder: (_) {
-              final licStore = locator<LicenseStore>();
-              if (!licStore.isExpiringSoon || licStore.licenseInfo == null) return const SizedBox.shrink();
-              final days = licStore.licenseInfo!.daysRemaining;
-              
-              // If not expired yet (days > 0), check if snoozed
-              if (days > 0) {
-                if (_snoozeLicenseUntil != null && _snoozeLicenseUntil!.isAfter(DateTime.now())) {
-                  return const SizedBox.shrink();
-                }
-              }
-              
-              return Container(
-                margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: days <= 0 ? Colors.red.shade50 : Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: days <= 0 ? Colors.red.shade200 : Colors.orange.shade200),
-                ),
-                child: Row(
+        appBar: _isEodStrictlyPending
+            ? null
+            : buildPrimaryAppBar(
+                titleWidget: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: days <= 0 ? Colors.red.shade100 : Colors.orange.shade100,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        days <= 0 ? Icons.error_outline_rounded : Icons.timer_outlined,
-                        color: days <= 0 ? Colors.red.shade700 : Colors.orange.shade700,
-                        size: 20,
+                    Text(
+                      'Dashboard',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.headingFontSize(context),
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            days <= 0
-                                ? 'License expired!'
-                                : days == 0
-                                    ? 'License expires today!'
-                                    : 'License expires in $days day${days == 1 ? '' : 's'}',
-                            style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: days <= 0 ? Colors.red.shade800 : Colors.orange.shade800),
-                          ),
-                          Text(
-                            'Renew your license to avoid service interruption.',
-                            style: GoogleFonts.poppins(
-                                fontSize: 11,
-                                color: days <= 0 ? Colors.red.shade700 : Colors.orange.shade700),
-                          ),
-                        ],
+                    Text(
+                      _storeName.isNotEmpty ? _storeName : 'Restaurant',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white70,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    TextButton(
-                      onPressed: () => Navigator.pushNamed(
-                          context, RouteNames.restaurantLicensing),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
-                        backgroundColor: days <= 0 ? Colors.red.shade100 : Colors.orange.shade100,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
-                      child: Text('Renew',
-                          style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: days <= 0 ? Colors.red.shade800 : Colors.orange.shade800)),
-                    ),
-                    // If not expired, show the snooze button
-                    if (days > 0) ...[
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: Icon(Icons.close_rounded, color: Colors.orange.shade800, size: 18),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        onPressed: () => _snoozeAlert('snooze_license_until', const Duration(hours: 24)),
-                      ),
-                    ],
                   ],
                 ),
-              );
-            },
-          ),
-
-          // Pending EOD warning banner
-          if (_hasPendingEOD && (_snoozeEodUntil == null || _snoozeEodUntil!.isBefore(DateTime.now())))
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.red.shade50,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.red.shade200),
+                actions: [NotificationBell(iconSize: isTablet ? 24 : 22)],
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade100,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 20),
+        body: Stack(
+          children: [
+            Column(
+              children: [
+                // License expiry warning banner (7 days or less remaining)
+                Observer(
+                  builder: (_) {
+                    final licStore = locator<LicenseStore>();
+                    if (!licStore.isExpiringSoon ||
+                        licStore.licenseInfo == null)
+                      return const SizedBox.shrink();
+                    final days = licStore.licenseInfo!.daysRemaining;
+
+                    // If not expired yet (days > 0), check if snoozed
+                    if (days > 0) {
+                      if (_snoozeLicenseUntil != null &&
+                          _snoozeLicenseUntil!.isAfter(DateTime.now())) {
+                        return const SizedBox.shrink();
+                      }
+                    }
+
+                    return Container(
+                      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppResponsive.largeSpacing(context),
+                        vertical: AppResponsive.mediumSpacing(context),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('End of Day Pending', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.red.shade800)),
-                            Text('Previous day session is still open.', style: GoogleFonts.poppins(fontSize: 11, color: Colors.red.shade600)),
+                      decoration: BoxDecoration(
+                        color: days <= 0
+                            ? Colors.red.shade50
+                            : Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: days <= 0
+                              ? Colors.red.shade200
+                              : Colors.orange.shade200,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(
+                              AppResponsive.smallSpacing(context),
+                            ),
+                            decoration: BoxDecoration(
+                              color: days <= 0
+                                  ? Colors.red.shade100
+                                  : Colors.orange.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              days <= 0
+                                  ? Icons.error_outline_rounded
+                                  : Icons.timer_outlined,
+                              color: days <= 0
+                                  ? Colors.red.shade700
+                                  : Colors.orange.shade700,
+                              size: AppResponsive.iconSize(context),
+                            ),
+                          ),
+                          SizedBox(width: AppResponsive.mediumSpacing(context)),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  days <= 0
+                                      ? 'License expired!'
+                                      : days == 0
+                                      ? 'License expires today!'
+                                      : 'License expires in $days day${days == 1 ? '' : 's'}',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
+                                    fontWeight: FontWeight.w600,
+                                    color: days <= 0
+                                        ? Colors.red.shade800
+                                        : Colors.orange.shade800,
+                                  ),
+                                ),
+                                Text(
+                                  'Renew your license to avoid service interruption.',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.captionFontSize(
+                                      context,
+                                    ),
+                                    color: days <= 0
+                                        ? Colors.red.shade700
+                                        : Colors.orange.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(width: AppResponsive.smallSpacing(context)),
+                          TextButton(
+                            onPressed: () => Navigator.pushNamed(
+                              context,
+                              RouteNames.restaurantLicensing,
+                            ),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              backgroundColor: days <= 0
+                                  ? Colors.red.shade100
+                                  : Colors.orange.shade100,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: Text(
+                              'Renew',
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.smallFontSize(context),
+                                fontWeight: FontWeight.w600,
+                                color: days <= 0
+                                    ? Colors.red.shade800
+                                    : Colors.orange.shade800,
+                              ),
+                            ),
+                          ),
+                          // If not expired, show the snooze button
+                          if (days > 0) ...[
+                            SizedBox(
+                              width: AppResponsive.smallSpacing(context),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.close_rounded,
+                                color: Colors.orange.shade800,
+                                size: AppResponsive.smallIconSize(context),
+                              ),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              onPressed: () => _snoozeAlert(
+                                'snooze_license_until',
+                                const Duration(hours: 24),
+                              ),
+                            ),
                           ],
-                        ),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: Icon(Icons.close_rounded, color: Colors.red.shade800, size: 18),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        onPressed: () async {
-                          await DayManagementService.snoozeEODAlert();
-                          await _snoozeAlert('snooze_eod_until', const Duration(hours: 24));
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () async {
-                            await DayManagementService.snoozeEODAlert();
-                            await _snoozeAlert('snooze_eod_until', const Duration(hours: 24));
-                          },
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: Colors.red.shade300),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                          ),
-                          child: Text('Continue Today', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.red.shade700)),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            await Navigator.pushNamed(context, RouteNames.restaurantEndDay);
-                            if (mounted) _checkDayStarted();
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red.shade600,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                          ),
-                          child: Text('Complete EOD', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.white)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+                    );
+                  },
+                ),
 
-          // Day-not-started banner (non-blocking). The day starts on the first
-          // order; this just lets the user start it early if they want.
-          if (_dayNotStarted && !_hasPendingEOD && (_snoozeDayStartUntil == null || _snoozeDayStartUntil!.isBefore(DateTime.now())))
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppColors.warning.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.warning.withOpacity(0.4)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.wb_sunny_outlined, color: AppColors.warning, size: 20),
-                  const SizedBox(width: 12),
-                  Expanded(
+                // Pending EOD warning banner
+                if (_hasPendingEOD &&
+                    (_snoozeEodUntil == null ||
+                        _snoozeEodUntil!.isBefore(DateTime.now())))
+                  Container(
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppResponsive.largeSpacing(context),
+                      vertical: AppResponsive.mediumSpacing(context),
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Day not started',
-                            style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                        Text('Starts automatically on your first order, or start it now.',
-                            style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary)),
+                        Row(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(
+                                AppResponsive.smallSpacing(context),
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade100,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.warning_amber_rounded,
+                                color: Colors.red.shade700,
+                                size: AppResponsive.iconSize(context),
+                              ),
+                            ),
+                            SizedBox(
+                              width: AppResponsive.mediumSpacing(context),
+                            ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'End of Day Pending',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: AppResponsive.bodyFontSize(
+                                        context,
+                                      ),
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.red.shade800,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Previous day session is still open.',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: AppResponsive.captionFontSize(
+                                        context,
+                                      ),
+                                      color: Colors.red.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(
+                              width: AppResponsive.smallSpacing(context),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.close_rounded,
+                                color: Colors.red.shade800,
+                                size: AppResponsive.smallIconSize(context),
+                              ),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              onPressed: () async {
+                                await DayManagementService.snoozeEODAlert();
+                                await _snoozeAlert(
+                                  'snooze_eod_until',
+                                  const Duration(hours: 24),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: AppResponsive.smallSpacing(context)),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () async {
+                                  await DayManagementService.snoozeEODAlert();
+                                  await _snoozeAlert(
+                                    'snooze_eod_until',
+                                    const Duration(hours: 24),
+                                  );
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(color: Colors.red.shade300),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                  ),
+                                ),
+                                child: Text(
+                                  'Continue Today',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.smallFontSize(
+                                      context,
+                                    ),
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.red.shade700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(
+                              width: AppResponsive.smallSpacing(context),
+                            ),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () async {
+                                  await Navigator.pushNamed(
+                                    context,
+                                    RouteNames.restaurantEndDay,
+                                  );
+                                  if (mounted) _checkDayStarted();
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red.shade600,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                  ),
+                                ),
+                                child: Text(
+                                  'Complete EOD',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.smallFontSize(
+                                      context,
+                                    ),
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  ElevatedButton(
-                    onPressed: () async {
-                      final started = await promptStartDay(context);
-                      if (started && mounted) setState(() => _dayNotStarted = false);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+
+                // Day-not-started banner (non-blocking). The day starts on the first
+                // order; this just lets the user start it early if they want.
+                if (_dayNotStarted &&
+                    !_hasPendingEOD &&
+                    (_snoozeDayStartUntil == null ||
+                        _snoozeDayStartUntil!.isBefore(DateTime.now())))
+                  Container(
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
                     ),
-                    child: Text('Start Day',
-                        style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: Icon(Icons.close_rounded, color: AppColors.warning, size: 18),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    onPressed: () => _snoozeAlert('snooze_day_start_until', const Duration(hours: 24)),
-                  ),
-                ],
-              ),
-            ),
-
-          // Content
-          Expanded(
-            child: Observer(
-              builder: (_) => LayoutBuilder(
-              builder: (context, constraints) {
-                final cards = _getVisibleCards(context);
-                // Single source of truth for column count (respects AppResponsive breakpoints).
-                final columns = AppResponsive.gridColumns(context);
-                final rows = (cards.length / columns).ceil();
-
-                final spacing = isDesktop ? 20.0 : isTablet ? 16.0 : 12.0;
-                final padH = isDesktop ? 28.0 : isTablet ? 24.0 : 16.0;
-                final padTop = isDesktop ? 12.0 : isTablet ? 8.0 : 4.0;
-                final pad = EdgeInsets.fromLTRB(padH, padTop, padH, padH);
-
-                // The densest the cards should ever be (their current look).
-                final naturalRatio = isDesktop ? 1.4 : isTablet ? 1.3 : 1.2;
-
-                final availW = constraints.maxWidth - padH * 2;
-                final availH = constraints.maxHeight - padTop - padH;
-                final cellW = (availW - (columns - 1) * spacing) / columns;
-                final naturalGridH =
-                    (cellW / naturalRatio) * rows + (rows - 1) * spacing;
-
-                final children = cards
-                    .map((card) => DashboardMenuCard(
-                          icon: card.icon,
-                          title: card.title,
-                          color: card.color,
-                          compact: !isTablet,
-                          onTap: () {
-                            // Entitlement denied → show upgrade blocker
-                            // instead of navigating.
-                            if (card.entitlementKey != null &&
-                                !PlanGuard.allowedOr(
-                                    context, card.entitlementKey!,
-                                    featureName: card.title)) {
-                              return;
-                            }
-                            card.onTap();
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppResponsive.largeSpacing(context),
+                      vertical: AppResponsive.mediumSpacing(context),
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: AppColors.warning.withOpacity(0.4),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.wb_sunny_outlined,
+                          color: AppColors.warning,
+                          size: AppResponsive.iconSize(context),
+                        ),
+                        SizedBox(width: AppResponsive.mediumSpacing(context)),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Day not started',
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.bodyFontSize(context),
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              Text(
+                                'Starts automatically on your first order, or start it now.',
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.captionFontSize(
+                                    context,
+                                  ),
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(width: AppResponsive.smallSpacing(context)),
+                        ElevatedButton(
+                          onPressed: () async {
+                            final started = await promptStartDay(context);
+                            if (started && mounted)
+                              setState(() => _dayNotStarted = false);
                           },
-                          // Low-stock count badge on the Inventory tile.
-                          badge: card.title == 'Inventory'
-                              ? Observer(
-                                  builder: (_) {
-                                    final count = StockAdjustService
-                                        .lowStockEntries()
-                                        .length;
-                                    if (count == 0) {
-                                      return const SizedBox.shrink();
-                                    }
-                                    return DashboardCardBadge(count: count);
-                                  },
-                                )
-                              : null,
-                        ))
-                    .toList();
-
-                // Content taller than the viewport (e.g. phone, many rows) → scroll.
-                if (naturalGridH > availH) {
-                  return SingleChildScrollView(
-                    padding: pad,
-                    child: GridView.count(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisCount: columns,
-                      crossAxisSpacing: spacing,
-                      mainAxisSpacing: spacing,
-                      childAspectRatio: naturalRatio,
-                      children: children,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                          ),
+                          child: Text(
+                            'Start Day',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.smallFontSize(context),
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: AppResponsive.smallSpacing(context)),
+                        IconButton(
+                          icon: Icon(
+                            Icons.close_rounded,
+                            color: AppColors.warning,
+                            size: AppResponsive.smallIconSize(context),
+                          ),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          onPressed: () => _snoozeAlert(
+                            'snooze_day_start_until',
+                            const Duration(hours: 24),
+                          ),
+                        ),
+                      ],
                     ),
-                  );
-                }
-
-                // Fits → stretch the rows to fill the leftover vertical space.
-                final cellH = (availH - (rows - 1) * spacing) / rows;
-                final fillRatio = (cellW / cellH).clamp(0.85, naturalRatio);
-                return Padding(
-                  padding: pad,
-                  child: GridView.count(
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: columns,
-                    crossAxisSpacing: spacing,
-                    mainAxisSpacing: spacing,
-                    childAspectRatio: fillRatio,
-                    children: children,
                   ),
-                );
-              },
-            ),
-            ),
-          ),
+
+                // Content
+                Expanded(
+                  child: Observer(
+                    builder: (_) => LayoutBuilder(
+                      builder: (context, constraints) {
+                        final cards = _getVisibleCards(context);
+                        // Single source of truth for column count (respects AppResponsive breakpoints).
+                        final columns = AppResponsive.gridColumns(context);
+                        final rows = (cards.length / columns).ceil();
+
+                        final spacing = AppResponsive.gridSpacing(context);
+                        final padH = AppResponsive.getValue(
+                          context,
+                          mobile: 16.0,
+                          tablet: 24.0,
+                          desktop: 28.0,
+                        );
+                        final padTop = AppResponsive.getValue(
+                          context,
+                          mobile: 4.0,
+                          tablet: 8.0,
+                          desktop: 12.0,
+                        );
+                        final pad = EdgeInsets.fromLTRB(
+                          padH,
+                          padTop,
+                          padH,
+                          padH,
+                        );
+
+                        // The densest the cards should ever be (their current look).
+                        final naturalRatio = AppResponsive.getValue(
+                          context,
+                          mobile: 1.2,
+                          tablet: 1.3,
+                          desktop: 1.4,
+                        );
+
+                        final availW = constraints.maxWidth - padH * 2;
+                        final availH = constraints.maxHeight - padTop - padH;
+                        final cellW =
+                            (availW - (columns - 1) * spacing) / columns;
+                        final naturalGridH =
+                            (cellW / naturalRatio) * rows +
+                            (rows - 1) * spacing;
+
+                        final children = cards
+                            .map(
+                              (card) => DashboardMenuCard(
+                                icon: card.icon,
+                                title: card.title,
+                                color: card.color,
+                                compact: !isTablet,
+                                onTap: () {
+                                  // Entitlement denied → show upgrade blocker
+                                  // instead of navigating.
+                                  if (card.entitlementKey != null &&
+                                      !PlanGuard.allowedOr(
+                                        context,
+                                        card.entitlementKey!,
+                                        featureName: card.title,
+                                      )) {
+                                    return;
+                                  }
+                                  card.onTap();
+                                },
+                                // Low-stock count badge on the Inventory tile.
+                                badge: card.title == 'Inventory'
+                                    ? Observer(
+                                        builder: (_) {
+                                          final count =
+                                              StockAdjustService.lowStockEntries()
+                                                  .length;
+                                          if (count == 0) {
+                                            return const SizedBox.shrink();
+                                          }
+                                          return DashboardCardBadge(
+                                            count: count,
+                                          );
+                                        },
+                                      )
+                                    : null,
+                              ),
+                            )
+                            .toList();
+
+                        // Content taller than the viewport (e.g. phone, many rows) → scroll.
+                        if (naturalGridH > availH) {
+                          return SingleChildScrollView(
+                            padding: pad,
+                            child: GridView.count(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              crossAxisCount: columns,
+                              crossAxisSpacing: spacing,
+                              mainAxisSpacing: spacing,
+                              childAspectRatio: naturalRatio,
+                              children: children,
+                            ),
+                          );
+                        }
+
+                        // Fits → stretch the rows to fill the leftover vertical space.
+                        final cellH = (availH - (rows - 1) * spacing) / rows;
+                        final fillRatio = (cellW / cellH).clamp(
+                          0.85,
+                          naturalRatio,
+                        );
+                        return Padding(
+                          padding: pad,
+                          child: GridView.count(
+                            physics: const NeverScrollableScrollPhysics(),
+                            crossAxisCount: columns,
+                            crossAxisSpacing: spacing,
+                            mainAxisSpacing: spacing,
+                            childAspectRatio: fillRatio,
+                            children: children,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ), // Column / body
+            if (_isEodStrictlyPending)
+              Positioned.fill(child: _buildLockedOverlay(context)),
           ],
-        ), // Column / body
-        if (_isEodStrictlyPending)
-          Positioned.fill(child: _buildLockedOverlay(context)),
-      ]),
+        ),
       ), // PopScope closing
     );
   }
@@ -558,31 +771,130 @@ class _AdminWelcomeState extends State<AdminWelcome> {
   // Admin and Manager see all cards. Other roles see only what canAccess() permits.
   List<_MenuCardData> _getVisibleCards(BuildContext context) {
     final all = [
-      _MenuCardData('Start Order',   Icons.shopping_cart_rounded,       Colors.blue,           'startOrder',   () => Navigator.pushNamed(context, RouteNames.restaurantStartOrder), entitlementKey: EntKeys.billing),
-      _MenuCardData('Manage Menu',   Icons.restaurant_menu_rounded,     Colors.purple,         'manageMenu',   () => Navigator.pushNamed(context, RouteNames.restaurantManageMenu), entitlementKey: EntKeys.manageMenu),
-      _MenuCardData('Manage Staff',  Icons.people_rounded,              Colors.teal,           'manageStaff',  () => Navigator.pushNamed(context, RouteNames.restaurantStaff), entitlementKey: EntKeys.users),
-      _MenuCardData('Customers',     Icons.person_outline_rounded,      Colors.indigo,         'customers',    () => Navigator.pushNamed(context, RouteNames.restaurantCustomers), entitlementKey: EntKeys.customers),
-      _MenuCardData('Reports',       Icons.bar_chart_rounded,           Colors.orange,         'reports',      () => Navigator.pushNamed(context, RouteNames.restaurantReports), entitlementKey: EntKeys.reports),
-      _MenuCardData('Tax Settings',  Icons.receipt_long_rounded,        Colors.green,          'taxSettings',  () => Navigator.pushNamed(context, RouteNames.restaurantTaxSettings), entitlementKey: EntKeys.settings),
-      _MenuCardData('Expenses',      Icons.account_balance_wallet_rounded, Colors.red,         'expenses',     () => Navigator.pushNamed(context, RouteNames.restaurantExpenses), entitlementKey: EntKeys.expenses),
-      _MenuCardData('Inventory',     Icons.inventory_2_rounded,         Colors.amber,          'inventory',    () => Navigator.pushNamed(context, RouteNames.restaurantInventory), entitlementKey: EntKeys.inventory),
-      _MenuCardData('Settings',      Icons.settings_rounded,            Colors.blueGrey,       'settings',     () => Navigator.pushNamed(context, RouteNames.restaurantSettings), entitlementKey: EntKeys.settings),
+      _MenuCardData(
+        'Start Order',
+        Icons.shopping_cart_rounded,
+        Colors.blue,
+        'startOrder',
+        () => Navigator.pushNamed(context, RouteNames.restaurantStartOrder),
+        entitlementKey: EntKeys.billing,
+      ),
+      _MenuCardData(
+        'Manage Menu',
+        Icons.restaurant_menu_rounded,
+        Colors.purple,
+        'manageMenu',
+        () => Navigator.pushNamed(context, RouteNames.restaurantManageMenu),
+        entitlementKey: EntKeys.manageMenu,
+      ),
+      _MenuCardData(
+        'Manage Staff',
+        Icons.people_rounded,
+        Colors.teal,
+        'manageStaff',
+        () => Navigator.pushNamed(context, RouteNames.restaurantStaff),
+        entitlementKey: EntKeys.users,
+      ),
+      _MenuCardData(
+        'Customers',
+        Icons.person_outline_rounded,
+        Colors.indigo,
+        'customers',
+        () => Navigator.pushNamed(context, RouteNames.restaurantCustomers),
+        entitlementKey: EntKeys.customers,
+      ),
+      _MenuCardData(
+        'Reports',
+        Icons.bar_chart_rounded,
+        Colors.orange,
+        'reports',
+        () => Navigator.pushNamed(context, RouteNames.restaurantReports),
+        entitlementKey: EntKeys.reports,
+      ),
+      _MenuCardData(
+        'Tax Settings',
+        Icons.receipt_long_rounded,
+        Colors.green,
+        'taxSettings',
+        () => Navigator.pushNamed(context, RouteNames.restaurantTaxSettings),
+        entitlementKey: EntKeys.settings,
+      ),
+      _MenuCardData(
+        'Expenses',
+        Icons.account_balance_wallet_rounded,
+        Colors.red,
+        'expenses',
+        () => Navigator.pushNamed(context, RouteNames.restaurantExpenses),
+        entitlementKey: EntKeys.expenses,
+      ),
+      _MenuCardData(
+        'Inventory',
+        Icons.inventory_2_rounded,
+        Colors.amber,
+        'inventory',
+        () => Navigator.pushNamed(context, RouteNames.restaurantInventory),
+        entitlementKey: EntKeys.inventory,
+      ),
+      _MenuCardData(
+        'Settings',
+        Icons.settings_rounded,
+        Colors.blueGrey,
+        'settings',
+        () => Navigator.pushNamed(context, RouteNames.restaurantSettings),
+        entitlementKey: EntKeys.settings,
+      ),
       // Usage & Limits is read-only plan info — NOT a premium feature, so it
       // carries no entitlementKey (never plan-gated). 'settings' keeps it
       // admin/manager-only, matching its account-level nature.
-      _MenuCardData('Usage & Limits', Icons.insights_rounded,           Colors.cyan,           'settings',     () => Navigator.pushNamed(context, RouteNames.restaurantUsageLimit)),
+      _MenuCardData(
+        'Usage & Limits',
+        Icons.insights_rounded,
+        Colors.cyan,
+        'settings',
+        () => Navigator.pushNamed(context, RouteNames.restaurantUsageLimit),
+      ),
       // Day lifecycle follows billing: a day auto-opens on the first bill, so
       // Cash Drawer + End of Day must be available whenever billing is granted.
-      _MenuCardData('Cash Drawer',   Icons.point_of_sale_rounded,       const Color(0xFF00897B), 'cashDrawer', () => Navigator.pushNamed(context, RouteNames.restaurantCashDrawer), entitlementKey: EntKeys.cashDrawer),
-      _MenuCardData('End of Day',    Icons.nightlight_round,            Colors.deepOrange,     'cashDrawer',   () => Navigator.pushNamed(context, RouteNames.restaurantEndDay), entitlementKey: EntKeys.billing),
-      _MenuCardData('Attendance',    Icons.access_time_rounded,         Colors.deepPurple,     'startOrder',   () => Navigator.pushNamed(context, RouteNames.restaurantAttendance), entitlementKey: EntKeys.attendance),
-      _MenuCardData('Logout',        Icons.logout_rounded,              Colors.red.shade700,   'logout',       () => _showLogoutDialog(context)),
+      _MenuCardData(
+        'Cash Drawer',
+        Icons.point_of_sale_rounded,
+        const Color(0xFF00897B),
+        'cashDrawer',
+        () => Navigator.pushNamed(context, RouteNames.restaurantCashDrawer),
+        entitlementKey: EntKeys.cashDrawer,
+      ),
+      _MenuCardData(
+        'End of Day',
+        Icons.nightlight_round,
+        Colors.deepOrange,
+        'cashDrawer',
+        () => Navigator.pushNamed(context, RouteNames.restaurantEndDay),
+        entitlementKey: EntKeys.billing,
+      ),
+      _MenuCardData(
+        'Attendance',
+        Icons.access_time_rounded,
+        Colors.deepPurple,
+        'startOrder',
+        () => Navigator.pushNamed(context, RouteNames.restaurantAttendance),
+        entitlementKey: EntKeys.attendance,
+      ),
+      _MenuCardData(
+        'Logout',
+        Icons.logout_rounded,
+        Colors.red.shade700,
+        'logout',
+        () => _showLogoutDialog(context),
+      ),
     ];
     // Role still hides; entitlement no longer hides — denied cards stay visible
     // and show the upgrade blocker on tap (see _buildMenuCard).
     return all
-        .where((c) =>
-            c.permission == 'logout' || RestaurantSession.canAccess(c.permission))
+        .where(
+          (c) =>
+              c.permission == 'logout' ||
+              RestaurantSession.canAccess(c.permission),
+        )
         .toList();
   }
 
@@ -606,13 +918,13 @@ class _AdminWelcomeState extends State<AdminWelcome> {
               // ── Gradient Header ─────────────────────────────
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 24),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 28,
+                  horizontal: 24,
+                ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [
-                      Colors.red.shade700,
-                      Colors.red.shade400,
-                    ],
+                    colors: [Colors.red.shade700, Colors.red.shade400],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -635,7 +947,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                     Text(
                       'Logout',
                       style: GoogleFonts.poppins(
-                        fontSize: 20,
+                        fontSize: AppResponsive.headingFontSize(context),
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
                       ),
@@ -644,7 +956,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                     Text(
                       'End your current session',
                       style: GoogleFonts.poppins(
-                        fontSize: 13,
+                        fontSize: AppResponsive.smallFontSize(context),
                         color: Colors.white.withOpacity(0.85),
                       ),
                     ),
@@ -658,7 +970,10 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                 child: Column(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.red.withOpacity(0.06),
                         border: Border.all(color: Colors.red.withOpacity(0.2)),
@@ -666,13 +981,17 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.info_outline_rounded, size: 18, color: Colors.red.shade700),
-                          const SizedBox(width: 10),
+                          Icon(
+                            Icons.info_outline_rounded,
+                            size: 18,
+                            color: Colors.red.shade700,
+                          ),
+                          SizedBox(width: AppResponsive.smallSpacing(context)),
                           Expanded(
                             child: Text(
                               'Are you sure you want to logout? You will need to sign in again to continue.',
                               style: GoogleFonts.poppins(
-                                fontSize: 12.5,
+                                fontSize: AppResponsive.smallFontSize(context),
                                 color: Colors.red.shade700,
                                 fontWeight: FontWeight.w500,
                                 height: 1.4,
@@ -701,14 +1020,14 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                             child: Text(
                               'Cancel',
                               style: GoogleFonts.poppins(
-                                fontSize: 14,
+                                fontSize: AppResponsive.bodyFontSize(context),
                                 color: AppColors.textSecondary,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        SizedBox(width: AppResponsive.mediumSpacing(context)),
                         Expanded(
                           flex: 2,
                           child: ElevatedButton(
@@ -736,7 +1055,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                               style: GoogleFonts.poppins(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w600,
-                                fontSize: 14,
+                                fontSize: AppResponsive.bodyFontSize(context),
                               ),
                             ),
                           ),
@@ -790,162 +1109,186 @@ class _AdminWelcomeState extends State<AdminWelcome> {
         ],
       ),
       child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.lock_clock_rounded,
-                  size: 56,
-                  color: Colors.orange.shade700,
-                ),
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.lock_clock_rounded,
+              size: 56,
+              color: Colors.orange.shade700,
+            ),
+          ),
+          const SizedBox(height: 28),
+          Text(
+            'End of Day Required',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.getValue(
+                context,
+                mobile: 22.0,
+                tablet: 26.0,
+                desktop: 28.0,
               ),
-              const SizedBox(height: 28),
-              Text(
-                'End of Day Required',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black87,
-                ),
+              fontWeight: FontWeight.w700,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            constraints: const BoxConstraints(maxWidth: 360),
+            child: Text(
+              "Your daily session has exceeded the maximum allowed duration. Complete End of Day to unlock — you'll be prompted to resolve any open orders.",
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                height: 1.5,
+                color: Colors.grey.shade600,
               ),
-              const SizedBox(height: 12),
-              Container(
-                constraints: const BoxConstraints(maxWidth: 360),
-                child: Text(
-                  "Your daily session has exceeded the maximum allowed duration. Complete End of Day to unlock — you'll be prompted to resolve any open orders.",
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    height: 1.5,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 28),
-              // Context card — so the lock screen isn't a bare wall.
-              Container(
-                constraints: const BoxConstraints(maxWidth: 340),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.orange.shade200),
-                ),
-                child: Column(
+            ),
+          ),
+          const SizedBox(height: 28),
+          // Context card — so the lock screen isn't a bare wall.
+          Container(
+            constraints: const BoxConstraints(maxWidth: 340),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.orange.shade200),
+            ),
+            child: Column(
+              children: [
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Icon(Icons.schedule_rounded,
-                            size: 18, color: Colors.orange.shade800),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Session exceeded the maximum allowed duration.',
-                            style: GoogleFonts.poppins(
-                                fontSize: 12.5, color: Colors.orange.shade900),
+                    Icon(
+                      Icons.schedule_rounded,
+                      size: 18,
+                      color: Colors.orange.shade800,
+                    ),
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
+                    Expanded(
+                      child: Text(
+                        'Session exceeded the maximum allowed duration.',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.smallFontSize(context),
+                          color: Colors.orange.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_openTableCount > 0) ...[
+                  Divider(height: 18, color: Colors.orange.shade200),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.table_restaurant_rounded,
+                        size: 18,
+                        color: Colors.orange.shade800,
+                      ),
+                      SizedBox(width: AppResponsive.smallSpacing(context)),
+                      Expanded(
+                        child: Text(
+                          '$_openTableCount open table(s) still need settling.',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            fontWeight: FontWeight.w600,
+                            color: Colors.orange.shade900,
                           ),
                         ),
-                      ],
-                    ),
-                    if (_openTableCount > 0) ...[
-                      Divider(height: 18, color: Colors.orange.shade200),
-                      Row(
-                        children: [
-                          Icon(Icons.table_restaurant_rounded,
-                              size: 18, color: Colors.orange.shade800),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              '$_openTableCount open table(s) still need settling.',
-                              style: GoogleFonts.poppins(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.orange.shade900),
-                            ),
-                          ),
-                        ],
                       ),
                     ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              Container(
-                constraints: const BoxConstraints(maxWidth: 320),
-                child: Column(
-                  children: [
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton.icon(
-                        onPressed: () async {
-                          await Navigator.pushNamed(context, RouteNames.restaurantEndDay);
-                          _checkDayStarted();
-                        },
-                        icon: const Icon(Icons.wb_sunny_rounded, color: Colors.white, size: 20),
-                        label: Text(
-                          'Complete End Day',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                            color: Colors.white,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green.shade600,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          await _clearLoginState();
-                          if (context.mounted) {
-                            Navigator.pushNamedAndRemoveUntil(
-                              context,
-                              RouteNames.restaurantLogin,
-                              (route) => false,
-                            );
-                          }
-                        },
-                        icon: Icon(Icons.logout_rounded, color: Colors.grey.shade700, size: 20),
-                        label: Text(
-                          'Logout',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: Colors.grey.shade300, width: 1.5),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+                  ),
+                ],
+              ],
+            ),
           ),
+          const SizedBox(height: 24),
+          Container(
+            constraints: const BoxConstraints(maxWidth: 320),
+            child: Column(
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      await Navigator.pushNamed(
+                        context,
+                        RouteNames.restaurantEndDay,
+                      );
+                      _checkDayStarted();
+                    },
+                    icon: const Icon(
+                      Icons.wb_sunny_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    label: Text(
+                      'Complete End Day',
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600,
+                        fontSize: AppResponsive.buttonFontSize(context),
+                        color: Colors.white,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade600,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      await _clearLoginState();
+                      if (context.mounted) {
+                        Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          RouteNames.restaurantLogin,
+                          (route) => false,
+                        );
+                      }
+                    },
+                    icon: Icon(
+                      Icons.logout_rounded,
+                      color: Colors.grey.shade700,
+                      size: 20,
+                    ),
+                    label: Text(
+                      'Logout',
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600,
+                        fontSize: AppResponsive.buttonFontSize(context),
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: Colors.grey.shade300, width: 1.5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -969,7 +1312,12 @@ class _MenuCardData {
   /// does not grant this key.
   final String? entitlementKey;
 
-  const _MenuCardData(this.title, this.icon, this.color, this.permission,
-      this.onTap,
-      {this.entitlementKey});
+  const _MenuCardData(
+    this.title,
+    this.icon,
+    this.color,
+    this.permission,
+    this.onTap, {
+    this.entitlementKey,
+  });
 }

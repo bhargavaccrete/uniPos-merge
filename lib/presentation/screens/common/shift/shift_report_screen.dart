@@ -139,13 +139,26 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
     final shifts = shiftStore.filteredShifts;
     final expenses = _cachedExpenses;
 
-    final headers = ['Staff', 'Date', 'Start', 'End', 'Duration', 'Orders', 'Sales', 'Expenses', 'Net Revenue', 'Status'];
+    final headers = [
+      'Staff',
+      'Date',
+      'Start',
+      'End',
+      'Duration',
+      'Orders',
+      'Sales',
+      'Expenses',
+      'Net Revenue',
+      'Status',
+    ];
     final data = shifts.map((s) {
       final shiftEnd = s.endTime ?? DateTime.now();
       final shiftExp = expenses
-          .where((e) =>
-              !e.dateandTime.isBefore(s.startTime) &&
-              !e.dateandTime.isAfter(shiftEnd))
+          .where(
+            (e) =>
+                !e.dateandTime.isBefore(s.startTime) &&
+                !e.dateandTime.isAfter(shiftEnd),
+          )
           .fold<double>(0.0, (sum, e) => sum + e.amount);
       return <dynamic>[
         s.staffName,
@@ -163,7 +176,10 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
 
     final totalSales = shifts.fold<double>(0.0, (sum, s) => sum + s.totalSales);
     final totalOrders = shifts.fold<int>(0, (sum, s) => sum + s.orderCount);
-    final totalMins = shifts.fold<int>(0, (sum, s) => sum + s.duration.inMinutes);
+    final totalMins = shifts.fold<int>(
+      0,
+      (sum, s) => sum + s.duration.inMinutes,
+    );
 
     await ReportExportService.showExportDialog(
       context: context,
@@ -193,21 +209,30 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Shift Report',
-                style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 20)),
-            Observer(builder: (_) {
-              final openCount = shiftStore.shifts.where((s) => s.isOpen).length;
-              return Text(
-                openCount > 0
-                    ? '$openCount shift${openCount > 1 ? 's' : ''} currently active'
-                    : 'No active shifts',
-                style: GoogleFonts.poppins(
-                    color: Colors.white70, fontSize: 12),
-              );
-            }),
+            Text(
+              'Shift Report',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: AppResponsive.headingFontSize(context),
+              ),
+            ),
+            Observer(
+              builder: (_) {
+                final openCount = shiftStore.shifts
+                    .where((s) => s.isOpen)
+                    .length;
+                return Text(
+                  openCount > 0
+                      ? '$openCount shift${openCount > 1 ? 's' : ''} currently active'
+                      : 'No active shifts',
+                  style: GoogleFonts.poppins(
+                    color: Colors.white70,
+                    fontSize: AppResponsive.smallFontSize(context),
+                  ),
+                );
+              },
+            ),
           ],
         ),
         actions: [
@@ -217,40 +242,55 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildSearchBar(context),
-          _buildFilterChips(context),
-          Observer(builder: (_) {
-            if (shiftStore.filterPeriod == 'Custom') {
-              return _buildCustomDateRow(context);
-            }
-            return const SizedBox.shrink();
-          }),
-          Expanded(
-            child: Observer(
+      // Search/filter rows are plain Padding, not full-bleed strips, so the
+      // whole body caps together. The Scaffold background still spans.
+      body: AppResponsive.constrainedContent(
+        context: context,
+        maxWidth: AppResponsive.maxFormWidth(context),
+        alignment: Alignment.topCenter,
+        child: Column(
+          children: [
+            _buildSearchBar(context),
+            _buildFilterChips(context),
+            Observer(
               builder: (_) {
-                if (shiftStore.isLoading) {
-                  return const Center(child: CircularProgressIndicator());
+                if (shiftStore.filterPeriod == 'Custom') {
+                  return _buildCustomDateRow(context);
                 }
-                final filtered = shiftStore.filteredShifts;
-                final closed = filtered.where((s) => !s.isOpen).toList();
-                final open = filtered.where((s) => s.isOpen).toList();
-
-                return Column(
-                  children: [
-                    _buildSummaryBar(context, currency, closed, open),
-                    Expanded(
-                      child: filtered.isEmpty
-                          ? _buildEmptyState(context)
-                          : _buildGroupedList(context, currency, open, closed, _cachedExpenses),
-                    ),
-                  ],
-                );
+                return const SizedBox.shrink();
               },
             ),
-          ),
-        ],
+            Expanded(
+              child: Observer(
+                builder: (_) {
+                  if (shiftStore.isLoading) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final filtered = shiftStore.filteredShifts;
+                  final closed = filtered.where((s) => !s.isOpen).toList();
+                  final open = filtered.where((s) => s.isOpen).toList();
+
+                  return Column(
+                    children: [
+                      _buildSummaryBar(context, currency, closed, open),
+                      Expanded(
+                        child: filtered.isEmpty
+                            ? _buildEmptyState(context)
+                            : _buildGroupedList(
+                                context,
+                                currency,
+                                open,
+                                closed,
+                                _cachedExpenses,
+                              ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -277,9 +317,11 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
                     _searchController.clear();
                     shiftStore.setSearch('');
                   },
-                  child: Icon(Icons.close,
-                      color: AppColors.textSecondary,
-                      size: AppResponsive.iconSize(context)),
+                  child: Icon(
+                    Icons.close,
+                    color: AppColors.textSecondary,
+                    size: AppResponsive.iconSize(context),
+                  ),
                 )
               : const SizedBox.shrink(),
         ),
@@ -292,73 +334,98 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
   static const _periods = ['All', 'Today', 'Week', 'Month', 'Custom'];
 
   Widget _buildFilterChips(BuildContext context) {
-    return Observer(builder: (_) {
-      final active = shiftStore.filterPeriod;
-      return Padding(
-        padding: EdgeInsets.symmetric(
+    return Observer(
+      builder: (_) {
+        final active = shiftStore.filterPeriod;
+        return Padding(
+          padding: EdgeInsets.symmetric(
             vertical: AppResponsive.mediumSpacing(context),
-            horizontal: AppResponsive.largeSpacing(context)),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: _periods.map((p) {
-              final isSelected = active == p;
-              return Padding(
-                padding: EdgeInsets.only(right: AppResponsive.smallSpacing(context)),
-                child: GestureDetector(
-                  onTap: () {
-                    if (p != 'Custom') {
-                      setState(() {
-                        _customFrom = null;
-                        _customTo = null;
-                      });
-                    }
-                    shiftStore.setFilter(p);
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: EdgeInsets.symmetric(
+            horizontal: AppResponsive.largeSpacing(context),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _periods.map((p) {
+                final isSelected = active == p;
+                return Padding(
+                  padding: EdgeInsets.only(
+                    right: AppResponsive.smallSpacing(context),
+                  ),
+                  child: GestureDetector(
+                    onTap: () {
+                      if (p != 'Custom') {
+                        setState(() {
+                          _customFrom = null;
+                          _customTo = null;
+                        });
+                      }
+                      shiftStore.setFilter(p);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: EdgeInsets.symmetric(
                         horizontal: AppResponsive.largeSpacing(context),
-                        vertical: AppResponsive.smallSpacing(context)),
-                    decoration: BoxDecoration(
-                      color: isSelected ? AppColors.primary : AppColors.white,
-                      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-                      border: Border.all(
-                          color: isSelected ? AppColors.primary : AppColors.divider),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                  color: AppColors.primary.withValues(alpha: 0.25),
+                        vertical: AppResponsive.smallSpacing(context),
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.primary : AppColors.white,
+                        borderRadius: BorderRadius.circular(
+                          AppResponsive.borderRadius(context),
+                        ),
+                        border: Border.all(
+                          color: isSelected
+                              ? AppColors.primary
+                              : AppColors.divider,
+                        ),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.25,
+                                  ),
                                   blurRadius: 6,
-                                  offset: const Offset(0, 2))
-                            ]
-                          : [],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (p == 'Custom')
-                          Padding(
-                            padding: const EdgeInsets.only(right: 4),
-                            child: Icon(Icons.date_range,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : [],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (p == 'Custom')
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4),
+                              child: Icon(
+                                Icons.date_range,
                                 size: AppResponsive.smallIconSize(context),
-                                color: isSelected ? Colors.white : AppColors.textSecondary),
-                          ),
-                        Text(p,
+                                color: isSelected
+                                    ? Colors.white
+                                    : AppColors.textSecondary,
+                              ),
+                            ),
+                          Text(
+                            p,
                             style: GoogleFonts.poppins(
-                                fontSize: AppResponsive.smallFontSize(context),
-                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                                color: isSelected ? Colors.white : AppColors.textPrimary)),
-                      ],
+                              fontSize: AppResponsive.smallFontSize(context),
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                              color: isSelected
+                                  ? Colors.white
+                                  : AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              );
-            }).toList(),
+                );
+              }).toList(),
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
   }
 
   // ── Custom date row ───────────────────────────────────────────────────────
@@ -367,10 +434,11 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
     final fmt = DateFormat('dd MMM yyyy');
     return Padding(
       padding: EdgeInsets.fromLTRB(
-          AppResponsive.largeSpacing(context),
-          0,
-          AppResponsive.largeSpacing(context),
-          AppResponsive.mediumSpacing(context)),
+        AppResponsive.largeSpacing(context),
+        0,
+        AppResponsive.largeSpacing(context),
+        AppResponsive.mediumSpacing(context),
+      ),
       child: Row(
         children: [
           Expanded(
@@ -405,28 +473,39 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
       onTap: onTap,
       child: Container(
         padding: EdgeInsets.symmetric(
-            horizontal: AppResponsive.mediumSpacing(context),
-            vertical: AppResponsive.smallSpacing(context) + 2),
+          horizontal: AppResponsive.mediumSpacing(context),
+          vertical: AppResponsive.smallSpacing(context) + 2,
+        ),
         decoration: BoxDecoration(
           color: AppColors.white,
           border: Border.all(
-              color: value != null ? AppColors.primary : AppColors.divider,
-              width: value != null ? 1.5 : 1),
-          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+            color: value != null ? AppColors.primary : AppColors.divider,
+            width: value != null ? 1.5 : 1,
+          ),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.borderRadius(context),
+          ),
         ),
         child: Row(
           children: [
-            Icon(Icons.calendar_today,
-                size: AppResponsive.smallIconSize(context),
-                color: value != null ? AppColors.primary : AppColors.textSecondary),
+            Icon(
+              Icons.calendar_today,
+              size: AppResponsive.smallIconSize(context),
+              color: value != null
+                  ? AppColors.primary
+                  : AppColors.textSecondary,
+            ),
             SizedBox(width: 6),
             Expanded(
               child: Text(
                 value ?? label,
                 style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.smallFontSize(context),
-                    color: value != null ? AppColors.textPrimary : AppColors.textSecondary,
-                    fontWeight: value != null ? FontWeight.w500 : FontWeight.w400),
+                  fontSize: AppResponsive.smallFontSize(context),
+                  color: value != null
+                      ? AppColors.textPrimary
+                      : AppColors.textSecondary,
+                  fontWeight: value != null ? FontWeight.w500 : FontWeight.w400,
+                ),
               ),
             ),
           ],
@@ -445,54 +524,91 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
   ) {
     final allForSummary = [...closed, ...open];
     // FIX 1: Include open shifts in all totals — they have live data from loadShifts().
-    final totalSales = allForSummary.fold<double>(0.0, (s, sh) => s + sh.totalSales);
-    final totalOrders = allForSummary.fold<int>(0, (s, sh) => s + sh.orderCount);
-    final totalMins = allForSummary.fold<int>(0, (s, sh) => s + sh.duration.inMinutes);
+    final totalSales = allForSummary.fold<double>(
+      0.0,
+      (s, sh) => s + sh.totalSales,
+    );
+    final totalOrders = allForSummary.fold<int>(
+      0,
+      (s, sh) => s + sh.orderCount,
+    );
+    final totalMins = allForSummary.fold<int>(
+      0,
+      (s, sh) => s + sh.duration.inMinutes,
+    );
 
     return Container(
       margin: EdgeInsets.fromLTRB(
-          AppResponsive.largeSpacing(context),
-          0,
-          AppResponsive.largeSpacing(context),
-          AppResponsive.mediumSpacing(context)),
+        AppResponsive.largeSpacing(context),
+        0,
+        AppResponsive.largeSpacing(context),
+        AppResponsive.mediumSpacing(context),
+      ),
       padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.primary.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _summaryTile(context, '${allForSummary.length}', 'Shifts', Icons.badge_outlined),
+          _summaryTile(
+            context,
+            '${allForSummary.length}',
+            'Shifts',
+            Icons.badge_outlined,
+          ),
           _summaryTile(context, '$totalOrders', 'Orders', Icons.receipt_long),
           // FIX 3: Use DecimalSettings for consistent currency formatting.
-          _summaryTile(context, '$currency${DecimalSettings.formatAmount(totalSales)}', 'Sales',
-              Icons.attach_money),
           _summaryTile(
-              context,
-              '${totalMins ~/ 60}h ${totalMins.remainder(60)}m',
-              'Hours',
-              Icons.timer_outlined),
+            context,
+            '$currency${DecimalSettings.formatAmount(totalSales)}',
+            'Sales',
+            Icons.attach_money,
+          ),
+          _summaryTile(
+            context,
+            '${totalMins ~/ 60}h ${totalMins.remainder(60)}m',
+            'Hours',
+            Icons.timer_outlined,
+          ),
         ],
       ),
     );
   }
 
-  Widget _summaryTile(BuildContext context, String value, String label, IconData icon) {
+  Widget _summaryTile(
+    BuildContext context,
+    String value,
+    String label,
+    IconData icon,
+  ) {
     return Column(
       children: [
-        Icon(icon, color: AppColors.primary, size: AppResponsive.iconSize(context)),
+        Icon(
+          icon,
+          color: AppColors.primary,
+          size: AppResponsive.iconSize(context),
+        ),
         SizedBox(height: 4),
-        Text(value,
-            style: GoogleFonts.poppins(
-                fontWeight: FontWeight.w700,
-                fontSize: AppResponsive.bodyFontSize(context),
-                color: AppColors.textPrimary)),
-        Text(label,
-            style: GoogleFonts.poppins(
-                fontSize: AppResponsive.captionFontSize(context),
-                color: AppColors.textSecondary)),
+        Text(
+          value,
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.w700,
+            fontSize: AppResponsive.bodyFontSize(context),
+            color: AppColors.textPrimary,
+          ),
+        ),
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.captionFontSize(context),
+            color: AppColors.textSecondary,
+          ),
+        ),
       ],
     );
   }
@@ -509,7 +625,9 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
     final grouped = _groupByDay([...open, ...closed]);
 
     return ListView(
-      padding: EdgeInsets.symmetric(horizontal: AppResponsive.largeSpacing(context)),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.largeSpacing(context),
+      ),
       children: [
         for (final entry in grouped.entries) ...[
           _dayHeader(context, entry.key, entry.value),
@@ -520,34 +638,48 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
     );
   }
 
-  Widget _dayHeader(BuildContext context, String dateLabel, List<ShiftModel> shifts) {
+  Widget _dayHeader(
+    BuildContext context,
+    String dateLabel,
+    List<ShiftModel> shifts,
+  ) {
     final totalSales = shifts.fold<double>(0.0, (s, sh) => s + sh.totalSales);
     final currency = CurrencyHelper.currentSymbol;
     return Padding(
       padding: EdgeInsets.only(
-          top: AppResponsive.smallSpacing(context),
-          bottom: AppResponsive.smallSpacing(context)),
+        top: AppResponsive.smallSpacing(context),
+        bottom: AppResponsive.smallSpacing(context),
+      ),
       child: Row(
         children: [
-          Expanded(
-              child: Divider(color: AppColors.divider, thickness: 1)),
+          Expanded(child: Divider(color: AppColors.divider, thickness: 1)),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: AppResponsive.mediumSpacing(context)),
+            padding: EdgeInsets.symmetric(
+              horizontal: AppResponsive.mediumSpacing(context),
+            ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.calendar_today,
-                    size: AppResponsive.smallIconSize(context),
-                    color: AppColors.primary),
+                Icon(
+                  Icons.calendar_today,
+                  size: AppResponsive.smallIconSize(context),
+                  color: AppColors.primary,
+                ),
                 SizedBox(width: 6),
-                Text(dateLabel,
-                    style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.smallFontSize(context),
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary)),
+                Text(
+                  dateLabel,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
                 SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(20),
@@ -555,9 +687,10 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
                   child: Text(
                     '${shifts.length} shift${shifts.length > 1 ? 's' : ''}  •  $currency${DecimalSettings.formatAmount(totalSales)}',
                     style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.captionFontSize(context),
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w500),
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
@@ -577,27 +710,32 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
     final msg = query.isNotEmpty
         ? 'No shifts found for "$query"'
         : period == 'Today'
-            ? 'No shifts today'
-            : period == 'Week'
-                ? 'No shifts this week'
-                : period == 'Month'
-                    ? 'No shifts this month'
-                    : period == 'Custom'
-                        ? 'No shifts in selected range'
-                        : 'No shifts yet';
+        ? 'No shifts today'
+        : period == 'Week'
+        ? 'No shifts this week'
+        : period == 'Month'
+        ? 'No shifts this month'
+        : period == 'Custom'
+        ? 'No shifts in selected range'
+        : 'No shifts yet';
 
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.schedule,
-              size: AppResponsive.largeIconSize(context) * 1.5,
-              color: Colors.grey.shade300),
+          Icon(
+            Icons.schedule,
+            size: AppResponsive.largeIconSize(context) * 1.5,
+            color: Colors.grey.shade300,
+          ),
           SizedBox(height: AppResponsive.mediumSpacing(context)),
-          Text(msg,
-              style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.bodyFontSize(context),
-                  color: AppColors.textSecondary)),
+          Text(
+            msg,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              color: AppColors.textSecondary,
+            ),
+          ),
         ],
       ),
     );
@@ -625,9 +763,14 @@ class _ShiftCardState extends State<_ShiftCard> {
   /// Generates a consistent avatar color from a staff name.
   Color _avatarColor(String name) {
     const palette = [
-      Color(0xFF1565C0), Color(0xFF00695C), Color(0xFF6A1B9A),
-      Color(0xFFD84315), Color(0xFF2E7D32), Color(0xFF0277BD),
-      Color(0xFF4527A0), Color(0xFFC62828),
+      Color(0xFF1565C0),
+      Color(0xFF00695C),
+      Color(0xFF6A1B9A),
+      Color(0xFFD84315),
+      Color(0xFF2E7D32),
+      Color(0xFF0277BD),
+      Color(0xFF4527A0),
+      Color(0xFFC62828),
     ];
     final idx = name.codeUnits.fold(0, (a, b) => a + b) % palette.length;
     return palette[idx];
@@ -642,7 +785,13 @@ class _ShiftCardState extends State<_ShiftCard> {
     final avatarColor = _avatarColor(s.staffName);
     final initials = s.staffName.trim().isEmpty
         ? '?'
-        : s.staffName.trim().split(' ').map((w) => w[0]).take(2).join().toUpperCase();
+        : s.staffName
+              .trim()
+              .split(' ')
+              .map((w) => w[0])
+              .take(2)
+              .join()
+              .toUpperCase();
 
     return GestureDetector(
       onTap: () => setState(() => _expanded = !_expanded),
@@ -650,16 +799,20 @@ class _ShiftCardState extends State<_ShiftCard> {
         margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius: BorderRadius.circular(AppResponsive.largeBorderRadius(context)),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.largeBorderRadius(context),
+          ),
           border: Border.all(
-              color: isOpen
-                  ? Colors.green.withValues(alpha: 0.3)
-                  : AppColors.divider),
+            color: isOpen
+                ? Colors.green.withValues(alpha: 0.3)
+                : AppColors.divider,
+          ),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: AppResponsive.shadowBlurRadius(context),
-                offset: const Offset(0, 2)),
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: AppResponsive.shadowBlurRadius(context),
+              offset: const Offset(0, 2),
+            ),
           ],
         ),
         child: Padding(
@@ -671,20 +824,31 @@ class _ShiftCardState extends State<_ShiftCard> {
                 children: [
                   // Staff avatar
                   Container(
-                    width: AppResponsive.getValue<double>(context,
-                        mobile: 36, tablet: 40, desktop: 44),
-                    height: AppResponsive.getValue<double>(context,
-                        mobile: 36, tablet: 40, desktop: 44),
+                    width: AppResponsive.getValue<double>(
+                      context,
+                      mobile: 36,
+                      tablet: 40,
+                      desktop: 44,
+                    ),
+                    height: AppResponsive.getValue<double>(
+                      context,
+                      mobile: 36,
+                      tablet: 40,
+                      desktop: 44,
+                    ),
                     decoration: BoxDecoration(
                       color: avatarColor.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     alignment: Alignment.center,
-                    child: Text(initials,
-                        style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.smallFontSize(context),
-                            fontWeight: FontWeight.w700,
-                            color: avatarColor)),
+                    child: Text(
+                      initials,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        fontWeight: FontWeight.w700,
+                        color: avatarColor,
+                      ),
+                    ),
                   ),
                   SizedBox(width: AppResponsive.mediumSpacing(context)),
 
@@ -693,18 +857,22 @@ class _ShiftCardState extends State<_ShiftCard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(s.staffName,
-                            style: GoogleFonts.poppins(
-                                fontSize: AppResponsive.bodyFontSize(context),
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary)),
+                        Text(
+                          s.staffName,
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
                         Text(
                           isOpen
                               ? 'Started ${_fmtTime(s.startTime)}'
                               : '${_fmtTime(s.startTime)} → ${_fmtTime(s.endTime!)}',
                           style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.smallFontSize(context),
-                              color: AppColors.textSecondary),
+                            fontSize: AppResponsive.smallFontSize(context),
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ],
                     ),
@@ -713,18 +881,23 @@ class _ShiftCardState extends State<_ShiftCard> {
                   // Status badge
                   Container(
                     padding: EdgeInsets.symmetric(
-                        horizontal: AppResponsive.smallSpacing(context),
-                        vertical: 3),
+                      horizontal: AppResponsive.smallSpacing(context),
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: statusColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(
-                          AppResponsive.smallBorderRadius(context)),
+                        AppResponsive.smallBorderRadius(context),
+                      ),
                     ),
-                    child: Text(isOpen ? 'Active' : 'Closed',
-                        style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.captionFontSize(context),
-                            fontWeight: FontWeight.w600,
-                            color: statusColor)),
+                    child: Text(
+                      isOpen ? 'Active' : 'Closed',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.captionFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: statusColor,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -735,14 +908,25 @@ class _ShiftCardState extends State<_ShiftCard> {
               Wrap(
                 spacing: AppResponsive.smallSpacing(context),
                 children: [
-                  _chip(context, Icons.timer_outlined,
-                      '${dur.inHours}h ${dur.inMinutes.remainder(60)}m', Colors.blue),
-                  _chip(context, Icons.receipt_rounded,
-                      '${s.orderCount} orders', Colors.indigo),
+                  _chip(
+                    context,
+                    Icons.timer_outlined,
+                    '${dur.inHours}h ${dur.inMinutes.remainder(60)}m',
+                    Colors.blue,
+                  ),
+                  _chip(
+                    context,
+                    Icons.receipt_rounded,
+                    '${s.orderCount} orders',
+                    Colors.indigo,
+                  ),
                   // FIX 3: Consistent DecimalSettings formatting.
-                  _chip(context, Icons.attach_money,
-                      '${widget.currency}${DecimalSettings.formatAmount(s.totalSales)}',
-                      Colors.green),
+                  _chip(
+                    context,
+                    Icons.attach_money,
+                    '${widget.currency}${DecimalSettings.formatAmount(s.totalSales)}',
+                    Colors.green,
+                  ),
                 ],
               ),
 
@@ -751,33 +935,55 @@ class _ShiftCardState extends State<_ShiftCard> {
                 SizedBox(height: AppResponsive.smallSpacing(context)),
                 Divider(color: AppColors.divider, height: 1),
                 SizedBox(height: AppResponsive.smallSpacing(context)),
-                _detailRow(context, 'Sales',
-                    '${widget.currency}${s.totalSales.toStringAsFixed(2)}'),
-                Builder(builder: (_) {
-                  final shiftEnd = s.endTime ?? DateTime.now();
-                  // FIX 2: !isAfter(shiftEnd) is exact — avoids attributing expenses
-                  // from up to 999ms after close to this shift.
-                  final shiftExp = widget.expenses
-                      .where((e) =>
-                          !e.dateandTime.isBefore(s.startTime) &&
-                          !e.dateandTime.isAfter(shiftEnd))
-                      .fold<double>(0.0, (sum, e) => sum + e.amount);
-                  return Column(
-                    children: [
-                      _detailRow(context, 'Expenses',
-                          '- ${widget.currency}${shiftExp.toStringAsFixed(2)}'),
-                      _detailRow(context, 'Net Revenue',
-                          '${widget.currency}${(s.totalSales - shiftExp).toStringAsFixed(2)}'),
-                    ],
-                  );
-                }),
+                _detailRow(
+                  context,
+                  'Sales',
+                  '${widget.currency}${s.totalSales.toStringAsFixed(2)}',
+                ),
+                Builder(
+                  builder: (_) {
+                    final shiftEnd = s.endTime ?? DateTime.now();
+                    // FIX 2: !isAfter(shiftEnd) is exact — avoids attributing expenses
+                    // from up to 999ms after close to this shift.
+                    final shiftExp = widget.expenses
+                        .where(
+                          (e) =>
+                              !e.dateandTime.isBefore(s.startTime) &&
+                              !e.dateandTime.isAfter(shiftEnd),
+                        )
+                        .fold<double>(0.0, (sum, e) => sum + e.amount);
+                    return Column(
+                      children: [
+                        _detailRow(
+                          context,
+                          'Expenses',
+                          '- ${widget.currency}${shiftExp.toStringAsFixed(2)}',
+                        ),
+                        _detailRow(
+                          context,
+                          'Net Revenue',
+                          '${widget.currency}${(s.totalSales - shiftExp).toStringAsFixed(2)}',
+                        ),
+                      ],
+                    );
+                  },
+                ),
                 _detailRow(context, 'Orders', '${s.orderCount}'),
-                _detailRow(context, 'Duration',
-                    '${dur.inHours}h ${dur.inMinutes.remainder(60)}m'),
-                _detailRow(context, 'Started',
-                    DateFormat('dd MMM yyyy, HH:mm').format(s.startTime)),
-                _detailRow(context, 'Ended',
-                    DateFormat('dd MMM yyyy, HH:mm').format(s.endTime!)),
+                _detailRow(
+                  context,
+                  'Duration',
+                  '${dur.inHours}h ${dur.inMinutes.remainder(60)}m',
+                ),
+                _detailRow(
+                  context,
+                  'Started',
+                  DateFormat('dd MMM yyyy, HH:mm').format(s.startTime),
+                ),
+                _detailRow(
+                  context,
+                  'Ended',
+                  DateFormat('dd MMM yyyy, HH:mm').format(s.endTime!),
+                ),
               ],
             ],
           ),
@@ -790,12 +996,19 @@ class _ShiftCardState extends State<_ShiftCard> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: AppResponsive.smallIconSize(context) * 0.85, color: color),
+        Icon(
+          icon,
+          size: AppResponsive.smallIconSize(context) * 0.85,
+          color: color,
+        ),
         const SizedBox(width: 3),
-        Text(text,
-            style: GoogleFonts.poppins(
-                fontSize: AppResponsive.smallFontSize(context),
-                color: AppColors.textSecondary)),
+        Text(
+          text,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.smallFontSize(context),
+            color: AppColors.textSecondary,
+          ),
+        ),
       ],
     );
   }
@@ -803,19 +1016,26 @@ class _ShiftCardState extends State<_ShiftCard> {
   Widget _detailRow(BuildContext context, String label, String value) {
     return Padding(
       padding: EdgeInsets.symmetric(
-          vertical: AppResponsive.smallSpacing(context) * 0.4),
+        vertical: AppResponsive.smallSpacing(context) * 0.4,
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.smallFontSize(context),
-                  color: AppColors.textSecondary)),
-          Text(value,
-              style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.smallFontSize(context),
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary)),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+            ),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
         ],
       ),
     );

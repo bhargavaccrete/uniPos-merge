@@ -82,7 +82,8 @@ class _RestaurantStockTakeListScreenState
     final confirmed = await showAppConfirmDialog(
       context: context,
       title: 'Discard ${take.takeNumber}?',
-      message: 'The count and all its lines will be deleted. Stock is not '
+      message:
+          'The count and all its lines will be deleted. Stock is not '
           'affected — nothing was applied.',
       confirmLabel: 'Discard',
       accent: AppColors.danger,
@@ -95,7 +96,8 @@ class _RestaurantStockTakeListScreenState
       NotificationService.instance.showSuccess('Stock take discarded');
     } else {
       NotificationService.instance.showError(
-        restaurantStockTakeStore.errorMessage ?? 'Could not discard stock take.',
+        restaurantStockTakeStore.errorMessage ??
+            'Could not discard stock take.',
       );
     }
   }
@@ -121,7 +123,8 @@ class _RestaurantStockTakeListScreenState
               content = AppEmptyState(
                 icon: Icons.fact_check_outlined,
                 title: 'No stock takes yet',
-                message: 'Count your raw materials and apply the variances '
+                message:
+                    'Count your raw materials and apply the variances '
                     'in one go, instead of correcting items one at a time.',
                 action: ElevatedButton.icon(
                   onPressed: _startTake,
@@ -132,9 +135,12 @@ class _RestaurantStockTakeListScreenState
                     foregroundColor: AppColors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 13),
+                      horizontal: 20,
+                      vertical: 13,
+                    ),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               );
@@ -172,7 +178,14 @@ class _RestaurantStockTakeListScreenState
                     ),
                   ],
                 ),
-                Expanded(child: content),
+                Expanded(
+                  child: AppResponsive.constrainedContent(
+                    context: context,
+                    maxWidth: AppResponsive.maxFormWidth(context),
+                    alignment: Alignment.topCenter,
+                    child: content,
+                  ),
+                ),
               ],
             );
           },
@@ -251,8 +264,10 @@ class _RestaurantStockTakeListScreenState
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
@@ -271,11 +286,15 @@ class _RestaurantStockTakeListScreenState
                 // that already happened.
                 if (take.isDraft)
                   PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert,
-                        size: 20, color: AppColors.textSecondary),
+                    icon: const Icon(
+                      Icons.more_vert,
+                      size: 20,
+                      color: AppColors.textSecondary,
+                    ),
                     color: AppColors.white,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     onSelected: (v) {
                       if (v == 'discard') _cancelTake(take);
                     },

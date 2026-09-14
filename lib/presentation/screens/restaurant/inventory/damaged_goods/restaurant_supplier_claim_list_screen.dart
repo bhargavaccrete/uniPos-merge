@@ -87,13 +87,13 @@ class _RestaurantSupplierClaimListScreenState
 
   Widget _capped(BuildContext context, Widget child) {
     final maxWidth = AppResponsive.maxContentWidth(context);
+    // Mobile is uncapped — returning early keeps two widgets out of the tree.
     if (maxWidth == double.infinity) return child;
-    return Align(
+    return AppResponsive.constrainedContent(
+      context: context,
+      maxWidth: maxWidth,
       alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
-      ),
+      child: child,
     );
   }
 

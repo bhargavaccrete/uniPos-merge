@@ -24,8 +24,11 @@ class AddCategoryDialog extends StatefulWidget {
     this.editCategory,
   });
 
-  static Future<bool> show(BuildContext context,
-      {VoidCallback? onCategoryAdded, Category? editCategory}) async {
+  static Future<bool> show(
+    BuildContext context, {
+    VoidCallback? onCategoryAdded,
+    Category? editCategory,
+  }) async {
     bool wasAdded = false;
     final isWide = !AppResponsive.isMobile(context);
 
@@ -35,8 +38,10 @@ class AddCategoryDialog extends StatefulWidget {
         barrierDismissible: true,
         builder: (_) => Dialog(
           backgroundColor: Colors.transparent,
-          insetPadding:
-              const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 40,
+            vertical: 24,
+          ),
           child: ConstrainedBox(
             constraints: BoxConstraints(
               maxWidth: 520,
@@ -104,12 +109,14 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
     }
 
     final exists = categoryStore.categories.any(
-      (c) => (_isEditMode ? c.id != widget.editCategory!.id : true) &&
+      (c) =>
+          (_isEditMode ? c.id != widget.editCategory!.id : true) &&
           c.name.toLowerCase() == trimmedName.toLowerCase(),
     );
     if (exists) {
-      NotificationService.instance
-          .showError('A category with this name already exists');
+      NotificationService.instance.showError(
+        'A category with this name already exists',
+      );
       return;
     }
 
@@ -119,8 +126,11 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
     try {
       if (_isEditMode) {
         final updated = widget.editCategory!.copyWith(name: trimmedName);
-        AuditTrailHelper.trackEdit(updated,
-            editedBy: RestaurantSession.staffName ?? RestaurantSession.effectiveRole);
+        AuditTrailHelper.trackEdit(
+          updated,
+          editedBy:
+              RestaurantSession.staffName ?? RestaurantSession.effectiveRole,
+        );
         await categoryStore.updateCategory(updated);
       } else {
         final newCategory = Category(
@@ -157,7 +167,7 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
               child: _formFields(),
-            )
+            ),
           ),
         ],
       ),
@@ -177,7 +187,7 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             Center(
               child: Container(
                 width: 40,
@@ -205,18 +215,25 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
       padding: EdgeInsets.fromLTRB(20, isDialog ? 20 : 8, 16, 16),
       child: Row(
         children: [
-          Icon(Icons.category_outlined, color: AppColors.primary, size: 24),
-          const SizedBox(width: 10),
+          Icon(
+            Icons.category_outlined,
+            color: AppColors.primary,
+            size: AppResponsive.iconSize(context),
+          ),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Text(
             _isEditMode ? 'Edit Category' : 'Add Category',
             style: GoogleFonts.poppins(
-                fontSize: 18, fontWeight: FontWeight.w600, color: Colors.black87),
+              fontSize: AppResponsive.subheadingFontSize(context),
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
           ),
           if (isDialog) ...[
             const Spacer(),
             IconButton(
               onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.close, size: 20),
+              icon: Icon(Icons.close, size: AppResponsive.iconSize(context)),
               style: IconButton.styleFrom(
                 backgroundColor: AppColors.surfaceLight,
                 foregroundColor: AppColors.textSecondary,
@@ -234,7 +251,7 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
       children: [
         // ── Category Name card ──────────────────────────────────────
         _sectionHeader('Category Name', Icons.label_outline_rounded),
-        const SizedBox(height: 12),
+        SizedBox(height: AppResponsive.mediumSpacing(context)),
         _card(
           child: AppTextField(
             controller: _categoryNameController,
@@ -248,7 +265,7 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
           ),
         ),
 
-        const SizedBox(height: 24),
+        SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
         // ── Save button ──────────────────────────────────────────────
         SizedBox(
@@ -261,27 +278,39 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white),
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
-                : Icon(_isEditMode ? Icons.check_circle_outline : Icons.add_circle_outline, color: Colors.white),
+                : Icon(
+                    _isEditMode
+                        ? Icons.check_circle_outline
+                        : Icons.add_circle_outline,
+                    color: Colors.white,
+                  ),
             label: Text(
-              _isSaving ? 'Saving…' : (_isEditMode ? 'Update Category' : 'Add Category'),
+              _isSaving
+                  ? 'Saving…'
+                  : (_isEditMode ? 'Update Category' : 'Add Category'),
               style: GoogleFonts.poppins(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white),
+                fontSize: AppResponsive.buttonFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
-              disabledBackgroundColor:
-                  AppColors.primary.withValues(alpha: 0.5),
+              disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.borderRadius(context),
+                ),
+              ),
               elevation: 0,
             ),
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: AppResponsive.smallSpacing(context)),
       ],
     );
   }
@@ -289,14 +318,19 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
   Widget _sectionHeader(String title, IconData icon) {
     return Row(
       children: [
-        Icon(icon, color: AppColors.primary, size: 20),
-        const SizedBox(width: 8),
+        Icon(
+          icon,
+          color: AppColors.primary,
+          size: AppResponsive.iconSize(context),
+        ),
+        SizedBox(width: AppResponsive.smallSpacing(context)),
         Text(
           title,
           style: GoogleFonts.poppins(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87),
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
         ),
       ],
     );
@@ -307,7 +341,9 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -319,5 +355,4 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
       child: child,
     );
   }
-
 }

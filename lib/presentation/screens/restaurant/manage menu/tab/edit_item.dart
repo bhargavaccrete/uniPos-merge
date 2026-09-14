@@ -19,10 +19,12 @@ import 'package:billberrylite/util/restaurant/audit_trail_helper.dart';
 import 'package:billberrylite/domain/services/restaurant/stock_adjust_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/tax_selector_sheet.dart';
 // Shared add/edit-item components — kept in sync with the Add Item sheet so both
 // screens present the same controls. The SellingMethod enum is the canonical one.
-import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/add_item_form_state.dart' show SellingMethod;
+import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/add_item_form_state.dart'
+    show SellingMethod;
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/widgets/selling_method_selector.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/veg_selector_sheet.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/category_selector_sheet.dart';
@@ -130,10 +132,10 @@ class _EdititemScreenState extends State<EdititemScreen> {
 
   late List<bool> _extraCheckedList;
   bool _extrasExpanded = false;
-  Map<String, Map<String, TextEditingController>> _extraConstraintControllers = {}; // extraId -> {min, max}
-  Map<String, bool> _extraHasConstraints = {}; // Track if extra has min/max enabled
-
-
+  Map<String, Map<String, TextEditingController>> _extraConstraintControllers =
+      {}; // extraId -> {min, max}
+  Map<String, bool> _extraHasConstraints =
+      {}; // Track if extra has min/max enabled
 
   // This Future will safely load all data before building the UI
   late Future<EditScreenData> _loadDataFuture;
@@ -142,9 +144,15 @@ class _EdititemScreenState extends State<EdititemScreen> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.items.name);
-    _itemPriceController = TextEditingController(text: widget.items.price?.toString() ?? '');
-    _descController = TextEditingController(text: widget.items.description ?? '');
-    _itemCodeController = TextEditingController(text: widget.items.itemCode ?? '');
+    _itemPriceController = TextEditingController(
+      text: widget.items.price?.toString() ?? '',
+    );
+    _descController = TextEditingController(
+      text: widget.items.description ?? '',
+    );
+    _itemCodeController = TextEditingController(
+      text: widget.items.itemCode ?? '',
+    );
     final stock = widget.items.stockQuantity;
     _stockController = TextEditingController(
       text: stock == 0
@@ -155,7 +163,9 @@ class _EdititemScreenState extends State<EdititemScreen> {
     _lowStockController = TextEditingController(
       text: lowStock == null
           ? ''
-          : (lowStock % 1 == 0 ? lowStock.toStringAsFixed(0) : lowStock.toString()),
+          : (lowStock % 1 == 0
+                ? lowStock.toStringAsFixed(0)
+                : lowStock.toString()),
     );
     _lowStockAlertFilter = widget.items.lowStockAlertEnabled ? 'YES' : 'NO';
     selectedCategoryId = widget.items.categoryOfItem ?? '';
@@ -164,13 +174,17 @@ class _EdititemScreenState extends State<EdititemScreen> {
     selectedTaxIds = List<String>.from(widget.items.taxIds ?? const []);
 
     // ✅ ADDED: Initialize selling method based on existing item
-    _sellingMethod = widget.items.isSoldByWeight == true ? SellingMethod.byWeight : SellingMethod.byUnit;
+    _sellingMethod = widget.items.isSoldByWeight == true
+        ? SellingMethod.byWeight
+        : SellingMethod.byUnit;
     // Clamp to a supported value (kItemUnits); imported/legacy items may carry
     // an unsupported unit, which would crash the DropdownButton.
     _selectedUnit = normalizeItemUnit(widget.items.unit) ?? kItemUnits.first;
 
     selectedFilter = widget.items.trackInventory == true ? 'YES' : 'NO';
-    allowOutOfStockFilter = widget.items.allowOrderWhenOutOfStock == true ? 'YES' : 'NO';
+    allowOutOfStockFilter = widget.items.allowOrderWhenOutOfStock == true
+        ? 'YES'
+        : 'NO';
 
     _isEnabled = widget.items.isEnabled;
     _productType = widget.items.effectiveProductType;
@@ -179,7 +193,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
 
     _loadDataFuture = _loadInitialData();
   }
-// In _EdititemScreenState
+  // In _EdititemScreenState
 
   Future<EditScreenData> _loadInitialData() async {
     // Load data from stores
@@ -198,20 +212,29 @@ class _EdititemScreenState extends State<EdititemScreen> {
     // pre-selects the variants and choices.
 
     _variantCheckedList = List.generate(allVariants.length, (index) {
-      return widget.items.variant?.any((v) => v.variantId == allVariants[index].id) ?? false;
+      return widget.items.variant?.any(
+            (v) => v.variantId == allVariants[index].id,
+          ) ??
+          false;
     });
     // Open the Variants section automatically if any are already selected.
     _variantsExpanded = _variantCheckedList.contains(true);
 
     _variantPriceControllers = List.generate(allVariants.length, (index) {
-      final existingVariant = widget.items.variant?.firstWhere((v) => v.variantId == allVariants[index].id,
-          orElse: () => ItemVariante(variantId: '', price: 0.0));
-      return TextEditingController(text: existingVariant?.price.toString() ?? '');
+      final existingVariant = widget.items.variant?.firstWhere(
+        (v) => v.variantId == allVariants[index].id,
+        orElse: () => ItemVariante(variantId: '', price: 0.0),
+      );
+      return TextEditingController(
+        text: existingVariant?.price.toString() ?? '',
+      );
     });
 
     _variantStockControllers = List.generate(allVariants.length, (index) {
-      final existingVariant = widget.items.variant?.firstWhere((v) => v.variantId == allVariants[index].id,
-          orElse: () => ItemVariante(variantId: '', price: 0.0));
+      final existingVariant = widget.items.variant?.firstWhere(
+        (v) => v.variantId == allVariants[index].id,
+        orElse: () => ItemVariante(variantId: '', price: 0.0),
+      );
       final s = existingVariant?.stockQuantity;
       return TextEditingController(
         text: (s == null || s == 0)
@@ -224,10 +247,11 @@ class _EdititemScreenState extends State<EdititemScreen> {
       return widget.items.choiceIds?.contains(allChoices[index].id) ?? false;
     });
     _choicesExpanded = _choiceCheckedList.contains(true);
-    _defaultChoiceOptionIds =
-        List<String>.from(widget.items.defaultChoiceOptionIds ?? const []);
+    _defaultChoiceOptionIds = List<String>.from(
+      widget.items.defaultChoiceOptionIds ?? const [],
+    );
 
-    _extraCheckedList = List.generate(allExtra.length, (index){
+    _extraCheckedList = List.generate(allExtra.length, (index) {
       return widget.items.extraId?.contains(allExtra[index].Id) ?? false;
     });
     _extrasExpanded = _extraCheckedList.contains(true);
@@ -240,12 +264,21 @@ class _EdititemScreenState extends State<EdititemScreen> {
       final globalMax = extra.maximum;
       final hasConstraints = constraints != null
           ? (constraints['min'] != 0 || constraints['max'] != 0)
-          : (globalMin != null && globalMin != 0) || (globalMax != null && globalMax != 0);
+          : (globalMin != null && globalMin != 0) ||
+                (globalMax != null && globalMax != 0);
 
       _extraHasConstraints[extra.Id] = hasConstraints;
       _extraConstraintControllers[extra.Id] = {
-        'min': TextEditingController(text: constraints?['min']?.toString() ?? (globalMin != null && globalMin != 0 ? globalMin.toString() : '')),
-        'max': TextEditingController(text: constraints?['max']?.toString() ?? (globalMax != null && globalMax != 0 ? globalMax.toString() : '')),
+        'min': TextEditingController(
+          text:
+              constraints?['min']?.toString() ??
+              (globalMin != null && globalMin != 0 ? globalMin.toString() : ''),
+        ),
+        'max': TextEditingController(
+          text:
+              constraints?['max']?.toString() ??
+              (globalMax != null && globalMax != 0 ? globalMax.toString() : ''),
+        ),
       };
     }
 
@@ -295,7 +328,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
       NotificationService.instance.showError('Item name cannot be empty');
       return;
     }
-    
+
     final itemCode = _itemCodeController.text.trim();
     if (itemCode.isEmpty) {
       NotificationService.instance.showError('Item code cannot be empty');
@@ -305,9 +338,13 @@ class _EdititemScreenState extends State<EdititemScreen> {
       NotificationService.instance.showError('Item code must be 4-5 digits');
       return;
     }
-    final duplicateCode = itemStore.items.any((i) => i.itemCode == itemCode && i.id != widget.items.id);
+    final duplicateCode = itemStore.items.any(
+      (i) => i.itemCode == itemCode && i.id != widget.items.id,
+    );
     if (duplicateCode) {
-      NotificationService.instance.showError('Item code already exists. Please enter a different code.');
+      NotificationService.instance.showError(
+        'Item code already exists. Please enter a different code.',
+      );
       return;
     }
 
@@ -317,7 +354,9 @@ class _EdititemScreenState extends State<EdititemScreen> {
     if (ProductType.isMenuType(_productType)) {
       final priceValue = double.tryParse(_itemPriceController.text.trim());
       if (priceValue == null || priceValue <= 0) {
-        NotificationService.instance.showError('Please enter a valid selling price');
+        NotificationService.instance.showError(
+          'Please enter a valid selling price',
+        );
         return;
       }
       if (selectedCategoryId.isEmpty) {
@@ -330,215 +369,237 @@ class _EdititemScreenState extends State<EdititemScreen> {
     setState(() => _isSaving = true);
 
     try {
-    // Handle image: keep existing imageBytes or use newly selected imageBytes
-    Uint8List? finalImageBytes = widget.items.imageBytes;
+      // Handle image: keep existing imageBytes or use newly selected imageBytes
+      Uint8List? finalImageBytes = widget.items.imageBytes;
 
-    // Use the bytes that were already read when picking the image
-    if (_selectedImageBytes != null) {
-      finalImageBytes = _selectedImageBytes;
-    }
+      // Use the bytes that were already read when picking the image
+      if (_selectedImageBytes != null) {
+        finalImageBytes = _selectedImageBytes;
+      }
 
-    // Variant stock changes to log as adjustments after the item is saved.
-    final pendingAdjustments = <Map<String, dynamic>>[];
-    Map<String, dynamic>? pendingSimpleAdjustment;
-    List<ItemVariante> selectedVariants = [];
-    final isRawOrSemi = _productType == ProductType.rawMaterial ||
-        _productType == ProductType.semiFinished;
-    if (!isRawOrSemi) {
-      for (int i = 0; i < _allVariants.length; i++) {
-        if (_variantCheckedList[i]) {
-          final priceText = _variantPriceControllers[i].text.trim();
-          final variantId = _allVariants[i].id;
+      // Variant stock changes to log as adjustments after the item is saved.
+      final pendingAdjustments = <Map<String, dynamic>>[];
+      Map<String, dynamic>? pendingSimpleAdjustment;
+      List<ItemVariante> selectedVariants = [];
+      final isRawOrSemi =
+          _productType == ProductType.rawMaterial ||
+          _productType == ProductType.semiFinished;
+      if (!isRawOrSemi) {
+        for (int i = 0; i < _allVariants.length; i++) {
+          if (_variantCheckedList[i]) {
+            final priceText = _variantPriceControllers[i].text.trim();
+            final variantId = _allVariants[i].id;
 
-          // ✅ FIX: Preserve existing stock quantities when editing
-          // Find the existing variant with this variantId to preserve stock data
-          final existingVariant = widget.items.variant?.firstWhere(
-            (v) => v.variantId == variantId,
-            orElse: () => ItemVariante(
-              variantId: variantId,
-              price: 0.0,
-              trackInventory: null,
-              stockQuantity: null,
-            ),
-          );
+            // ✅ FIX: Preserve existing stock quantities when editing
+            // Find the existing variant with this variantId to preserve stock data
+            final existingVariant = widget.items.variant?.firstWhere(
+              (v) => v.variantId == variantId,
+              orElse: () => ItemVariante(
+                variantId: variantId,
+                price: 0.0,
+                trackInventory: null,
+                stockQuantity: null,
+              ),
+            );
 
-          // When inventory tracking is on, take the edited per-variant stock;
-          // otherwise keep whatever was there.
-          final newStock = selectedFilter.toLowerCase() == 'yes'
-              ? (double.tryParse(_variantStockControllers[i].text.trim()) ??
-                  existingVariant?.stockQuantity ??
-                  0.0)
-              : existingVariant?.stockQuantity;
+            // When inventory tracking is on, take the edited per-variant stock;
+            // otherwise keep whatever was there.
+            final newStock = selectedFilter.toLowerCase() == 'yes'
+                ? (double.tryParse(_variantStockControllers[i].text.trim()) ??
+                      existingVariant?.stockQuantity ??
+                      0.0)
+                : existingVariant?.stockQuantity;
 
-          // Log an adjustment if a tracked variant's stock actually changed.
-          if (selectedFilter.toLowerCase() == 'yes' && newStock != null) {
-            final oldStock = existingVariant?.stockQuantity ?? 0.0;
-            if (newStock != oldStock) {
-              pendingAdjustments.add({'variantId': variantId, 'old': oldStock, 'new': newStock});
+            // Log an adjustment if a tracked variant's stock actually changed.
+            if (selectedFilter.toLowerCase() == 'yes' && newStock != null) {
+              final oldStock = existingVariant?.stockQuantity ?? 0.0;
+              if (newStock != oldStock) {
+                pendingAdjustments.add({
+                  'variantId': variantId,
+                  'old': oldStock,
+                  'new': newStock,
+                });
+              }
             }
-          }
 
-          selectedVariants.add(ItemVariante(
-              variantId: variantId,
-              price: double.tryParse(priceText) ?? 0.0,
-              trackInventory: existingVariant?.trackInventory,
-              stockQuantity: newStock));
+            selectedVariants.add(
+              ItemVariante(
+                variantId: variantId,
+                price: double.tryParse(priceText) ?? 0.0,
+                trackInventory: existingVariant?.trackInventory,
+                stockQuantity: newStock,
+              ),
+            );
+          }
         }
       }
-    }
 
-    List<String> selectedChoiceIds = [];
-    for (int i = 0; i < _allChoices.length; i++) {
-      if (_choiceCheckedList[i]) {
-        selectedChoiceIds.add(_allChoices[i].id);
+      List<String> selectedChoiceIds = [];
+      for (int i = 0; i < _allChoices.length; i++) {
+        if (_choiceCheckedList[i]) {
+          selectedChoiceIds.add(_allChoices[i].id);
+        }
       }
-    }
 
-
-    List<String> selectedExtraId = [];
-    for(int i = 0 ; i < _allExtra.length; i++ ){
-      if(_extraCheckedList[i]){
-        selectedExtraId.add(_allExtra[i].Id);
+      List<String> selectedExtraId = [];
+      for (int i = 0; i < _allExtra.length; i++) {
+        if (_extraCheckedList[i]) {
+          selectedExtraId.add(_allExtra[i].Id);
+        }
       }
-    }
 
-    // Build extra constraints map from controllers
-    Map<String, Map<String, int>> extraConstraints = {};
-    for(int i = 0 ; i < _allExtra.length; i++ ){
-      if(_extraCheckedList[i]){
-        final extraId = _allExtra[i].Id;
-        final minText = _extraConstraintControllers[extraId]?['min']?.text.trim() ?? '';
-        final maxText = _extraConstraintControllers[extraId]?['max']?.text.trim() ?? '';
+      // Build extra constraints map from controllers
+      Map<String, Map<String, int>> extraConstraints = {};
+      for (int i = 0; i < _allExtra.length; i++) {
+        if (_extraCheckedList[i]) {
+          final extraId = _allExtra[i].Id;
+          final minText =
+              _extraConstraintControllers[extraId]?['min']?.text.trim() ?? '';
+          final maxText =
+              _extraConstraintControllers[extraId]?['max']?.text.trim() ?? '';
 
-        final minValue = int.tryParse(minText) ?? 0;
-        final maxValue = int.tryParse(maxText) ?? 0;
+          final minValue = int.tryParse(minText) ?? 0;
+          final maxValue = int.tryParse(maxText) ?? 0;
 
-        extraConstraints[extraId] = {
-          'min': minValue,
-          'max': maxValue,
-        };
+          extraConstraints[extraId] = {'min': minValue, 'max': maxValue};
+        }
       }
-    }
 
-    final updateItem = widget.items.copyWith(
-      name: trimmedName,
-      price: double.tryParse(_itemPriceController.text.trim()),
-      // Raw Material only: also seed lastPurchaseCost from the same Cost
-      // Price input, since that's what recipe costing actually reads (B1).
-      lastPurchaseCost: ProductType.seededLastPurchaseCost(
-          _productType, double.tryParse(_itemPriceController.text.trim())),
-      description: _descController.text.trim(),
-      isVeg: selectedIMGCategory,
-      categoryOfItem: selectedCategoryId,
-      imageBytes: finalImageBytes,
-      variant: selectedVariants,
-      choiceIds: selectedChoiceIds,
-      defaultChoiceOptionIds: _defaultChoiceOptionIds,
-      extraId: selectedExtraId,
-      extraConstraints: extraConstraints.isNotEmpty ? extraConstraints : null,
-      allowOrderWhenOutOfStock: allowOutOfStockFilter.toLowerCase() == 'yes',
-      isSoldByWeight: _sellingMethod == SellingMethod.byWeight,
-      // Raw Material/Semi-Finished: a stock-keeping unit, independent of
-      // Selling Method (a POS-sale concept that doesn't apply to them), so
-      // it's always persisted. Finished Good/Recipe-Based keep the original
-      // by-weight-only condition, unchanged.
-      unit: (_productType == ProductType.rawMaterial ||
+      final updateItem = widget.items.copyWith(
+        name: trimmedName,
+        price: double.tryParse(_itemPriceController.text.trim()),
+        // Raw Material only: also seed lastPurchaseCost from the same Cost
+        // Price input, since that's what recipe costing actually reads (B1).
+        lastPurchaseCost: ProductType.seededLastPurchaseCost(
+          _productType,
+          double.tryParse(_itemPriceController.text.trim()),
+        ),
+        description: _descController.text.trim(),
+        isVeg: selectedIMGCategory,
+        categoryOfItem: selectedCategoryId,
+        imageBytes: finalImageBytes,
+        variant: selectedVariants,
+        choiceIds: selectedChoiceIds,
+        defaultChoiceOptionIds: _defaultChoiceOptionIds,
+        extraId: selectedExtraId,
+        extraConstraints: extraConstraints.isNotEmpty ? extraConstraints : null,
+        allowOrderWhenOutOfStock: allowOutOfStockFilter.toLowerCase() == 'yes',
+        isSoldByWeight: _sellingMethod == SellingMethod.byWeight,
+        // Raw Material/Semi-Finished: a stock-keeping unit, independent of
+        // Selling Method (a POS-sale concept that doesn't apply to them), so
+        // it's always persisted. Finished Good/Recipe-Based keep the original
+        // by-weight-only condition, unchanged.
+        unit:
+            (_productType == ProductType.rawMaterial ||
+                _productType == ProductType.semiFinished)
+            ? _selectedUnit
+            : (_sellingMethod == SellingMethod.byWeight ? _selectedUnit : null),
+        itemCode: itemCode,
+        productType: _productType,
+        isEnabled: _isEnabled,
+      );
+
+      // Set tax directly (not via copyWith) so selecting "No Tax" (null) actually
+      // clears it — copyWith's `?? this.taxRate` would otherwise keep the old rate.
+      updateItem.taxRate = selectedTaxRate;
+      updateItem.taxIds = selectedTaxIds;
+
+      // recipeId: same "can't clear via copyWith" issue as taxRate above — set
+      // directly so switching away from a recipe-having type actually detaches it.
+      updateItem.recipeId = ProductType.hasRecipe(_productType)
+          ? _currentRecipe?.id
+          : null;
+
+      // sellDirectlyAtPos: same direct-set reason. Only Raw Materials and Semi-Finished carry an
+      // override; switching to any other type clears it back to null so the item
+      // follows that type's default.
+      updateItem.sellDirectlyAtPos =
+          (_productType == ProductType.rawMaterial ||
               _productType == ProductType.semiFinished)
-          ? _selectedUnit
-          : (_sellingMethod == SellingMethod.byWeight ? _selectedUnit : null),
-      itemCode: itemCode,
-      productType: _productType,
-      isEnabled: _isEnabled,
-    );
+          ? _sellDirectlyAtPos
+          : null;
 
-    // Set tax directly (not via copyWith) so selecting "No Tax" (null) actually
-    // clears it — copyWith's `?? this.taxRate` would otherwise keep the old rate.
-    updateItem.taxRate = selectedTaxRate;
-    updateItem.taxIds = selectedTaxIds;
+      // Low-stock alert (only meaningful when inventory tracking is on).
+      // Set directly so turning tracking/alert off clears the override.
+      final lowStockOn =
+          selectedFilter.toLowerCase() == 'yes' &&
+          _lowStockAlertFilter == 'YES';
+      updateItem.lowStockAlertEnabled = lowStockOn;
+      updateItem.lowStockThreshold = lowStockOn
+          ? double.tryParse(_lowStockController.text.trim())
+          : null;
 
-    // recipeId: same "can't clear via copyWith" issue as taxRate above — set
-    // directly so switching away from a recipe-having type actually detaches it.
-    updateItem.recipeId =
-        ProductType.hasRecipe(_productType) ? _currentRecipe?.id : null;
-
-    // sellDirectlyAtPos: same direct-set reason. Only Raw Materials and Semi-Finished carry an
-    // override; switching to any other type clears it back to null so the item
-    // follows that type's default.
-    updateItem.sellDirectlyAtPos =
-        (_productType == ProductType.rawMaterial ||
-         _productType == ProductType.semiFinished)
-            ? _sellDirectlyAtPos
-            : null;
-
-    // Low-stock alert (only meaningful when inventory tracking is on).
-    // Set directly so turning tracking/alert off clears the override.
-    final lowStockOn =
-        selectedFilter.toLowerCase() == 'yes' && _lowStockAlertFilter == 'YES';
-    updateItem.lowStockAlertEnabled = lowStockOn;
-    updateItem.lowStockThreshold =
-        lowStockOn ? double.tryParse(_lowStockController.text.trim()) : null;
-
-    // Item-level stock for SIMPLE items (no variants). Variant items keep the
-    // item-level quantity at 0 and track stock per-variant instead.
-    final requestedStockQuantity = !_variantCheckedList.contains(true)
-        ? (selectedFilter.toLowerCase() == 'yes'
-            ? (double.tryParse(_stockController.text.trim()) ?? 0.0)
-            : 0.0)
-        : 0.0;
-    // Recipe-Based items derive availability from their recipe and must never
-    // carry over stale tracking/quantity from before a type switch — see
-    // ProductType.resolvePhysicalStock. Every other type passes through
-    // unchanged.
-    final physicalStock = ProductType.resolvePhysicalStock(
-      _productType,
-      requestedTrackInventory: selectedFilter.toLowerCase() == 'yes',
-      requestedStockQuantity: requestedStockQuantity,
-    );
-    updateItem.trackInventory = physicalStock.trackInventory;
-    if (!_variantCheckedList.contains(true)) {
-      final oldStock = widget.items.stockQuantity;
-      updateItem.stockQuantity = physicalStock.stockQuantity;
-      // Log an adjustment if a tracked item's stock actually changed.
-      if (physicalStock.trackInventory && physicalStock.stockQuantity != oldStock) {
-        pendingSimpleAdjustment = {'old': oldStock, 'new': physicalStock.stockQuantity};
+      // Item-level stock for SIMPLE items (no variants). Variant items keep the
+      // item-level quantity at 0 and track stock per-variant instead.
+      final requestedStockQuantity = !_variantCheckedList.contains(true)
+          ? (selectedFilter.toLowerCase() == 'yes'
+                ? (double.tryParse(_stockController.text.trim()) ?? 0.0)
+                : 0.0)
+          : 0.0;
+      // Recipe-Based items derive availability from their recipe and must never
+      // carry over stale tracking/quantity from before a type switch — see
+      // ProductType.resolvePhysicalStock. Every other type passes through
+      // unchanged.
+      final physicalStock = ProductType.resolvePhysicalStock(
+        _productType,
+        requestedTrackInventory: selectedFilter.toLowerCase() == 'yes',
+        requestedStockQuantity: requestedStockQuantity,
+      );
+      updateItem.trackInventory = physicalStock.trackInventory;
+      if (!_variantCheckedList.contains(true)) {
+        final oldStock = widget.items.stockQuantity;
+        updateItem.stockQuantity = physicalStock.stockQuantity;
+        // Log an adjustment if a tracked item's stock actually changed.
+        if (physicalStock.trackInventory &&
+            physicalStock.stockQuantity != oldStock) {
+          pendingSimpleAdjustment = {
+            'old': oldStock,
+            'new': physicalStock.stockQuantity,
+          };
+        }
+      } else if (ProductType.isStockDerived(_productType)) {
+        // A variant-having item switched to Recipe-Based must not retain stale
+        // item-level stock either, even though variants normally govern it.
+        updateItem.stockQuantity = 0.0;
       }
-    } else if (ProductType.isStockDerived(_productType)) {
-      // A variant-having item switched to Recipe-Based must not retain stale
-      // item-level stock either, even though variants normally govern it.
-      updateItem.stockQuantity = 0.0;
-    }
 
-    AuditTrailHelper.trackEdit(updateItem, editedBy: RestaurantSession.staffName ?? RestaurantSession.effectiveRole);
-
-    await itemStore.updateItem(updateItem);
-
-    // Persist (or drop) the recipe alongside the item — see design doc §4.
-    if (ProductType.hasRecipe(_productType) && _currentRecipe != null) {
-      await recipeRepository.saveRecipe(_currentRecipe!.copyWith(itemId: updateItem.id));
-    } else {
-      await recipeRepository.deleteRecipeForItem(updateItem.id);
-    }
-
-    // Log any variant stock changes so the history & running balance stay honest.
-    for (final adj in pendingAdjustments) {
-      await StockAdjustService.logAdjustment(
-        item: updateItem,
-        variantId: adj['variantId'] as String,
-        oldStock: adj['old'] as double,
-        newStock: adj['new'] as double,
+      AuditTrailHelper.trackEdit(
+        updateItem,
+        editedBy:
+            RestaurantSession.staffName ?? RestaurantSession.effectiveRole,
       );
-    }
 
-    // Same for a simple (non-variant) item whose stock was edited.
-    if (pendingSimpleAdjustment != null) {
-      await StockAdjustService.logAdjustment(
-        item: updateItem,
-        oldStock: pendingSimpleAdjustment['old'] as double,
-        newStock: pendingSimpleAdjustment['new'] as double,
-      );
-    }
+      await itemStore.updateItem(updateItem);
 
-    if (mounted) Navigator.pop(context, true);
+      // Persist (or drop) the recipe alongside the item — see design doc §4.
+      if (ProductType.hasRecipe(_productType) && _currentRecipe != null) {
+        await recipeRepository.saveRecipe(
+          _currentRecipe!.copyWith(itemId: updateItem.id),
+        );
+      } else {
+        await recipeRepository.deleteRecipeForItem(updateItem.id);
+      }
+
+      // Log any variant stock changes so the history & running balance stay honest.
+      for (final adj in pendingAdjustments) {
+        await StockAdjustService.logAdjustment(
+          item: updateItem,
+          variantId: adj['variantId'] as String,
+          oldStock: adj['old'] as double,
+          newStock: adj['new'] as double,
+        );
+      }
+
+      // Same for a simple (non-variant) item whose stock was edited.
+      if (pendingSimpleAdjustment != null) {
+        await StockAdjustService.logAdjustment(
+          item: updateItem,
+          oldStock: pendingSimpleAdjustment['old'] as double,
+          newStock: pendingSimpleAdjustment['new'] as double,
+        );
+      }
+
+      if (mounted) Navigator.pop(context, true);
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -550,7 +611,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
       backgroundColor: Colors.grey[50],
       appBar: buildPrimaryAppBar(
         title: 'Edit Item',
-        titleFontSize: 18,
+        titleFontSize: AppResponsive.subheadingFontSize(context),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -578,12 +639,16 @@ class _EdititemScreenState extends State<EdititemScreen> {
   Widget _buildSectionHeader(String title, IconData icon) {
     return Row(
       children: [
-        Icon(icon, color: AppColors.primary, size: 22),
-        const SizedBox(width: 10),
+        Icon(
+          icon,
+          color: AppColors.primary,
+          size: AppResponsive.iconSize(context),
+        ),
+        SizedBox(width: AppResponsive.smallSpacing(context)),
         Text(
           title,
           style: GoogleFonts.poppins(
-            fontSize: 16,
+            fontSize: AppResponsive.subheadingFontSize(context),
             fontWeight: FontWeight.w600,
             color: Colors.black87,
           ),
@@ -608,7 +673,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
         children: [
           // Basic Information Section
           _buildSectionHeader('Basic Information', Icons.info_outline),
-          const SizedBox(height: 15),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
           AppTextField(
             controller: _nameController,
             focusNode: _nameFocus,
@@ -618,7 +683,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
             textInputAction: TextInputAction.next,
             onFieldSubmitted: (_) => _codeFocus.requestFocus(),
           ),
-          const SizedBox(height: 15),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
           AppTextField(
             controller: _itemCodeController,
             focusNode: _codeFocus,
@@ -633,22 +698,29 @@ class _EdititemScreenState extends State<EdititemScreen> {
             textInputAction: TextInputAction.next,
             onFieldSubmitted: (_) => _priceFocus.requestFocus(),
           ),
-          const SizedBox(height: 15),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             dense: true,
-            title: Text('Active / Enabled',
-                style: GoogleFonts.poppins(
-                    fontSize: 14, fontWeight: FontWeight.w500)),
+            title: Text(
+              'Active / Enabled',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
             subtitle: Text(
-                'Turn off to temporarily hide this item from POS and listings.',
-                style: GoogleFonts.poppins(
-                    fontSize: 12, color: AppColors.textSecondary)),
+              'Turn off to temporarily hide this item from POS and listings.',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.textSecondary,
+              ),
+            ),
             value: _isEnabled,
             activeColor: AppColors.primary,
             onChanged: (v) => setState(() => _isEnabled = v),
           ),
-          const SizedBox(height: 25),
+          SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
           // Selling Method Section — Raw Material/Semi-Finished get a plain
           // Stock Unit picker instead (they aren't sold, so Selling Method
@@ -656,7 +728,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
           if (_productType == ProductType.rawMaterial ||
               _productType == ProductType.semiFinished) ...[
             _buildSectionHeader('Stock Unit', Icons.straighten_outlined),
-            const SizedBox(height: 15),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
             SellingMethodButton(
               method: _sellingMethod,
               unit: _selectedUnit,
@@ -665,14 +737,14 @@ class _EdititemScreenState extends State<EdititemScreen> {
             ),
           ] else ...[
             _buildSectionHeader('Selling Method', Icons.scale),
-            const SizedBox(height: 15),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
             SellingMethodButton(
               method: _sellingMethod,
               unit: _selectedUnit,
               onTap: _selectSellingMethod,
             ),
           ],
-          const SizedBox(height: 25),
+          SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
           // Price
           AppTextField(
@@ -681,11 +753,14 @@ class _EdititemScreenState extends State<EdititemScreen> {
             label: 'Price',
             prefixWidget: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              child: Text("${CurrencyHelper.currentSymbol}",
-                  style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primary)),
+              child: Text(
+                "${CurrencyHelper.currentSymbol}",
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
             ),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
@@ -694,22 +769,22 @@ class _EdititemScreenState extends State<EdititemScreen> {
             textInputAction: TextInputAction.next,
             onFieldSubmitted: (_) => _descFocus.requestFocus(),
           ),
-          const SizedBox(height: 25),
+          SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
           // Category Section
           _buildSectionHeader('Category', Icons.category_outlined),
-          const SizedBox(height: 15),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
           CategorySelectorButton(
             selectedCategoryName: selectedCategoryName,
             onTap: _selectCategory,
           ),
-          const SizedBox(height: 25),
+          SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
           // Product Type — determines whether this item is stocked directly,
           // made from a recipe, or both. See docs/inventory_recipe_system_plan.md §3/§8.1.
           if (PlanEnforce.allows(EntKeys.inventory)) ...[
             _buildSectionHeader('Product Type', Icons.category_rounded),
-            const SizedBox(height: 15),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
             Dropdown(
               items: ProductType.all.map(ProductType.displayName).toList(),
               selectedItem: ProductType.displayName(_productType),
@@ -741,41 +816,47 @@ class _EdititemScreenState extends State<EdititemScreen> {
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               dense: true,
-              title: Text(_productType == ProductType.rawMaterial ? 'Sell directly at POS' : 'Show on POS Menu',
-                  style: GoogleFonts.poppins(
-                      fontSize: 14, fontWeight: FontWeight.w500)),
+              title: Text(
+                _productType == ProductType.rawMaterial
+                    ? 'Sell directly at POS'
+                    : 'Show on POS Menu',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               subtitle: Text(
-                  _productType == ProductType.rawMaterial
-                      ? 'Raw materials are hidden from the menu by default. Turn on to sell this one as-is.'
-                      : 'Semi-finished prep items are hidden from the menu by default. Turn on to show and sell this one.',
-                  style: GoogleFonts.poppins(
-                      fontSize: 12, color: AppColors.textSecondary)),
+                _productType == ProductType.rawMaterial
+                    ? 'Raw materials are hidden from the menu by default. Turn on to sell this one as-is.'
+                    : 'Semi-finished prep items are hidden from the menu by default. Turn on to show and sell this one.',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  color: AppColors.textSecondary,
+                ),
+              ),
               value: _sellDirectlyAtPos ?? false,
               activeColor: AppColors.primary,
               onChanged: (v) => setState(() => _sellDirectlyAtPos = v),
             ),
           ],
-          const SizedBox(height: 25),
+          SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
           // Tax Section
           if (TaxFeature.enabled) ...[
             _buildSectionHeader('Tax', Icons.percent_rounded),
-            const SizedBox(height: 15),
-            TaxSelectorButton(
-              taxRate: selectedTaxRate,
-              onTap: _selectTax,
-            ),
-            const SizedBox(height: 25),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
+            TaxSelectorButton(taxRate: selectedTaxRate, onTap: _selectTax),
+            SizedBox(height: AppResponsive.extraLargeSpacing(context)),
           ],
 
           // Food Type (Veg / Non-Veg)
           _buildSectionHeader('Food Type', Icons.eco_outlined),
-          const SizedBox(height: 15),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
           VegSelectorButton(
             selectedCategory: selectedIMGCategory,
             onTap: _selectVeg,
           ),
-          const SizedBox(height: 25),
+          SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
           // Description
           AppTextField(
@@ -788,7 +869,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
             minLines: 1,
             onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
           ),
-          const SizedBox(height: 25),
+          SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
           // Inventory Management — stock module. InventoryToggle hides itself
           // when the plan excludes `inventory`, so guard the header/fields to match.
@@ -797,11 +878,15 @@ class _EdititemScreenState extends State<EdititemScreen> {
           // this whole module is replaced by an "Available to Make" readout below.
           if (PlanEnforce.allows(EntKeys.inventory) &&
               _productType != ProductType.recipeBased) ...[
-            _buildSectionHeader('Inventory Management', Icons.inventory_2_outlined),
-            const SizedBox(height: 15),
+            _buildSectionHeader(
+              'Inventory Management',
+              Icons.inventory_2_outlined,
+            ),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
             InventoryToggle(
               trackInventory: selectedFilter.toLowerCase() == 'yes',
-              allowOrderWhenOutOfStock: allowOutOfStockFilter.toLowerCase() == 'yes',
+              allowOrderWhenOutOfStock:
+                  allowOutOfStockFilter.toLowerCase() == 'yes',
               onTrackInventoryChanged: (v) => setState(() {
                 selectedFilter = v ? 'YES' : 'NO';
                 // Enforce stock limits by default when enabling tracking.
@@ -814,72 +899,83 @@ class _EdititemScreenState extends State<EdititemScreen> {
               // Current Stock — only for SIMPLE items. Variant items track stock
               // per-variant in the Variants section below.
               if (!_variantCheckedList.contains(true)) ...[
-                const SizedBox(height: 14),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 _buildCurrentStockField(),
               ] else ...[
-                const SizedBox(height: 10),
-                Text('Stock is set per variant below.',
-                    style: GoogleFonts.poppins(
-                        fontSize: 12, color: AppColors.textSecondary)),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
+                Text(
+                  'Stock is set per variant below.',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: AppColors.textSecondary,
+                  ),
+                ),
               ],
-              const SizedBox(height: 14),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               _buildLowStockSection(),
             ],
-            const SizedBox(height: 25),
+            SizedBox(height: AppResponsive.extraLargeSpacing(context)),
           ],
           if (_productType == ProductType.recipeBased) ...[
             _buildSectionHeader('Availability', Icons.inventory_2_outlined),
-            const SizedBox(height: 15),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
             _buildAvailableToMakeCard(),
-            const SizedBox(height: 14),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             // No physical stock for Recipe-Based — this only controls whether
             // POS may sell when the calculated available-to-make figure is
             // zero, exactly as InventoryService already enforces.
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               dense: true,
-              title: Text('Allow order if out of stock',
-                  style: GoogleFonts.poppins(
-                      fontSize: 14, fontWeight: FontWeight.w500)),
+              title: Text(
+                'Allow order if out of stock',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               subtitle: Text(
-                  'Let staff sell this even when no ingredients remain to make it.',
-                  style: GoogleFonts.poppins(
-                      fontSize: 12, color: AppColors.textSecondary)),
+                'Let staff sell this even when no ingredients remain to make it.',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  color: AppColors.textSecondary,
+                ),
+              ),
               value: allowOutOfStockFilter.toLowerCase() == 'yes',
               activeColor: AppColors.primary,
               onChanged: (v) =>
                   setState(() => allowOutOfStockFilter = v ? 'YES' : 'NO'),
             ),
-            const SizedBox(height: 25),
+            SizedBox(height: AppResponsive.extraLargeSpacing(context)),
           ],
 
           // Recipe (Bill of Materials) — Semi-Finished items describe what
           // they're prepped FROM; Recipe-Based items describe what they're
           // assembled FROM at sale time. See design doc §3/§4/§8.2.
-          if (PlanEnforce.allows(EntKeys.inventory) && ProductType.hasRecipe(_productType)) ...[
+          if (PlanEnforce.allows(EntKeys.inventory) &&
+              ProductType.hasRecipe(_productType)) ...[
             RecipeBuilderWidget(
               itemId: widget.items.id,
-              allItems: itemStore.items.where((i) => i.id != widget.items.id).toList(),
+              allItems: itemStore.items
+                  .where((i) => i.id != widget.items.id)
+                  .toList(),
               initialRecipe: _currentRecipe,
               sellingPrice: double.tryParse(_itemPriceController.text.trim()),
               onChanged: (recipe) => setState(() => _currentRecipe = recipe),
             ),
-            const SizedBox(height: 25),
+            SizedBox(height: AppResponsive.extraLargeSpacing(context)),
           ],
 
           // Item Image Section
           _buildSectionHeader('Item Image', Icons.image_outlined),
-          const SizedBox(height: 15),
-          ImageUploader(
-            imageBytes: _displayImageBytes,
-            onTap: _pickImage,
-          ),
-          const SizedBox(height: 25),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
+          ImageUploader(imageBytes: _displayImageBytes, onTap: _pickImage),
+          SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
           // Variants, Choices & Extras Section — always shown so new options can
           // be created here (via the "+ New" button in each section header).
           _buildSectionHeader('Additional Options', Icons.extension),
-          const SizedBox(height: 15),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
           if (_productType != ProductType.rawMaterial &&
               _productType != ProductType.semiFinished) ...[
             _buildVariantSection(_allVariants),
@@ -896,21 +992,38 @@ class _EdititemScreenState extends State<EdititemScreen> {
             child: ElevatedButton.icon(
               onPressed: _isSaving ? null : () => _saveChanges(data),
               icon: _isSaving
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
                   : const Icon(Icons.save, color: Colors.white),
               label: Text(
                 _isSaving ? 'Saving…' : 'Save Changes',
-                style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontSize: AppResponsive.subheadingFontSize(context),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
-                disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                disabledBackgroundColor: AppColors.primary.withValues(
+                  alpha: 0.5,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.borderRadius(context),
+                  ),
+                ),
                 elevation: 0,
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
         ],
       ),
     );
@@ -949,15 +1062,19 @@ class _EdititemScreenState extends State<EdititemScreen> {
 
   Future<void> _selectVeg() async {
     FocusScope.of(context).unfocus();
-    final result = await VegSelectorSheet.show(context,
-        currentSelection: selectedIMGCategory);
+    final result = await VegSelectorSheet.show(
+      context,
+      currentSelection: selectedIMGCategory,
+    );
     if (result != null) setState(() => selectedIMGCategory = result);
   }
 
   Future<void> _selectTax() async {
     FocusScope.of(context).unfocus();
-    final result =
-        await TaxSelectorSheet.show(context, selectedTaxIds: selectedTaxIds);
+    final result = await TaxSelectorSheet.show(
+      context,
+      selectedTaxIds: selectedTaxIds,
+    );
     if (result != null) {
       setState(() {
         selectedTaxIds = result.ids;
@@ -970,7 +1087,9 @@ class _EdititemScreenState extends State<EdititemScreen> {
     FocusScope.of(context).unfocus();
     final result = await CategorySelectorSheet.show(
       context,
-      selectedCategoryId: selectedCategoryId.isEmpty ? null : selectedCategoryId,
+      selectedCategoryId: selectedCategoryId.isEmpty
+          ? null
+          : selectedCategoryId,
       onAddCategory: () async {
         Navigator.pop(context);
         final wasAdded = await AddCategoryDialog.show(context);
@@ -996,14 +1115,17 @@ class _EdititemScreenState extends State<EdititemScreen> {
   }
 
   Future<void> _pickImage() async {
-    final picked = await ImagePicker()
-        .pickImage(source: ImageSource.gallery, imageQuality: 85);
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
     // 3 MB cap — matches the Add Item sheet (was 2 MB here).
     if (bytes.length > 3 * 1024 * 1024) {
       NotificationService.instance.showError(
-          'Image size must be less than 3MB. Please choose a smaller image.');
+        'Image size must be less than 3MB. Please choose a smaller image.',
+      );
       return;
     }
     if (mounted) setState(() => _selectedImageBytes = bytes);
@@ -1016,7 +1138,8 @@ class _EdititemScreenState extends State<EdititemScreen> {
   /// Method, which they don't show); Finished Good/Recipe-Based keep the
   /// original by-weight-only condition, unchanged.
   String _unitLabel() {
-    final isBackOfHouse = _productType == ProductType.rawMaterial ||
+    final isBackOfHouse =
+        _productType == ProductType.rawMaterial ||
         _productType == ProductType.semiFinished;
     if (isBackOfHouse) return _selectedUnit;
     return _sellingMethod == SellingMethod.byWeight ? _selectedUnit : 'pcs';
@@ -1045,35 +1168,47 @@ class _EdititemScreenState extends State<EdititemScreen> {
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           dense: true,
-          title: Text('Low-stock alert',
-              style:
-                  GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
-          subtitle: Text('Warn when this item runs low',
-              style: GoogleFonts.poppins(
-                  fontSize: 12, color: AppColors.textSecondary)),
+          title: Text(
+            'Low-stock alert',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          subtitle: Text(
+            'Warn when this item runs low',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+            ),
+          ),
           value: _lowStockAlertFilter == 'YES',
           activeColor: AppColors.primary,
           onChanged: (v) =>
               setState(() => _lowStockAlertFilter = v ? 'YES' : 'NO'),
         ),
         if (_lowStockAlertFilter == 'YES') ...[
-          const SizedBox(height: 8),
-          Builder(builder: (_) {
-            final unit = _unitLabel();
-            return AppTextField(
-              controller: _lowStockController,
-              label: 'Alert threshold ($unit, optional)',
-              hint:
-                  'Default: ${AppSettings.lowStockThreshold.toStringAsFixed(0)} $unit',
-              icon: Icons.warning_amber_rounded,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-              ],
-              textInputAction: TextInputAction.done,
-              onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
-            );
-          }),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+          Builder(
+            builder: (_) {
+              final unit = _unitLabel();
+              return AppTextField(
+                controller: _lowStockController,
+                label: 'Alert threshold ($unit, optional)',
+                hint:
+                    'Default: ${AppSettings.lowStockThreshold.toStringAsFixed(0)} $unit',
+                icon: Icons.warning_amber_rounded,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                ],
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
+              );
+            },
+          ),
         ],
       ],
     );
@@ -1093,29 +1228,35 @@ class _EdititemScreenState extends State<EdititemScreen> {
         if (line.effectiveQuantity <= 0) continue;
         Items? ingredient;
         try {
-          ingredient = itemStore.items.firstWhere((i) => i.id == line.ingredientItemId);
+          ingredient = itemStore.items.firstWhere(
+            (i) => i.id == line.ingredientItemId,
+          );
         } catch (_) {
           minBatches = 0;
           break;
         }
         if (!ingredient.trackInventory) continue;
         final batches = ingredient.stockQuantity / line.effectiveQuantity;
-        minBatches = minBatches == null ? batches : (batches < minBatches ? batches : minBatches);
+        minBatches = minBatches == null
+            ? batches
+            : (batches < minBatches ? batches : minBatches);
       }
       final yieldQty = recipe.yieldQty > 0 ? recipe.yieldQty : 1.0;
-      available = minBatches == null ? double.infinity : (minBatches * yieldQty).floorToDouble();
+      available = minBatches == null
+          ? double.infinity
+          : (minBatches * yieldQty).floorToDouble();
     }
 
     final color = available == null
         ? AppColors.textSecondary
         : available <= 0
-            ? AppColors.danger
-            : available <= 5
-                ? Colors.orange
-                : AppColors.success;
+        ? AppColors.danger
+        : available <= 5
+        ? Colors.orange
+        : AppColors.success;
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: color.withOpacity(0.08),
         borderRadius: BorderRadius.circular(10),
@@ -1123,8 +1264,12 @@ class _EdititemScreenState extends State<EdititemScreen> {
       ),
       child: Row(
         children: [
-          Icon(Icons.restaurant_menu_rounded, color: color, size: 22),
-          const SizedBox(width: 12),
+          Icon(
+            Icons.restaurant_menu_rounded,
+            color: color,
+            size: AppResponsive.iconSize(context),
+          ),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1133,15 +1278,21 @@ class _EdititemScreenState extends State<EdititemScreen> {
                   available == null
                       ? 'Add ingredients below to see availability'
                       : available == double.infinity
-                          ? 'Unlimited (no tracked ingredients)'
-                          : '${available.toStringAsFixed(0)} can be made right now',
+                      ? 'Unlimited (no tracked ingredients)'
+                      : '${available.toStringAsFixed(0)} can be made right now',
                   style: GoogleFonts.poppins(
-                      fontSize: 14, fontWeight: FontWeight.w600, color: color),
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'Stock is derived from the recipe\'s ingredients — selling this item deducts them, not a stock count of its own.',
-                  style: GoogleFonts.poppins(fontSize: 11.5, color: AppColors.textSecondary),
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.captionFontSize(context),
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -1155,9 +1306,14 @@ class _EdititemScreenState extends State<EdititemScreen> {
   Widget _addNewButton(VoidCallback onTap) {
     return TextButton.icon(
       onPressed: onTap,
-      icon: const Icon(Icons.add, size: 16),
-      label: Text('New',
-          style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600)),
+      icon: Icon(Icons.add, size: AppResponsive.smallIconSize(context)),
+      label: Text(
+        'New',
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.bodyFontSize(context),
+          fontWeight: FontWeight.w600,
+        ),
+      ),
       style: TextButton.styleFrom(
         foregroundColor: AppColors.primary,
         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -1238,15 +1394,19 @@ class _EdititemScreenState extends State<EdititemScreen> {
         final gMin = e.minimum, gMax = e.maximum;
         return {
           'min': TextEditingController(
-              text: (gMin != null && gMin != 0) ? gMin.toString() : ''),
+            text: (gMin != null && gMin != 0) ? gMin.toString() : '',
+          ),
           'max': TextEditingController(
-              text: (gMax != null && gMax != 0) ? gMax.toString() : ''),
+            text: (gMax != null && gMax != 0) ? gMax.toString() : '',
+          ),
         };
       });
       _extraHasConstraints.putIfAbsent(
-          e.Id,
-          () => (e.minimum != null && e.minimum != 0) ||
-              (e.maximum != null && e.maximum != 0));
+        e.Id,
+        () =>
+            (e.minimum != null && e.minimum != 0) ||
+            (e.maximum != null && e.maximum != 0),
+      );
     }
     setState(() {
       _allExtra = fresh;
@@ -1261,10 +1421,12 @@ class _EdititemScreenState extends State<EdititemScreen> {
       color: Colors.white,
       elevation: 2,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: AppResponsive.padding(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1272,18 +1434,25 @@ class _EdititemScreenState extends State<EdititemScreen> {
               children: [
                 Expanded(
                   child: InkWell(
-                    onTap: () => setState(() => _variantsExpanded = !_variantsExpanded),
-                    borderRadius: BorderRadius.circular(8),
+                    onTap: () =>
+                        setState(() => _variantsExpanded = !_variantsExpanded),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.smallBorderRadius(context),
+                    ),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Row(
                         children: [
-                          Icon(Icons.tune, color: AppColors.primary, size: 20),
-                          const SizedBox(width: 8),
+                          Icon(
+                            Icons.tune,
+                            color: AppColors.primary,
+                            size: AppResponsive.iconSize(context),
+                          ),
+                          SizedBox(width: AppResponsive.smallSpacing(context)),
                           Text(
                             'Variants',
                             style: GoogleFonts.poppins(
-                              fontSize: 15,
+                              fontSize: AppResponsive.bodyFontSize(context),
                               fontWeight: FontWeight.w600,
                               color: Colors.black87,
                             ),
@@ -1292,18 +1461,24 @@ class _EdititemScreenState extends State<EdititemScreen> {
                           AnimatedRotation(
                             turns: _variantsExpanded ? 0.5 : 0.0,
                             duration: const Duration(milliseconds: 200),
-                            child: Icon(Icons.keyboard_arrow_down,
-                                color: AppColors.textSecondary, size: 22),
+                            child: Icon(
+                              Icons.keyboard_arrow_down,
+                              color: AppColors.textSecondary,
+                              size: AppResponsive.iconSize(context),
+                            ),
                           ),
                           if (!_variantsExpanded &&
                               _variantCheckedList.contains(true)) ...[
-                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: AppResponsive.smallSpacing(context),
+                            ),
                             Text(
                               '${_variantCheckedList.where((c) => c).length} selected',
                               style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w500),
+                                fontSize: AppResponsive.smallFontSize(context),
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ],
                         ],
@@ -1318,10 +1493,16 @@ class _EdititemScreenState extends State<EdititemScreen> {
               const Divider(),
               if (variants.isEmpty)
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text('No variants yet. Tap "New" to add one.',
-                      style: GoogleFonts.poppins(
-                          fontSize: 13, color: AppColors.textSecondary)),
+                  padding: EdgeInsets.symmetric(
+                    vertical: AppResponsive.smallSpacing(context),
+                  ),
+                  child: Text(
+                    'No variants yet. Tap "New" to add one.',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ),
               ListView.builder(
                 shrinkWrap: true,
@@ -1336,7 +1517,8 @@ class _EdititemScreenState extends State<EdititemScreen> {
                     children: [
                       Checkbox(
                         value: _variantCheckedList[index],
-                        onChanged: (value) => setState(() => _variantCheckedList[index] = value!),
+                        onChanged: (value) =>
+                            setState(() => _variantCheckedList[index] = value!),
                       ),
                       Expanded(
                         flex: 3,
@@ -1346,29 +1528,37 @@ class _EdititemScreenState extends State<EdititemScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: AppResponsive.smallSpacing(context)),
                       Expanded(
                         flex: 3,
                         child: AppTextField(
                           controller: _variantPriceControllers[index],
                           hint: 'Price',
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d*\.?\d{0,2}'),
+                            ),
                           ],
                         ),
                       ),
                       // Per-variant stock — only when inventory tracking is on.
                       if (trackOn && _variantCheckedList[index]) ...[
-                        const SizedBox(width: 8),
+                        SizedBox(width: AppResponsive.smallSpacing(context)),
                         Expanded(
                           flex: 3,
                           child: AppTextField(
                             controller: _variantStockControllers[index],
                             hint: 'Stock',
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                             inputFormatters: [
-                              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d*\.?\d{0,2}'),
+                              ),
                             ],
                           ),
                         ),
@@ -1392,41 +1582,66 @@ class _EdititemScreenState extends State<EdititemScreen> {
         onTap: () => _pickItemDefaults(allChoices),
         borderRadius: BorderRadius.circular(10),
         child: Container(
-          padding: const EdgeInsets.all(14),
+          padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
           decoration: BoxDecoration(
             border: Border.all(color: AppColors.divider),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
             children: [
-              Icon(Icons.task_alt_outlined, color: AppColors.primary, size: 20),
-              const SizedBox(width: 12),
+              Icon(
+                Icons.task_alt_outlined,
+                color: AppColors.primary,
+                size: AppResponsive.iconSize(context),
+              ),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Default Selection',
-                        style: GoogleFonts.poppins(
-                            fontSize: 14, fontWeight: FontWeight.w600)),
-                    Text('Pre-tick choice options for this item',
-                        style: GoogleFonts.poppins(
-                            fontSize: 12, color: AppColors.textSecondary)),
+                    Text(
+                      'Default Selection',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      'Pre-tick choice options for this item',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ],
                 ),
               ),
               if (_defaultChoiceOptionIds.isNotEmpty)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(12)),
-                  child: Text('${_defaultChoiceOptionIds.length}',
-                      style: GoogleFonts.poppins(
-                          color: Colors.white, fontSize: 12)),
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.borderRadius(context),
+                    ),
+                  ),
+                  child: Text(
+                    '${_defaultChoiceOptionIds.length}',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: AppResponsive.smallFontSize(context),
+                    ),
+                  ),
                 ),
-              const SizedBox(width: 8),
-              Icon(Icons.arrow_forward_ios,
-                  size: 14, color: AppColors.textSecondary),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 14,
+                color: AppColors.textSecondary,
+              ),
             ],
           ),
         ),
@@ -1443,7 +1658,10 @@ class _EdititemScreenState extends State<EdititemScreen> {
       }
     }
     final result = await showDefaultChoicePicker(
-        context, selectedChoiceIds, _defaultChoiceOptionIds);
+      context,
+      selectedChoiceIds,
+      _defaultChoiceOptionIds,
+    );
     if (result != null && mounted) {
       setState(() => _defaultChoiceOptionIds = result);
     }
@@ -1452,14 +1670,18 @@ class _EdititemScreenState extends State<EdititemScreen> {
   // Helper widget for building the choices section
   Widget _buildChoiceSection(List<ChoicesModel> choices) {
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
+      margin: EdgeInsets.symmetric(
+        vertical: AppResponsive.smallSpacing(context),
+      ),
       color: Colors.white,
       elevation: 2,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: AppResponsive.padding(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1467,18 +1689,25 @@ class _EdititemScreenState extends State<EdititemScreen> {
               children: [
                 Expanded(
                   child: InkWell(
-                    onTap: () => setState(() => _choicesExpanded = !_choicesExpanded),
-                    borderRadius: BorderRadius.circular(8),
+                    onTap: () =>
+                        setState(() => _choicesExpanded = !_choicesExpanded),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.smallBorderRadius(context),
+                    ),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Row(
                         children: [
-                          Icon(Icons.checklist, color: AppColors.primary, size: 20),
-                          const SizedBox(width: 8),
+                          Icon(
+                            Icons.checklist,
+                            color: AppColors.primary,
+                            size: AppResponsive.iconSize(context),
+                          ),
+                          SizedBox(width: AppResponsive.smallSpacing(context)),
                           Text(
                             'Choices',
                             style: GoogleFonts.poppins(
-                              fontSize: 15,
+                              fontSize: AppResponsive.bodyFontSize(context),
                               fontWeight: FontWeight.w600,
                               color: Colors.black87,
                             ),
@@ -1487,18 +1716,24 @@ class _EdititemScreenState extends State<EdititemScreen> {
                           AnimatedRotation(
                             turns: _choicesExpanded ? 0.5 : 0.0,
                             duration: const Duration(milliseconds: 200),
-                            child: Icon(Icons.keyboard_arrow_down,
-                                color: AppColors.textSecondary, size: 22),
+                            child: Icon(
+                              Icons.keyboard_arrow_down,
+                              color: AppColors.textSecondary,
+                              size: AppResponsive.iconSize(context),
+                            ),
                           ),
                           if (!_choicesExpanded &&
                               _choiceCheckedList.contains(true)) ...[
-                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: AppResponsive.smallSpacing(context),
+                            ),
                             Text(
                               '${_choiceCheckedList.where((c) => c).length} selected',
                               style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w500),
+                                fontSize: AppResponsive.smallFontSize(context),
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ],
                         ],
@@ -1513,10 +1748,16 @@ class _EdititemScreenState extends State<EdititemScreen> {
               const Divider(),
               if (choices.isEmpty)
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text('No choices yet. Tap "New" to add one.',
-                      style: GoogleFonts.poppins(
-                          fontSize: 13, color: AppColors.textSecondary)),
+                  padding: EdgeInsets.symmetric(
+                    vertical: AppResponsive.smallSpacing(context),
+                  ),
+                  child: Text(
+                    'No choices yet. Tap "New" to add one.',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ),
               ListView.builder(
                 shrinkWrap: true,
@@ -1527,7 +1768,8 @@ class _EdititemScreenState extends State<EdititemScreen> {
                     controlAffinity: ListTileControlAffinity.leading,
                     title: Text(choices[index].name),
                     value: _choiceCheckedList[index],
-                    onChanged: (value) => setState(() => _choiceCheckedList[index] = value!),
+                    onChanged: (value) =>
+                        setState(() => _choiceCheckedList[index] = value!),
                   );
                 },
               ),
@@ -1537,16 +1779,21 @@ class _EdititemScreenState extends State<EdititemScreen> {
       ),
     );
   }
+
   Widget _buildExtrtaSection(List<Extramodel> extra) {
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
+      margin: EdgeInsets.symmetric(
+        vertical: AppResponsive.smallSpacing(context),
+      ),
       color: Colors.white,
       elevation: 2,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: AppResponsive.padding(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1554,18 +1801,25 @@ class _EdititemScreenState extends State<EdititemScreen> {
               children: [
                 Expanded(
                   child: InkWell(
-                    onTap: () => setState(() => _extrasExpanded = !_extrasExpanded),
-                    borderRadius: BorderRadius.circular(8),
+                    onTap: () =>
+                        setState(() => _extrasExpanded = !_extrasExpanded),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.smallBorderRadius(context),
+                    ),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Row(
                         children: [
-                          Icon(Icons.add_circle_outline, color: AppColors.primary, size: 20),
-                          const SizedBox(width: 8),
+                          Icon(
+                            Icons.add_circle_outline,
+                            color: AppColors.primary,
+                            size: AppResponsive.iconSize(context),
+                          ),
+                          SizedBox(width: AppResponsive.smallSpacing(context)),
                           Text(
                             'Extras',
                             style: GoogleFonts.poppins(
-                              fontSize: 15,
+                              fontSize: AppResponsive.bodyFontSize(context),
                               fontWeight: FontWeight.w600,
                               color: Colors.black87,
                             ),
@@ -1574,18 +1828,24 @@ class _EdititemScreenState extends State<EdititemScreen> {
                           AnimatedRotation(
                             turns: _extrasExpanded ? 0.5 : 0.0,
                             duration: const Duration(milliseconds: 200),
-                            child: Icon(Icons.keyboard_arrow_down,
-                                color: AppColors.textSecondary, size: 22),
+                            child: Icon(
+                              Icons.keyboard_arrow_down,
+                              color: AppColors.textSecondary,
+                              size: AppResponsive.iconSize(context),
+                            ),
                           ),
                           if (!_extrasExpanded &&
                               _extraCheckedList.contains(true)) ...[
-                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: AppResponsive.smallSpacing(context),
+                            ),
                             Text(
                               '${_extraCheckedList.where((c) => c).length} selected',
                               style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w500),
+                                fontSize: AppResponsive.smallFontSize(context),
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ],
                         ],
@@ -1600,88 +1860,123 @@ class _EdititemScreenState extends State<EdititemScreen> {
               const Divider(),
               if (extra.isEmpty)
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text('No extras yet. Tap "New" to add one.',
-                      style: GoogleFonts.poppins(
-                          fontSize: 13, color: AppColors.textSecondary)),
+                  padding: EdgeInsets.symmetric(
+                    vertical: AppResponsive.smallSpacing(context),
+                  ),
+                  child: Text(
+                    'No extras yet. Tap "New" to add one.',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ),
               ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: extra.length,
-              itemBuilder: (context, index) {
-                final extraItem = extra[index];
-                final isChecked = _extraCheckedList[index];
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: extra.length,
+                itemBuilder: (context, index) {
+                  final extraItem = extra[index];
+                  final isChecked = _extraCheckedList[index];
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    CheckboxListTile(
-                      controlAffinity: ListTileControlAffinity.leading,
-                      title: Text(extraItem.Ename),
-                      value: isChecked,
-                      onChanged: (value) => setState(() => _extraCheckedList[index] = value!),
-                    ),
-                    if (isChecked)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 56.0, right: 16.0, bottom: 8.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            CheckboxListTile(
-                              controlAffinity: ListTileControlAffinity.leading,
-                              contentPadding: EdgeInsets.zero,
-                              title: Text('Set Min/Max', style: TextStyle(fontSize: 14, color: Colors.grey[700])),
-                              value: _extraHasConstraints[extraItem.Id] ?? false,
-                              onChanged: (value) {
-                                setState(() {
-                                  _extraHasConstraints[extraItem.Id] = value!;
-                                  // Clear controllers if unchecked
-                                  if (!value) {
-                                    _extraConstraintControllers[extraItem.Id]?['min']?.clear();
-                                    _extraConstraintControllers[extraItem.Id]?['max']?.clear();
-                                  }
-                                });
-                              },
-                            ),
-                            if (_extraHasConstraints[extraItem.Id] ?? false)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8.0),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: AppTextField(
-                                        controller: _extraConstraintControllers[extraItem.Id]?['min'],
-                                        label: 'Minimum',
-                                        hint: '0',
-                                        keyboardType: TextInputType.number,
-                                        inputFormatters: [
-                                          FilteringTextInputFormatter.digitsOnly,
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: AppTextField(
-                                        controller: _extraConstraintControllers[extraItem.Id]?['max'],
-                                        label: 'Maximum',
-                                        hint: '0',
-                                        keyboardType: TextInputType.number,
-                                        inputFormatters: [
-                                          FilteringTextInputFormatter.digitsOnly,
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CheckboxListTile(
+                        controlAffinity: ListTileControlAffinity.leading,
+                        title: Text(extraItem.Ename),
+                        value: isChecked,
+                        onChanged: (value) =>
+                            setState(() => _extraCheckedList[index] = value!),
                       ),
-                  ],
-                );
-              },
-            ),
+                      if (isChecked)
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            left: 56.0,
+                            right: 16.0,
+                            bottom: 8.0,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              CheckboxListTile(
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                                contentPadding: EdgeInsets.zero,
+                                title: Text(
+                                  'Set Min/Max',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                                value:
+                                    _extraHasConstraints[extraItem.Id] ?? false,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _extraHasConstraints[extraItem.Id] = value!;
+                                    // Clear controllers if unchecked
+                                    if (!value) {
+                                      _extraConstraintControllers[extraItem
+                                              .Id]?['min']
+                                          ?.clear();
+                                      _extraConstraintControllers[extraItem
+                                              .Id]?['max']
+                                          ?.clear();
+                                    }
+                                  });
+                                },
+                              ),
+                              if (_extraHasConstraints[extraItem.Id] ?? false)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8.0),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: AppTextField(
+                                          controller:
+                                              _extraConstraintControllers[extraItem
+                                                  .Id]?['min'],
+                                          label: 'Minimum',
+                                          hint: '0',
+                                          keyboardType: TextInputType.number,
+                                          inputFormatters: [
+                                            FilteringTextInputFormatter
+                                                .digitsOnly,
+                                          ],
+                                        ),
+                                      ),
+                                      SizedBox(
+                                        width: AppResponsive.largeSpacing(
+                                          context,
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: AppTextField(
+                                          controller:
+                                              _extraConstraintControllers[extraItem
+                                                  .Id]?['max'],
+                                          label: 'Maximum',
+                                          hint: '0',
+                                          keyboardType: TextInputType.number,
+                                          inputFormatters: [
+                                            FilteringTextInputFormatter
+                                                .digitsOnly,
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
             ],
           ],
         ),
@@ -1689,13 +1984,3 @@ class _EdititemScreenState extends State<EdititemScreen> {
     );
   }
 }
-
-
-
-
-
-
-
-
-
-

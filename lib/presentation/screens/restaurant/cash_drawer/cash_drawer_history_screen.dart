@@ -49,12 +49,12 @@ class _HistoryRow {
   final String typeName;
   final Color typeColor;
   final String staffName;
-  final double inAmount;       // positive = cash added
-  final double outAmount;      // positive = cash removed
+  final double inAmount; // positive = cash added
+  final double outAmount; // positive = cash removed
   final double runningBalance; // drawer total AFTER this entry
   final String reason;
   final String? note;
-  final bool isAuditOnly;      // true for adjustments / discrepancies
+  final bool isAuditOnly; // true for adjustments / discrepancies
 
   const _HistoryRow({
     required this.timestamp,
@@ -76,7 +76,8 @@ class CashDrawerHistoryScreen extends StatefulWidget {
   const CashDrawerHistoryScreen({super.key});
 
   @override
-  State<CashDrawerHistoryScreen> createState() => _CashDrawerHistoryScreenState();
+  State<CashDrawerHistoryScreen> createState() =>
+      _CashDrawerHistoryScreenState();
 }
 
 class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
@@ -90,12 +91,23 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
   DateTime _toDate = DateTime.now();
   String _typeFilter = 'All';
 
-  static const _typeOptions = ['All', 'Opening', 'Sale', 'Refund', 'Expense', 'Cash In', 'Cash Out', 'Withdrawal', 'Adjustment', 'Shift End'];
+  static const _typeOptions = [
+    'All',
+    'Opening',
+    'Sale',
+    'Refund',
+    'Expense',
+    'Cash In',
+    'Cash Out',
+    'Withdrawal',
+    'Adjustment',
+    'Shift End',
+  ];
 
   // Pre-computed summary totals
-  double _totalIn  = 0.0;
+  double _totalIn = 0.0;
   double _totalOut = 0.0;
-  double _net      = 0.0;
+  double _net = 0.0;
 
   // ── Init ────────────────────────────────────────────────────────────────────
 
@@ -117,7 +129,9 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
       final drafts = <_RowDraft>[];
 
       // ── Source 1: Manual cash movements (opening, cash in/out, adjustments) ─
-      final box = Hive.box<CashMovementModel>(HiveBoxNames.restaurantCashMovements);
+      final box = Hive.box<CashMovementModel>(
+        HiveBoxNames.restaurantCashMovements,
+      );
       for (final m in box.values) {
         String typeName;
         Color typeColor;
@@ -135,13 +149,15 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
             typeColor = Colors.green.shade700;
             inAmt = m.amount;
           case 'out':
-            final isEOD = m.reason.toLowerCase().contains('safe drop') ||
+            final isEOD =
+                m.reason.toLowerCase().contains('safe drop') ||
                 m.reason.toLowerCase().contains('end of day');
             typeName = isEOD ? 'Withdrawal' : 'Cash Out';
             typeColor = Colors.red.shade700;
             outAmt = m.amount;
           case 'adjustment':
-            final isDiscrepancy = m.reason.toLowerCase().contains('shortage') ||
+            final isDiscrepancy =
+                m.reason.toLowerCase().contains('shortage') ||
                 m.reason.toLowerCase().contains('overage') ||
                 m.reason.toLowerCase().contains('discrepancy');
             typeName = isDiscrepancy ? 'Discrepancy' : 'Adjustment';
@@ -162,17 +178,19 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
             }
         }
 
-        drafts.add(_RowDraft(
-          timestamp: m.timestamp,
-          typeName: typeName,
-          typeColor: typeColor,
-          staffName: m.staffName,
-          inAmount: inAmt,
-          outAmount: outAmt,
-          reason: m.reason,
-          note: m.note,
-          isAuditOnly: auditOnly,
-        ));
+        drafts.add(
+          _RowDraft(
+            timestamp: m.timestamp,
+            typeName: typeName,
+            typeColor: typeColor,
+            staffName: m.staffName,
+            inAmount: inAmt,
+            outAmount: outAmt,
+            reason: m.reason,
+            note: m.note,
+            isAuditOnly: auditOnly,
+          ),
+        );
       }
 
       // ── Source 2: Cash sales from orders ──────────────────────────────────
@@ -204,22 +222,25 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
         if (originalCash <= 0) continue;
 
         final billNo = o.billNumber ?? o.id.substring(0, 6);
-        final saleStaff = (o.shiftId != null ? shiftIdToName[o.shiftId] : null)
-            ?? staffAtTime(o.orderAt!);
+        final saleStaff =
+            (o.shiftId != null ? shiftIdToName[o.shiftId] : null) ??
+            staffAtTime(o.orderAt!);
 
         // 1. Add Sale entry
         final saleLabel = o.isSplitPayment == true
             ? 'Bill #$billNo (cash portion)'
             : 'Bill #$billNo';
-        drafts.add(_RowDraft(
-          timestamp: o.orderAt!,
-          typeName: 'Sale',
-          typeColor: Colors.green.shade600,
-          staffName: saleStaff,
-          inAmount: originalCash,
-          outAmount: 0.0,
-          reason: saleLabel,
-        ));
+        drafts.add(
+          _RowDraft(
+            timestamp: o.orderAt!,
+            typeName: 'Sale',
+            typeColor: Colors.green.shade600,
+            staffName: saleStaff,
+            inAmount: originalCash,
+            outAmount: 0.0,
+            reason: saleLabel,
+          ),
+        );
 
         // 2. Add Refund entry if there is a refund
         final refundCash = _cashRefundComponentOf(o);
@@ -228,17 +249,21 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
               ? 'Refund for Bill #$billNo (cash portion)'
               : 'Refund for Bill #$billNo';
           final refundTime = o.refundedAt ?? o.orderAt!;
-          final refundStaff = o.refundedAt != null ? staffAtTime(o.refundedAt!) : saleStaff;
+          final refundStaff = o.refundedAt != null
+              ? staffAtTime(o.refundedAt!)
+              : saleStaff;
 
-          drafts.add(_RowDraft(
-            timestamp: refundTime,
-            typeName: 'Refund',
-            typeColor: Colors.red.shade700,
-            staffName: refundStaff,
-            inAmount: 0.0,
-            outAmount: refundCash,
-            reason: refundLabel,
-          ));
+          drafts.add(
+            _RowDraft(
+              timestamp: refundTime,
+              typeName: 'Refund',
+              typeColor: Colors.red.shade700,
+              staffName: refundStaff,
+              inAmount: 0.0,
+              outAmount: refundCash,
+              reason: refundLabel,
+            ),
+          );
         }
       }
 
@@ -256,19 +281,23 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
             ? 'Expense — $catName (${e.reason})'
             : 'Expense — $catName';
 
-        drafts.add(_RowDraft(
-          timestamp: e.dateandTime,
-          typeName: 'Expense',
-          typeColor: Colors.deepOrange.shade600,
-          staffName: staffAtTime(e.dateandTime),
-          inAmount: 0.0,
-          outAmount: e.amount,
-          reason: desc,
-        ));
+        drafts.add(
+          _RowDraft(
+            timestamp: e.dateandTime,
+            typeName: 'Expense',
+            typeColor: Colors.deepOrange.shade600,
+            staffName: staffAtTime(e.dateandTime),
+            inAmount: 0.0,
+            outAmount: e.amount,
+            reason: desc,
+          ),
+        );
       }
 
       // ── Source 4: Shift-end handover records ──────────────────────────────
-      final handoverBox = Hive.box<CashHandoverModel>(HiveBoxNames.restaurantCashHandovers);
+      final handoverBox = Hive.box<CashHandoverModel>(
+        HiveBoxNames.restaurantCashHandovers,
+      );
       final currency = CurrencyHelper.currentSymbol;
       for (final h in handoverBox.values) {
         if (h.status == 'PENDING') continue; // skip incomplete legacy records
@@ -279,7 +308,8 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
         if (isSystem) {
           // Single-step record
           final counted = '$currency${h.closedAmount.toStringAsFixed(2)}';
-          final expected = '$currency${(h.receivedAmount ?? 0).toStringAsFixed(2)}';
+          final expected =
+              '$currency${(h.receivedAmount ?? 0).toStringAsFixed(2)}';
           reason = isMismatch
               ? 'Shift end — ${h.closedBy} counted $counted, POS expected $expected'
               : 'Shift end — ${h.closedBy} counted $counted ✓ matches POS';
@@ -292,17 +322,21 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
               ? 'Handover ${h.closedBy}→${h.receivedBy} — variance $v'
               : 'Handover ${h.closedBy}→${h.receivedBy} ✓ matched';
         }
-        drafts.add(_RowDraft(
-          timestamp: h.closedAt,
-          typeName: 'Shift End',
-          typeColor: isMismatch ? Colors.orange.shade700 : Colors.teal.shade600,
-          staffName: h.closedBy,
-          inAmount: 0.0,
-          outAmount: 0.0,
-          reason: reason,
-          note: h.closedNote,
-          isAuditOnly: true,
-        ));
+        drafts.add(
+          _RowDraft(
+            timestamp: h.closedAt,
+            typeName: 'Shift End',
+            typeColor: isMismatch
+                ? Colors.orange.shade700
+                : Colors.teal.shade600,
+            staffName: h.closedBy,
+            inAmount: 0.0,
+            outAmount: 0.0,
+            reason: reason,
+            note: h.closedNote,
+            isAuditOnly: true,
+          ),
+        );
       }
 
       // ── Sort all events chronologically ───────────────────────────────────
@@ -316,18 +350,20 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
         if (!d.isAuditOnly) {
           running += d.inAmount - d.outAmount;
         }
-        rows.add(_HistoryRow(
-          timestamp: d.timestamp,
-          typeName: d.typeName,
-          typeColor: d.typeColor,
-          staffName: d.staffName,
-          inAmount: d.inAmount,
-          outAmount: d.outAmount,
-          runningBalance: running,
-          reason: d.reason,
-          note: d.note,
-          isAuditOnly: d.isAuditOnly,
-        ));
+        rows.add(
+          _HistoryRow(
+            timestamp: d.timestamp,
+            typeName: d.typeName,
+            typeColor: d.typeColor,
+            staffName: d.staffName,
+            inAmount: d.inAmount,
+            outAmount: d.outAmount,
+            runningBalance: running,
+            reason: d.reason,
+            note: d.note,
+            isAuditOnly: d.isAuditOnly,
+          ),
+        );
       }
 
       _allRows = rows.reversed.toList(); // newest first
@@ -383,10 +419,14 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
     double outSum = 0.0;
 
     for (final r in _allRows) {
-      if (r.timestamp.isBefore(from) || !r.timestamp.isBefore(toExclusive)) continue;
+      if (r.timestamp.isBefore(from) || !r.timestamp.isBefore(toExclusive)) {
+        continue;
+      }
       if (_typeFilter != 'All') {
         if (_typeFilter == 'Adjustment') {
-          if (r.typeName != 'Adjustment' && r.typeName != 'Discrepancy') continue;
+          if (r.typeName != 'Adjustment' && r.typeName != 'Discrepancy') {
+            continue;
+          }
         } else if (r.typeName != _typeFilter) {
           continue;
         }
@@ -415,7 +455,8 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               margin: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
                 color: AppColors.divider,
@@ -429,12 +470,23 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
                   color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(Icons.today_outlined, color: AppColors.primary, size: 20),
+                child: Icon(
+                  Icons.today_outlined,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
               ),
-              title: Text('Single Day',
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-              subtitle: Text('View one specific day',
-                  style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
+              title: Text(
+                'Single Day',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                'View one specific day',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  color: AppColors.textSecondary,
+                ),
+              ),
               onTap: () {
                 Navigator.pop(ctx);
                 _pickSingleDay();
@@ -447,12 +499,23 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
                   color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(Icons.date_range_outlined, color: AppColors.primary, size: 20),
+                child: Icon(
+                  Icons.date_range_outlined,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
               ),
-              title: Text('Date Range',
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-              subtitle: Text('View multiple days',
-                  style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
+              title: Text(
+                'Date Range',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                'View multiple days',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  color: AppColors.textSecondary,
+                ),
+              ),
               onTap: () {
                 Navigator.pop(ctx);
                 _pickDateRange();
@@ -484,7 +547,7 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
     if (picked != null) {
       setState(() {
         _fromDate = picked;
-        _toDate   = picked;
+        _toDate = picked;
       });
       _applyFilter();
     }
@@ -509,7 +572,7 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
     if (range != null) {
       setState(() {
         _fromDate = range.start;
-        _toDate   = range.end;
+        _toDate = range.end;
       });
       _applyFilter();
     }
@@ -520,36 +583,54 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
   // Excel and PDF, consistent with every other report.
 
   Future<void> _exportReport() async {
-    final fmt     = DateFormat('dd MMM yyyy  HH:mm');
+    final fmt = DateFormat('dd MMM yyyy  HH:mm');
     final dateFmt = DateFormat('dd MMM yyyy');
 
     final headers = [
-      'Date / Time', 'Type', 'Staff', 'In', 'Out', 'Balance', 'Reason / Note',
+      'Date / Time',
+      'Type',
+      'Staff',
+      'In',
+      'Out',
+      'Balance',
+      'Reason / Note',
     ];
 
-    final data = _filteredRows.map((r) => [
-      fmt.format(r.timestamp),
-      r.typeName,
-      r.staffName,
-      r.inAmount  > 0 ? ReportExportService.formatCurrency(r.inAmount)  : '—',
-      r.outAmount > 0 ? ReportExportService.formatCurrency(r.outAmount) : '—',
-      ReportExportService.formatCurrency(r.runningBalance),
-      (r.note != null && r.note!.isNotEmpty) ? '${r.reason} — ${r.note}' : r.reason,
-    ]).toList();
+    final data = _filteredRows
+        .map(
+          (r) => [
+            fmt.format(r.timestamp),
+            r.typeName,
+            r.staffName,
+            r.inAmount > 0
+                ? ReportExportService.formatCurrency(r.inAmount)
+                : '—',
+            r.outAmount > 0
+                ? ReportExportService.formatCurrency(r.outAmount)
+                : '—',
+            ReportExportService.formatCurrency(r.runningBalance),
+            (r.note != null && r.note!.isNotEmpty)
+                ? '${r.reason} — ${r.note}'
+                : r.reason,
+          ],
+        )
+        .toList();
 
-    final periodName = '${dateFmt.format(_fromDate)} – ${dateFmt.format(_toDate)}';
+    final periodName =
+        '${dateFmt.format(_fromDate)} – ${dateFmt.format(_toDate)}';
     final summary = {
       'Report Period': periodName,
-      'Total In':  ReportExportService.formatCurrency(_totalIn),
+      'Total In': ReportExportService.formatCurrency(_totalIn),
       'Total Out': ReportExportService.formatCurrency(_totalOut),
-      'Net':       ReportExportService.formatCurrency(_net),
-      'Entries':   _filteredRows.length.toString(),
+      'Net': ReportExportService.formatCurrency(_net),
+      'Entries': _filteredRows.length.toString(),
       'Generated': ReportExportService.formatDateTime(DateTime.now()),
     };
 
     await ReportExportService.showExportDialog(
       context: context,
-      fileName: 'cash_drawer_history_${DateFormat('yyyyMMdd').format(DateTime.now())}',
+      fileName:
+          'cash_drawer_history_${DateFormat('yyyyMMdd').format(DateTime.now())}',
       reportTitle: 'Cash Drawer History - $periodName',
       headers: headers,
       data: data,
@@ -569,15 +650,21 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Cash Drawer History',
-                style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: AppResponsive.headingFontSize(context))),
-            Text('Full audit trail — every cash movement',
-                style: GoogleFonts.poppins(
-                    color: Colors.white70,
-                    fontSize: AppResponsive.smallFontSize(context))),
+            Text(
+              'Cash Drawer History',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: AppResponsive.headingFontSize(context),
+              ),
+            ),
+            Text(
+              'Full audit trail — every cash movement',
+              style: GoogleFonts.poppins(
+                color: Colors.white70,
+                fontSize: AppResponsive.smallFontSize(context),
+              ),
+            ),
           ],
         ),
         actions: [
@@ -588,19 +675,28 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
           ),
         ],
       ),
-      body: Column(children: [
-        if (!_isLoading) ...[
-          _buildFilterBar(context),
-          _buildSummaryBar(context, currency),
-        ],
-        Expanded(
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _filteredRows.isEmpty
+      // Filter/summary bars are margin'd cards, not full-bleed strips, so the
+      // whole body caps together. The Scaffold background still spans.
+      body: AppResponsive.constrainedContent(
+        context: context,
+        maxWidth: AppResponsive.maxFormWidth(context),
+        alignment: Alignment.topCenter,
+        child: Column(
+          children: [
+            if (!_isLoading) ...[
+              _buildFilterBar(context),
+              _buildSummaryBar(context, currency),
+            ],
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _filteredRows.isEmpty
                   ? _buildEmpty(context)
                   : _buildTable(context, currency),
+            ),
+          ],
         ),
-      ]),
+      ),
     );
   }
 
@@ -608,7 +704,8 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
 
   Widget _buildFilterBar(BuildContext context) {
     final dateFmt = DateFormat('dd MMM yy');
-    final isSingleDay = _fromDate.year == _toDate.year &&
+    final isSingleDay =
+        _fromDate.year == _toDate.year &&
         _fromDate.month == _toDate.month &&
         _fromDate.day == _toDate.day;
     final dateLabel = isSingleDay
@@ -625,8 +722,9 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
       padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius:
-            BorderRadius.circular(AppResponsive.borderRadius(context)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
       child: Column(
@@ -642,31 +740,40 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
               ),
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.07),
-                borderRadius:
-                    BorderRadius.circular(AppResponsive.borderRadius(context)),
-                border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.25)),
-              ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(
-                  isSingleDay ? Icons.today_outlined : Icons.date_range_outlined,
-                  size: AppResponsive.smallIconSize(context),
-                  color: AppColors.primary,
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.borderRadius(context),
                 ),
-                SizedBox(width: AppResponsive.smallSpacing(context)),
-                Text(
-                  dateLabel,
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.bodyFontSize(context),
-                    fontWeight: FontWeight.w600,
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.25),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isSingleDay
+                        ? Icons.today_outlined
+                        : Icons.date_range_outlined,
+                    size: AppResponsive.smallIconSize(context),
                     color: AppColors.primary,
                   ),
-                ),
-                SizedBox(width: AppResponsive.smallSpacing(context)),
-                Icon(Icons.arrow_drop_down,
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
+                  Text(
+                    dateLabel,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
+                  Icon(
+                    Icons.arrow_drop_down,
                     size: AppResponsive.iconSize(context),
-                    color: AppColors.primary),
-              ]),
+                    color: AppColors.primary,
+                  ),
+                ],
+              ),
             ),
           ),
           SizedBox(height: AppResponsive.mediumSpacing(context)),
@@ -677,8 +784,9 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
               children: _typeOptions.map((option) {
                 final isSelected = _typeFilter == option;
                 return Padding(
-                  padding:
-                      EdgeInsets.only(right: AppResponsive.smallSpacing(context)),
+                  padding: EdgeInsets.only(
+                    right: AppResponsive.smallSpacing(context),
+                  ),
                   child: GestureDetector(
                     onTap: () {
                       setState(() => _typeFilter = option);
@@ -691,10 +799,14 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
                         vertical: AppResponsive.smallSpacing(context),
                       ),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primary : Colors.transparent,
+                        color: isSelected
+                            ? AppColors.primary
+                            : Colors.transparent,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: isSelected ? AppColors.primary : AppColors.divider,
+                          color: isSelected
+                              ? AppColors.primary
+                              : AppColors.divider,
                           width: isSelected ? 1.5 : 1,
                         ),
                       ),
@@ -702,8 +814,9 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
                         option,
                         style: GoogleFonts.poppins(
                           fontSize: AppResponsive.smallFontSize(context),
-                          fontWeight:
-                              isSelected ? FontWeight.w700 : FontWeight.w500,
+                          fontWeight: isSelected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
                           color: isSelected
                               ? Colors.white
                               : AppColors.textSecondary,
@@ -734,75 +847,117 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
       padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
-      child: Row(children: [
-        _summaryTile(context, 'Total In',  _totalIn,  Colors.green.shade700, currency),
-        _vDivider(),
-        _summaryTile(context, 'Total Out', _totalOut, Colors.red.shade700,   currency),
-        _vDivider(),
-        _summaryTile(context, 'Net',       _net,      netColor,              currency),
-        _vDivider(),
-        _summaryTile(context, 'Entries',   _filteredRows.length.toDouble(),
-            AppColors.textSecondary, '', isCount: true),
-      ]),
+      child: Row(
+        children: [
+          _summaryTile(
+            context,
+            'Total In',
+            _totalIn,
+            Colors.green.shade700,
+            currency,
+          ),
+          _vDivider(),
+          _summaryTile(
+            context,
+            'Total Out',
+            _totalOut,
+            Colors.red.shade700,
+            currency,
+          ),
+          _vDivider(),
+          _summaryTile(context, 'Net', _net, netColor, currency),
+          _vDivider(),
+          _summaryTile(
+            context,
+            'Entries',
+            _filteredRows.length.toDouble(),
+            AppColors.textSecondary,
+            '',
+            isCount: true,
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _summaryTile(BuildContext context, String label, double amount,
-      Color color, String currency, {bool isCount = false}) =>
-      Expanded(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label,
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.captionFontSize(context),
-                color: AppColors.textSecondary,
-              )),
-          const SizedBox(height: 2),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              isCount
-                  ? '${amount.toInt()}'
-                  : '$currency${DecimalSettings.formatAmount(amount)}',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.bodyFontSize(context),
-                fontWeight: FontWeight.w700,
-                color: color,
-              ),
+  Widget _summaryTile(
+    BuildContext context,
+    String label,
+    double amount,
+    Color color,
+    String currency, {
+    bool isCount = false,
+  }) => Expanded(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.captionFontSize(context),
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 2),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            isCount
+                ? '${amount.toInt()}'
+                : '$currency${DecimalSettings.formatAmount(amount)}',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w700,
+              color: color,
             ),
           ),
-        ]),
-      );
+        ),
+      ],
+    ),
+  );
 
   Widget _vDivider() => Container(
-      width: 1,
-      height: 36,
-      color: AppColors.divider,
-      margin: const EdgeInsets.symmetric(horizontal: 8));
+    width: 1,
+    height: 36,
+    color: AppColors.divider,
+    margin: const EdgeInsets.symmetric(horizontal: 8),
+  );
 
   // ── Empty state ──────────────────────────────────────────────────────────────
 
   Widget _buildEmpty(BuildContext context) => Center(
-    child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Icon(Icons.history_outlined,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.history_outlined,
           size: AppResponsive.largeIconSize(context) * 1.5,
-          color: AppColors.divider),
-      SizedBox(height: AppResponsive.mediumSpacing(context)),
-      Text('No transactions found',
+          color: AppColors.divider,
+        ),
+        SizedBox(height: AppResponsive.mediumSpacing(context)),
+        Text(
+          'No transactions found',
           style: GoogleFonts.poppins(
             fontSize: AppResponsive.bodyFontSize(context),
             color: AppColors.textSecondary,
-          )),
-      SizedBox(height: AppResponsive.smallSpacing(context)),
-      Text('Try widening the date range or changing the filter',
+          ),
+        ),
+        SizedBox(height: AppResponsive.smallSpacing(context)),
+        Text(
+          'Try widening the date range or changing the filter',
           style: GoogleFonts.poppins(
             fontSize: AppResponsive.smallFontSize(context),
             color: AppColors.textSecondary,
-          )),
-    ]),
+          ),
+        ),
+      ],
+    ),
   );
 
   // ── Table ────────────────────────────────────────────────────────────────────
@@ -820,8 +975,12 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
 
   // ── Mobile card list ─────────────────────────────────────────────────────────
 
-  Widget _buildMobileList(BuildContext context, String currency,
-      DateFormat dateFmt, DateFormat timeFmt) {
+  Widget _buildMobileList(
+    BuildContext context,
+    String currency,
+    DateFormat dateFmt,
+    DateFormat timeFmt,
+  ) {
     return ListView.builder(
       padding: EdgeInsets.fromLTRB(
         AppResponsive.largeSpacing(context),
@@ -835,13 +994,24 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
     );
   }
 
-  Widget _mobileCard(BuildContext context, _HistoryRow r, String currency,
-      DateFormat dateFmt, DateFormat timeFmt) {
-    final inColor  = r.isAuditOnly ? Colors.orange.shade700 : Colors.green.shade700;
-    final outColor = r.isAuditOnly ? Colors.orange.shade700 : Colors.red.shade700;
+  Widget _mobileCard(
+    BuildContext context,
+    _HistoryRow r,
+    String currency,
+    DateFormat dateFmt,
+    DateFormat timeFmt,
+  ) {
+    final inColor = r.isAuditOnly
+        ? Colors.orange.shade700
+        : Colors.green.shade700;
+    final outColor = r.isAuditOnly
+        ? Colors.orange.shade700
+        : Colors.red.shade700;
     final balColor = r.isAuditOnly
         ? Colors.orange.shade700
-        : r.runningBalance < 0 ? Colors.red.shade700 : AppColors.textPrimary;
+        : r.runningBalance < 0
+        ? Colors.red.shade700
+        : AppColors.textPrimary;
 
     return GestureDetector(
       onTap: r.note != null ? () => _showNote(context, r) : null,
@@ -857,130 +1027,180 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
         color: r.isAuditOnly ? Colors.orange.shade50 : AppColors.white,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // ── Top row: badge + date/time ──────────────────────────────
-            Row(children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: r.typeColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(r.typeName,
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.captionFontSize(context),
-                      fontWeight: FontWeight.w700,
-                      color: r.typeColor,
-                    )),
-              ),
-              if (r.isAuditOnly) ...[
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.shade100,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text('audit',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Top row: badge + date/time ──────────────────────────────
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: r.typeColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      r.typeName,
                       style: GoogleFonts.poppins(
-                        fontSize: 9,
-                        color: Colors.orange.shade700,
-                      )),
-                ),
-              ],
-              const Spacer(),
-              if (r.staffName.isNotEmpty) ...[
-                Icon(Icons.person_outline, size: 11, color: AppColors.textSecondary),
-                const SizedBox(width: 2),
-                Text('${r.staffName}  ',
+                        fontSize: AppResponsive.captionFontSize(context),
+                        fontWeight: FontWeight.w700,
+                        color: r.typeColor,
+                      ),
+                    ),
+                  ),
+                  if (r.isAuditOnly) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade100,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'audit',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.captionFontSize(context),
+                          color: Colors.orange.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
+                  if (r.staffName.isNotEmpty) ...[
+                    Icon(
+                      Icons.person_outline,
+                      size: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 2),
+                    Text(
+                      '${r.staffName}  ',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.captionFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                  Text(
+                    '${dateFmt.format(r.timestamp)}  ${timeFmt.format(r.timestamp)}',
                     style: GoogleFonts.poppins(
                       fontSize: AppResponsive.captionFontSize(context),
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    )),
-              ],
-              Text(
-                '${dateFmt.format(r.timestamp)}  ${timeFmt.format(r.timestamp)}',
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.captionFontSize(context),
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  if (r.note != null) ...[
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.info_outline,
+                      size: 14,
+                      color: Colors.blue.shade400,
+                    ),
+                  ],
+                ],
               ),
-              if (r.note != null) ...[
-                const SizedBox(width: 4),
-                Icon(Icons.info_outline, size: 14, color: Colors.blue.shade400),
-              ],
-            ]),
 
-            if (r.reason.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(r.reason,
+              if (r.reason.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  r.reason,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
                     fontSize: AppResponsive.captionFontSize(context),
                     color: AppColors.textSecondary,
-                  )),
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 8),
+              const Divider(height: 1),
+              const SizedBox(height: 8),
+
+              // ── Amounts row ─────────────────────────────────────────────
+              Row(
+                children: [
+                  _amountBlock(
+                    context,
+                    'IN',
+                    r.inAmount > 0
+                        ? '+$currency${DecimalSettings.formatAmount(r.inAmount)}'
+                        : '—',
+                    r.inAmount > 0 ? inColor : AppColors.textSecondary,
+                  ),
+                  _amountBlock(
+                    context,
+                    'OUT',
+                    r.outAmount > 0
+                        ? '−$currency${DecimalSettings.formatAmount(r.outAmount)}'
+                        : '—',
+                    r.outAmount > 0 ? outColor : AppColors.textSecondary,
+                  ),
+                  _amountBlock(
+                    context,
+                    'Balance',
+                    '$currency${DecimalSettings.formatAmount(r.runningBalance)}',
+                    balColor,
+                  ),
+                ],
+              ),
             ],
-
-            const SizedBox(height: 8),
-            const Divider(height: 1),
-            const SizedBox(height: 8),
-
-            // ── Amounts row ─────────────────────────────────────────────
-            Row(children: [
-              _amountBlock(context, 'IN',
-                r.inAmount > 0
-                    ? '+$currency${DecimalSettings.formatAmount(r.inAmount)}'
-                    : '—',
-                r.inAmount > 0 ? inColor : AppColors.textSecondary,
-              ),
-              _amountBlock(context, 'OUT',
-                r.outAmount > 0
-                    ? '−$currency${DecimalSettings.formatAmount(r.outAmount)}'
-                    : '—',
-                r.outAmount > 0 ? outColor : AppColors.textSecondary,
-              ),
-              _amountBlock(context, 'Balance',
-                '$currency${DecimalSettings.formatAmount(r.runningBalance)}',
-                balColor,
-              ),
-            ]),
-          ]),
+          ),
         ),
       ),
     );
   }
 
   Widget _amountBlock(
-      BuildContext context, String label, String value, Color valueColor) {
+    BuildContext context,
+    String label,
+    String value,
+    Color valueColor,
+  ) {
     return Expanded(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
             style: GoogleFonts.poppins(
               fontSize: AppResponsive.captionFontSize(context),
               color: AppColors.textSecondary,
-            )),
-        const SizedBox(height: 2),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(value,
+            ),
+          ),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
               style: GoogleFonts.poppins(
                 fontSize: AppResponsive.smallFontSize(context),
                 fontWeight: FontWeight.w700,
                 color: valueColor,
-              )),
-        ),
-      ]),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   // ── Desktop table ────────────────────────────────────────────────────────────
 
-  Widget _buildDesktopTable(BuildContext context, String currency,
-      DateFormat dateFmt, DateFormat timeFmt) {
+  Widget _buildDesktopTable(
+    BuildContext context,
+    String currency,
+    DateFormat dateFmt,
+    DateFormat timeFmt,
+  ) {
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
         AppResponsive.largeSpacing(context),
@@ -988,28 +1208,35 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
         AppResponsive.largeSpacing(context),
         AppResponsive.largeSpacing(context),
       ),
-      child: Column(children: [
-        _tableHeader(context, currency),
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: const BorderRadius.only(
-              bottomLeft: Radius.circular(12),
-              bottomRight: Radius.circular(12),
+      child: Column(
+        children: [
+          _tableHeader(context, currency),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(12),
+                bottomRight: Radius.circular(12),
+              ),
+              border: Border.all(color: AppColors.divider),
             ),
-            border: Border.all(color: AppColors.divider),
+            child: ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _filteredRows.length,
+              separatorBuilder: (_, __) =>
+                  Divider(height: 1, color: AppColors.divider),
+              itemBuilder: (_, i) => _tableRow(
+                context,
+                _filteredRows[i],
+                currency,
+                dateFmt,
+                timeFmt,
+              ),
+            ),
           ),
-          child: ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _filteredRows.length,
-            separatorBuilder: (_, __) =>
-                Divider(height: 1, color: AppColors.divider),
-            itemBuilder: (_, i) => _tableRow(
-                context, _filteredRows[i], currency, dateFmt, timeFmt),
-          ),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 
@@ -1021,35 +1248,48 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
     decoration: BoxDecoration(
       color: AppColors.primary,
       borderRadius: const BorderRadius.only(
-        topLeft: Radius.circular(12), topRight: Radius.circular(12),
+        topLeft: Radius.circular(12),
+        topRight: Radius.circular(12),
       ),
     ),
-    child: Row(children: [
-      _hCell(context, 'Date/Time', flex: 3),
-      _hCell(context, 'Type',      flex: 2),
-      _hCell(context, 'Staff',     flex: 2),
-      _hCell(context, 'IN',        flex: 2, align: TextAlign.right),
-      _hCell(context, 'OUT',       flex: 2, align: TextAlign.right),
-      _hCell(context, 'Balance',   flex: 2, align: TextAlign.right),
-      _hCell(context, 'Reason',    flex: 4),
-    ]),
+    child: Row(
+      children: [
+        _hCell(context, 'Date/Time', flex: 3),
+        _hCell(context, 'Type', flex: 2),
+        _hCell(context, 'Staff', flex: 2),
+        _hCell(context, 'IN', flex: 2, align: TextAlign.right),
+        _hCell(context, 'OUT', flex: 2, align: TextAlign.right),
+        _hCell(context, 'Balance', flex: 2, align: TextAlign.right),
+        _hCell(context, 'Reason', flex: 4),
+      ],
+    ),
   );
 
-  Widget _hCell(BuildContext context, String t,
-          {int flex = 1, TextAlign align = TextAlign.left}) =>
-      Expanded(
-        flex: flex,
-        child: Text(t,
-            textAlign: align,
-            style: GoogleFonts.poppins(
-              fontSize: AppResponsive.captionFontSize(context),
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-            )),
-      );
+  Widget _hCell(
+    BuildContext context,
+    String t, {
+    int flex = 1,
+    TextAlign align = TextAlign.left,
+  }) => Expanded(
+    flex: flex,
+    child: Text(
+      t,
+      textAlign: align,
+      style: GoogleFonts.poppins(
+        fontSize: AppResponsive.captionFontSize(context),
+        fontWeight: FontWeight.w700,
+        color: Colors.white,
+      ),
+    ),
+  );
 
-  Widget _tableRow(BuildContext context, _HistoryRow r, String currency,
-      DateFormat dateFmt, DateFormat timeFmt) {
+  Widget _tableRow(
+    BuildContext context,
+    _HistoryRow r,
+    String currency,
+    DateFormat dateFmt,
+    DateFormat timeFmt,
+  ) {
     return GestureDetector(
       onTap: r.note != null ? () => _showNote(context, r) : null,
       child: Container(
@@ -1058,174 +1298,213 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
           horizontal: AppResponsive.mediumSpacing(context),
           vertical: AppResponsive.smallSpacing(context) + 2,
         ),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-          // Date / Time
-          Expanded(
-            flex: 3,
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(dateFmt.format(r.timestamp),
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.smallFontSize(context),
-                    fontWeight: FontWeight.w600,
-                  )),
-              Text(timeFmt.format(r.timestamp),
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.captionFontSize(context),
-                    color: AppColors.textSecondary,
-                  )),
-            ]),
-          ),
-          // Type badge
-          Expanded(
-            flex: 2,
-            child: Container(
-              margin: EdgeInsets.only(right: AppResponsive.smallSpacing(context)),
-              padding: EdgeInsets.symmetric(
-                horizontal: AppResponsive.smallSpacing(context),
-                vertical: 3,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Date / Time
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    dateFmt.format(r.timestamp),
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    timeFmt.format(r.timestamp),
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
               ),
-              decoration: BoxDecoration(
-                color: r.typeColor.withValues(alpha: 0.12),
-                borderRadius:
-                    BorderRadius.circular(AppResponsive.borderRadius(context)),
-              ),
-              child: Text(r.typeName,
+            ),
+            // Type badge
+            Expanded(
+              flex: 2,
+              child: Container(
+                margin: EdgeInsets.only(
+                  right: AppResponsive.smallSpacing(context),
+                ),
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.smallSpacing(context),
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: r.typeColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.borderRadius(context),
+                  ),
+                ),
+                child: Text(
+                  r.typeName,
                   style: GoogleFonts.poppins(
                     fontSize: AppResponsive.captionFontSize(context),
                     fontWeight: FontWeight.w700,
                     color: r.typeColor,
-                  )),
+                  ),
+                ),
+              ),
             ),
-          ),
-          // Staff
-          Expanded(
-            flex: 2,
-            child: Text(r.staffName,
+            // Staff
+            Expanded(
+              flex: 2,
+              child: Text(
+                r.staffName,
                 style: GoogleFonts.poppins(
                   fontSize: AppResponsive.captionFontSize(context),
                   color: AppColors.textPrimary,
-                )),
-          ),
-          // IN
-          Expanded(
-            flex: 2,
-            child: Text(
-              r.inAmount > 0
-                  ? '+$currency${DecimalSettings.formatAmount(r.inAmount)}'
-                  : '—',
-              textAlign: TextAlign.right,
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.smallFontSize(context),
-                fontWeight: FontWeight.w600,
-                color: r.inAmount > 0
-                    ? (r.isAuditOnly
-                        ? Colors.orange.shade700
-                        : Colors.green.shade700)
-                    : AppColors.textSecondary,
+                ),
               ),
             ),
-          ),
-          // OUT
-          Expanded(
-            flex: 2,
-            child: Text(
-              r.outAmount > 0
-                  ? '−$currency${DecimalSettings.formatAmount(r.outAmount)}'
-                  : '—',
-              textAlign: TextAlign.right,
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.smallFontSize(context),
-                fontWeight: FontWeight.w600,
-                color: r.outAmount > 0
-                    ? (r.isAuditOnly
-                        ? Colors.orange.shade700
-                        : Colors.red.shade700)
-                    : AppColors.textSecondary,
-              ),
-            ),
-          ),
-          // Running balance
-          Expanded(
-            flex: 2,
-            child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Text(
-                '$currency${DecimalSettings.formatAmount(r.runningBalance)}',
+            // IN
+            Expanded(
+              flex: 2,
+              child: Text(
+                r.inAmount > 0
+                    ? '+$currency${DecimalSettings.formatAmount(r.inAmount)}'
+                    : '—',
                 textAlign: TextAlign.right,
                 style: GoogleFonts.poppins(
                   fontSize: AppResponsive.smallFontSize(context),
-                  fontWeight: FontWeight.w700,
-                  color: r.isAuditOnly
-                      ? Colors.orange.shade700
-                      : r.runningBalance < 0
-                          ? Colors.red.shade700
-                          : AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                  color: r.inAmount > 0
+                      ? (r.isAuditOnly
+                            ? Colors.orange.shade700
+                            : Colors.green.shade700)
+                      : AppColors.textSecondary,
                 ),
               ),
-              if (r.isAuditOnly)
-                Text('audit only',
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.captionFontSize(context) * 0.85,
-                      color: Colors.orange.shade500,
-                    )),
-            ]),
-          ),
-          // Reason
-          Expanded(
-            flex: 4,
-            child: Padding(
-              padding:
-                  EdgeInsets.only(left: AppResponsive.smallSpacing(context)),
-              child: Row(children: [
-                Expanded(
-                  child: Text(r.reason,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.captionFontSize(context),
-                        color: AppColors.textSecondary,
-                      )),
-                ),
-                if (r.note != null) ...[
-                  const SizedBox(width: 4),
-                  Icon(Icons.info_outline,
-                      size: AppResponsive.smallIconSize(context) * 0.85,
-                      color: Colors.blue.shade400),
-                ],
-              ]),
             ),
-          ),
-        ]),
+            // OUT
+            Expanded(
+              flex: 2,
+              child: Text(
+                r.outAmount > 0
+                    ? '−$currency${DecimalSettings.formatAmount(r.outAmount)}'
+                    : '—',
+                textAlign: TextAlign.right,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  fontWeight: FontWeight.w600,
+                  color: r.outAmount > 0
+                      ? (r.isAuditOnly
+                            ? Colors.orange.shade700
+                            : Colors.red.shade700)
+                      : AppColors.textSecondary,
+                ),
+              ),
+            ),
+            // Running balance
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '$currency${DecimalSettings.formatAmount(r.runningBalance)}',
+                    textAlign: TextAlign.right,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      fontWeight: FontWeight.w700,
+                      color: r.isAuditOnly
+                          ? Colors.orange.shade700
+                          : r.runningBalance < 0
+                          ? Colors.red.shade700
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                  if (r.isAuditOnly)
+                    Text(
+                      'audit only',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.captionFontSize(context) * 0.85,
+                        color: Colors.orange.shade500,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            // Reason
+            Expanded(
+              flex: 4,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: AppResponsive.smallSpacing(context),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        r.reason,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.captionFontSize(context),
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                    if (r.note != null) ...[
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.info_outline,
+                        size: AppResponsive.smallIconSize(context) * 0.85,
+                        color: Colors.blue.shade400,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   void _showNote(BuildContext context, _HistoryRow r) {
     final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        ? ((AppResponsive.screenWidth(context) -
+                      AppResponsive.dialogWidth(context)) /
+                  2)
+              .clamp(40.0, double.infinity)
         : 24.0;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
         insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        title: Text(r.typeName,
-            style: GoogleFonts.poppins(
-                fontWeight: FontWeight.w700,
-                fontSize: AppResponsive.bodyFontSize(context))),
+        title: Text(
+          r.typeName,
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.w700,
+            fontSize: AppResponsive.bodyFontSize(context),
+          ),
+        ),
         content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _noteRow('Type',   r.typeName),
-              _noteRow('Staff',  r.staffName),
-              _noteRow('Reason', r.reason),
-              if (r.note != null) _noteRow('Note', r.note!),
-              _noteRow('Time',
-                  DateFormat('dd MMM yyyy  HH:mm').format(r.timestamp)),
-            ]),
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _noteRow('Type', r.typeName),
+            _noteRow('Staff', r.staffName),
+            _noteRow('Reason', r.reason),
+            if (r.note != null) _noteRow('Note', r.note!),
+            _noteRow(
+              'Time',
+              DateFormat('dd MMM yyyy  HH:mm').format(r.timestamp),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Close', style: GoogleFonts.poppins())),
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close', style: GoogleFonts.poppins()),
+          ),
         ],
       ),
     );
@@ -1234,15 +1513,22 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
   Widget _noteRow(String label, String value) => Padding(
     padding: const EdgeInsets.only(bottom: 6),
     child: RichText(
+      // Poppins is set once on the parent span; the children inherit it and
+      // override only weight/colour, so their plain TextStyle is deliberate.
       text: TextSpan(
-        style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textPrimary),
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.bodyFontSize(context),
+          color: AppColors.textPrimary,
+        ),
         children: [
           TextSpan(
-              text: '$label: ',
-              style: const TextStyle(fontWeight: FontWeight.w600)),
+            text: '$label: ',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
           TextSpan(
-              text: value,
-              style: TextStyle(color: AppColors.textSecondary)),
+            text: value,
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
         ],
       ),
     ),

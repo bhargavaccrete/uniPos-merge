@@ -19,12 +19,16 @@ class NotificationBell extends StatelessWidget {
   const NotificationBell({
     super.key,
     this.tint = Colors.white,
-    this.iconSize = 22,
+    this.iconSize,
     this.route,
   });
 
   final Color tint;
-  final double iconSize;
+
+  /// Null resolves to [AppResponsive.iconSize] (20/22/24). A default parameter
+  /// cannot read `context`, so the old `= 22` was fixed at every breakpoint;
+  /// resolving in build() is the only way to make the fallback responsive.
+  final double? iconSize;
 
   /// Defaults to whichever notifications route belongs to the current mode.
   final String? route;
@@ -34,8 +38,9 @@ class NotificationBell extends StatelessWidget {
     return Observer(
       builder: (context) {
         final count = notificationStore.unreadCount;
+        final resolvedIconSize = iconSize ?? AppResponsive.iconSize(context);
         return Padding(
-          padding: const EdgeInsets.only(right: 12),
+          padding: EdgeInsets.only(right: AppResponsive.mediumSpacing(context)),
           child: Center(
             child: Stack(
               clipBehavior: Clip.none,
@@ -46,7 +51,7 @@ class NotificationBell extends StatelessWidget {
                         ? Icons.notifications_rounded
                         : Icons.notifications_none_rounded,
                     color: tint,
-                    size: iconSize,
+                    size: resolvedIconSize,
                   ),
                   onPressed: () => Navigator.pushNamed(
                     context,

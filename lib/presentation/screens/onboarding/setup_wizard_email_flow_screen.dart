@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
@@ -316,7 +317,7 @@ class _SetupWizardEmailFlowScreenState extends State<SetupWizardEmailFlowScreen>
               children: [
                 Text(
                   'Setup Wizard',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: AppResponsive.headingFontSize(context),
                     fontWeight: FontWeight.bold,
                     color: AppColors.darkNeutral,
@@ -324,7 +325,7 @@ class _SetupWizardEmailFlowScreenState extends State<SetupWizardEmailFlowScreen>
                 ),
                 Text(
                   'Step ${_currentStep + 1} of $_totalSteps · ~${currentStepInfo.estimatedTime}',
-                  style: TextStyle(
+                  style: GoogleFonts.poppins(
                     fontSize: AppResponsive.smallFontSize(context),
                     color: Colors.grey[600],
                   ),
@@ -390,8 +391,8 @@ class _SetupWizardEmailFlowScreenState extends State<SetupWizardEmailFlowScreen>
           Expanded(
             child: Text(
               'Demo flow — email licensing preview. Nothing is saved on finish.',
-              style: TextStyle(
-                fontSize: 12,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
                 fontWeight: FontWeight.w600,
                 color: AppColors.warning,
               ),
@@ -502,7 +503,8 @@ class _DemoSidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     final totalSteps = steps.length;
     return Container(
-      width: 320,
+      // Mirrors SetupSidebar in setupWizardScreen.dart — keep the two in step.
+      width: (AppResponsive.screenWidth(context) * 0.26).clamp(260.0, 320.0),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -523,17 +525,17 @@ class _DemoSidebar extends StatelessWidget {
               const SizedBox(height: 10),
               Text(
                 'Bill Berry Lite Setup — Demo',
-                style: const TextStyle(
+                style: GoogleFonts.poppins(
                   color: Colors.white,
-                  fontSize: 18,
+                  fontSize: AppResponsive.subheadingFontSize(context),
                   fontWeight: FontWeight.bold,
                 ),
               ),
               Text(
                 '${currentStep + 1} of $totalSteps Steps',
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   color: Colors.white.withValues(alpha: 0.85),
-                  fontSize: 12,
+                  fontSize: AppResponsive.smallFontSize(context),
                 ),
               ),
               const SizedBox(height: 20),
@@ -612,8 +614,10 @@ class _DemoSidebar extends StatelessWidget {
                               Expanded(
                                 child: Text(
                                   step.title,
-                                  style: TextStyle(
-                                    fontSize: 14,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
                                     fontWeight: isActive
                                         ? FontWeight.w600
                                         : FontWeight.w500,

@@ -55,8 +55,9 @@ class _RawMaterialsScreenState extends State<RawMaterialsScreen> {
         children: [
           Observer(
             builder: (_) {
-              final count =
-                  itemStore.items.where((i) => i.isRawMaterial).length;
+              final count = itemStore.items
+                  .where((i) => i.isRawMaterial)
+                  .length;
               return GradientHeroHeader(
                 title: 'Raw Materials',
                 subtitle:
@@ -84,34 +85,39 @@ class _RawMaterialsScreenState extends State<RawMaterialsScreen> {
             ),
           ),
           Expanded(
-            child: Observer(
-              builder: (_) {
-                final items =
-                    itemStore.items
-                        .where(
-                          (i) =>
-                              i.isRawMaterial &&
-                              (_query.isEmpty ||
-                                  i.name.toLowerCase().contains(_query)),
-                        )
-                        .toList()
-                      ..sort((a, b) => a.name.compareTo(b.name));
+            child: AppResponsive.constrainedContent(
+              context: context,
+              maxWidth: AppResponsive.maxFormWidth(context),
+              alignment: Alignment.topCenter,
+              child: Observer(
+                builder: (_) {
+                  final items =
+                      itemStore.items
+                          .where(
+                            (i) =>
+                                i.isRawMaterial &&
+                                (_query.isEmpty ||
+                                    i.name.toLowerCase().contains(_query)),
+                          )
+                          .toList()
+                        ..sort((a, b) => a.name.compareTo(b.name));
 
-                if (items.isEmpty) {
-                  return const AppEmptyState(
-                    icon: Icons.grain_rounded,
-                    title: 'No raw materials yet',
-                    message: 'Mark an item Raw Material to track it here.',
+                  if (items.isEmpty) {
+                    return const AppEmptyState(
+                      icon: Icons.grain_rounded,
+                      title: 'No raw materials yet',
+                      message: 'Mark an item Raw Material to track it here.',
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: AppResponsive.padding(context),
+                    itemCount: items.length,
+                    itemBuilder: (context, index) =>
+                        _RawMaterialTile(item: items[index]),
                   );
-                }
-
-                return ListView.builder(
-                  padding: AppResponsive.padding(context),
-                  itemCount: items.length,
-                  itemBuilder: (context, index) =>
-                      _RawMaterialTile(item: items[index]),
-                );
-              },
+                },
+              ),
             ),
           ),
         ],
@@ -160,16 +166,13 @@ class _RawMaterialTile extends StatelessWidget {
           Container(
             width: 6,
             height: 6,
-            decoration: BoxDecoration(
-              color: base,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: base, shape: BoxShape.circle),
           ),
           const SizedBox(width: 6),
           Text(
             label,
             style: GoogleFonts.poppins(
-              fontSize: 11,
+              fontSize: AppResponsive.captionFontSize(context),
               fontWeight: FontWeight.w600,
               color: base,
             ),
@@ -239,7 +242,7 @@ class _RawMaterialTile extends StatelessWidget {
                   Text(
                     item.name,
                     style: GoogleFonts.poppins(
-                      fontSize: 14.5,
+                      fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
                     ),
@@ -252,7 +255,7 @@ class _RawMaterialTile extends StatelessWidget {
                       Text(
                         'Stock: ${_formatStock(item.stockQuantity, showDecimals)} $unit',
                         style: GoogleFonts.poppins(
-                          fontSize: 12,
+                          fontSize: AppResponsive.smallFontSize(context),
                           color: AppColors.textSecondary,
                         ),
                       ),
@@ -261,7 +264,7 @@ class _RawMaterialTile extends StatelessWidget {
                         Text(
                           'Last cost: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.lastPurchaseCost!)}',
                           style: GoogleFonts.poppins(
-                            fontSize: 12,
+                            fontSize: AppResponsive.smallFontSize(context),
                             color: AppColors.textSecondary,
                           ),
                         ),

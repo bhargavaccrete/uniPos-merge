@@ -45,13 +45,20 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
   final SetupWizardStore _store = locator<SetupWizardStore>();
 
   final PageController _pageController = PageController();
+
+  /// Navigator for the DESKTOP content pane, so routes pushed from a step
+  /// (Added Items, Category Selection, Bulk Import…) render beside the sidebar
+  /// instead of covering the whole window. Mobile and tablet have no sidebar to
+  /// preserve, so they keep pushing on the root navigator.
+  final GlobalKey<NavigatorState> _paneNavigatorKey =
+      GlobalKey<NavigatorState>();
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
   // Dynamic: steps for modules the plan doesn't include (Staff/Tax/Payment) are
   // filtered out once the manifest loads at the Verify Email step.
-  int get _totalSteps => SetupStep.getSteps().length;
+  int get _totalSteps => SetupStep.getSteps(_store).length;
 
   /// `currentStep` clamped into the CURRENT step list.
   ///
@@ -102,7 +109,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
       final isLicensed = licenseStore.isLicensed;
 
       if (_store.hasStoreDetails) {
-        final steps = SetupStep.getSteps();
+        final steps = SetupStep.getSteps(_store);
         int targetStep = 0;
         if (isLicensed) {
           targetStep = steps.indexWhere((s) => s.title == 'Tax Setup');
@@ -171,19 +178,19 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
     // Dismiss keyboard before moving to previous step
     FocusScope.of(context).unfocus();
 
-    if (_store.currentStep > 0) {
+    if (_safeStep > 0) {
       // Once the license is activated, lock the Verify Email step (and anything
       // before it): going back would try to re-run email/OTP/activation, which
       // breaks (the key is consumed and the OTP expired). The activation is
       // permanent and remembered via LicenseStore.isLicensed.
       if (locator<LicenseStore>().isLicensed) {
-        final steps = SetupStep.getSteps();
+        final steps = SetupStep.getSteps(_store);
         final emailIndex = steps.indexWhere((s) => s.title == 'Verify Email');
-        if (emailIndex >= 0 && _store.currentStep - 1 <= emailIndex) {
+        if (emailIndex >= 0 && _safeStep - 1 <= emailIndex) {
           return; // don't step back onto (or before) the activated license step
         }
       }
-      final prev = _store.currentStep - 1;
+      final prev = _safeStep - 1;
       _store.setCurrentStep(prev);
       _saveWizardProgress(prev);
       _pageController.previousPage(
@@ -197,13 +204,31 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
     // Dismiss keyboard before jumping to step
     FocusScope.of(context).unfocus();
 
+    // The sidebar stays tappable while a route is open inside the pane, so
+    // clear it — otherwise the PageView jumps underneath a screen that is
+    // still covering it.
+    _paneNavigatorKey.currentState?.popUntil((r) => r.isFirst);
+
     _store.setCurrentStep(step);
     _saveWizardProgress(step);
-    _pageController.animateToPage(
-      step,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
+
+    // The store index and the PageView must move together. If the controller
+    // has no client yet (restore firing before the PageView's first layout),
+    // animateToPage is a silent no-op — the sidebar would then show the
+    // restored step while the content sat on Welcome. Retry once attached.
+    if (_pageController.hasClients) {
+      _pageController.animateToPage(
+        step,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _pageController.hasClients) {
+          _pageController.jumpToPage(step);
+        }
+      });
+    }
   }
 
   void _completeSetup() async {
@@ -266,9 +291,18 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
     }
   }
 
+  /// A context INSIDE the desktop pane's Navigator.
+  ///
+  /// The State's own `context` sits above that Navigator, so a dialog opened
+  /// with it resolves to the root and covers the sidebar. The pane Navigator's
+  /// overlay is below it, so `useRootNavigator: false` finds the pane instead.
+  /// Falls back to the screen's context on mobile/tablet, where no pane exists.
+  BuildContext get _paneDialogContext =>
+      _paneNavigatorKey.currentState?.overlay?.context ?? context;
+
   void _showHelpDialog() {
     showAppInfoDialog(
-      context: context,
+      context: _paneDialogContext,
       title: 'Need Help?',
       message: 'Contact support for assistance with setup.',
       icon: Icons.support_agent_rounded,
@@ -276,10 +310,10 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
   }
 
   void _showExitDialog() async {
-    final progress = ((_store.currentStep + 1) / _totalSteps * 100).round();
+    final progress = ((_safeStep + 1) / _totalSteps * 100).round();
 
     final shouldExit = await showAppConfirmDialog(
-      context: context,
+      context: _paneDialogContext,
       title: 'Exit Setup?',
       message:
           'Your progress will be automatically saved ($progress% complete). '
@@ -305,7 +339,16 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _showExitDialog();
+        if (didPop) return;
+        // A route open inside the desktop pane owns the back gesture first —
+        // otherwise back would offer to exit setup while the user is only two
+        // levels deep in Category Selection.
+        final pane = _paneNavigatorKey.currentState;
+        if (pane != null && pane.canPop()) {
+          pane.pop();
+          return;
+        }
+        _showExitDialog();
       },
       child: Scaffold(
         backgroundColor: AppColors.surfaceLight,
@@ -392,44 +435,67 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
       children: [
         Observer(
           builder: (_) => SetupSidebar(
-            currentStep: _store.currentStep,
-            totalSteps: _totalSteps,
+            steps: SetupStep.getSteps(_store),
+            // _safeStep, not the raw currentStep: if the list shrank while the
+            // user sat past the new end, the raw value renders >100% progress
+            // and highlights nothing.
+            currentStep: _safeStep,
             onStepTap: _jumpToStep,
             onGetHelp: _showHelpDialog,
             onExit: _showExitDialog,
           ),
         ),
         Expanded(
-          child: Column(
-            children: [
-              _buildDesktopHeader(),
-              Expanded(
-                child: Center(
-                  child: Container(
-                    constraints: BoxConstraints(
-                      maxWidth: AppResponsive.maxFormWidth(context),
-                    ),
-                    child: PageView(
-                      controller: _pageController,
-                      physics: const NeverScrollableScrollPhysics(),
-                      children: _buildSteps(),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          child: Navigator(
+            key: _paneNavigatorKey,
+            onGenerateRoute: (_) => MaterialPageRoute(
+              builder: (_) => _buildPaneContent(),
+            ),
           ),
         ),
       ],
     );
   }
 
+  /// The wizard itself, as the pane navigator's first route.
+  ///
+  /// The Observer must live HERE rather than around the Navigator: a route's
+  /// content is built once by `onGenerateRoute` and is not rebuilt when an
+  /// ancestor rebuilds, so an Observer outside would leave the header and step
+  /// list frozen at whatever `currentStep` was when the pane was first built.
+  Widget _buildPaneContent() {
+    return Observer(
+      builder: (_) => Column(
+        children: [
+          _buildDesktopHeader(),
+          Expanded(
+            child: Center(
+              child: Container(
+                constraints: BoxConstraints(
+                  maxWidth: AppResponsive.maxFormWidth(context),
+                ),
+                child: PageView(
+                  controller: _pageController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: _buildSteps(),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDesktopHeader() {
-    final steps = SetupStep.getSteps();
+    final steps = SetupStep.getSteps(_store);
     final currentStepInfo = steps[_safeStep];
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 25),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.extraLargeSpacing(context),
+        vertical: AppResponsive.largeSpacing(context),
+      ),
       decoration: BoxDecoration(
         color: AppColors.white,
         boxShadow: [
@@ -449,7 +515,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
                 Text(
                   currentStepInfo.title,
                   style: GoogleFonts.poppins(
-                    fontSize: 26,
+                    fontSize: AppResponsive.headingFontSize(context),
                     fontWeight: FontWeight.bold,
                     color: AppColors.darkNeutral,
                   ),
@@ -458,7 +524,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
                 Text(
                   currentStepInfo.description,
                   style: GoogleFonts.poppins(
-                    fontSize: 15,
+                    fontSize: AppResponsive.bodyFontSize(context),
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -478,7 +544,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
                 Text(
                   'Est. ${currentStepInfo.estimatedTime}',
                   style: GoogleFonts.poppins(
-                    fontSize: 14,
+                    fontSize: AppResponsive.smallFontSize(context),
                     color: AppColors.info,
                     fontWeight: FontWeight.w500,
                   ),
@@ -492,7 +558,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
   }
 
   Widget _buildHeader() {
-    final currentStepInfo = SetupStep.getSteps()[_safeStep];
+    final currentStepInfo = SetupStep.getSteps(_store)[_safeStep];
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: AppResponsive.mediumSpacing(context),
@@ -505,12 +571,14 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
       ),
       child: Row(
         children: [
-          if (_store.currentStep > 0)
+          if (_safeStep > 0)
             IconButton(
               icon: Icon(Icons.arrow_back, color: AppColors.darkNeutral),
               onPressed: _store.isLoading ? null : _previousStep,
             )
           else
+            // Back-button column: reserves the IconButton's own 48px so the
+            // centred title doesn't shift sideways on step 0.
             const SizedBox(width: 48),
           Expanded(
             child: Column(
@@ -524,7 +592,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
                   ),
                 ),
                 Text(
-                  'Step ${_store.currentStep + 1} of $_totalSteps · ~${currentStepInfo.estimatedTime}',
+                  'Step ${_safeStep + 1} of $_totalSteps · ~${currentStepInfo.estimatedTime}',
                   style: GoogleFonts.poppins(
                     fontSize: AppResponsive.smallFontSize(context),
                     color: AppColors.textSecondary,
@@ -560,7 +628,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
                 duration: const Duration(milliseconds: 300),
                 width:
                     constraints.maxWidth *
-                    ((_store.currentStep + 1) / _totalSteps),
+                    ((_safeStep + 1) / _totalSteps),
                 decoration: BoxDecoration(
                   color: AppColors.primary,
                   borderRadius: BorderRadius.circular(2),
@@ -723,25 +791,32 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
 // ==================== SUPPORTING WIDGETS ====================
 
 class SetupSidebar extends StatelessWidget {
+  /// The SAME list the wizard built its PageView from — passed in rather than
+  /// re-derived here, so a sidebar row can never name a different step than the
+  /// page on screen.
+  final List<SetupStep> steps;
   final int currentStep;
-  final int totalSteps;
   final Function(int) onStepTap;
   final VoidCallback onGetHelp;
   final VoidCallback onExit;
 
   const SetupSidebar({
     super.key,
+    required this.steps,
     required this.currentStep,
-    required this.totalSteps,
     required this.onStepTap,
     required this.onGetHelp,
     required this.onExit,
   });
 
+  int get totalSteps => steps.length;
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 320,
+      // 26% of the window, floored and capped. A fixed 320 is a third of a
+      // 1024px laptop but only a sixth of a 1920px monitor — wrong at both ends.
+      width: (AppResponsive.screenWidth(context) * 0.26).clamp(260.0, 320.0),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -754,8 +829,8 @@ class SetupSidebar extends StatelessWidget {
           Positioned.fill(child: CustomPaint(painter: SidebarPatternPainter())),
           Column(
             children: [
-              _buildLogoSection(),
-              _buildProgressIndicator(),
+              _buildLogoSection(context),
+              _buildProgressIndicator(context),
               const SizedBox(height: 20),
               Expanded(child: _buildStepsList()),
               _buildBottomActions(context),
@@ -766,7 +841,7 @@ class SetupSidebar extends StatelessWidget {
     );
   }
 
-  Widget _buildLogoSection() {
+  Widget _buildLogoSection(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 30),
       child: Column(
@@ -798,7 +873,7 @@ class SetupSidebar extends StatelessWidget {
             'Bill Berry Lite Setup',
             style: GoogleFonts.poppins(
               color: Colors.white,
-              fontSize: 22,
+              fontSize: AppResponsive.headingFontSize(context),
               fontWeight: FontWeight.bold,
               letterSpacing: 0.5,
             ),
@@ -814,7 +889,7 @@ class SetupSidebar extends StatelessWidget {
               '${currentStep + 1} of $totalSteps Steps',
               style: GoogleFonts.poppins(
                 color: Colors.white.withOpacity(0.9),
-                fontSize: 12,
+                fontSize: AppResponsive.captionFontSize(context),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -824,7 +899,7 @@ class SetupSidebar extends StatelessWidget {
     );
   }
 
-  Widget _buildProgressIndicator() {
+  Widget _buildProgressIndicator(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 30),
       padding: const EdgeInsets.all(15),
@@ -842,14 +917,14 @@ class SetupSidebar extends StatelessWidget {
                 'Progress',
                 style: GoogleFonts.poppins(
                   color: Colors.white.withOpacity(0.8),
-                  fontSize: 13,
+                  fontSize: AppResponsive.smallFontSize(context),
                 ),
               ),
               Text(
                 '${((currentStep + 1) / totalSteps * 100).round()}%',
                 style: GoogleFonts.poppins(
                   color: Colors.white,
-                  fontSize: 14,
+                  fontSize: AppResponsive.smallFontSize(context),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -871,8 +946,6 @@ class SetupSidebar extends StatelessWidget {
   }
 
   Widget _buildStepsList() {
-    final steps = SetupStep.getSteps();
-
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       itemCount: steps.length,
@@ -956,7 +1029,8 @@ class SetupSidebar extends StatelessWidget {
                           Text(
                             step.title,
                             style: GoogleFonts.poppins(
-                              fontSize: 14,
+                              // Interactive (tappable once completed) → body, not small.
+                              fontSize: AppResponsive.bodyFontSize(context),
                               fontWeight: isActive
                                   ? FontWeight.w600
                                   : FontWeight.w500,
@@ -973,7 +1047,9 @@ class SetupSidebar extends StatelessWidget {
                               child: Text(
                                 'Completed',
                                 style: GoogleFonts.poppins(
-                                  fontSize: 11,
+                                  fontSize: AppResponsive.captionFontSize(
+                                    context,
+                                  ),
                                   color: AppColors.success,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -995,6 +1071,8 @@ class SetupSidebar extends StatelessWidget {
                         child: Text(
                           'Current',
                           style: GoogleFonts.poppins(
+                            // Below the ladder's 11px floor. captionFontSize
+                            // would inflate this micro-badge by 3px; static.
                             fontSize: 10,
                             color: AppColors.primary,
                             fontWeight: FontWeight.bold,
@@ -1021,7 +1099,10 @@ class SetupSidebar extends StatelessWidget {
             icon: const Icon(Icons.help_outline, size: 18),
             label: Text(
               'Get Help',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+              ),
             ),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.white,
@@ -1039,7 +1120,10 @@ class SetupSidebar extends StatelessWidget {
             icon: const Icon(Icons.exit_to_app, size: 18),
             label: Text(
               'Save & Exit',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+              ),
             ),
             style: TextButton.styleFrom(
               foregroundColor: Colors.white.withOpacity(0.8),
@@ -1064,7 +1148,15 @@ class SetupStep {
     required this.estimatedTime,
   });
 
-  static List<SetupStep> getSteps() {
+  /// The step list, derived from [store].
+  ///
+  /// The store MUST be the same instance the wizard uses to build its
+  /// PageView. `SetupWizardStore` is registered with `registerFactory`, so
+  /// calling `locator<SetupWizardStore>()` here would hand back a fresh store
+  /// whose `taxEnabled` still defaults to true — the sidebar would then list a
+  /// Tax Setup step the PageView had dropped, putting every later step one row
+  /// out of sync with the screen actually being shown.
+  static List<SetupStep> getSteps(SetupWizardStore store) {
     return [
       const SetupStep(
         title: 'Welcome',
@@ -1093,8 +1185,7 @@ class SetupStep {
         description: 'Verify your email and activate your license',
         estimatedTime: '2 min',
       ),
-      if (PlanEnforce.allows(EntKeys.settings) &&
-          locator<SetupWizardStore>().taxEnabled)
+      if (PlanEnforce.allows(EntKeys.settings) && store.taxEnabled)
         const SetupStep(
           title: 'Tax Setup',
           icon: Icons.receipt,
@@ -1259,7 +1350,7 @@ class WelcomeStep extends StatelessWidget {
                   Wrap(
                     alignment: WrapAlignment.center,
                     spacing: AppResponsive.smallSpacing(context),
-                    runSpacing: 8,
+                    runSpacing: AppResponsive.smallSpacing(context),
                     children: [
                       _buildChip(context, Icons.timer, 'Under 10 min'),
                       _buildChip(context, Icons.security, 'Private & secure'),
@@ -1305,15 +1396,23 @@ class WelcomeStep extends StatelessWidget {
 
   Widget _buildChip(BuildContext context, IconData icon, String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.mediumSpacing(context),
+        vertical: AppResponsive.smallSpacing(context),
+      ),
       decoration: BoxDecoration(
         color: AppColors.primary.withOpacity(0.08),
+        // Pill shape — ornamental, not dimensional.
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: AppColors.primary),
+          Icon(
+            icon,
+            size: AppResponsive.smallIconSize(context),
+            color: AppColors.primary,
+          ),
           const SizedBox(width: 6),
           Text(
             label,

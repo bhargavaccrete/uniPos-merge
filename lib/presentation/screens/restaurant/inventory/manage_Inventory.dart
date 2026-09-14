@@ -38,6 +38,33 @@ import 'package:billberrylite/presentation/widget/componets/common/dashboard_men
 import 'package:billberrylite/presentation/widget/componets/common/gradient_hero_header.dart';
 import 'stock_history_screen.dart';
 
+/// Width cap for this screen's content.
+///
+/// Wider than `maxFormWidth` (800) on purpose: this is a module grid plus
+/// per-item stock adjusters, not a form. At 800 the grid drops to 3 columns
+/// and the adjuster row crowds; 1100 keeps 4 columns at ~248px and leaves the
+/// adjusters comfortable. The gradient hero stays full-bleed — it is a
+/// background, and Rule 5 caps content, not backgrounds.
+const double kInventoryContentMaxWidth = 1100.0;
+
+/// Hub module-grid columns from the MEASURED grid width, not the screen.
+///
+/// Once content is capped the grid no longer spans the window, so screen
+/// breakpoints over-count it. These buckets reproduce the old 2/3/4 at every
+/// real breakpoint while staying correct inside the cap.
+int inventoryHubColumns(double gridWidth) {
+  if (gridWidth < 420) return 2;
+  if (gridWidth < 760) return 3;
+  return 4;
+}
+
+/// Max width for the stock add/remove controls.
+///
+/// The row is `Expanded(flex: 3/4/3)`, and flex splits whatever width exists —
+/// on a laptop that inflated the +/- buttons to several hundred pixels each.
+/// Desktop-only so tablet and mobile render exactly as before.
+const double kStockAdjusterMaxWidth = 560.0;
+
 class ManageInventory extends StatefulWidget {
   const ManageInventory({super.key});
 
@@ -197,7 +224,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                           Text(
                             isAdd ? 'Adding' : 'Removing',
                             style: GoogleFonts.poppins(
-                              fontSize: 11,
+                              fontSize: AppResponsive.captionFontSize(context),
                               color: AppColors.textSecondary,
                             ),
                           ),
@@ -205,7 +232,9 @@ class _ManageInventoryState extends State<ManageInventory> {
                           Text(
                             '${isAdd ? '+' : '−'}${_formatStock(quantity, unit, isWeightBased)}',
                             style: GoogleFonts.poppins(
-                              fontSize: 16,
+                              fontSize: AppResponsive.subheadingFontSize(
+                                context,
+                              ),
                               fontWeight: FontWeight.w700,
                               color: accent,
                             ),
@@ -223,7 +252,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                           Text(
                             'New balance',
                             style: GoogleFonts.poppins(
-                              fontSize: 11,
+                              fontSize: AppResponsive.captionFontSize(context),
                               color: AppColors.textSecondary,
                             ),
                           ),
@@ -231,7 +260,9 @@ class _ManageInventoryState extends State<ManageInventory> {
                           Text(
                             _formatStock(newBalance, unit, isWeightBased),
                             style: GoogleFonts.poppins(
-                              fontSize: 16,
+                              fontSize: AppResponsive.subheadingFontSize(
+                                context,
+                              ),
                               fontWeight: FontWeight.w700,
                               color: AppColors.textPrimary,
                             ),
@@ -245,7 +276,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                 Text(
                   'Reason',
                   style: GoogleFonts.poppins(
-                    fontSize: 13,
+                    fontSize: AppResponsive.smallFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
@@ -288,7 +319,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                             Text(
                               r,
                               style: GoogleFonts.poppins(
-                                fontSize: 12.5,
+                                fontSize: AppResponsive.smallFontSize(context),
                                 fontWeight: selected
                                     ? FontWeight.w600
                                     : FontWeight.w500,
@@ -307,7 +338,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                 Text(
                   'Note (optional)',
                   style: GoogleFonts.poppins(
-                    fontSize: 13,
+                    fontSize: AppResponsive.smallFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
@@ -417,21 +448,13 @@ class _ManageInventoryState extends State<ManageInventory> {
           Container(
             width: 6,
             height: 6,
-            decoration: BoxDecoration(
-              color: base,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: base, shape: BoxShape.circle),
           ),
           SizedBox(width: 6),
           Text(
             label,
             style: GoogleFonts.poppins(
-              fontSize: AppResponsive.getValue(
-                context,
-                mobile: 11.0,
-                tablet: 12.0,
-                desktop: 13.0,
-              ),
+              fontSize: AppResponsive.captionFontSize(context),
               fontWeight: FontWeight.w600,
               color: base,
             ),
@@ -463,7 +486,7 @@ class _ManageInventoryState extends State<ManageInventory> {
       child: Text(
         out ? 'Out' : 'Low',
         style: GoogleFonts.poppins(
-          fontSize: 10,
+          fontSize: AppResponsive.captionFontSize(context),
           fontWeight: FontWeight.w700,
           color: color,
         ),
@@ -738,23 +761,11 @@ class _ManageInventoryState extends State<ManageInventory> {
   Widget _buildItemTile(Items item) {
     return Padding(
       padding: EdgeInsets.symmetric(
-        horizontal: AppResponsive.getValue(
-          context,
-          mobile: 16.0,
-          tablet: 20.0,
-          desktop: 24.0,
-        ),
+        horizontal: AppResponsive.largeSpacing(context),
         vertical: 6,
       ),
       child: Container(
-        padding: EdgeInsets.all(
-          AppResponsive.getValue(
-            context,
-            mobile: 12.0,
-            tablet: 14.0,
-            desktop: 16.0,
-          ),
-        ),
+        padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
         decoration: BoxDecoration(
           color: AppColors.surfaceLight,
           borderRadius: BorderRadius.circular(
@@ -775,12 +786,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                         item.name,
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w600,
-                          fontSize: AppResponsive.getValue(
-                            context,
-                            mobile: 14.0,
-                            tablet: 15.0,
-                            desktop: 16.0,
-                          ),
+                          fontSize: AppResponsive.bodyFontSize(context),
                           color: AppColors.textPrimary,
                         ),
                       ),
@@ -789,12 +795,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                         children: [
                           Container(
                             padding: EdgeInsets.symmetric(
-                              horizontal: AppResponsive.getValue(
-                                context,
-                                mobile: 8.0,
-                                tablet: 10.0,
-                                desktop: 12.0,
-                              ),
+                              horizontal: AppResponsive.smallSpacing(context),
                               vertical: AppResponsive.getValue(
                                 context,
                                 mobile: 4.0,
@@ -826,12 +827,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                           Text(
                             '(${_unitFor(item)})',
                             style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.getValue(
-                                context,
-                                mobile: 11.0,
-                                tablet: 12.0,
-                                desktop: 13.0,
-                              ),
+                              fontSize: AppResponsive.captionFontSize(context),
                               color: AppColors.textSecondary,
                               fontWeight: FontWeight.w500,
                             ),
@@ -865,12 +861,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                 'Variants:',
                 style: GoogleFonts.poppins(
                   fontWeight: FontWeight.w600,
-                  fontSize: AppResponsive.getValue(
-                    context,
-                    mobile: 12.0,
-                    tablet: 13.0,
-                    desktop: 14.0,
-                  ),
+                  fontSize: AppResponsive.smallFontSize(context),
                   color: AppColors.textPrimary,
                 ),
               ),
@@ -916,12 +907,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                           _variantStatusBadge(item, variant),
                           Container(
                             padding: EdgeInsets.symmetric(
-                              horizontal: AppResponsive.getValue(
-                                context,
-                                mobile: 8.0,
-                                tablet: 10.0,
-                                desktop: 12.0,
-                              ),
+                              horizontal: AppResponsive.smallSpacing(context),
                               vertical: AppResponsive.getValue(
                                 context,
                                 mobile: 4.0,
@@ -937,12 +923,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                               '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(variant.price)}',
                               style: GoogleFonts.poppins(
                                 fontWeight: FontWeight.w600,
-                                fontSize: AppResponsive.getValue(
-                                  context,
-                                  mobile: 12.0,
-                                  tablet: 13.0,
-                                  desktop: 14.0,
-                                ),
+                                fontSize: AppResponsive.smallFontSize(context),
                                 color: AppColors.primary,
                               ),
                             ),
@@ -1005,7 +986,12 @@ class _ManageInventoryState extends State<ManageInventory> {
 
     return Container(
       padding: EdgeInsets.all(
-        AppResponsive.getValue(context, mobile: 10.0, tablet: 12.0, desktop: 14.0),
+        AppResponsive.getValue(
+          context,
+          mobile: 10.0,
+          tablet: 12.0,
+          desktop: 14.0,
+        ),
       ),
       decoration: BoxDecoration(
         color: AppColors.surfaceLight,
@@ -1016,8 +1002,11 @@ class _ManageInventoryState extends State<ManageInventory> {
       ),
       child: Row(
         children: [
-          Icon(Icons.restaurant_menu_rounded,
-              size: 18, color: AppColors.secondary),
+          Icon(
+            Icons.restaurant_menu_rounded,
+            size: 18,
+            color: AppColors.secondary,
+          ),
           SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -1026,7 +1015,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                 Text(
                   'Can make',
                   style: GoogleFonts.poppins(
-                    fontSize: 11,
+                    fontSize: AppResponsive.captionFontSize(context),
                     color: AppColors.textSecondary,
                     fontWeight: FontWeight.w500,
                   ),
@@ -1036,9 +1025,9 @@ class _ManageInventoryState extends State<ManageInventory> {
                   unlimited
                       ? 'Not limited by ingredients'
                       : '${canMake.toStringAsFixed(0)} '
-                          '${_unitFor(item)}',
+                            '${_unitFor(item)}',
                   style: GoogleFonts.poppins(
-                    fontSize: 15,
+                    fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: unlimited || canMake > 0
                         ? AppColors.success
@@ -1053,7 +1042,7 @@ class _ManageInventoryState extends State<ManageInventory> {
               'From recipe ingredients',
               textAlign: TextAlign.end,
               style: GoogleFonts.poppins(
-                fontSize: 10.5,
+                fontSize: AppResponsive.captionFontSize(context),
                 color: AppColors.textSecondary,
               ),
             ),
@@ -1082,99 +1071,110 @@ class _ManageInventoryState extends State<ManageInventory> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            // Current Stock
-            Expanded(
-              flex: 3,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Stock:',
-                    style: GoogleFonts.poppins(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    _formatStock(currentStock, unit, isWeightBased),
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: currentStock > 0
-                          ? AppColors.success
-                          : AppColors.danger,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(width: 8),
-            // Input with unit hint
-            Expanded(
-              flex: 4,
-              child: AppTextField(
-                controller: controller,
-                hint: 'Qty ($unit)',
-                keyboardType: isWeightBased
-                    ? TextInputType.numberWithOptions(decimal: true)
-                    : TextInputType.number,
-                inputFormatters: isWeightBased
-                    ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))]
-                    : [FilteringTextInputFormatter.digitsOnly],
-                onChanged: isWeightBased ? (_) => setState(() {}) : null,
-              ),
-            ),
-            SizedBox(width: 8),
-            // Action Buttons
-            Expanded(
-              flex: 3,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 40,
-                      child: ElevatedButton(
-                        onPressed: () => _removeStock(item, variant: variant),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.danger,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: Icon(Icons.remove_rounded, size: 18),
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: AppResponsive.isDesktop(context)
+                ? kStockAdjusterMaxWidth
+                : double.infinity,
+          ),
+          child: Row(
+            children: [
+              // Current Stock
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Stock:',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.captionFontSize(context),
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  ),
-                  SizedBox(width: 6),
-                  Expanded(
-                    child: SizedBox(
-                      height: 40,
-                      child: ElevatedButton(
-                        onPressed: () => _addStock(item, variant: variant),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.success,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: Icon(Icons.add_rounded, size: 18),
+                    SizedBox(height: 2),
+                    Text(
+                      _formatStock(currentStock, unit, isWeightBased),
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: currentStock > 0
+                            ? AppColors.success
+                            : AppColors.danger,
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+              SizedBox(width: 8),
+              // Input with unit hint
+              Expanded(
+                flex: 4,
+                child: AppTextField(
+                  controller: controller,
+                  hint: 'Qty ($unit)',
+                  keyboardType: isWeightBased
+                      ? TextInputType.numberWithOptions(decimal: true)
+                      : TextInputType.number,
+                  inputFormatters: isWeightBased
+                      ? [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d*'),
+                          ),
+                        ]
+                      : [FilteringTextInputFormatter.digitsOnly],
+                  onChanged: isWeightBased ? (_) => setState(() {}) : null,
+                ),
+              ),
+              SizedBox(width: 8),
+              // Action Buttons
+              Expanded(
+                flex: 3,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 40,
+                        child: ElevatedButton(
+                          onPressed: () => _removeStock(item, variant: variant),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.danger,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Icon(Icons.remove_rounded, size: 18),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 6),
+                    Expanded(
+                      child: SizedBox(
+                        height: 40,
+                        child: ElevatedButton(
+                          onPressed: () => _addStock(item, variant: variant),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.success,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Icon(Icons.add_rounded, size: 18),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
         // Live conversion hint for weight-based items
         if (isWeightBased && controller.text.isNotEmpty)
@@ -1187,7 +1187,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                 child: Text(
                   hint,
                   style: GoogleFonts.poppins(
-                    fontSize: 11,
+                    fontSize: AppResponsive.captionFontSize(context),
                     color: AppColors.primary,
                     fontWeight: FontWeight.w500,
                   ),
@@ -1203,162 +1203,190 @@ class _ManageInventoryState extends State<ManageInventory> {
   // Groups everything that used to be a wall of app-bar icons into one
   // clearly-labelled "Manage Inventory" section, separate from the item-level
   // "Stock Levels" list below it.
-  List<({String title, String subtitle, IconData icon, Color color, VoidCallback onTap})>
-      _hubActions(BuildContext context) => [
-            (
-              title: 'Recipes',
-              subtitle: 'Build BOMs for composed items',
-              icon: Icons.receipt_long_rounded,
-              color: AppColors.secondary,
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const RecipesScreen())),
-            ),
-            (
-              title: 'Raw Materials',
-              subtitle: 'Ingredients & stock levels',
-              icon: Icons.grass_rounded,
-              color: AppColors.success,
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const RawMaterialsScreen())),
-            ),
-            (
-              title: 'Suppliers',
-              subtitle: 'Contacts, balances & payments',
-              icon: Icons.people_alt_rounded,
-              color: AppColors.secondary,
-              onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const RestaurantSupplierListScreen())),
-            ),
-            (
-              title: 'Purchase Orders',
-              subtitle: 'Order & receive from suppliers',
-              icon: Icons.local_shipping_rounded,
-              color: AppColors.info,
-              onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const PurchaseOrderListScreen())),
-            ),
-            (
-              title: 'Production',
-              subtitle: 'Batch-prep semi-finished items',
-              icon: Icons.outdoor_grill_rounded,
-              color: AppColors.accent,
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const ProductionScreen())),
-            ),
-            (
-              title: 'Stock Take',
-              subtitle: 'Physical count reconciliation',
-              icon: Icons.fact_check_rounded,
-              color: AppColors.warning,
-              onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) =>
-                          const RestaurantStockTakeListScreen())),
-            ),
-            (
-              title: 'Inventory Losses',
-              subtitle: 'Wastage, theft & write-offs',
-              icon: Icons.money_off_rounded,
-              color: AppColors.danger,
-              onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) =>
-                          const RestaurantInventoryLossListScreen())),
-            ),
-            (
-              title: 'Damaged Goods',
-              subtitle: 'Supplier returns & claims',
-              icon: Icons.assignment_return_rounded,
-              color: AppColors.orange,
-              onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) =>
-                          const RestaurantDamagedGoodsHubScreen())),
-            ),
-            (
-              title: 'Food Cost Report',
-              subtitle: 'Margins, usage & wastage %',
-              icon: Icons.query_stats_rounded,
-              color: AppColors.primary,
-              onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const FoodCostReportScreen())),
-            ),
-          ];
+  List<
+    ({
+      String title,
+      String subtitle,
+      IconData icon,
+      Color color,
+      VoidCallback onTap,
+    })
+  >
+  _hubActions(BuildContext context) => [
+    (
+      title: 'Recipes',
+      subtitle: 'Build BOMs for composed items',
+      icon: Icons.receipt_long_rounded,
+      color: AppColors.secondary,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const RecipesScreen()),
+      ),
+    ),
+    (
+      title: 'Raw Materials',
+      subtitle: 'Ingredients & stock levels',
+      icon: Icons.grass_rounded,
+      color: AppColors.success,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const RawMaterialsScreen()),
+      ),
+    ),
+    (
+      title: 'Suppliers',
+      subtitle: 'Contacts, balances & payments',
+      icon: Icons.people_alt_rounded,
+      color: AppColors.secondary,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const RestaurantSupplierListScreen()),
+      ),
+    ),
+    (
+      title: 'Purchase Orders',
+      subtitle: 'Order & receive from suppliers',
+      icon: Icons.local_shipping_rounded,
+      color: AppColors.info,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const PurchaseOrderListScreen()),
+      ),
+    ),
+    (
+      title: 'Production',
+      subtitle: 'Batch-prep semi-finished items',
+      icon: Icons.outdoor_grill_rounded,
+      color: AppColors.accent,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ProductionScreen()),
+      ),
+    ),
+    (
+      title: 'Stock Take',
+      subtitle: 'Physical count reconciliation',
+      icon: Icons.fact_check_rounded,
+      color: AppColors.warning,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const RestaurantStockTakeListScreen(),
+        ),
+      ),
+    ),
+    (
+      title: 'Inventory Losses',
+      subtitle: 'Wastage, theft & write-offs',
+      icon: Icons.money_off_rounded,
+      color: AppColors.danger,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const RestaurantInventoryLossListScreen(),
+        ),
+      ),
+    ),
+    (
+      title: 'Damaged Goods',
+      subtitle: 'Supplier returns & claims',
+      icon: Icons.assignment_return_rounded,
+      color: AppColors.orange,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const RestaurantDamagedGoodsHubScreen(),
+        ),
+      ),
+    ),
+    (
+      title: 'Food Cost Report',
+      subtitle: 'Margins, usage & wastage %',
+      icon: Icons.query_stats_rounded,
+      color: AppColors.primary,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const FoodCostReportScreen()),
+      ),
+    ),
+  ];
 
   Widget _buildSectionHeading(String title, String subtitle) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0, desktop: 24.0),
-        20,
-        16,
-        10,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+    return AppResponsive.constrainedContent(
+      context: context,
+      maxWidth: kInventoryContentMaxWidth,
+      alignment: Alignment.topCenter,
+      heightFactor: 1,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppResponsive.largeSpacing(context),
+          20,
+          16,
+          10,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.subheadingFontSize(context),
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
             ),
-          ),
-          SizedBox(height: 2),
-          Text(
-            subtitle,
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              color: AppColors.textSecondary,
+            SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.textSecondary,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildHubGrid(BuildContext context) {
     final actions = _hubActions(context);
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: AppResponsive.getValue(
-          context,
-          mobile: 16.0,
-          tablet: 20.0,
-          desktop: 24.0,
+    return AppResponsive.constrainedContent(
+      context: context,
+      maxWidth: kInventoryContentMaxWidth,
+      alignment: Alignment.topCenter,
+      heightFactor: 1,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.largeSpacing(context),
         ),
-      ),
-      child: GridView.count(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        crossAxisCount: AppResponsive.gridColumns(context),
-        crossAxisSpacing: AppResponsive.gridSpacing(context),
-        mainAxisSpacing: AppResponsive.gridSpacing(context),
-        childAspectRatio: AppResponsive.getValue(
-          context,
-          mobile: 1.02,
-          tablet: 1.15,
-          desktop: 1.25,
+        child: LayoutBuilder(
+          builder: (context, constraints) => GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: inventoryHubColumns(constraints.maxWidth),
+            crossAxisSpacing: AppResponsive.gridSpacing(context),
+            mainAxisSpacing: AppResponsive.gridSpacing(context),
+            childAspectRatio: AppResponsive.getValue(
+              context,
+              mobile: 1.02,
+              tablet: 1.15,
+              desktop: 1.25,
+            ),
+            children: actions
+                .map(
+                  (a) => DashboardMenuCard(
+                    title: a.title,
+                    subtitle: a.subtitle,
+                    icon: a.icon,
+                    color: a.color,
+                    compact: AppResponsive.isMobile(context),
+                    onTap: a.onTap,
+                  ),
+                )
+                .toList(),
+          ),
         ),
-        children: actions
-            .map((a) => DashboardMenuCard(
-                  title: a.title,
-                  subtitle: a.subtitle,
-                  icon: a.icon,
-                  color: a.color,
-                  compact: AppResponsive.isMobile(context),
-                  onTap: a.onTap,
-                ))
-            .toList(),
       ),
     );
   }
@@ -1418,7 +1446,7 @@ class _ManageInventoryState extends State<ManageInventory> {
               title,
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
-                fontSize: 15,
+                fontSize: AppResponsive.bodyFontSize(context),
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
               ),
@@ -1428,7 +1456,7 @@ class _ManageInventoryState extends State<ManageInventory> {
               subtitle,
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
-                fontSize: 12,
+                fontSize: AppResponsive.smallFontSize(context),
                 color: AppColors.textSecondary,
               ),
             ),
@@ -1488,7 +1516,7 @@ class _ManageInventoryState extends State<ManageInventory> {
                             textAlign: TextAlign.center,
                             style: GoogleFonts.poppins(
                               color: Colors.white,
-                              fontSize: 10,
+                              fontSize: AppResponsive.captionFontSize(context),
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -1512,9 +1540,11 @@ class _ManageInventoryState extends State<ManageInventory> {
           // Give those items a synthetic "Uncategorized" group instead of
           // hiding them until someone assigns a real category.
           final categoryIds = categories.map((c) => c.id).toSet();
-          final hasUncategorizedStock = items.any((item) =>
-              item.trackInventory == true &&
-              !categoryIds.contains(item.categoryOfItem));
+          final hasUncategorizedStock = items.any(
+            (item) =>
+                item.trackInventory == true &&
+                !categoryIds.contains(item.categoryOfItem),
+          );
           final displayCategories = [
             ...categories,
             if (hasUncategorizedStock)
@@ -1533,12 +1563,7 @@ class _ManageInventoryState extends State<ManageInventory> {
               .where((item) => !InventoryService.isInStock(item))
               .length;
 
-          final horizontalPad = AppResponsive.getValue(
-            context,
-            mobile: 16.0,
-            tablet: 20.0,
-            desktop: 24.0,
-          );
+          final horizontalPad = AppResponsive.largeSpacing(context);
 
           return CustomScrollView(
             slivers: [
@@ -1559,65 +1584,79 @@ class _ManageInventoryState extends State<ManageInventory> {
                 ),
               ),
               SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                      horizontalPad, 0, horizontalPad, 10),
-                  child: Column(
-                    children: [
-                      AppTextField(
-                        controller: _searchController,
-                        onChanged: (v) => setState(
-                            () => _searchQuery = v.trim().toLowerCase()),
-                        hint: 'Search items...',
-                        icon: Icons.search_rounded,
-                        suffixIcon: _searchQuery.isNotEmpty
-                            ? IconButton(
-                                icon: Icon(
-                                  Icons.close_rounded,
-                                  size: 18,
-                                  color: AppColors.textSecondary,
-                                ),
-                                onPressed: () => setState(() {
-                                  _searchController.clear();
-                                  _searchQuery = '';
-                                }),
-                              )
-                            : null,
-                      ),
-                      const SizedBox(height: 10),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: FilterChip(
-                          label: Text(
-                            'Low stock only',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                child: AppResponsive.constrainedContent(
+                  context: context,
+                  maxWidth: kInventoryContentMaxWidth,
+                  alignment: Alignment.topCenter,
+                  heightFactor: 1,
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      horizontalPad,
+                      0,
+                      horizontalPad,
+                      10,
+                    ),
+                    child: Column(
+                      children: [
+                        AppTextField(
+                          controller: _searchController,
+                          onChanged: (v) => setState(
+                            () => _searchQuery = v.trim().toLowerCase(),
+                          ),
+                          hint: 'Search items...',
+                          icon: Icons.search_rounded,
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: Icon(
+                                    Icons.close_rounded,
+                                    size: 18,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  onPressed: () => setState(() {
+                                    _searchController.clear();
+                                    _searchQuery = '';
+                                  }),
+                                )
+                              : null,
+                        ),
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: FilterChip(
+                            label: Text(
+                              'Low stock only',
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.smallFontSize(context),
+                                fontWeight: FontWeight.w600,
+                                color: _showLowStockOnly
+                                    ? Colors.white
+                                    : AppColors.textPrimary,
+                              ),
+                            ),
+                            avatar: Icon(
+                              Icons.warning_amber_rounded,
+                              size: 16,
                               color: _showLowStockOnly
                                   ? Colors.white
-                                  : AppColors.textPrimary,
+                                  : AppColors.warning,
                             ),
+                            selected: _showLowStockOnly,
+                            onSelected: (v) =>
+                                setState(() => _showLowStockOnly = v),
+                            selectedColor: AppColors.warning,
+                            backgroundColor: AppColors.warning.withValues(
+                              alpha: 0.08,
+                            ),
+                            side: BorderSide(
+                              color: AppColors.warning.withValues(
+                                alpha: _showLowStockOnly ? 1 : 0.3,
+                              ),
+                            ),
+                            showCheckmark: false,
                           ),
-                          avatar: Icon(
-                            Icons.warning_amber_rounded,
-                            size: 16,
-                            color: _showLowStockOnly
-                                ? Colors.white
-                                : AppColors.warning,
-                          ),
-                          selected: _showLowStockOnly,
-                          onSelected: (v) =>
-                              setState(() => _showLowStockOnly = v),
-                          selectedColor: AppColors.warning,
-                          backgroundColor: AppColors.warning.withValues(alpha: 0.08),
-                          side: BorderSide(
-                            color: AppColors.warning
-                                .withValues(alpha: _showLowStockOnly ? 1 : 0.3),
-                          ),
-                          showCheckmark: false,
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -1642,18 +1681,27 @@ class _ManageInventoryState extends State<ManageInventory> {
                         "Enable 'Manage Inventory' on a menu item to track its stock here.",
                     action: OutlinedButton.icon(
                       onPressed: () => Navigator.pushNamed(
-                          context, '/restaurant-manage-menu'),
+                        context,
+                        '/restaurant-manage-menu',
+                      ),
                       icon: const Icon(Icons.restaurant_menu_rounded, size: 16),
-                      label: Text('Go to Menu Management',
-                          style: GoogleFonts.poppins(
-                              fontSize: 12.5, fontWeight: FontWeight.w600)),
+                      label: Text(
+                        'Go to Menu Management',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.smallFontSize(context),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
                         side: const BorderSide(color: AppColors.primary),
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                     ),
                   ),
@@ -1661,44 +1709,51 @@ class _ManageInventoryState extends State<ManageInventory> {
               else
                 SliverPadding(
                   padding: EdgeInsets.fromLTRB(
-                      horizontalPad, 0, horizontalPad, horizontalPad),
+                    horizontalPad,
+                    0,
+                    horizontalPad,
+                    horizontalPad,
+                  ),
                   sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final category = displayCategories[index];
-                        final isUncategorizedGroup =
-                            category.id == _uncategorizedId;
-                        final categoryItems = items
-                            .where(
-                              (item) =>
-                                  (isUncategorizedGroup
-                                      ? !categoryIds
-                                          .contains(item.categoryOfItem)
-                                      : item.categoryOfItem == category.id) &&
-                                  item.trackInventory == true &&
-                                  (!_showLowStockOnly || _isAlertItem(item)) &&
-                                  (_searchQuery.isEmpty ||
-                                      item.name.toLowerCase().contains(
-                                            _searchQuery,
-                                          ) ||
-                                      (item.itemCode != null &&
-                                          item.itemCode!
-                                              .toLowerCase()
-                                              .contains(_searchQuery))),
-                            )
-                            .toList();
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final category = displayCategories[index];
+                      final isUncategorizedGroup =
+                          category.id == _uncategorizedId;
+                      final categoryItems = items
+                          .where(
+                            (item) =>
+                                (isUncategorizedGroup
+                                    ? !categoryIds.contains(item.categoryOfItem)
+                                    : item.categoryOfItem == category.id) &&
+                                item.trackInventory == true &&
+                                (!_showLowStockOnly || _isAlertItem(item)) &&
+                                (_searchQuery.isEmpty ||
+                                    item.name.toLowerCase().contains(
+                                      _searchQuery,
+                                    ) ||
+                                    (item.itemCode != null &&
+                                        item.itemCode!.toLowerCase().contains(
+                                          _searchQuery,
+                                        ))),
+                          )
+                          .toList();
 
-                        if (categoryItems.isEmpty) {
-                          return const SizedBox.shrink();
-                        }
+                      if (categoryItems.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
 
-                        // Auto-expand when searching or filtering to low stock
-                        final isExpanded =
-                            (_searchQuery.isNotEmpty || _showLowStockOnly)
-                                ? true
-                                : (_expandedCategories[category.id] ?? false);
+                      // Auto-expand when searching or filtering to low stock
+                      final isExpanded =
+                          (_searchQuery.isNotEmpty || _showLowStockOnly)
+                          ? true
+                          : (_expandedCategories[category.id] ?? false);
 
-                        return Container(
+                      return AppResponsive.constrainedContent(
+                        context: context,
+                        maxWidth: kInventoryContentMaxWidth,
+                        alignment: Alignment.topCenter,
+                        heightFactor: 1,
+                        child: Container(
                           margin: EdgeInsets.only(bottom: 8),
                           decoration: BoxDecoration(
                             color: AppColors.white,
@@ -1708,8 +1763,9 @@ class _ManageInventoryState extends State<ManageInventory> {
                             border: Border.all(color: AppColors.divider),
                           ),
                           child: Theme(
-                            data: Theme.of(context)
-                                .copyWith(dividerColor: Colors.transparent),
+                            data: Theme.of(
+                              context,
+                            ).copyWith(dividerColor: Colors.transparent),
                             child: ExpansionTile(
                               // Key includes isExpanded so toggling search / low-stock
                               // filter rebuilds the tile and re-applies initiallyExpanded
@@ -1729,13 +1785,15 @@ class _ManageInventoryState extends State<ManageInventory> {
                                 category.name,
                                 style: GoogleFonts.poppins(
                                   fontWeight: FontWeight.w500,
-                                  fontSize: 14,
+                                  fontSize: AppResponsive.bodyFontSize(context),
                                 ),
                               ),
                               subtitle: Text(
                                 '${categoryItems.length} item${categoryItems.length != 1 ? 's' : ''}',
                                 style: GoogleFonts.poppins(
-                                  fontSize: 11,
+                                  fontSize: AppResponsive.captionFontSize(
+                                    context,
+                                  ),
                                   color: AppColors.textSecondary,
                                 ),
                               ),
@@ -1750,10 +1808,9 @@ class _ManageInventoryState extends State<ManageInventory> {
                               }).toList(),
                             ),
                           ),
-                        );
-                      },
-                      childCount: displayCategories.length,
-                    ),
+                        ),
+                      );
+                    }, childCount: displayCategories.length),
                   ),
                 ),
             ],

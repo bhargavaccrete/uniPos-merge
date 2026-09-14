@@ -31,6 +31,11 @@ Future<bool> showAppConfirmDialog({
   final accentColor = accent ?? AppColors.primary;
   final result = await showDialog<bool>(
     context: context,
+    // Nearest navigator, not the root: inside a surface that hosts its own
+    // Navigator (the setup wizard's content pane) the dialog then opens
+    // within that pane and leaves the surrounding chrome visible. Anywhere
+    // else the nearest navigator IS the root, so nothing changes.
+    useRootNavigator: false,
     barrierDismissible: barrierDismissible,
     builder: (context) => AppDialogShell(
       title: title,
@@ -91,6 +96,7 @@ Future<void> showAppInfoDialog({
   final accentColor = accent ?? AppColors.primary;
   return showDialog<void>(
     context: context,
+    useRootNavigator: false, // see showAppConfirmDialog
     builder: (context) => AppDialogShell(
       title: title,
       body: _bodyText(message),
@@ -114,6 +120,7 @@ Future<void> showAppErrorDialog({
   final hasList = errors != null && errors.isNotEmpty;
   return showDialog<void>(
     context: context,
+    useRootNavigator: false, // see showAppConfirmDialog
     builder: (context) => AppDialogShell(
       title: title,
       accent: AppColors.danger,
@@ -255,7 +262,7 @@ class AppDialogShell extends StatelessWidget {
         ? ((AppResponsive.screenWidth(context) -
                     AppResponsive.dialogWidth(context)) /
                 2)
-            .clamp(40.0, 200.0)
+            .clamp(40.0, double.infinity)
         : 24.0;
 
     return Dialog(

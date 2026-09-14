@@ -559,7 +559,7 @@ class ReportExportService {
         ? ((AppResponsive.screenWidth(context) -
                     AppResponsive.dialogWidth(context)) /
                 2)
-            .clamp(40.0, 200.0)
+            .clamp(40.0, double.infinity)
         : 24.0;
 
     await showDialog(

@@ -40,7 +40,10 @@ class HiveTypeIds {
   static const int businessDetails = 4;
   // 5 was taxRateItem — retired, named tax rates now live in the shared
   // Tax entity (typeId 114, data/models/common/taxmodel_314.dart), not this
-  // per-record blob. Don't reuse 5.
+  // per-record blob. Don't reuse 5: boxes written before the retirement still
+  // contain TaxRateItem frames, and models/legacy/legacy_tax_rate_item.dart
+  // keeps a read-only adapter registered on 5 so those boxes can still open.
+  static const int legacyTaxRateItem = 5;
   static const int paymentMethod = 6;
 
   // ==================== RESTAURANT MODELS (100-149) ====================

@@ -21,10 +21,12 @@ class Startorder extends StatefulWidget {
   final bool? isForAddingItem;
   final String? newOrderForTableId;
 
-  const Startorder({super.key,
+  const Startorder({
+    super.key,
     this.isForAddingItem,
-    this.existingOrder, this.newOrderForTableId});
-
+    this.existingOrder,
+    this.newOrderForTableId,
+  });
 
   @override
   State<Startorder> createState() => _StartorderState();
@@ -34,7 +36,10 @@ class _StartorderState extends State<Startorder>
     with SingleTickerProviderStateMixin {
   late TabController tabController;
   String? _tableIdForCurrentSession;
-  late final int _tabCount = (OrderSettings.enableDineIn && PlanEnforce.allows(EntKeys.billingTables)) ? 3 : 2;
+  late final int _tabCount =
+      (OrderSettings.enableDineIn && PlanEnforce.allows(EntKeys.billingTables))
+      ? 3
+      : 2;
   DateTime? _lastBackPress;
   int _previousTabIndex = 0;
 
@@ -64,7 +69,6 @@ class _StartorderState extends State<Startorder>
 
     // Initial
 
-
     _refreshCurrentTab();
   }
 
@@ -80,9 +84,12 @@ class _StartorderState extends State<Startorder>
       orderStore.loadOrders();
     }
     // Refresh tables when switching to tables tab (only if dine-in enabled)
-    else if (tabController.index == 2 && (OrderSettings.enableDineIn && PlanEnforce.allows(EntKeys.billingTables))) {
+    else if (tabController.index == 2 &&
+        (OrderSettings.enableDineIn &&
+            PlanEnforce.allows(EntKeys.billingTables))) {
       tableStore.loadTables();
-      orderStore.loadOrders(); // CRITICAL: Need orders to find active order for table
+      orderStore
+          .loadOrders(); // CRITICAL: Need orders to find active order for table
     }
   }
 
@@ -94,12 +101,19 @@ class _StartorderState extends State<Startorder>
 
   Widget _buildTabButton(int index, IconData icon, String label) {
     final isSelected = tabController.index == index;
-    final fs = AppResponsive.getValue<double>(context, mobile: 13, tablet: 15, desktop: 16);
-    final iconSz = AppResponsive.getValue<double>(context, mobile: 18, tablet: 20, desktop: 22);
+    final fs = AppResponsive.bodyFontSize(context);
+    final iconSz = AppResponsive.getValue<double>(
+      context,
+      mobile: 18,
+      tablet: 20,
+      desktop: 22,
+    );
     return GestureDetector(
       onTap: () => tabController.animateTo(index),
       child: Container(
-        padding: EdgeInsets.symmetric(vertical: 10),
+        padding: EdgeInsets.symmetric(
+          vertical: AppResponsive.smallSpacing(context),
+        ),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary : AppColors.surfaceMedium,
           borderRadius: BorderRadius.circular(10),
@@ -107,20 +121,25 @@ class _StartorderState extends State<Startorder>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: iconSz, color: isSelected ? Colors.white : AppColors.textSecondary),
-            SizedBox(width: 8),
-            Text(label, style: GoogleFonts.poppins(fontSize: fs, fontWeight: FontWeight.w500, color: isSelected ? Colors.white : AppColors.textSecondary)),
+            Icon(
+              icon,
+              size: iconSz,
+              color: isSelected ? Colors.white : AppColors.textSecondary,
+            ),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: fs,
+                fontWeight: FontWeight.w500,
+                color: isSelected ? Colors.white : AppColors.textSecondary,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
-
-
-
-
-
-
 
   @override
   /// Builds the detailed view for an existing order (matches your screenshot).
@@ -263,7 +282,6 @@ class _StartorderState extends State<Startorder>
   //     ),
   //   );
   // }
-
   /// Builds the default TabBar view for starting new orders.
   Widget build(BuildContext context) {
     final isTablet = !AppResponsive.isMobile(context);
@@ -285,129 +303,198 @@ class _StartorderState extends State<Startorder>
             content: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.exit_to_app_rounded, color: Colors.white, size: 20),
-                SizedBox(width: 10),
-                Text('Press back again to exit', textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
+                Icon(
+                  Icons.exit_to_app_rounded,
+                  color: Colors.white,
+                  size: AppResponsive.iconSize(context),
+                ),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
+                Text(
+                  'Press back again to exit',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ],
             ),
             duration: const Duration(seconds: 2),
             behavior: SnackBarBehavior.floating,
             backgroundColor: AppColors.primary,
-            margin: const EdgeInsets.only(bottom: 24, left: 24, right: 24),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: EdgeInsets.all(
+              AppResponsive.extraLargeSpacing(context),
+            ).copyWith(top: 0),
+            padding: EdgeInsets.symmetric(
+              horizontal: AppResponsive.largeSpacing(context),
+              vertical: AppResponsive.mediumSpacing(context),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(
+                AppResponsive.borderRadius(context),
+              ),
+            ),
           ),
         );
       },
       child: Scaffold(
         backgroundColor: AppColors.surfaceLight,
         drawer: Drawerr(),
-      appBar: buildPrimaryAppBar(
-        titleWidget: Row(
-          children: [
-            Text(
-              'Bill Berry Lite',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.getValue<double>(context, mobile: 18, tablet: 20, desktop: 22),
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-            if (widget.newOrderForTableId != null) ...[
-              SizedBox(width: 8),
+        appBar: buildPrimaryAppBar(
+          titleWidget: Row(
+            children: [
               Text(
-                '• Table ${widget.newOrderForTableId}',
+                'Bill Berry Lite',
                 style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.getValue<double>(context, mobile: 13, tablet: 14),
-                  color: Colors.white70,
+                  fontSize: AppResponsive.getValue<double>(
+                    context,
+                    mobile: 18,
+                    tablet: 20,
+                    desktop: 22,
+                  ),
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
                 ),
               ),
+              if (widget.newOrderForTableId != null) ...[
+                SizedBox(width: AppResponsive.smallSpacing(context)),
+                Text(
+                  '• Table ${widget.newOrderForTableId}',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.getValue<double>(
+                      context,
+                      mobile: 13,
+                      tablet: 14,
+                    ),
+                    color: Colors.white70,
+                  ),
+                ),
+              ],
             ],
-          ],
-        ),
-      ),
-      body: Column(
-        children: [
-          // Auto-backup progress indicator — thin bar at the very top
-          ValueListenableBuilder<bool>(
-            valueListenable: AutoBackupService.isBackingUp,
-            builder: (_, backing, __) => backing
-                ? LinearProgressIndicator(
-                    minHeight: 3,
-                    backgroundColor: Colors.transparent,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.success),
-                  )
-                : const SizedBox.shrink(),
           ),
+        ),
+        body: Column(
+          children: [
+            // Auto-backup progress indicator — thin bar at the very top
+            ValueListenableBuilder<bool>(
+              valueListenable: AutoBackupService.isBackingUp,
+              builder: (_, backing, __) => backing
+                  ? LinearProgressIndicator(
+                      minHeight: 3,
+                      backgroundColor: Colors.transparent,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        AppColors.success,
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
 
-          // Horizontal Tabs for Tablet
-          if (isTablet)
-            Container(
-              color: AppColors.white,
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Expanded(child: _buildTabButton(0, Icons.restaurant_menu, 'Menu')),
-                  SizedBox(width: 8),
-                  Expanded(child: _buildTabButton(1, Icons.receipt_long, 'Orders')),
-                  if ((OrderSettings.enableDineIn && PlanEnforce.allows(EntKeys.billingTables))) ...[
-                    SizedBox(width: 8),
-                    Expanded(child: _buildTabButton(2, Icons.table_restaurant, 'Tables')),
+            // Horizontal Tabs for Tablet
+            if (isTablet)
+              Container(
+                color: AppColors.white,
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.largeSpacing(context),
+                  vertical: AppResponsive.smallSpacing(context),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildTabButton(0, Icons.restaurant_menu, 'Menu'),
+                    ),
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
+                    Expanded(
+                      child: _buildTabButton(1, Icons.receipt_long, 'Orders'),
+                    ),
+                    if ((OrderSettings.enableDineIn &&
+                        PlanEnforce.allows(EntKeys.billingTables))) ...[
+                      SizedBox(width: AppResponsive.smallSpacing(context)),
+                      Expanded(
+                        child: _buildTabButton(
+                          2,
+                          Icons.table_restaurant,
+                          'Tables',
+                        ),
+                      ),
+                    ],
                   ],
+                ),
+              ),
+
+            // TabBarView
+            Expanded(
+              child: TabBarView(
+                controller: tabController,
+                children: [
+                  // Menu tab: MenuScreen now owns both layouts internally — the
+                  // opt-in "Menu Grid View" (mobile only) and the default list;
+                  // tablet keeps its own grid layout. Wrapped in the settings
+                  // listener so flipping the flag live-swaps the mode without
+                  // leaving the screen.
+                  ValueListenableBuilder<Map<String, bool>>(
+                    valueListenable: AppSettings.settingsNotifier,
+                    builder: (context, __, ___) => MenuScreen(
+                      tableIdForNewOrder: _tableIdForCurrentSession,
+                      isForAddingItem: widget.isForAddingItem ?? false,
+                    ),
+                  ),
+                  Order(),
+                  if ((OrderSettings.enableDineIn &&
+                      PlanEnforce.allows(EntKeys.billingTables)))
+                    const TableScreen(),
                 ],
               ),
             ),
-
-          // TabBarView
-          Expanded(
-            child: TabBarView(
-              controller: tabController,
-              children: [
-                // Menu tab: MenuScreen now owns both layouts internally — the
-                // opt-in "Menu Grid View" (mobile only) and the default list;
-                // tablet keeps its own grid layout. Wrapped in the settings
-                // listener so flipping the flag live-swaps the mode without
-                // leaving the screen.
-                ValueListenableBuilder<Map<String, bool>>(
-                  valueListenable: AppSettings.settingsNotifier,
-                  builder: (context, __, ___) => MenuScreen(
-                    tableIdForNewOrder: _tableIdForCurrentSession,
-                    isForAddingItem: widget.isForAddingItem ?? false,
+          ],
+        ),
+        // Mobile-only chrome (isTablet == !isMobile), so every value below is
+        // permanently on the ladder's mobile step. Static is correct here:
+        // swapping `size: 22` for AppResponsive.iconSize would SHRINK it to 20
+        // rather than make it responsive.
+        bottomNavigationBar: isTablet
+            ? null
+            : Container(
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  border: Border(top: BorderSide(color: AppColors.divider)),
+                ),
+                child: SafeArea(
+                  child: SizedBox(
+                    height: 56,
+                    child: TabBar(
+                      controller: tabController,
+                      labelColor: AppColors.primary,
+                      unselectedLabelColor: AppColors.textSecondary,
+                      indicatorColor: AppColors.primary,
+                      indicatorWeight: 2,
+                      labelStyle: GoogleFonts.poppins(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      unselectedLabelStyle: GoogleFonts.poppins(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w400,
+                      ),
+                      tabs: [
+                        Tab(
+                          icon: Icon(Icons.restaurant_menu, size: 22),
+                          text: 'Menu',
+                        ),
+                        Tab(
+                          icon: Icon(Icons.receipt_long, size: 22),
+                          text: 'Orders',
+                        ),
+                        if ((OrderSettings.enableDineIn &&
+                            PlanEnforce.allows(EntKeys.billingTables)))
+                          Tab(
+                            icon: Icon(Icons.table_restaurant, size: 22),
+                            text: 'Tables',
+                          ),
+                      ],
+                    ),
                   ),
                 ),
-                Order(),
-                if ((OrderSettings.enableDineIn && PlanEnforce.allows(EntKeys.billingTables)))
-                  const TableScreen(),
-              ],
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: isTablet ? null : Container(
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          border: Border(top: BorderSide(color: AppColors.divider)),
-        ),
-        child: SafeArea(
-          child: SizedBox(
-            height: 56,
-            child: TabBar(
-              controller: tabController,
-              labelColor: AppColors.primary,
-              unselectedLabelColor: AppColors.textSecondary,
-              indicatorColor: AppColors.primary,
-              indicatorWeight: 2,
-              labelStyle: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w500),
-              unselectedLabelStyle: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w400),
-              tabs: [
-                Tab(icon: Icon(Icons.restaurant_menu, size: 22), text: 'Menu'),
-                Tab(icon: Icon(Icons.receipt_long, size: 22), text: 'Orders'),
-                if ((OrderSettings.enableDineIn && PlanEnforce.allows(EntKeys.billingTables)))
-                  Tab(icon: Icon(Icons.table_restaurant, size: 22), text: 'Tables'),
-              ],
-            ),
-          ),
-        ))
+              ),
       ),
     );
   }

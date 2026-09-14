@@ -148,6 +148,8 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
     final isUpi = method.value == 'upi';
     await showDialog(
       context: context,
+      // Nearest navigator — stays inside the wizard's pane, clear of the sidebar.
+      useRootNavigator: false,
       builder: (context) {
         // Shared by the last field's done key and the Update button so pressing
         // enter on the keyboard commits the edit exactly like tapping Update.
@@ -257,7 +259,14 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
                             children: [
                               Icon(
                                 Icons.qr_code_2,
-                                size: 48,
+                                // Empty-state glyph: above largeIconSize's 36
+                                // ceiling, so a raw step ladder.
+                                size: AppResponsive.getValue(
+                                  context,
+                                  mobile: 48.0,
+                                  tablet: 56.0,
+                                  desktop: 64.0,
+                                ),
                                 color: AppColors.textSecondary.withValues(
                                   alpha: 0.5,
                                 ),
@@ -290,15 +299,27 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
                                   ),
                                   border: Border.all(color: AppColors.divider),
                                 ),
-                                child: SizedBox(
-                                  width: 160,
-                                  height: 160,
-                                  child: QrImageView(
-                                    data: qrData,
-                                    version: QrVersions.auto,
-                                    size: 160,
-                                    gapless: true,
-                                  ),
+                                // One value drives the box AND the painter —
+                                // if they drift the QR renders letterboxed.
+                                child: Builder(
+                                  builder: (context) {
+                                    final qrSize = AppResponsive.getValue(
+                                      context,
+                                      mobile: 160.0,
+                                      tablet: 190.0,
+                                      desktop: 220.0,
+                                    );
+                                    return SizedBox(
+                                      width: qrSize,
+                                      height: qrSize,
+                                      child: QrImageView(
+                                        data: qrData,
+                                        version: QrVersions.auto,
+                                        size: qrSize,
+                                        gapless: true,
+                                      ),
+                                    );
+                                  },
                                 ),
                               ),
                               SizedBox(
@@ -400,6 +421,8 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
   void _showCurrencyPicker() {
     showModalBottomSheet(
       context: context,
+      // Nearest navigator — the sheet rises from the bottom of the pane.
+      useRootNavigator: false,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => Container(
@@ -416,14 +439,22 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
             Container(
               width: 40,
               height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 12),
+              margin: EdgeInsets.symmetric(
+                vertical: AppResponsive.mediumSpacing(context),
+              ),
               decoration: BoxDecoration(
                 color: Colors.grey.shade300,
+                // Hairline radius — ornamental.
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              padding: EdgeInsets.fromLTRB(
+                AppResponsive.largeSpacing(context),
+                0,
+                AppResponsive.largeSpacing(context),
+                AppResponsive.mediumSpacing(context),
+              ),
               child: Row(
                 children: [
                   const Icon(Icons.currency_exchange, color: AppColors.primary),
@@ -495,6 +526,9 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
                         : null,
                     onTap: () async {
                       await CurrencyHelper.setCurrency(info.code);
+                      // The sheet is opened with useRootNavigator: false, so it
+                      // sits on the same (pane) navigator this context resolves
+                      // to — a plain pop closes exactly the sheet.
                       if (mounted) Navigator.pop(context);
                     },
                   );
@@ -516,6 +550,7 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
 
     await showDialog(
       context: context,
+      useRootNavigator: false, // stays inside the wizard's pane
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
           // Shared by the name field's done key and the Add button so pressing
@@ -582,7 +617,7 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
                 SizedBox(height: AppResponsive.smallSpacing(context)),
                 Wrap(
                   spacing: 8,
-                  runSpacing: 8,
+                  runSpacing: AppResponsive.smallSpacing(context),
                   children: _availableIcons.entries.map((e) {
                     final selected = selectedIcon == e.key;
                     return InkWell(
@@ -590,9 +625,9 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
                       borderRadius: BorderRadius.circular(10),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 150),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 9,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppResponsive.mediumSpacing(context),
+                          vertical: AppResponsive.smallSpacing(context),
                         ),
                         decoration: BoxDecoration(
                           color: selected
@@ -803,9 +838,9 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
                         return GestureDetector(
                           onTap: _showCurrencyPicker,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: AppResponsive.largeSpacing(context),
+                              vertical: AppResponsive.mediumSpacing(context),
                             ),
                             decoration: BoxDecoration(
                               color: AppColors.white,
@@ -947,11 +982,13 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
           children: [
             if (!hasEnabled)
               Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: EdgeInsets.only(
+                  bottom: AppResponsive.mediumSpacing(context),
+                ),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.mediumSpacing(context),
+                    vertical: AppResponsive.smallSpacing(context),
                   ),
                   decoration: BoxDecoration(
                     color: AppColors.danger.withValues(alpha: 0.08),
@@ -986,7 +1023,11 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: widget.onPrevious,
-                    icon: const Icon(Icons.arrow_back, size: 16),
+                    // Matches the Continue button's icon on the same row.
+                    icon: Icon(
+                      Icons.arrow_back,
+                      size: AppResponsive.smallIconSize(context),
+                    ),
                     label: Text(
                       'Back',
                       style: GoogleFonts.poppins(
@@ -997,7 +1038,9 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.textSecondary,
                       side: const BorderSide(color: AppColors.divider),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: EdgeInsets.symmetric(
+                        vertical: AppResponsive.mediumSpacing(context),
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(
                           AppResponsive.borderRadius(context),
@@ -1029,7 +1072,9 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
                       disabledBackgroundColor: AppColors.primary.withValues(
                         alpha: 0.4,
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: EdgeInsets.symmetric(
+                        vertical: AppResponsive.mediumSpacing(context),
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(
                           AppResponsive.borderRadius(context),
@@ -1054,7 +1099,7 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
     final enabled = method.isEnabled as bool;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(
@@ -1074,7 +1119,10 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.largeSpacing(context),
+          vertical: AppResponsive.mediumSpacing(context),
+        ),
         child: Row(
           children: [
             // Icon badge
@@ -1196,7 +1244,7 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
                   tooltip: 'Edit Method',
                   splashRadius: 20,
                   constraints: const BoxConstraints(),
-                  padding: const EdgeInsets.all(8),
+                  padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
                 ),
               ),
             ],
@@ -1226,7 +1274,9 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
     return GestureDetector(
       onTap: _showAddMethodDialog,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: EdgeInsets.symmetric(
+          vertical: AppResponsive.mediumSpacing(context),
+        ),
         decoration: BoxDecoration(
           color: AppColors.white,
           borderRadius: BorderRadius.circular(
@@ -1267,7 +1317,13 @@ class _PaymentSetupStepState extends State<PaymentSetupStep> {
         children: [
           Icon(
             Icons.payment_outlined,
-            size: 64,
+            // Empty-state glyph: above largeIconSize's 36 ceiling.
+            size: AppResponsive.getValue(
+              context,
+              mobile: 64.0,
+              tablet: 76.0,
+              desktop: 88.0,
+            ),
             color: AppColors.textSecondary.withValues(alpha: 0.3),
           ),
           SizedBox(height: AppResponsive.largeSpacing(context)),

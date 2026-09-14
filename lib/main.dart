@@ -332,6 +332,18 @@ class BillBerryApp extends StatelessWidget {
       title: 'Bill Berry Lite',
       debugShowCheckedModeBanner: false,
 
+      // App-wide Poppins. Without this there is NO textTheme at all, so any
+      // `Text` without a style — and any raw `TextStyle(...)` — falls back to
+      // Roboto while its `GoogleFonts.poppins` siblings render Poppins.
+      //
+      // `fontFamily` (not `poppinsTextTheme`) on purpose: it changes ONLY the
+      // typeface. A full text theme would also impose its own font SIZES and
+      // colours, which would fight the AppResponsive ladders.
+      //
+      // 'Poppins' is the family declared in pubspec.yaml (assets/fonts/), so
+      // this resolves from the bundled TTFs with no network access.
+      theme: ThemeData(fontFamily: 'Poppins'),
+
       // Wrap all routes with NotificationOverlay + app-wide inactivity handling + global back exit protection.
       builder: (context, child) {
         return NotificationOverlay(

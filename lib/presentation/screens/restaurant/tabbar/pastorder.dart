@@ -11,6 +11,8 @@ import 'orderDetails.dart';
 import '../../../../util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+
 class Pastorder extends StatefulWidget {
   const Pastorder({super.key});
 
@@ -21,7 +23,12 @@ class Pastorder extends StatefulWidget {
 class _PastorderState extends State<Pastorder> {
   // Filters
   String _orderType = 'All';
-  final List<String> _orderTypeOptions = const ['All', 'Take Away', 'Delivery', 'Dine In'];
+  final List<String> _orderTypeOptions = const [
+    'All',
+    'Take Away',
+    'Delivery',
+    'Dine In',
+  ];
   final TextEditingController _searchCtrl = TextEditingController();
   DateTimeRange? _dateRange;
 
@@ -38,7 +45,8 @@ class _PastorderState extends State<Pastorder> {
     super.dispose();
   }
 
-  String _money(num? v) => '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount((v ?? 0).toDouble())}';
+  String _money(num? v) =>
+      '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount((v ?? 0).toDouble())}';
 
   String _fmtDateTime(DateTime? d) {
     if (d == null) return '—';
@@ -56,8 +64,22 @@ class _PastorderState extends State<Pastorder> {
   bool _withinRange(DateTime? dt) {
     if (dt == null) return true;
     if (_dateRange == null) return true;
-    final start = DateTime(_dateRange!.start.year, _dateRange!.start.month, _dateRange!.start.day, 0, 0, 0);
-    final end = DateTime(_dateRange!.end.year, _dateRange!.end.month, _dateRange!.end.day, 23, 59, 59);
+    final start = DateTime(
+      _dateRange!.start.year,
+      _dateRange!.start.month,
+      _dateRange!.start.day,
+      0,
+      0,
+      0,
+    );
+    final end = DateTime(
+      _dateRange!.end.year,
+      _dateRange!.end.month,
+      _dateRange!.end.day,
+      23,
+      59,
+      59,
+    );
     return (dt.isAfter(start) || dt.isAtSameMomentAs(start)) &&
         (dt.isBefore(end) || dt.isAtSameMomentAs(end));
   }
@@ -68,7 +90,8 @@ class _PastorderState extends State<Pastorder> {
       context: context,
       firstDate: DateTime(2000),
       lastDate: DateTime(now.year + 2),
-      initialDateRange: _dateRange ??
+      initialDateRange:
+          _dateRange ??
           DateTimeRange(
             start: DateTime(now.year, now.month, now.day),
             end: DateTime(now.year, now.month, now.day),
@@ -81,7 +104,10 @@ class _PastorderState extends State<Pastorder> {
           surface: Colors.white,
           onSurface: Colors.black,
         );
-        return Theme(data: Theme.of(ctx).copyWith(colorScheme: scheme), child: child!);
+        return Theme(
+          data: Theme.of(ctx).copyWith(colorScheme: scheme),
+          child: child!,
+        );
       },
     );
     if (picked != null) setState(() => _dateRange = picked);
@@ -93,7 +119,10 @@ class _PastorderState extends State<Pastorder> {
       children: [
         // 🔽 Filter header — matches Active Orders style (search-forward + compact dropdown)
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: EdgeInsets.symmetric(
+            horizontal: AppResponsive.largeSpacing(context),
+            vertical: AppResponsive.smallSpacing(context),
+          ),
           color: AppColors.white,
           child: Column(
             children: [
@@ -107,39 +136,55 @@ class _PastorderState extends State<Pastorder> {
                       icon: Icons.search_rounded,
                       suffixIcon: _searchCtrl.text.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.clear, color: AppColors.textSecondary, size: 18),
+                              icon: Icon(
+                                Icons.clear,
+                                color: AppColors.textSecondary,
+                                size: AppResponsive.smallIconSize(context),
+                              ),
                               onPressed: () => _searchCtrl.clear(),
                             )
                           : null,
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppResponsive.smallSpacing(context),
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.white,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.smallBorderRadius(context),
+                      ),
                       border: Border.all(color: AppColors.divider, width: 1.5),
                     ),
                     child: DropdownButton<String>(
                       value: _orderType,
                       isDense: true,
                       underline: const SizedBox(),
-                      icon: const Icon(Icons.keyboard_arrow_down, size: 20, color: AppColors.textPrimary),
+                      icon: Icon(
+                        Icons.keyboard_arrow_down,
+                        size: AppResponsive.iconSize(context),
+                        color: AppColors.textPrimary,
+                      ),
                       style: GoogleFonts.poppins(
-                        fontSize: 13,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w500,
                         color: AppColors.textPrimary,
                       ),
                       items: _orderTypeOptions
-                          .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                          .map(
+                            (e) => DropdownMenuItem(value: e, child: Text(e)),
+                          )
                           .toList(),
-                      onChanged: (val) => setState(() => _orderType = val ?? 'All'),
+                      onChanged: (val) =>
+                          setState(() => _orderType = val ?? 'All'),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
+              SizedBox(height: AppResponsive.smallSpacing(context)),
               // Row 2: date range + Today shortcut
               Row(
                 children: [
@@ -148,7 +193,10 @@ class _PastorderState extends State<Pastorder> {
                       onTap: _pickDateRange,
                       borderRadius: BorderRadius.circular(10),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppResponsive.mediumSpacing(context),
+                          vertical: AppResponsive.mediumSpacing(context),
+                        ),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: AppColors.divider),
@@ -156,23 +204,37 @@ class _PastorderState extends State<Pastorder> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.calendar_today_outlined, size: 18, color: AppColors.textSecondary),
-                            const SizedBox(width: 8),
+                            Icon(
+                              Icons.calendar_today_outlined,
+                              size: AppResponsive.smallIconSize(context),
+                              color: AppColors.textSecondary,
+                            ),
+                            SizedBox(
+                              width: AppResponsive.smallSpacing(context),
+                            ),
                             Expanded(
                               child: Text(
                                 _dateRange == null
                                     ? 'Date range'
                                     : '${_fmtDate(_dateRange!.start)} — ${_fmtDate(_dateRange!.end)}',
-                                style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textPrimary),
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.bodyFontSize(context),
+                                  color: AppColors.textPrimary,
+                                ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             if (_dateRange != null)
                               InkWell(
                                 onTap: () => setState(() => _dateRange = null),
-                                child: const Padding(
-                                  padding: EdgeInsets.only(left: 8.0),
-                                  child: Icon(Icons.close_rounded, size: 18),
+                                child: Padding(
+                                  padding: EdgeInsets.only(
+                                    left: AppResponsive.smallSpacing(context),
+                                  ),
+                                  child: Icon(
+                                    Icons.close_rounded,
+                                    size: AppResponsive.smallIconSize(context),
+                                  ),
                                 ),
                               ),
                           ],
@@ -180,7 +242,7 @@ class _PastorderState extends State<Pastorder> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
                   SizedBox(
                     height: 44,
                     child: OutlinedButton.icon(
@@ -188,10 +250,23 @@ class _PastorderState extends State<Pastorder> {
                         final now = DateTime.now();
                         final start = DateTime(now.year, now.month, now.day);
                         final end = DateTime(now.year, now.month, now.day);
-                        setState(() => _dateRange = DateTimeRange(start: start, end: end));
+                        setState(
+                          () => _dateRange = DateTimeRange(
+                            start: start,
+                            end: end,
+                          ),
+                        );
                       },
-                      icon: const Icon(Icons.today_outlined, size: 18),
-                      label: Text('Today', style: GoogleFonts.poppins(fontSize: 13)),
+                      icon: Icon(
+                        Icons.today_outlined,
+                        size: AppResponsive.smallIconSize(context),
+                      ),
+                      label: Text(
+                        'Today',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.bodyFontSize(context),
+                        ),
+                      ),
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: AppColors.divider),
                         foregroundColor: AppColors.textPrimary,
@@ -219,13 +294,22 @@ class _PastorderState extends State<Pastorder> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.receipt_long_outlined, size: 64, color: AppColors.divider),
-                      const SizedBox(height: 16),
+                      Icon(
+                        Icons.receipt_long_outlined,
+                        size: AppResponsive.getValue(
+                          context,
+                          mobile: 64.0,
+                          tablet: 76.0,
+                          desktop: 88.0,
+                        ),
+                        color: AppColors.divider,
+                      ),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
                       Text(
                         'No past orders found',
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w500,
-                          fontSize: 16,
+                          fontSize: AppResponsive.subheadingFontSize(context),
                           color: AppColors.textSecondary,
                         ),
                       ),
@@ -235,24 +319,35 @@ class _PastorderState extends State<Pastorder> {
               }
 
               // newest first
-              all.sort((a, b) => (b.orderAt ?? DateTime(2000)).compareTo(a.orderAt ?? DateTime(2000)));
-
+              all.sort(
+                (a, b) => (b.orderAt ?? DateTime(2000)).compareTo(
+                  a.orderAt ?? DateTime(2000),
+                ),
+              );
 
               final q = _searchCtrl.text.trim().toLowerCase();
               final filtered = all.where((o) {
-                final typeOk = _orderType == 'All' ||
-                    (o.orderType ?? '').toLowerCase() == _orderType.toLowerCase();
+                final typeOk =
+                    _orderType == 'All' ||
+                    (o.orderType ?? '').toLowerCase() ==
+                        _orderType.toLowerCase();
                 final dateOk = _withinRange(o.orderAt);
                 final kotStr = o.kotNumbers.map((k) => k.toString()).join(' ');
-                final billStr = o.billNumber != null ? 'inv${o.billNumber} ${o.billNumber}' : '';
-                final text = [
-                  o.customerName,
-                  kotStr,
-                  billStr,
-                  o.orderType,
-                  o.paymentmode,
-                  o.tableNo,
-                ].where((e) => e != null && e!.isNotEmpty).map((e) => e!.toLowerCase()).join(' ');
+                final billStr = o.billNumber != null
+                    ? 'inv${o.billNumber} ${o.billNumber}'
+                    : '';
+                final text =
+                    [
+                          o.customerName,
+                          kotStr,
+                          billStr,
+                          o.orderType,
+                          o.paymentmode,
+                          o.tableNo,
+                        ]
+                        .where((e) => e != null && e!.isNotEmpty)
+                        .map((e) => e!.toLowerCase())
+                        .join(' ');
                 final searchOk = q.isEmpty || text.contains(q);
                 return typeOk && dateOk && searchOk;
               }).toList();
@@ -262,13 +357,22 @@ class _PastorderState extends State<Pastorder> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.search_off, size: 64, color: AppColors.divider),
-                      const SizedBox(height: 16),
+                      Icon(
+                        Icons.search_off,
+                        size: AppResponsive.getValue(
+                          context,
+                          mobile: 64.0,
+                          tablet: 76.0,
+                          desktop: 88.0,
+                        ),
+                        color: AppColors.divider,
+                      ),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
                       Text(
                         'No matching orders for selected filters',
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w500,
-                          fontSize: 16,
+                          fontSize: AppResponsive.subheadingFontSize(context),
                           color: AppColors.textSecondary,
                         ),
                         textAlign: TextAlign.center,
@@ -289,13 +393,21 @@ class _PastorderState extends State<Pastorder> {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => Orderdetails(Order: o)),
+                        MaterialPageRoute(
+                          builder: (_) => Orderdetails(Order: o),
+                        ),
                       ).then((_) => setState(() {}));
                     },
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.borderRadius(context),
+                    ),
                     child: Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.all(12),
+                      margin: EdgeInsets.only(
+                        bottom: AppResponsive.mediumSpacing(context),
+                      ),
+                      padding: EdgeInsets.all(
+                        AppResponsive.mediumSpacing(context),
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         border: Border.all(
@@ -303,7 +415,9 @@ class _PastorderState extends State<Pastorder> {
                               ? AppColors.textSecondary
                               : const Color(0xFFDEE1E6),
                         ),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(
+                          AppResponsive.borderRadius(context),
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -316,33 +430,89 @@ class _PastorderState extends State<Pastorder> {
                                   spacing: 6,
                                   runSpacing: 4,
                                   children: [
-                                    Text('KOT:', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 12)),
-                                    ...o.getKotNumbers().map((kotNum) => Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                                    Text(
+                                      'KOT:',
+                                      style: GoogleFonts.poppins(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: AppResponsive.smallFontSize(
+                                          context,
+                                        ),
                                       ),
-                                      child: Text('#$kotNum',
-                                        style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary)),
-                                    )),
+                                    ),
+                                    ...o.getKotNumbers().map(
+                                      (kotNum) => Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary.withOpacity(
+                                            0.1,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            AppResponsive.smallBorderRadius(
+                                              context,
+                                            ),
+                                          ),
+                                          border: Border.all(
+                                            color: AppColors.primary
+                                                .withOpacity(0.3),
+                                          ),
+                                        ),
+                                        child: Text(
+                                          '#$kotNum',
+                                          style: GoogleFonts.poppins(
+                                            fontSize:
+                                                AppResponsive.captionFontSize(
+                                                  context,
+                                                ),
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.primary,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                     if (o.billNumber != null)
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: Colors.green.shade100,
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: Colors.green.shade300),
+                                          borderRadius: BorderRadius.circular(
+                                            AppResponsive.smallBorderRadius(
+                                              context,
+                                            ),
+                                          ),
+                                          border: Border.all(
+                                            color: Colors.green.shade300,
+                                          ),
                                         ),
-                                        child: Text('INV${o.billNumber}',
-                                          style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.green.shade700)),
+                                        child: Text(
+                                          'INV${o.billNumber}',
+                                          style: GoogleFonts.poppins(
+                                            fontSize:
+                                                AppResponsive.captionFontSize(
+                                                  context,
+                                                ),
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.green.shade700,
+                                          ),
+                                        ),
                                       ),
                                   ],
                                 ),
                               ),
-                              Text(_fmtDateTime(o.orderAt),
-                                  style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary)),
+                              Text(
+                                _fmtDateTime(o.orderAt),
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.captionFontSize(
+                                    context,
+                                  ),
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 6),
@@ -351,15 +521,29 @@ class _PastorderState extends State<Pastorder> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  (o.customerName?.isNotEmpty == true) ? o.customerName! : 'Guest',
-                                  style: GoogleFonts.poppins(fontSize: 14),
+                                  (o.customerName?.isNotEmpty == true)
+                                      ? o.customerName!
+                                      : 'Guest',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
+                                  ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Text(_money(o.totalPrice),
-                                  style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: AppResponsive.smallSpacing(context),
+                              ),
+                              Text(
+                                _money(o.totalPrice),
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              SizedBox(
+                                width: AppResponsive.smallSpacing(context),
+                              ),
                               // Reprint button
                               if (!isVoided)
                                 InkWell(
@@ -375,17 +559,38 @@ class _PastorderState extends State<Pastorder> {
                                   },
                                   borderRadius: BorderRadius.circular(6),
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: AppResponsive.smallSpacing(
+                                        context,
+                                      ),
+                                      vertical: 4,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: AppColors.primary.withValues(alpha: 0.1),
+                                      color: AppColors.primary.withValues(
+                                        alpha: 0.1,
+                                      ),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Icon(Icons.print_outlined, size: 14, color: AppColors.primary),
+                                        Icon(
+                                          Icons.print_outlined,
+                                          size: 14,
+                                          color: AppColors.primary,
+                                        ),
                                         const SizedBox(width: 4),
-                                        Text('Print', style: GoogleFonts.poppins(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w500)),
+                                        Text(
+                                          'Print',
+                                          style: GoogleFonts.poppins(
+                                            fontSize:
+                                                AppResponsive.captionFontSize(
+                                                  context,
+                                                ),
+                                            color: AppColors.primary,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -396,42 +601,96 @@ class _PastorderState extends State<Pastorder> {
                           // Type + table + payment + status badges
                           Row(
                             children: [
-                              Text(o.orderType ?? '',
-                                  style: GoogleFonts.poppins(color: Colors.black54, fontSize: 12)),
+                              Text(
+                                o.orderType ?? '',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.black54,
+                                  fontSize: AppResponsive.smallFontSize(
+                                    context,
+                                  ),
+                                ),
+                              ),
                               if ((o.tableNo ?? '').isNotEmpty) ...[
                                 const SizedBox(width: 6),
-                                Text('• Table ${o.tableNo}',
-                                    style: GoogleFonts.poppins(color: Colors.black54, fontSize: 12)),
+                                Text(
+                                  '• Table ${o.tableNo}',
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.black54,
+                                    fontSize: AppResponsive.smallFontSize(
+                                      context,
+                                    ),
+                                  ),
+                                ),
                               ],
                               const Spacer(),
                               if ((o.paymentmode ?? '').isNotEmpty)
                                 Flexible(
-                                  child: Text(o.paymentDisplay,
-                                      textAlign: TextAlign.right,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: GoogleFonts.poppins(color: Colors.black54, fontSize: 12)),
+                                  child: Text(
+                                    o.paymentDisplay,
+                                    textAlign: TextAlign.right,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.black54,
+                                      fontSize: AppResponsive.smallFontSize(
+                                        context,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               if (isVoided) ...[
-                                const SizedBox(width: 8),
+                                SizedBox(
+                                  width: AppResponsive.smallSpacing(context),
+                                ),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: AppResponsive.smallSpacing(
+                                      context,
+                                    ),
+                                    vertical: 3,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: AppColors.divider,
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(
+                                      AppResponsive.smallBorderRadius(context),
+                                    ),
                                   ),
-                                  child: Text('Voided',
-                                      style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                                  child: Text(
+                                    'Voided',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: AppResponsive.captionFontSize(
+                                        context,
+                                      ),
+                                      color: AppColors.textSecondary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                 ),
                               ] else if (isRefunded) ...[
-                                const SizedBox(width: 8),
+                                SizedBox(
+                                  width: AppResponsive.smallSpacing(context),
+                                ),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: AppResponsive.smallSpacing(
+                                      context,
+                                    ),
+                                    vertical: 3,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: Colors.red.shade50,
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(
+                                      AppResponsive.smallBorderRadius(context),
+                                    ),
                                   ),
-                                  child: Text('Refunded',
-                                      style: GoogleFonts.poppins(fontSize: 11, color: Colors.red.shade700)),
+                                  child: Text(
+                                    'Refunded',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: AppResponsive.captionFontSize(
+                                        context,
+                                      ),
+                                      color: Colors.red.shade700,
+                                    ),
+                                  ),
                                 ),
                               ],
                             ],
@@ -449,5 +708,3 @@ class _PastorderState extends State<Pastorder> {
     );
   }
 }
-
-

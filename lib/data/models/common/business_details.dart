@@ -49,7 +49,7 @@ class BusinessDetails extends HiveObject {
   @HiveField(13)
   final Uint8List? logo;
 
-  @HiveField(14)
+  @HiveField(14, defaultValue: false)
   final bool isSetupComplete;
 
   @HiveField(15)
@@ -62,12 +62,12 @@ class BusinessDetails extends HiveObject {
   /// wizard step-gating logic should read this field. Kept separate from
   /// [isRegisteredForTax] (see below) even though V1 onboarding always sets both
   /// identically — a future "Tax Settings" screen could decouple them.
-  @HiveField(17)
+  @HiveField(17, defaultValue: false)
   final bool taxEnabled;
 
   /// Legal/business status: is the business registered for GST/VAT/Sales Tax?
   /// Gates whether the registration-number field is shown during onboarding.
-  @HiveField(18)
+  @HiveField(18, defaultValue: false)
   final bool isRegisteredForTax;
 
   /// Which kind of retail store this is — a `RetailStoreTypes` key such as

@@ -37,6 +37,7 @@ import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sh
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/widgets/category_selector_button.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/widgets/selling_method_selector.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/util/common/responsive_route.dart';
 
 /// Complete Restaurant Add Item Screen for Setup Wizard
 /// Production-ready with full validation, image upload, and category management
@@ -240,9 +241,9 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   // ============ CATEGORY SELECTION ============
 
   Future<void> _showCategorySelection() async {
-    final result = await Navigator.push<Category>(
+    final result = await pushResponsive<Category>(
       context,
-      MaterialPageRoute(builder: (context) => const CategoryManagementScreen()),
+      const CategoryManagementScreen(),
     );
 
     if (result != null) {
@@ -319,18 +320,16 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
     }
 
     // Navigate to Add More Info screen
-    final result = await Navigator.push<Map<String, dynamic>>(
+    final result = await pushResponsive<Map<String, dynamic>>(
       context,
-      MaterialPageRoute(
-        builder: (context) => AddMoreInfoScreen(
-          initialData: {
-            'variants': _selectedVariants.map((v) => v.toMap()).toList(),
-            'choiceIds': _selectedChoiceIds,
-            'extraIds': _selectedExtraIds,
-            'defaultChoiceOptionIds': _defaultChoiceOptionIds,
-            'trackInventory': _trackInventory,
-          },
-        ),
+      AddMoreInfoScreen(
+        initialData: {
+          'variants': _selectedVariants.map((v) => v.toMap()).toList(),
+          'choiceIds': _selectedChoiceIds,
+          'extraIds': _selectedExtraIds,
+          'defaultChoiceOptionIds': _defaultChoiceOptionIds,
+          'trackInventory': _trackInventory,
+        },
       ),
     );
 
@@ -433,6 +432,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       // Show loading
       showDialog(
         context: context,
+        useRootNavigator: false, // stays inside the wizard's pane
         barrierDismissible: false,
         builder: (context) => const Center(child: CircularProgressIndicator()),
       );
@@ -490,8 +490,11 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         await StockAdjustService.recordOpeningStock(item);
       }
 
-      // Close loading
-      if (mounted) Navigator.pop(context);
+      // Close loading. The spinner sits on the same navigator this context
+      // resolves to, so a plain pop closes it. canPop guards the case where it
+      // was already torn down (a sidebar step-jump pops the pane to its first
+      // route) — without it this would pop the pane's own content route.
+      if (mounted && Navigator.of(context).canPop()) Navigator.pop(context);
 
       if (success) {
         // Show success
@@ -524,8 +527,8 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         );
       }
     } catch (e) {
-      // Close loading
-      if (mounted) Navigator.pop(context);
+      // Close loading — see the canPop note above.
+      if (mounted && Navigator.of(context).canPop()) Navigator.pop(context);
 
       // Show error
       NotificationService.instance.showError('Error saving item: $e');
@@ -611,12 +614,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
           icon: const Icon(Icons.upload_file),
           tooltip: 'Bulk Import',
           onPressed: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const RestaurantBulkImportScreen(),
-              ),
-            );
+            await pushResponsive(context, const RestaurantBulkImportScreen());
             // Reload item count after bulk import
             await _loadItemCount();
           },
@@ -641,7 +639,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildBulkImportCard(),
-            const SizedBox(height: 20),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
             _buildSectionHeader('Basic Information', Icons.info_outline),
             SizedBox(height: AppResponsive.largeSpacing(context)),
             _buildBasicInfoSection(),
@@ -684,7 +682,11 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   Widget _buildSectionHeader(String title, IconData icon) {
     return Row(
       children: [
-        Icon(icon, color: AppColors.primary, size: 22),
+        Icon(
+          icon,
+          color: AppColors.primary,
+          size: AppResponsive.iconSize(context),
+        ),
         SizedBox(width: AppResponsive.smallSpacing(context)),
         Text(
           title,
@@ -774,17 +776,17 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () async {
-                    await Navigator.push(
+                    await pushResponsive(
                       context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            const RestaurantBulkImportScreen(),
-                      ),
+                      const RestaurantBulkImportScreen(),
                     );
                     // Reload item count after bulk import
                     await _loadItemCount();
                   },
-                  icon: const Icon(Icons.upload_file, size: 18),
+                  icon: Icon(
+                    Icons.upload_file,
+                    size: AppResponsive.smallIconSize(context),
+                  ),
                   label: Text(
                     'Start Bulk Import',
                     style: GoogleFonts.poppins(
@@ -795,7 +797,9 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    padding: EdgeInsets.symmetric(
+                      vertical: AppResponsive.mediumSpacing(context),
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(
                         AppResponsive.smallBorderRadius(context),
@@ -811,7 +815,10 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
             padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
             decoration: BoxDecoration(
               color: Colors.blue[50],
-              borderRadius: BorderRadius.circular(6),
+              // Was 6 — matches the sibling container above.
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
             ),
             child: Row(
               children: [
@@ -991,7 +998,12 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                 ),
                 child: Image.memory(
                   _selectedImageBytes!,
-                  height: 200,
+                  height: AppResponsive.getValue(
+                    context,
+                    mobile: 200.0,
+                    tablet: 240.0,
+                    desktop: 280.0,
+                  ),
                   width: double.infinity,
                   fit: BoxFit.cover,
                 ),
@@ -1009,10 +1021,10 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                       color: Colors.red,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.close,
                       color: Colors.white,
-                      size: 18,
+                      size: AppResponsive.smallIconSize(context),
                     ),
                   ),
                 ),
@@ -1026,7 +1038,13 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
               AppResponsive.borderRadius(context),
             ),
             child: Container(
-              height: 140,
+              // Empty-picker box: tracks the filled preview's 200/240/280.
+              height: AppResponsive.getValue(
+                context,
+                mobile: 140.0,
+                tablet: 170.0,
+                desktop: 200.0,
+              ),
               width: double.infinity,
               decoration: BoxDecoration(
                 color: AppColors.surfaceLight,
@@ -1137,7 +1155,10 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
+        padding: EdgeInsets.symmetric(
+          vertical: AppResponsive.mediumSpacing(context),
+          horizontal: AppResponsive.smallSpacing(context),
+        ),
         decoration: BoxDecoration(
           border: Border.all(
             color: isSelected ? color : Colors.grey[300]!,
@@ -1149,7 +1170,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 20),
+            Icon(icon, color: color, size: AppResponsive.iconSize(context)),
             SizedBox(width: AppResponsive.smallSpacing(context)),
             Text(
               label,
@@ -1462,15 +1483,15 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   Widget _buildViewItemsBanner() {
     return GestureDetector(
       onTap: () async {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const SetupItemsListScreen()),
-        );
+        await pushResponsive(context, const SetupItemsListScreen());
         // Refresh count in case items were edited/deleted
         await _loadItemCount();
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.largeSpacing(context),
+          vertical: AppResponsive.mediumSpacing(context),
+        ),
         decoration: BoxDecoration(
           color: AppColors.success.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(
@@ -1489,13 +1510,13 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                 color: AppColors.success.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.check_circle_outline,
                 color: AppColors.success,
-                size: 22,
+                size: AppResponsive.iconSize(context),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1638,7 +1659,13 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                   : Colors.grey[600]!,
               bordercircular: 10,
               height: AppResponsive.buttonHeight(context),
-              width: 130,
+              // Width must grow with the label — subheadingFontSize goes 16→20.
+              width: AppResponsive.getValue(
+                context,
+                mobile: 130.0,
+                tablet: 150.0,
+                desktop: 170.0,
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [

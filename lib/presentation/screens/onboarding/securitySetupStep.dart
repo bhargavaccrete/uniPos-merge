@@ -276,12 +276,12 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
             Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: AppResponsive.largeSpacing(context),
-                vertical: 8,
+                vertical: AppResponsive.smallSpacing(context),
               ),
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.largeSpacing(context),
+                  vertical: AppResponsive.mediumSpacing(context),
                 ),
                 decoration: BoxDecoration(
                   color: AppColors.danger.withValues(alpha: 0.08),

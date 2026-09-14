@@ -328,7 +328,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
       return Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -338,7 +338,9 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.largeBorderRadius(context),
+              ),
               boxShadow: [
                 BoxShadow(
                   color: AppColors.primary.withValues(alpha: 0.3),
@@ -347,10 +349,10 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                 ),
               ],
             ),
-            child: const Icon(
+            child: Icon(
               Icons.store_rounded,
               color: Colors.white,
-              size: 30,
+              size: AppResponsive.largeIconSize(context),
             ),
           ),
           SizedBox(width: AppResponsive.mediumSpacing(context)),
@@ -700,7 +702,9 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: EdgeInsets.all(
+                            AppResponsive.mediumSpacing(context),
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.primary.withValues(alpha: 0.08),
                             shape: BoxShape.circle,
@@ -711,7 +715,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                             size: height > 140 ? 32 : 24,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        SizedBox(height: AppResponsive.smallSpacing(context)),
                         Text(
                           'Upload Logo',
                           style: GoogleFonts.poppins(
@@ -744,10 +748,10 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 2),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.delete_rounded,
                           color: Colors.white,
-                          size: 16,
+                          size: AppResponsive.smallIconSize(context),
                         ),
                       ),
                     ),
@@ -1120,7 +1124,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
           selected: _isRegisteredForTax,
           onTap: () => _onTaxRegistrationStatusChanged(true),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: AppResponsive.smallSpacing(context)),
         _buildTaxRegistrationOption(
           context,
           label: 'Not Registered',
@@ -1141,7 +1145,10 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.mediumSpacing(context),
+          vertical: AppResponsive.mediumSpacing(context),
+        ),
         decoration: BoxDecoration(
           color: selected
               ? AppColors.primary.withValues(alpha: 0.04)
@@ -1170,7 +1177,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                   ? const Icon(Icons.check, size: 12, color: Colors.white)
                   : null,
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
             Text(
               label,
               style: GoogleFonts.poppins(

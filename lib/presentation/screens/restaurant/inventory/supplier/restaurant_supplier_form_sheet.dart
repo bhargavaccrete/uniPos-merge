@@ -25,6 +25,10 @@ Future<RestaurantSupplierModel?> showRestaurantSupplierFormSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
+    // A modal sheet spans the whole window, so on a laptop this form would
+    // stretch edge to edge. `constraints` caps the sheet itself and keeps it
+    // centred; the scrim behind it still covers the full screen.
+    constraints: BoxConstraints(maxWidth: AppResponsive.maxFormWidth(context)),
     builder: (_) => _RestaurantSupplierFormSheet(existing: existing),
   );
 }
@@ -61,8 +65,9 @@ class _RestaurantSupplierFormSheetState
       _phoneController.text = s.phone ?? '';
       _addressController.text = s.address ?? '';
       _gstController.text = s.gstNumber ?? '';
-      _openingController.text =
-          s.openingBalance == 0 ? '' : s.openingBalance.toStringAsFixed(2);
+      _openingController.text = s.openingBalance == 0
+          ? ''
+          : s.openingBalance.toStringAsFixed(2);
     }
   }
 
@@ -91,8 +96,9 @@ class _RestaurantSupplierFormSheetState
           address: address.isEmpty ? null : address,
           gstNumber: gst.isEmpty ? null : gst,
         );
-        final updated =
-            restaurantSupplierRepository.getSupplierById(widget.existing!.supplierId);
+        final updated = restaurantSupplierRepository.getSupplierById(
+          widget.existing!.supplierId,
+        );
         NotificationService.instance.showSuccess('Supplier updated');
         navigator.pop(updated);
       } else {
@@ -101,8 +107,7 @@ class _RestaurantSupplierFormSheetState
           phone: phone.isEmpty ? null : phone,
           address: address.isEmpty ? null : address,
           gstNumber: gst.isEmpty ? null : gst,
-          openingBalance:
-              double.tryParse(_openingController.text.trim()) ?? 0,
+          openingBalance: double.tryParse(_openingController.text.trim()) ?? 0,
         );
         NotificationService.instance.showSuccess('Supplier added');
         navigator.pop(supplier);
@@ -135,9 +140,19 @@ class _RestaurantSupplierFormSheetState
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
           padding: EdgeInsets.fromLTRB(
-            AppResponsive.getValue(context, mobile: 20.0, tablet: 24.0, desktop: 28.0),
+            AppResponsive.getValue(
+              context,
+              mobile: 20.0,
+              tablet: 24.0,
+              desktop: 28.0,
+            ),
             12,
-            AppResponsive.getValue(context, mobile: 20.0, tablet: 24.0, desktop: 28.0),
+            AppResponsive.getValue(
+              context,
+              mobile: 20.0,
+              tablet: 24.0,
+              desktop: 28.0,
+            ),
             24,
           ),
           child: SingleChildScrollView(
@@ -182,7 +197,7 @@ class _RestaurantSupplierFormSheetState
                   Text(
                     _nameError!,
                     style: GoogleFonts.poppins(
-                      fontSize: 12,
+                      fontSize: AppResponsive.smallFontSize(context),
                       color: AppColors.danger,
                     ),
                   ),
@@ -224,11 +239,13 @@ class _RestaurantSupplierFormSheetState
                     label: 'Opening balance (${CurrencyHelper.currentSymbol})',
                     hint: 'Amount already owed to this supplier',
                     icon: Icons.account_balance_wallet_outlined,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(
-                          RegExp(r'^\d*\.?\d{0,2}')),
+                        RegExp(r'^\d*\.?\d{0,2}'),
+                      ),
                     ],
                   ),
                 const SizedBox(height: 24),
@@ -236,8 +253,9 @@ class _RestaurantSupplierFormSheetState
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed:
-                            _saving ? null : () => Navigator.of(context).pop(),
+                        onPressed: _saving
+                            ? null
+                            : () => Navigator.of(context).pop(),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           side: const BorderSide(color: AppColors.divider),
@@ -306,8 +324,11 @@ class _RestaurantSupplierFormSheetState
       ),
       child: Row(
         children: [
-          const Icon(Icons.lock_outline_rounded,
-              size: 18, color: AppColors.textSecondary),
+          const Icon(
+            Icons.lock_outline_rounded,
+            size: 18,
+            color: AppColors.textSecondary,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -316,7 +337,7 @@ class _RestaurantSupplierFormSheetState
                 Text(
                   'Opening balance',
                   style: GoogleFonts.poppins(
-                    fontSize: 12,
+                    fontSize: AppResponsive.smallFontSize(context),
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -325,7 +346,7 @@ class _RestaurantSupplierFormSheetState
                   '${CurrencyHelper.currentSymbol}'
                   '${widget.existing!.openingBalance.toStringAsFixed(2)}',
                   style: GoogleFonts.poppins(
-                    fontSize: 14,
+                    fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
@@ -334,7 +355,7 @@ class _RestaurantSupplierFormSheetState
                 Text(
                   'Already posted to the ledger. Use an adjustment to correct it.',
                   style: GoogleFonts.poppins(
-                    fontSize: 11,
+                    fontSize: AppResponsive.captionFontSize(context),
                     color: AppColors.textSecondary,
                   ),
                 ),

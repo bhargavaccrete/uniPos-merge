@@ -761,7 +761,7 @@ class _CartScreenState extends State<CartScreen>
 
     // Show dialog to select table to merge
     final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, double.infinity)
         : 24.0;
     showDialog(
       context: context,
@@ -856,7 +856,7 @@ class _CartScreenState extends State<CartScreen>
   Future<void> _confirmMerge(OrderModel sourceOrder) async {
     // Show confirmation dialog
     final mergeHInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, double.infinity)
         : 24.0;
     final confirmed = await showDialog<bool>(
       context: context,

@@ -1,5 +1,3 @@
-
-
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -29,7 +27,8 @@ import 'veg_selector_sheet.dart';
 import 'widgets/category_selector_button.dart';
 import 'widgets/tax_selector_button.dart';
 import 'widgets/inventory_toggle.dart';
-import 'widgets/selling_method_selector.dart' show SellingMethodSheet, SellingMethodButton;
+import 'widgets/selling_method_selector.dart'
+    show SellingMethodSheet, SellingMethodButton;
 
 /// Responsive add-item sheet:
 /// - Mobile  → bottom sheet (DraggableScrollableSheet)
@@ -60,8 +59,10 @@ class AddItemSheet extends StatefulWidget {
         barrierDismissible: true,
         builder: (_) => Dialog(
           backgroundColor: Colors.transparent,
-          insetPadding:
-              const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 40,
+            vertical: 24,
+          ),
           child: ConstrainedBox(
             constraints: BoxConstraints(
               maxWidth: 580,
@@ -122,18 +123,22 @@ class _AddItemSheetState extends State<AddItemSheet> {
     try {
       final picker = ImagePicker();
       final pickedFile = await picker.pickImage(
-          source: ImageSource.gallery, imageQuality: 85);
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
       if (pickedFile == null) return;
       final Uint8List bytes = await pickedFile.readAsBytes();
       if (bytes.length > 3 * 1024 * 1024) {
         NotificationService.instance.showError(
-            'Image size must be less than 3MB. Please choose a smaller image.');
+          'Image size must be less than 3MB. Please choose a smaller image.',
+        );
         return;
       }
       setState(() => _formState.setImage(bytes));
     } catch (_) {
-      NotificationService.instance
-          .showError('Failed to pick image. Please try again.');
+      NotificationService.instance.showError(
+        'Failed to pick image. Please try again.',
+      );
     }
   }
 
@@ -182,8 +187,9 @@ class _AddItemSheetState extends State<AddItemSheet> {
       // item was never saved (it never appeared in the list).
       final success = await itemStore.addItem(item);
       if (!success) {
-        NotificationService.instance
-            .showError(itemStore.errorMessage ?? 'Could not add item.');
+        NotificationService.instance.showError(
+          itemStore.errorMessage ?? 'Could not add item.',
+        );
         return; // keep the sheet open; don't fire onItemAdded / pop
       }
       await StockAdjustService.recordOpeningStock(item);
@@ -192,7 +198,8 @@ class _AddItemSheetState extends State<AddItemSheet> {
       // silently allowing a recipeless item to look fully configured.
       if (ProductType.hasRecipe(item.productType)) {
         NotificationService.instance.showWarning(
-            '${item.name} saved — add its recipe in Edit before selling it.');
+          '${item.name} saved — add its recipe in Edit before selling it.',
+        );
       }
       widget.onItemAdded?.call();
       if (mounted) {
@@ -227,10 +234,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
   }
 
   void _showValidationError(ValidationResult validation) {
-    showAppErrorDialog(
-      context: context,
-      errors: validation.missingFields,
-    );
+    showAppErrorDialog(context: context, errors: validation.missingFields);
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -284,7 +288,9 @@ class _AddItemSheetState extends State<AddItemSheet> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.borderRadius(context),
+              ),
               boxShadow: [
                 BoxShadow(
                   color: AppColors.primary.withValues(alpha: 0.3),
@@ -293,29 +299,42 @@ class _AddItemSheetState extends State<AddItemSheet> {
                 ),
               ],
             ),
-            child: const Icon(Icons.restaurant_menu_rounded,
-                color: Colors.white, size: 22),
+            child: Icon(
+              Icons.restaurant_menu_rounded,
+              color: Colors.white,
+              size: AppResponsive.iconSize(context),
+            ),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Add Menu Item',
-                    style: GoogleFonts.poppins(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary)),
-                Text('Fill in the item details below',
-                    style: GoogleFonts.poppins(
-                        fontSize: 12, color: AppColors.textSecondary)),
+                Text(
+                  'Add Menu Item',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.subheadingFontSize(context),
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                Text(
+                  'Fill in the item details below',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: AppColors.textSecondary,
+                  ),
+                ),
               ],
             ),
           ),
           IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.close_rounded,
-                color: AppColors.textSecondary, size: 22),
+            icon: Icon(
+              Icons.close_rounded,
+              color: AppColors.textSecondary,
+              size: AppResponsive.iconSize(context),
+            ),
           ),
         ],
       ),
@@ -359,7 +378,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildSheetHeader(),
-                      const SizedBox(height: 20),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
                       ..._formFields(),
                     ],
                   ),
@@ -386,7 +405,9 @@ class _AddItemSheetState extends State<AddItemSheet> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.borderRadius(context),
+            ),
             boxShadow: [
               BoxShadow(
                 color: AppColors.primary.withValues(alpha: 0.3),
@@ -395,22 +416,32 @@ class _AddItemSheetState extends State<AddItemSheet> {
               ),
             ],
           ),
-          child: const Icon(Icons.restaurant_menu_rounded,
-              color: Colors.white, size: 22),
+          child: Icon(
+            Icons.restaurant_menu_rounded,
+            color: Colors.white,
+            size: AppResponsive.iconSize(context),
+          ),
         ),
-        const SizedBox(width: 14),
+        SizedBox(width: AppResponsive.mediumSpacing(context)),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Add Menu Item',
-                  style: GoogleFonts.poppins(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary)),
-              Text('Fill in the item details below',
-                  style: GoogleFonts.poppins(
-                      fontSize: 12, color: AppColors.textSecondary)),
+              Text(
+                'Add Menu Item',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.subheadingFontSize(context),
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              Text(
+                'Fill in the item details below',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  color: AppColors.textSecondary,
+                ),
+              ),
             ],
           ),
         ),
@@ -422,42 +453,43 @@ class _AddItemSheetState extends State<AddItemSheet> {
 
   List<Widget> _formFields() {
     final isRecipeBased = _formState.productType == ProductType.recipeBased;
-    final isBackOfHouse = _formState.productType == ProductType.rawMaterial ||
+    final isBackOfHouse =
+        _formState.productType == ProductType.rawMaterial ||
         _formState.productType == ProductType.semiFinished;
     return [
       // Product Type drives every other field below it, so it's the first
       // decision the user makes.
       if (PlanEnforce.allows(EntKeys.inventory)) ...[
         _buildProductTypeSelector(),
-        const SizedBox(height: 18),
+        SizedBox(height: AppResponsive.largeSpacing(context)),
       ],
       if (_formState.productType == ProductType.rawMaterial ||
           _formState.productType == ProductType.semiFinished) ...[
         _buildSellDirectlyAtPosToggle(),
-        const SizedBox(height: 14),
+        SizedBox(height: AppResponsive.mediumSpacing(context)),
       ],
       _buildItemNameField(),
-      const SizedBox(height: 14),
+      SizedBox(height: AppResponsive.mediumSpacing(context)),
       _buildItemCodeField(),
-      const SizedBox(height: 14),
+      SizedBox(height: AppResponsive.mediumSpacing(context)),
       _buildEnabledToggle(),
-      const SizedBox(height: 18),
+      SizedBox(height: AppResponsive.largeSpacing(context)),
       // Raw Material/Semi-Finished aren't sold, so Selling Method (a POS
       // concept) is replaced by a plain Stock Unit picker.
       isBackOfHouse ? _buildStockUnitSelector() : _buildSellingMethodSelector(),
-      const SizedBox(height: 14),
+      SizedBox(height: AppResponsive.mediumSpacing(context)),
       _buildPriceField(),
-      const SizedBox(height: 14),
+      SizedBox(height: AppResponsive.mediumSpacing(context)),
       _buildCategorySelector(),
-      const SizedBox(height: 14),
+      SizedBox(height: AppResponsive.mediumSpacing(context)),
       if (TaxFeature.enabled) ...[
         _buildTaxSelector(),
-        const SizedBox(height: 14),
+        SizedBox(height: AppResponsive.mediumSpacing(context)),
       ],
       _buildVegSelector(),
-      const SizedBox(height: 14),
+      SizedBox(height: AppResponsive.mediumSpacing(context)),
       _buildDescriptionField(),
-      const SizedBox(height: 14),
+      SizedBox(height: AppResponsive.mediumSpacing(context)),
       // Recipe-Based items have no stock of their own — availability is derived
       // live from their ingredients, so the stock module is replaced by a note
       // plus the one stock-adjacent setting that still applies: Allow Order
@@ -465,26 +497,31 @@ class _AddItemSheetState extends State<AddItemSheet> {
       // calculated available-to-make figure, not a physical quantity.
       if (isRecipeBased) ...[
         _buildRecipeBasedStockNote(),
-        const SizedBox(height: 14),
+        SizedBox(height: AppResponsive.mediumSpacing(context)),
         _buildRecipeBasedAllowOOSToggle(),
       ] else ...[
         _buildInventoryToggle(),
         if (_formState.trackInventory) ...[
           if (_formState.selectedVariants.isEmpty) ...[
-            const SizedBox(height: 14),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             _buildCurrentStockField(),
           ] else ...[
-            const SizedBox(height: 10),
-            Text('Stock is set per variant in More Info.',
-                style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
+            SizedBox(height: AppResponsive.smallSpacing(context)),
+            Text(
+              'Stock is set per variant in More Info.',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.textSecondary,
+              ),
+            ),
           ],
-          const SizedBox(height: 14),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
           _buildLowStockSection(),
         ],
       ],
-      const SizedBox(height: 16),
+      SizedBox(height: AppResponsive.largeSpacing(context)),
       _buildImageUploader(),
-      const SizedBox(height: 24),
+      SizedBox(height: AppResponsive.extraLargeSpacing(context)),
       _buildActionButtons(),
     ];
   }
@@ -526,13 +563,9 @@ class _AddItemSheetState extends State<AddItemSheet> {
   // ── Product Type selector ─────────────────────────────────────────────────
 
   static const List<
-      ({
-        String type,
-        IconData icon,
-        Color color,
-        String label,
-        String desc,
-      })> _productTypeOptions = [
+    ({String type, IconData icon, Color color, String label, String desc})
+  >
+  _productTypeOptions = [
     (
       type: ProductType.finishedGood,
       icon: Icons.inventory_2_rounded,
@@ -570,16 +603,23 @@ class _AddItemSheetState extends State<AddItemSheet> {
       children: [
         Row(
           children: [
-            Icon(Icons.category_rounded, size: 18, color: AppColors.primary),
-            const SizedBox(width: 8),
-            Text('Product Type',
-                style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary)),
+            Icon(
+              Icons.category_rounded,
+              size: AppResponsive.smallIconSize(context),
+              color: AppColors.primary,
+            ),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
+            Text(
+              'Product Type',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
           ],
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: AppResponsive.smallSpacing(context)),
         LayoutBuilder(
           builder: (context, constraints) {
             const gap = 10.0;
@@ -588,16 +628,16 @@ class _AddItemSheetState extends State<AddItemSheet> {
               spacing: gap,
               runSpacing: gap,
               children: _productTypeOptions
-                  .map((o) => SizedBox(
-                        width: cardWidth,
-                        child: _productTypeCard(o),
-                      ))
+                  .map(
+                    (o) =>
+                        SizedBox(width: cardWidth, child: _productTypeCard(o)),
+                  )
                   .toList(),
             );
           },
         ),
         if (hasRecipe) ...[
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -607,22 +647,29 @@ class _AddItemSheetState extends State<AddItemSheet> {
                   AppColors.accent.withValues(alpha: 0.04),
                 ],
               ),
-              borderRadius: BorderRadius.circular(12),
-              border:
-                  Border.all(color: AppColors.accent.withValues(alpha: 0.25)),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.borderRadius(context),
+              ),
+              border: Border.all(
+                color: AppColors.accent.withValues(alpha: 0.25),
+              ),
             ),
             child: Row(
               children: [
-                Icon(Icons.auto_awesome_rounded,
-                    size: 16, color: AppColors.accent),
-                const SizedBox(width: 8),
+                Icon(
+                  Icons.auto_awesome_rounded,
+                  size: AppResponsive.smallIconSize(context),
+                  color: AppColors.accent,
+                ),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Expanded(
                   child: Text(
                     'Save the item first, then open it to build its recipe (ingredients, yield & live food cost).',
                     style: GoogleFonts.poppins(
-                        fontSize: 11.5,
-                        color: AppColors.textPrimary,
-                        height: 1.3),
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: AppColors.textPrimary,
+                      height: 1.3,
+                    ),
                   ),
                 ),
               ],
@@ -634,18 +681,15 @@ class _AddItemSheetState extends State<AddItemSheet> {
   }
 
   Widget _productTypeCard(
-      ({
-        String type,
-        IconData icon,
-        Color color,
-        String label,
-        String desc,
-      }) o) {
+    ({String type, IconData icon, Color color, String label, String desc}) o,
+  ) {
     final bool selected = _formState.productType == o.type;
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         onTap: () => setState(() => _formState.setProductType(o.type)),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
@@ -654,7 +698,9 @@ class _AddItemSheetState extends State<AddItemSheet> {
             color: selected
                 ? o.color.withValues(alpha: 0.10)
                 : AppColors.surfaceLight,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.borderRadius(context),
+            ),
             border: Border.all(
               color: selected ? o.color : AppColors.divider,
               width: selected ? 1.5 : 1,
@@ -694,7 +740,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
                     selected
                         ? Icons.check_circle_rounded
                         : Icons.circle_outlined,
-                    size: 18,
+                    size: AppResponsive.smallIconSize(context),
                     color: selected ? o.color : AppColors.divider,
                   ),
                 ],
@@ -705,7 +751,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.poppins(
-                  fontSize: 12.5,
+                  fontSize: AppResponsive.smallFontSize(context),
                   fontWeight: FontWeight.w700,
                   color: selected ? o.color : AppColors.textPrimary,
                 ),
@@ -735,18 +781,27 @@ class _AddItemSheetState extends State<AddItemSheet> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.info.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.info.withValues(alpha: 0.20)),
       ),
       child: Row(
         children: [
-          Icon(Icons.blender_rounded, size: 18, color: AppColors.info),
-          const SizedBox(width: 10),
+          Icon(
+            Icons.blender_rounded,
+            size: AppResponsive.smallIconSize(context),
+            color: AppColors.info,
+          ),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Expanded(
             child: Text(
               "No stock is tracked here — a Recipe-Based item's availability is calculated live from its ingredients.",
               style: GoogleFonts.poppins(
-                  fontSize: 12, color: AppColors.textPrimary, height: 1.35),
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.textPrimary,
+                height: 1.35,
+              ),
             ),
           ),
         ],
@@ -760,8 +815,8 @@ class _AddItemSheetState extends State<AddItemSheet> {
     final String label = isRaw
         ? 'Cost Price'
         : (_formState.productType == ProductType.recipeBased
-            ? 'Selling Price'
-            : 'Price');
+              ? 'Selling Price'
+              : 'Price');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -773,11 +828,14 @@ class _AddItemSheetState extends State<AddItemSheet> {
           hint: '0.00',
           prefixWidget: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            child: Text(CurrencyHelper.currentSymbol,
-                style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primary)),
+            child: Text(
+              CurrencyHelper.currentSymbol,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
+            ),
           ),
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: [
@@ -806,13 +864,21 @@ class _AddItemSheetState extends State<AddItemSheet> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline_rounded,
-              size: 13, color: AppColors.textSecondary),
+          Icon(
+            Icons.info_outline_rounded,
+            size: 13,
+            color: AppColors.textSecondary,
+          ),
           const SizedBox(width: 5),
           Expanded(
-            child: Text(text,
-                style: GoogleFonts.poppins(
-                    fontSize: 11, color: AppColors.textSecondary, height: 1.3)),
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.captionFontSize(context),
+                color: AppColors.textSecondary,
+                height: 1.3,
+              ),
+            ),
           ),
         ],
       ),
@@ -892,10 +958,20 @@ class _AddItemSheetState extends State<AddItemSheet> {
     return SwitchListTile(
       contentPadding: EdgeInsets.zero,
       dense: true,
-      title: Text(title,
-          style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
-      subtitle: Text(subtitle,
-          style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
+      title: Text(
+        title,
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.bodyFontSize(context),
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.smallFontSize(context),
+          color: AppColors.textSecondary,
+        ),
+      ),
       value: _formState.sellDirectlyAtPos ?? false,
       activeColor: AppColors.primary,
       onChanged: (v) => setState(() => _formState.setSellDirectlyAtPos(v)),
@@ -906,11 +982,20 @@ class _AddItemSheetState extends State<AddItemSheet> {
     return SwitchListTile(
       contentPadding: EdgeInsets.zero,
       dense: true,
-      title: Text('Active',
-          style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
+      title: Text(
+        'Active',
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.bodyFontSize(context),
+          fontWeight: FontWeight.w500,
+        ),
+      ),
       subtitle: Text(
-          'Pause this item everywhere — sales, POS menu, and lists — without deleting it.',
-          style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
+        'Pause this item everywhere — sales, POS menu, and lists — without deleting it.',
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.smallFontSize(context),
+          color: AppColors.textSecondary,
+        ),
+      ),
       value: _formState.isEnabled,
       activeColor: AppColors.primary,
       onChanged: (v) => setState(() => _formState.setIsEnabled(v)),
@@ -925,11 +1010,20 @@ class _AddItemSheetState extends State<AddItemSheet> {
     return SwitchListTile(
       contentPadding: EdgeInsets.zero,
       dense: true,
-      title: Text('Allow order if out of stock',
-          style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
+      title: Text(
+        'Allow order if out of stock',
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.bodyFontSize(context),
+          fontWeight: FontWeight.w500,
+        ),
+      ),
       subtitle: Text(
-          'Let staff sell this even when no ingredients remain to make it.',
-          style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
+        'Let staff sell this even when no ingredients remain to make it.',
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.smallFontSize(context),
+          color: AppColors.textSecondary,
+        ),
+      ),
       value: _formState.allowOrderWhenOutOfStock,
       activeColor: AppColors.primary,
       onChanged: (v) =>
@@ -942,9 +1036,9 @@ class _AddItemSheetState extends State<AddItemSheet> {
       builder: (_) {
         final liveName = _formState.selectedCategoryId != null
             ? categoryStore.categories
-                .where((c) => c.id == _formState.selectedCategoryId)
-                .map((c) => c.name)
-                .firstOrNull
+                  .where((c) => c.id == _formState.selectedCategoryId)
+                  .map((c) => c.name)
+                  .firstOrNull
             : null;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -956,7 +1050,8 @@ class _AddItemSheetState extends State<AddItemSheet> {
             if (!_formState.isMenuType) ...[
               const SizedBox(height: 6),
               _fieldHint(
-                  'Optional — ingredients & prep items are grouped by Product Type, not a menu category.'),
+                'Optional — ingredients & prep items are grouped by Product Type, not a menu category.',
+              ),
             ],
           ],
         );
@@ -994,7 +1089,8 @@ class _AddItemSheetState extends State<AddItemSheet> {
   /// Method, which they don't show); Finished Good/Recipe-Based keep the
   /// original by-weight-only condition, unchanged.
   String _unitLabel() {
-    final isBackOfHouse = _formState.productType == ProductType.rawMaterial ||
+    final isBackOfHouse =
+        _formState.productType == ProductType.rawMaterial ||
         _formState.productType == ProductType.semiFinished;
     if (isBackOfHouse) return _formState.selectedUnit;
     return _formState.sellingMethod == SellingMethod.byWeight
@@ -1025,31 +1121,46 @@ class _AddItemSheetState extends State<AddItemSheet> {
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           dense: true,
-          title: Text('Low-stock alert',
-              style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
-          subtitle: Text('Warn when this item runs low',
-              style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
+          title: Text(
+            'Low-stock alert',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          subtitle: Text(
+            'Warn when this item runs low',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+            ),
+          ),
           value: _formState.lowStockAlertEnabled,
           activeColor: AppColors.primary,
           onChanged: (v) => setState(() => _formState.setLowStockAlert(v)),
         ),
         if (_formState.lowStockAlertEnabled) ...[
-          const SizedBox(height: 8),
-          Builder(builder: (_) {
-            final unit = _unitLabel();
-            return AppTextField(
-              controller: _formState.lowStockThresholdController,
-              label: 'Alert threshold ($unit, optional)',
-              hint: 'Default: ${AppSettings.lowStockThreshold.toStringAsFixed(0)} $unit',
-              icon: Icons.warning_amber_rounded,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-              ],
-              textInputAction: TextInputAction.done,
-              onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
-            );
-          }),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+          Builder(
+            builder: (_) {
+              final unit = _unitLabel();
+              return AppTextField(
+                controller: _formState.lowStockThresholdController,
+                label: 'Alert threshold ($unit, optional)',
+                hint:
+                    'Default: ${AppSettings.lowStockThreshold.toStringAsFixed(0)} $unit',
+                icon: Icons.warning_amber_rounded,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                ],
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
+              );
+            },
+          ),
         ],
       ],
     );
@@ -1079,20 +1190,32 @@ class _AddItemSheetState extends State<AddItemSheet> {
         Expanded(
           child: OutlinedButton.icon(
             onPressed: _handleAddMoreInfo,
-            icon: const Icon(Icons.tune_rounded, size: 18),
-            label: Text('More Info',
-                style: GoogleFonts.poppins(
-                    fontSize: 13, fontWeight: FontWeight.w600)),
+            icon: Icon(
+              Icons.tune_rounded,
+              size: AppResponsive.smallIconSize(context),
+            ),
+            label: Text(
+              'More Info',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.primary,
               side: const BorderSide(color: AppColors.primary),
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              padding: EdgeInsets.symmetric(
+                vertical: AppResponsive.mediumSpacing(context),
+              ),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.borderRadius(context),
+                ),
+              ),
             ),
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: AppResponsive.mediumSpacing(context)),
         Expanded(
           flex: 2,
           child: ElevatedButton.icon(
@@ -1102,24 +1225,34 @@ class _AddItemSheetState extends State<AddItemSheet> {
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white),
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
-                : const Icon(Icons.check_rounded,
-                    size: 18, color: Colors.white),
+                : Icon(
+                    Icons.check_rounded,
+                    size: AppResponsive.smallIconSize(context),
+                    color: Colors.white,
+                  ),
             label: Text(
               _isSaving ? 'Saving…' : 'Add Item',
               style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white),
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
-              disabledBackgroundColor:
-                  AppColors.primary.withValues(alpha: 0.5),
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
+              padding: EdgeInsets.symmetric(
+                vertical: AppResponsive.mediumSpacing(context),
+              ),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.borderRadius(context),
+                ),
+              ),
               elevation: 0,
             ),
           ),

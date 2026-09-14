@@ -14,6 +14,24 @@ import 'package:billberrylite/presentation/widget/componets/common/primary_app_b
 import 'package:billberrylite/presentation/widget/componets/common/gradient_hero_header.dart';
 import '../manage menu/tab/edit_item.dart';
 
+/// Content cap for the recipe grid.
+///
+/// Wider than `maxFormWidth` (800) because this is a card grid: at 800 four
+/// columns give 177px cards. At 1100 they land at ~252px, which also matches
+/// what an uncapped 1024 screen already shows — so `gridColumns` stays correct
+/// and only the widest screens change.
+const double _kRecipesMaxWidth = 1100.0;
+
+/// Horizontal inset that centres the grid inside [_kRecipesMaxWidth].
+///
+/// A `SliverGrid` cannot be wrapped in a box widget, so the cap is expressed
+/// as padding rather than a `ConstrainedBox`.
+double _recipesSidePad(BuildContext context) {
+  final base = AppResponsive.padding(context).left;
+  final overflow = AppResponsive.screenWidth(context) - _kRecipesMaxWidth;
+  return overflow > 0 ? base + overflow / 2 : base;
+}
+
 /// Card-grid overview of every Semi-Finished and Recipe-Based item — the
 /// primary "eye-catching" surface that visualizes recipe cost, margin, and
 /// availability together. See docs/inventory_recipe_system_plan.md §8.3.
@@ -96,7 +114,10 @@ class _RecipesScreenState extends State<RecipesScreen> {
                 )
               else
                 SliverPadding(
-                  padding: AppResponsive.padding(context),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: _recipesSidePad(context),
+                    vertical: AppResponsive.padding(context).top,
+                  ),
                   sliver: SliverGrid(
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: columns,
@@ -149,13 +170,15 @@ class _RecipeCard extends StatelessWidget {
 
     final isSemi = item.isSemiFinished;
     final Color accent = isSemi ? AppColors.secondary : AppColors.accent;
-    final IconData typeIcon =
-        isSemi ? Icons.soup_kitchen_rounded : Icons.lunch_dining_rounded;
+    final IconData typeIcon = isSemi
+        ? Icons.soup_kitchen_rounded
+        : Icons.lunch_dining_rounded;
     final String typeLabel = isSemi ? 'Semi-Finished' : 'Recipe-Based';
 
     final bool isRecipeBased = item.isRecipeBased;
-    final double? availableToMake =
-        isRecipeBased ? InventoryService.calculateAvailableToMake(item) : null;
+    final double? availableToMake = isRecipeBased
+        ? InventoryService.calculateAvailableToMake(item)
+        : null;
 
     return Material(
       color: Colors.transparent,
@@ -186,7 +209,10 @@ class _RecipeCard extends StatelessWidget {
             children: [
               // Gradient header band, colour-coded by type.
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
@@ -214,7 +240,7 @@ class _RecipeCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.poppins(
-                          fontSize: 10.5,
+                          fontSize: AppResponsive.captionFontSize(context),
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
                           letterSpacing: 0.3,
@@ -236,7 +262,7 @@ class _RecipeCard extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.poppins(
-                          fontSize: 14.5,
+                          fontSize: AppResponsive.bodyFontSize(context),
                           fontWeight: FontWeight.w600,
                           color: AppColors.textPrimary,
                           height: 1.15,
@@ -254,17 +280,17 @@ class _RecipeCard extends StatelessWidget {
                           Text(
                             '$ingredientCount ingredient${ingredientCount == 1 ? '' : 's'}',
                             style: GoogleFonts.poppins(
-                              fontSize: 11,
+                              fontSize: AppResponsive.captionFontSize(context),
                               color: AppColors.textSecondary,
                             ),
                           ),
                         ],
                       ),
                       const Spacer(),
-                      _costMarginRow(costPerUnit, marginPercent),
+                      _costMarginRow(context, costPerUnit, marginPercent),
                       if (isRecipeBased) ...[
                         const SizedBox(height: 8),
-                        _buildAvailabilityChip(availableToMake ?? 0),
+                        _buildAvailabilityChip(context, availableToMake ?? 0),
                       ],
                     ],
                   ),
@@ -277,7 +303,11 @@ class _RecipeCard extends StatelessWidget {
     );
   }
 
-  Widget _costMarginRow(double costPerUnit, double? marginPercent) {
+  Widget _costMarginRow(
+    BuildContext context,
+    double costPerUnit,
+    double? marginPercent,
+  ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -288,7 +318,7 @@ class _RecipeCard extends StatelessWidget {
               Text(
                 'Cost / unit',
                 style: GoogleFonts.poppins(
-                  fontSize: 9.5,
+                  fontSize: AppResponsive.captionFontSize(context),
                   color: AppColors.textSecondary,
                 ),
               ),
@@ -298,7 +328,7 @@ class _RecipeCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.poppins(
-                  fontSize: 15,
+                  fontSize: AppResponsive.bodyFontSize(context),
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
                 ),
@@ -306,12 +336,12 @@ class _RecipeCard extends StatelessWidget {
             ],
           ),
         ),
-        if (marginPercent != null) _marginPill(marginPercent),
+        if (marginPercent != null) _marginPill(context, marginPercent),
       ],
     );
   }
 
-  Widget _marginPill(double marginPercent) {
+  Widget _marginPill(BuildContext context, double marginPercent) {
     final bool positive = marginPercent >= 0;
     final Color color = positive ? AppColors.success : AppColors.danger;
     return Container(
@@ -324,9 +354,7 @@ class _RecipeCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            positive
-                ? Icons.trending_up_rounded
-                : Icons.trending_down_rounded,
+            positive ? Icons.trending_up_rounded : Icons.trending_down_rounded,
             size: 13,
             color: color,
           ),
@@ -334,7 +362,7 @@ class _RecipeCard extends StatelessWidget {
           Text(
             '${marginPercent.toStringAsFixed(0)}%',
             style: GoogleFonts.poppins(
-              fontSize: 12.5,
+              fontSize: AppResponsive.smallFontSize(context),
               fontWeight: FontWeight.w700,
               color: color,
             ),
@@ -344,7 +372,7 @@ class _RecipeCard extends StatelessWidget {
     );
   }
 
-  Widget _buildAvailabilityChip(double available) {
+  Widget _buildAvailabilityChip(BuildContext context, double available) {
     final Color color;
     if (available <= 0) {
       color = AppColors.danger;
@@ -381,7 +409,7 @@ class _RecipeCard extends StatelessWidget {
               label,
               overflow: TextOverflow.ellipsis,
               style: GoogleFonts.poppins(
-                fontSize: 11,
+                fontSize: AppResponsive.captionFontSize(context),
                 fontWeight: FontWeight.w700,
                 color: color,
               ),

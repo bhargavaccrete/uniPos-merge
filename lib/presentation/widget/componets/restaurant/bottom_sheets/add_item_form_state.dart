@@ -75,7 +75,8 @@ class AddItemFormState extends ChangeNotifier {
   List<Map<String, dynamic>> selectedVariants = [];
   List<String> selectedChoiceIds = [];
   List<String> selectedExtraIds = [];
-  List<String> defaultChoiceOptionIds = []; // per-item default-selected choice options
+  List<String> defaultChoiceOptionIds =
+      []; // per-item default-selected choice options
 
   /// Reset all form fields to default values
   void reset() {
@@ -119,9 +120,9 @@ class AddItemFormState extends ChangeNotifier {
     final priceText = priceController.text.trim();
     if (isMenuType) {
       if (priceText.isEmpty) {
-        errors.add(productType == ProductType.recipeBased
-            ? 'Selling Price'
-            : 'Price');
+        errors.add(
+          productType == ProductType.recipeBased ? 'Selling Price' : 'Price',
+        );
       } else {
         final price = double.tryParse(priceText);
         if (price == null || price <= 0) {
@@ -155,25 +156,26 @@ class AddItemFormState extends ChangeNotifier {
       }
     }
 
-    return ValidationResult(
-      isValid: errors.isEmpty,
-      missingFields: errors,
-    );
+    return ValidationResult(isValid: errors.isEmpty, missingFields: errors);
   }
 
   /// Convert form state to Items model
   Future<Items> toItem() async {
-    final isRawOrSemi = productType == ProductType.rawMaterial ||
+    final isRawOrSemi =
+        productType == ProductType.rawMaterial ||
         productType == ProductType.semiFinished;
     final itemVariants = isRawOrSemi
         ? <ItemVariante>[]
         : selectedVariants
-            .map((v) => ItemVariante(
+              .map(
+                (v) => ItemVariante(
                   variantId: v['variantId'],
                   price: v['price'],
-                  stockQuantity: (v['stockQuantity'] as num?)?.toDouble() ?? 0.0,
-                ))
-            .toList();
+                  stockQuantity:
+                      (v['stockQuantity'] as num?)?.toDouble() ?? 0.0,
+                ),
+              )
+              .toList();
 
     return Items(
       id: const Uuid().v4(),
@@ -182,7 +184,9 @@ class AddItemFormState extends ChangeNotifier {
       // Raw Material only: also seed lastPurchaseCost from the same Cost
       // Price input, since that's what recipe costing actually reads (B1).
       lastPurchaseCost: ProductType.seededLastPurchaseCost(
-          productType, double.tryParse(priceController.text.trim())),
+        productType,
+        double.tryParse(priceController.text.trim()),
+      ),
       productType: productType,
       description: descriptionController.text.trim(),
       categoryOfItem: selectedCategoryId ?? "",
@@ -193,7 +197,8 @@ class AddItemFormState extends ChangeNotifier {
       // of Selling Method (which doesn't apply to an unsellable ingredient),
       // so it's always persisted. Finished Good/Recipe-Based keep the
       // original by-weight-only condition, unchanged.
-      unit: (productType == ProductType.rawMaterial ||
+      unit:
+          (productType == ProductType.rawMaterial ||
               productType == ProductType.semiFinished)
           ? selectedUnit
           : (sellingMethod == SellingMethod.byWeight ? selectedUnit : null),
@@ -209,7 +214,8 @@ class AddItemFormState extends ChangeNotifier {
           : null,
       trackInventory: trackInventory,
       allowOrderWhenOutOfStock: allowOrderWhenOutOfStock,
-      sellDirectlyAtPos: (productType == ProductType.rawMaterial ||
+      sellDirectlyAtPos:
+          (productType == ProductType.rawMaterial ||
               productType == ProductType.semiFinished)
           ? sellDirectlyAtPos
           : null,
@@ -246,10 +252,14 @@ class AddItemFormState extends ChangeNotifier {
 
   /// Update variants, choices, extras and tax from AddMoreInfo result
   void updateFromMoreInfo(Map<String, dynamic> result) {
-    selectedVariants = List<Map<String, dynamic>>.from(result['variants'] ?? []);
+    selectedVariants = List<Map<String, dynamic>>.from(
+      result['variants'] ?? [],
+    );
     selectedChoiceIds = List<String>.from(result['choiceIds'] ?? []);
     selectedExtraIds = List<String>.from(result['extraIds'] ?? []);
-    defaultChoiceOptionIds = List<String>.from(result['defaultChoiceOptionIds'] ?? []);
+    defaultChoiceOptionIds = List<String>.from(
+      result['defaultChoiceOptionIds'] ?? [],
+    );
     // More Info can also set the tax — keep it in sync so it isn't lost.
     if (result.containsKey('taxIds') || result.containsKey('taxRate')) {
       selectedTaxIds = List<String>.from(result['taxIds'] ?? selectedTaxIds);
@@ -301,8 +311,7 @@ class AddItemFormState extends ChangeNotifier {
   /// user-overridable via the toggle/switch.
   void setProductType(String type) {
     productType = type;
-    if (type == ProductType.rawMaterial ||
-        type == ProductType.semiFinished) {
+    if (type == ProductType.rawMaterial || type == ProductType.semiFinished) {
       trackInventory = true;
       allowOrderWhenOutOfStock = false;
       sellDirectlyAtPos = false;
@@ -365,10 +374,7 @@ class ValidationResult {
   final bool isValid;
   final List<String> missingFields;
 
-  ValidationResult({
-    required this.isValid,
-    required this.missingFields,
-  });
+  ValidationResult({required this.isValid, required this.missingFields});
 
   String get errorMessage {
     if (isValid) return '';

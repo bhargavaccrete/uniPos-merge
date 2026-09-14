@@ -129,6 +129,12 @@ class LocationDropdownField extends StatelessWidget {
   Future<String?> _openPicker(BuildContext context) {
     return showDialog<String>(
       context: context,
+      // Nearest navigator, not the root. Inside a surface that hosts its own
+      // Navigator (the setup wizard's content pane) the picker then opens
+      // within that pane — it stays clear of the sidebar AND centres on the
+      // content instead of on the whole window. Elsewhere the nearest
+      // navigator IS the root, so nothing changes.
+      useRootNavigator: false,
       builder: (_) => _LocationPickerDialog(
         title: label,
         icon: icon,

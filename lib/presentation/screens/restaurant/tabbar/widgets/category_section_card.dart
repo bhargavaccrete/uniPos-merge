@@ -38,11 +38,13 @@ class _CategorySectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       key: cardKey,
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       elevation: 2,
       color: AppColors.white,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
       ),
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -50,21 +52,26 @@ class _CategorySectionCard extends StatelessWidget {
           controller: controller,
           initiallyExpanded: initiallyExpanded,
           leading: Container(
-            padding: const EdgeInsets.all(10),
+            padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
             decoration: BoxDecoration(
               color: AppColors.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.restaurant_menu,
               color: AppColors.primary,
-              size: 24,
+              size: AppResponsive.getValue(
+                context,
+                mobile: 24.0,
+                tablet: 26.0,
+                desktop: 28.0,
+              ),
             ),
           ),
           title: Text(
             category.name,
             style: GoogleFonts.poppins(
-              fontSize: 16,
+              fontSize: AppResponsive.subheadingFontSize(context),
               fontWeight: FontWeight.w600,
               color: Colors.black87,
             ),
@@ -72,7 +79,7 @@ class _CategorySectionCard extends StatelessWidget {
           subtitle: Text(
             '${searchFilteredItems.length} items',
             style: GoogleFonts.poppins(
-              fontSize: 12,
+              fontSize: AppResponsive.smallFontSize(context),
               color: AppColors.textSecondary,
             ),
           ),
@@ -81,14 +88,33 @@ class _CategorySectionCard extends StatelessWidget {
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                padding: EdgeInsets.fromLTRB(
+                  AppResponsive.mediumSpacing(context),
+                  0,
+                  AppResponsive.mediumSpacing(context),
+                  AppResponsive.mediumSpacing(context),
+                ),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: AppResponsive.gridColumns(context,
-                      mobile: 2, tablet: 3, desktop: 4),
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: AppResponsive.getValue(context,
-                      mobile: 0.75, tablet: 0.70, desktop: 0.75),
+                  crossAxisCount: AppResponsive.gridColumns(
+                    context,
+                    mobile: 2,
+                    tablet: 3,
+                    desktop: 4,
+                  ),
+                  crossAxisSpacing: AppResponsive.gridSpacing(context),
+                  mainAxisSpacing: AppResponsive.gridSpacing(context),
+                  // Absolute height on desktop — see kMenuItemCardHeightDesktop
+                  // in menu.dart (this file is `part of` it).
+                  mainAxisExtent: AppResponsive.isDesktop(context)
+                      ? kMenuItemCardHeightDesktop
+                      : null,
+                  childAspectRatio: AppResponsive.getValue(
+                    context,
+                    mobile: 0.75,
+                    tablet: 0.70,
+                    // Ignored on desktop — mainAxisExtent pins the height there instead.
+                    desktop: 0.75,
+                  ),
                 ),
                 itemCount: searchFilteredItems.length,
                 itemBuilder: (_, i) =>
@@ -98,9 +124,15 @@ class _CategorySectionCard extends StatelessWidget {
               ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                padding: EdgeInsets.fromLTRB(
+                  AppResponsive.mediumSpacing(context),
+                  0,
+                  AppResponsive.mediumSpacing(context),
+                  AppResponsive.mediumSpacing(context),
+                ),
                 itemCount: searchFilteredItems.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                separatorBuilder: (_, __) =>
+                    SizedBox(height: AppResponsive.smallSpacing(context)),
                 itemBuilder: (context, itemIndex) {
                   final item = searchFilteredItems[itemIndex];
                   return _ItemListTile(

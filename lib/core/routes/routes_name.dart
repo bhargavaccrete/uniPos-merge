@@ -36,7 +36,6 @@ class RouteNames {
   // Restaurant - Customers
   static const restaurantCustomers = '/restaurant-customers';
   static const restaurantManageCustomers = '/restaurant-manage-customers';
-  static const restaurantAddEditCustomer = '/restaurant-add-edit-customer';
   static const restaurantCustomerDetail = '/restaurant-customer-detail';
 
   // Restaurant - Online Orders
@@ -63,25 +62,34 @@ class RouteNames {
   static const restaurantPerformanceStats = '/restaurant-performance-stats';
   static const restaurantReportsTotalSales = '/restaurant-report-totalsales';
   static const restaurantReportsSalesBYItem = '/restaurant-report-salebyitem';
-  static const restaurantReportsSalesByCategory = '/restaurant-report-salebycatgeory';
-  static const restaurantReportsDailyClosingReport = '/restaurant-report-dailyclosingreport';
-  static const restaurantReportsCustomerList = '/restaurant-report-customerlist';
-  static const restaurantReportsSalesComparison = '/restaurant-report-sales-comparison';
-  static const restaurantReportsComparisionByProduct  = '/restaurant-report-comparisionbyproduct';
-  static const restaurantReportsRefundDetails  = '/restaurant-report-refunddetails';
-  static const restaurantReportsVoidOrderReport  = '/restaurant-report-voidorderreport';
-  static const restaurantReportsItemCancellation  = '/restaurant-report-itemcancellation';
-  static const restaurantReportsDiscountOrderReport  = '/restaurant-report-discountoderreport';
-  static const restaurantReportsPosOrder  = '/restaurant-report-posorderreport';
-  static const restaurantReportsCustomerListByRevenue = '/restaurant-report-customerlistbyrevenue';
-  static const restaurantReportsExpense  = '/restaurant-report-expensereport';
+  static const restaurantReportsSalesByCategory =
+      '/restaurant-report-salebycatgeory';
+  static const restaurantReportsDailyClosingReport =
+      '/restaurant-report-dailyclosingreport';
+  static const restaurantReportsCustomerList =
+      '/restaurant-report-customerlist';
+  static const restaurantReportsSalesComparison =
+      '/restaurant-report-sales-comparison';
+  static const restaurantReportsComparisionByProduct =
+      '/restaurant-report-comparisionbyproduct';
+  static const restaurantReportsRefundDetails =
+      '/restaurant-report-refunddetails';
+  static const restaurantReportsVoidOrderReport =
+      '/restaurant-report-voidorderreport';
+  static const restaurantReportsItemCancellation =
+      '/restaurant-report-itemcancellation';
+  static const restaurantReportsDiscountOrderReport =
+      '/restaurant-report-discountoderreport';
+  static const restaurantReportsPosOrder = '/restaurant-report-posorderreport';
+  static const restaurantReportsCustomerListByRevenue =
+      '/restaurant-report-customerlistbyrevenue';
+  static const restaurantReportsExpense = '/restaurant-report-expensereport';
   static const restaurantReportsPaymentMode = '/restaurant-report-paymentmode';
   static const restaurantShiftReport = '/restaurant-shift-report';
   static const restaurantStaffPerformance = '/restaurant-staff-performance';
   static const restaurantCashDrawer = '/restaurant-cash-drawer';
   static const restaurantCashDrawerHistory = '/restaurant-cash-drawer-history';
   // static const restaurantReportsPerformanceStatistics  = '/restaurant-report-performanxestatisticsreport';
-
 
   // Restaurant - Settings
   static const restaurantSettings = '/restaurant-settings';
@@ -97,7 +105,8 @@ class RouteNames {
 
   // Restaurant - Printer
   static const restaurantPrinterSettings = '/restaurant-printer-settings';
-  static const restaurantPrinterCustomization = '/restaurant-printer-customization';
+  static const restaurantPrinterCustomization =
+      '/restaurant-printer-customization';
 
   // Restaurant - End Day
   static const restaurantEndDay = '/restaurant-end-day';
@@ -114,10 +123,7 @@ class RouteNames {
   static const restaurantBulkImport = '/restaurant-bulk-import';
   static const restaurantDataGenratorScreen = '/restaurant-datageneratorscreen';
   static const restaurantSplashPreview = '/restaurant-splash-preview';
-  static const restaurantlogin  = '/restaurant-login';
-
-
-
+  static const restaurantlogin = '/restaurant-login';
 
   // Retail
   static const retailBilling = '/retail-billing';

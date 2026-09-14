@@ -17,14 +17,14 @@ class ExpenseScreen extends StatefulWidget {
 class _ExpenseScreenState extends State<ExpenseScreen> {
   String selectedFilter = "Add Expense";
 
-  Widget _getBody(){
-    switch(selectedFilter){
+  Widget _getBody() {
+    switch (selectedFilter) {
       case "Add Expense":
         return Addexpence();
       case "View Expense":
         return ViewExpense();
       default:
-        return  Addexpence();
+        return Addexpence();
     }
   }
 
@@ -34,7 +34,9 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
       child: GestureDetector(
         onTap: () => setState(() => selectedFilter = label),
         child: Container(
-          padding: EdgeInsets.symmetric(vertical: AppResponsive.smallSpacing(context)),
+          padding: EdgeInsets.symmetric(
+            vertical: AppResponsive.smallSpacing(context),
+          ),
           decoration: BoxDecoration(
             color: isSelected ? AppColors.primary : AppColors.surfaceMedium,
             borderRadius: BorderRadius.circular(10),
@@ -42,12 +44,20 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: AppResponsive.smallIconSize(context), color: isSelected ? Colors.white : AppColors.textSecondary),
-              SizedBox(width: 6),
-              Text(label, style: GoogleFonts.poppins(
-                fontSize: AppResponsive.smallFontSize(context), fontWeight: FontWeight.w500,
+              Icon(
+                icon,
+                size: AppResponsive.smallIconSize(context),
                 color: isSelected ? Colors.white : AppColors.textSecondary,
-              )),
+              ),
+              SizedBox(width: 6),
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  fontWeight: FontWeight.w500,
+                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                ),
+              ),
             ],
           ),
         ),
@@ -59,9 +69,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: buildPrimaryAppBar(
-        title: 'Expenses',
-      ),
+      appBar: buildPrimaryAppBar(title: 'Expenses'),
       body: Column(
         children: [
           // Tabs
@@ -73,12 +81,19 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
               AppResponsive.largeSpacing(context),
               AppResponsive.mediumSpacing(context),
             ),
-            child: Row(
-              children: [
-                _buildTab('Add Expense', Icons.add_circle_rounded, context),
-                SizedBox(width: 8),
-                _buildTab('View Expense', Icons.list_alt_rounded, context),
-              ],
+            // White strip spans the window; only the two tabs are capped, so
+            // they do not stretch to ~700px each on a laptop.
+            child: AppResponsive.constrainedContent(
+              context: context,
+              maxWidth: AppResponsive.maxFormWidth(context),
+              heightFactor: 1,
+              child: Row(
+                children: [
+                  _buildTab('Add Expense', Icons.add_circle_rounded, context),
+                  SizedBox(width: 8),
+                  _buildTab('View Expense', Icons.list_alt_rounded, context),
+                ],
+              ),
             ),
           ),
 

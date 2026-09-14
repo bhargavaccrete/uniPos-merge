@@ -250,7 +250,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
                     _buildTaxList(),
                     SizedBox(height: AppResponsive.mediumSpacing(context)),
                     _buildFooterNote(),
-                    const SizedBox(height: 8),
+                    SizedBox(height: AppResponsive.smallSpacing(context)),
                   ],
                 ),
               ),
@@ -577,6 +577,8 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
     final formKey = GlobalKey<FormState>();
     await showDialog(
       context: context,
+      // Nearest navigator — stays inside the wizard's pane, clear of the sidebar.
+      useRootNavigator: false,
       builder: (ctx) {
         // Shared by the Rate field's done key and the Add button so pressing
         // enter on the keyboard commits the tax, exactly like tapping Add.
@@ -664,9 +666,13 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
                 color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              // vertical 2 stays static — a sub-8 badge inset, not layout.
+              padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.smallSpacing(context),
+                vertical: 2,
+              ),
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(
@@ -766,9 +772,14 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              // vertical 6 stays static — sub-8 pill inset.
+              padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.mediumSpacing(context),
+                vertical: 6,
+              ),
               decoration: BoxDecoration(
                 color: AppColors.success.withValues(alpha: 0.1),
+                // Pill shape — ornamental.
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -780,7 +791,7 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
             GestureDetector(
               onTap: () => _removeAt(index),
               child: Container(

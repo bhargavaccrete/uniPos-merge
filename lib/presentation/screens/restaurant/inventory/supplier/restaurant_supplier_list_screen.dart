@@ -80,8 +80,7 @@ class _RestaurantSupplierListScreenState
             final all = restaurantSupplierStore.suppliers.toList();
             final visible = restaurantSupplierStore.filteredSuppliers;
             final owed = restaurantSupplierStore.totalOutstanding;
-            final withBalance =
-                all.where((s) => s.currentBalance != 0).length;
+            final withBalance = all.where((s) => s.currentBalance != 0).length;
 
             return Column(
               children: [
@@ -111,11 +110,19 @@ class _RestaurantSupplierListScreenState
                 ),
                 Padding(
                   padding: EdgeInsets.fromLTRB(
-                    AppResponsive.getValue(context,
-                        mobile: 16.0, tablet: 20.0, desktop: 24.0),
+                    AppResponsive.getValue(
+                      context,
+                      mobile: 16.0,
+                      tablet: 20.0,
+                      desktop: 24.0,
+                    ),
                     12,
-                    AppResponsive.getValue(context,
-                        mobile: 16.0, tablet: 20.0, desktop: 24.0),
+                    AppResponsive.getValue(
+                      context,
+                      mobile: 16.0,
+                      tablet: 20.0,
+                      desktop: 24.0,
+                    ),
                     8,
                   ),
                   child: AppTextField(
@@ -125,39 +132,53 @@ class _RestaurantSupplierListScreenState
                     onChanged: restaurantSupplierStore.setSearchQuery,
                   ),
                 ),
+                // Hero stays full-bleed; only the supplier list narrows.
                 Expanded(
-                  child: all.isEmpty
-                      ? AppEmptyState(
-                          icon: Icons.people_alt_rounded,
-                          title: 'No suppliers yet',
-                          message:
-                              'Add the suppliers you buy raw materials from, then raise purchase orders against them.',
-                          action: appEmptyStateAction(
-                            label: 'Add Supplier',
-                            onPressed: _addSupplier,
-                          ),
-                        )
-                      : visible.isEmpty
-                          ? const AppEmptyState(
-                              icon: Icons.search_off_rounded,
-                              title: 'No matches',
-                              message:
-                                  'No supplier matches that search. Try a different name, phone or GST number.',
-                            )
-                          : ListView.separated(
-                              padding: EdgeInsets.fromLTRB(
-                                AppResponsive.getValue(context,
-                                    mobile: 16.0, tablet: 20.0, desktop: 24.0),
-                                4,
-                                AppResponsive.getValue(context,
-                                    mobile: 16.0, tablet: 20.0, desktop: 24.0),
-                                96,
-                              ),
-                              itemCount: visible.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(height: 10),
-                              itemBuilder: (_, i) => _supplierCard(visible[i]),
+                  child: AppResponsive.constrainedContent(
+                    context: context,
+                    maxWidth: AppResponsive.maxFormWidth(context),
+                    alignment: Alignment.topCenter,
+                    child: all.isEmpty
+                        ? AppEmptyState(
+                            icon: Icons.people_alt_rounded,
+                            title: 'No suppliers yet',
+                            message:
+                                'Add the suppliers you buy raw materials from, then raise purchase orders against them.',
+                            action: appEmptyStateAction(
+                              label: 'Add Supplier',
+                              onPressed: _addSupplier,
                             ),
+                          )
+                        : visible.isEmpty
+                        ? const AppEmptyState(
+                            icon: Icons.search_off_rounded,
+                            title: 'No matches',
+                            message:
+                                'No supplier matches that search. Try a different name, phone or GST number.',
+                          )
+                        : ListView.separated(
+                            padding: EdgeInsets.fromLTRB(
+                              AppResponsive.getValue(
+                                context,
+                                mobile: 16.0,
+                                tablet: 20.0,
+                                desktop: 24.0,
+                              ),
+                              4,
+                              AppResponsive.getValue(
+                                context,
+                                mobile: 16.0,
+                                tablet: 20.0,
+                                desktop: 24.0,
+                              ),
+                              96,
+                            ),
+                            itemCount: visible.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 10),
+                            itemBuilder: (_, i) => _supplierCard(visible[i]),
+                          ),
+                  ),
                 ),
               ],
             );
@@ -203,7 +224,7 @@ class _RestaurantSupplierListScreenState
                       ? '?'
                       : supplier.name.characters.first.toUpperCase(),
                   style: GoogleFonts.poppins(
-                    fontSize: 17,
+                    fontSize: AppResponsive.subheadingFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: AppColors.secondary,
                   ),
@@ -251,19 +272,19 @@ class _RestaurantSupplierListScreenState
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    settled
-                        ? 'Settled'
-                        : (isAdvance ? 'Advance' : 'Owed'),
+                    settled ? 'Settled' : (isAdvance ? 'Advance' : 'Owed'),
                     style: GoogleFonts.poppins(
-                      fontSize: 11,
+                      fontSize: AppResponsive.captionFontSize(context),
                       color: balanceColor,
                     ),
                   ),
                 ],
               ),
               const SizedBox(width: 4),
-              const Icon(Icons.chevron_right_rounded,
-                  color: AppColors.textSecondary),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textSecondary,
+              ),
             ],
           ),
         ),

@@ -353,6 +353,8 @@ class _ChoiceSelectionScreenState extends State<ChoiceSelectionScreen> {
 
     showDialog(
       context: context,
+      // Nearest navigator — stays inside the setup wizard's pane.
+      useRootNavigator: false,
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
@@ -595,6 +597,7 @@ Future<void> showAddChoiceDialog(BuildContext context,
     {required VoidCallback onAdded}) {
   return showDialog(
     context: context,
+    useRootNavigator: false, // stays inside the setup wizard's pane
     builder: (_) => _AddChoiceDialog(onAdded: onAdded),
   );
 }
@@ -694,7 +697,7 @@ class _AddChoiceDialogState extends State<_AddChoiceDialog> {
   Widget build(BuildContext context) {
     final hInset = !AppResponsive.isMobile(context)
         ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2)
-            .clamp(40.0, 200.0)
+            .clamp(40.0, double.infinity)
         : 24.0;
     return AlertDialog(
       insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),

@@ -43,8 +43,7 @@ class RestaurantStockTakeScreen extends StatefulWidget {
       _RestaurantStockTakeScreenState();
 }
 
-class _RestaurantStockTakeScreenState
-    extends State<RestaurantStockTakeScreen> {
+class _RestaurantStockTakeScreenState extends State<RestaurantStockTakeScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -74,15 +73,19 @@ class _RestaurantStockTakeScreenState
     final query = _searchController.text.trim().toLowerCase();
     if (query.isEmpty) return const [];
 
-    final counted =
-        restaurantStockTakeStore.currentItems.map((i) => i.itemId).toSet();
+    final counted = restaurantStockTakeStore.currentItems
+        .map((i) => i.itemId)
+        .toSet();
 
-    return itemStore.items.where((item) {
-      if (!item.trackInventory) return false;
-      if (!(item.isRawMaterial || item.isSemiFinished)) return false;
-      if (counted.contains(item.id)) return false;
-      return item.name.toLowerCase().contains(query);
-    }).take(20).toList();
+    return itemStore.items
+        .where((item) {
+          if (!item.trackInventory) return false;
+          if (!(item.isRawMaterial || item.isSemiFinished)) return false;
+          if (counted.contains(item.id)) return false;
+          return item.name.toLowerCase().contains(query);
+        })
+        .take(20)
+        .toList();
   }
 
   String _unitOf(Items item) =>
@@ -129,8 +132,9 @@ class _RestaurantStockTakeScreenState
       _searchController.clear();
       setState(() {});
     } else {
-      NotificationService.instance
-          .showError(restaurantStockTakeStore.errorMessage ?? 'Count failed.');
+      NotificationService.instance.showError(
+        restaurantStockTakeStore.errorMessage ?? 'Count failed.',
+      );
     }
   }
 
@@ -138,7 +142,8 @@ class _RestaurantStockTakeScreenState
     final confirmed = await showAppConfirmDialog(
       context: context,
       title: 'Remove line?',
-      message: '${line.itemName ?? 'This line'} will be dropped from the '
+      message:
+          '${line.itemName ?? 'This line'} will be dropped from the '
           'count. Stock is not affected.',
       confirmLabel: 'Remove',
       accent: AppColors.danger,
@@ -148,8 +153,9 @@ class _RestaurantStockTakeScreenState
     final ok = await restaurantStockTakeStore.removeLine(line.takeItemId);
     if (!mounted) return;
     if (!ok) {
-      NotificationService.instance
-          .showError(restaurantStockTakeStore.errorMessage ?? 'Could not remove line.');
+      NotificationService.instance.showError(
+        restaurantStockTakeStore.errorMessage ?? 'Could not remove line.',
+      );
     }
   }
 
@@ -180,8 +186,9 @@ class _RestaurantStockTakeScreenState
     if (!mounted) return;
 
     if (!result.success) {
-      NotificationService.instance
-          .showError(result.errorMessage ?? 'Apply failed.');
+      NotificationService.instance.showError(
+        result.errorMessage ?? 'Apply failed.',
+      );
       return;
     }
 
@@ -203,7 +210,8 @@ class _RestaurantStockTakeScreenState
       context: context,
       title: 'Some lines were not applied',
       errors: failed,
-      message: 'Their stock moved after they were counted, or the item no '
+      message:
+          'Their stock moved after they were counted, or the item no '
           'longer exists. Recount these in a new stock take.',
     );
   }
@@ -223,15 +231,16 @@ class _RestaurantStockTakeScreenState
             child: MoneyScope(
               child: restaurantStockTakeStore.isLoading && take == null
                   ? const Center(
-                      child:
-                          CircularProgressIndicator(color: AppColors.primary),
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
+                      ),
                     )
                   : take == null
-                      ? const AppEmptyState(
-                          icon: Icons.error_outline_rounded,
-                          title: 'Stock take not found',
-                        )
-                      : _buildBody(context),
+                  ? const AppEmptyState(
+                      icon: Icons.error_outline_rounded,
+                      title: 'Stock take not found',
+                    )
+                  : _buildBody(context),
             ),
           ),
           bottomNavigationBar: _isEditable ? _buildApplyBar(context) : null,
@@ -247,7 +256,14 @@ class _RestaurantStockTakeScreenState
         if (_isEditable) _buildSearch(context),
         if (_isEditable && _searchResults.isNotEmpty)
           _buildSearchResults(context),
-        Expanded(child: _buildLines(context)),
+        Expanded(
+          child: AppResponsive.constrainedContent(
+            context: context,
+            maxWidth: AppResponsive.maxFormWidth(context),
+            alignment: Alignment.topCenter,
+            child: _buildLines(context),
+          ),
+        ),
       ],
     );
   }
@@ -296,12 +312,18 @@ class _RestaurantStockTakeScreenState
           SizedBox(height: AppResponsive.smallSpacing(context)),
           Row(
             children: [
-              _metric(context, 'Counted',
-                  '${restaurantStockTakeStore.countedLineCount}',
-                  AppColors.textPrimary),
-              _metric(context, 'Variances',
-                  '${restaurantStockTakeStore.varianceLineCount}',
-                  AppColors.warning),
+              _metric(
+                context,
+                'Counted',
+                '${restaurantStockTakeStore.countedLineCount}',
+                AppColors.textPrimary,
+              ),
+              _metric(
+                context,
+                'Variances',
+                '${restaurantStockTakeStore.varianceLineCount}',
+                AppColors.warning,
+              ),
               _metric(
                 context,
                 'Net Qty',
@@ -347,7 +369,11 @@ class _RestaurantStockTakeScreenState
   }
 
   Widget _metric(
-      BuildContext context, String label, String value, Color color) {
+    BuildContext context,
+    String label,
+    String value,
+    Color color,
+  ) {
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -438,8 +464,10 @@ class _RestaurantStockTakeScreenState
                 color: AppColors.textSecondary,
               ),
             ),
-            trailing: const Icon(Icons.add_circle_outline_rounded,
-                color: AppColors.primary),
+            trailing: const Icon(
+              Icons.add_circle_outline_rounded,
+              color: AppColors.primary,
+            ),
             onTap: () => _promptCount(item),
           );
         },
@@ -457,7 +485,7 @@ class _RestaurantStockTakeScreenState
       child: Text(
         item.isRawMaterial ? 'Raw' : 'Semi',
         style: GoogleFonts.poppins(
-          fontSize: 10.5,
+          fontSize: AppResponsive.captionFontSize(context),
           fontWeight: FontWeight.w700,
           color: AppColors.info,
         ),
@@ -474,7 +502,7 @@ class _RestaurantStockTakeScreenState
         title: 'Nothing counted yet',
         message: _isEditable
             ? 'Search above to record what you counted. Stock does not '
-                'move until you apply.'
+                  'move until you apply.'
             : 'This stock take has no lines.',
       );
     }
@@ -486,7 +514,10 @@ class _RestaurantStockTakeScreenState
     );
   }
 
-  Widget _buildLineCard(BuildContext context, RestaurantStockTakeItemModel line) {
+  Widget _buildLineCard(
+    BuildContext context,
+    RestaurantStockTakeItemModel line,
+  ) {
     final variance = line.variance;
     final color = variance == 0
         ? AppColors.textSecondary
@@ -499,10 +530,13 @@ class _RestaurantStockTakeScreenState
       padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius:
-            BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
         border: Border.all(
-          color: variance == 0 ? AppColors.divider : color.withValues(alpha: 0.4),
+          color: variance == 0
+              ? AppColors.divider
+              : color.withValues(alpha: 0.4),
         ),
       ),
       child: Column(
@@ -524,11 +558,15 @@ class _RestaurantStockTakeScreenState
               ),
               if (_isEditable)
                 PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert,
-                      size: 20, color: AppColors.textSecondary),
+                  icon: const Icon(
+                    Icons.more_vert,
+                    size: 20,
+                    color: AppColors.textSecondary,
+                  ),
                   color: AppColors.white,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   onSelected: (value) {
                     if (value == 'recount') {
                       if (item != null) _promptCount(item);
@@ -537,7 +575,10 @@ class _RestaurantStockTakeScreenState
                     }
                   },
                   itemBuilder: (context) => [
-                    const PopupMenuItem(value: 'recount', child: Text('Recount')),
+                    const PopupMenuItem(
+                      value: 'recount',
+                      child: Text('Recount'),
+                    ),
                     const PopupMenuItem(value: 'remove', child: Text('Remove')),
                   ],
                 ),
@@ -546,10 +587,18 @@ class _RestaurantStockTakeScreenState
           SizedBox(height: AppResponsive.smallSpacing(context)),
           Row(
             children: [
-              _lineStat(context, 'System', '${line.systemQty} $unit',
-                  AppColors.textSecondary),
-              _lineStat(context, 'Counted', '${line.countedQty} $unit',
-                  AppColors.textPrimary),
+              _lineStat(
+                context,
+                'System',
+                '${line.systemQty} $unit',
+                AppColors.textSecondary,
+              ),
+              _lineStat(
+                context,
+                'Counted',
+                '${line.countedQty} $unit',
+                AppColors.textPrimary,
+              ),
               _lineStat(
                 context,
                 'Variance',
@@ -574,7 +623,11 @@ class _RestaurantStockTakeScreenState
   }
 
   Widget _lineStat(
-      BuildContext context, String label, String value, Color color) {
+    BuildContext context,
+    String label,
+    String value,
+    Color color,
+  ) {
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -622,7 +675,7 @@ class _RestaurantStockTakeScreenState
                     variances == 0
                         ? 'No variances to apply'
                         : '$variances line${variances == 1 ? '' : 's'} will '
-                            'adjust stock',
+                              'adjust stock',
                     style: GoogleFonts.poppins(
                       fontSize: AppResponsive.smallFontSize(context),
                       color: AppColors.textSecondary,
@@ -638,9 +691,12 @@ class _RestaurantStockTakeScreenState
                     disabledBackgroundColor: AppColors.divider,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 13),
+                      horizontal: 20,
+                      vertical: 13,
+                    ),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                   child: Text(
                     committing ? 'Applying...' : 'Apply Count',
@@ -697,8 +753,8 @@ class _CountEntryDialogState extends State<_CountEntryDialog> {
       text: widget.initialCount == null
           ? ''
           : (widget.initialCount == widget.initialCount!.roundToDouble()
-              ? widget.initialCount!.toStringAsFixed(0)
-              : widget.initialCount!.toString()),
+                ? widget.initialCount!.toStringAsFixed(0)
+                : widget.initialCount!.toString()),
     );
   }
 
@@ -746,11 +802,13 @@ class _CountEntryDialogState extends State<_CountEntryDialog> {
               required: true,
               autofocus: true,
               keyboardType: TextInputType.numberWithOptions(
-                  decimal: widget.allowDecimal),
+                decimal: widget.allowDecimal,
+              ),
               inputFormatters: widget.allowDecimal
                   ? [
                       FilteringTextInputFormatter.allow(
-                          RegExp(r'^\d*\.?\d{0,3}')),
+                        RegExp(r'^\d*\.?\d{0,3}'),
+                      ),
                     ]
                   : [
                       FilteringTextInputFormatter.digitsOnly,
@@ -882,7 +940,8 @@ class _CommitDialogState extends State<_CommitDialog> {
 
     return AppDialogShell(
       title: 'Apply Count',
-      subtitle: '${widget.varianceLines} line'
+      subtitle:
+          '${widget.varianceLines} line'
           '${widget.varianceLines == 1 ? '' : 's'} will adjust stock',
       accent: AppColors.primary,
       icon: Icons.playlist_add_check_rounded,
@@ -931,9 +990,7 @@ class _CommitDialogState extends State<_CommitDialog> {
             context,
             'Missing',
             '${widget.shortageQty}',
-            widget.shortageQty > 0
-                ? AppColors.danger
-                : AppColors.textSecondary,
+            widget.shortageQty > 0 ? AppColors.danger : AppColors.textSecondary,
           ),
           _stat(
             context,
@@ -952,8 +1009,7 @@ class _CommitDialogState extends State<_CommitDialog> {
     );
   }
 
-  Widget _stat(
-      BuildContext context, String label, String value, Color color) {
+  Widget _stat(BuildContext context, String label, String value, Color color) {
     return Expanded(
       child: Column(
         children: [
@@ -1030,11 +1086,11 @@ class _CommitDialogState extends State<_CommitDialog> {
     final color = booksLoss ? AppColors.danger : AppColors.textSecondary;
     final text = booksLoss
         ? 'Shortages will be recorded as inventory losses, so their cost '
-            'reaches your food-cost and wastage reports. Extra stock found is '
-            'never booked as a loss. This cannot be undone — correct a '
-            'mistake with a new stock take.'
+              'reaches your food-cost and wastage reports. Extra stock found is '
+              'never booked as a loss. This cannot be undone — correct a '
+              'mistake with a new stock take.'
         : 'Stock will be corrected without recording a loss. This cannot be '
-            'undone — correct a mistake with a new stock take.';
+              'undone — correct a mistake with a new stock take.';
 
     return Container(
       width: double.infinity,

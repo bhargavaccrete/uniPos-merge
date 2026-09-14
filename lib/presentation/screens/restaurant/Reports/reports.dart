@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:billberrylite/presentation/screens/restaurant/Reports/comparison/comparison.dart' show kComparisonPeriodEntitlements;
+import 'package:billberrylite/presentation/screens/restaurant/Reports/comparison/comparison.dart'
+    show kComparisonPeriodEntitlements;
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
@@ -33,7 +34,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
           return;
         }
         if (entitlementAnyOf != null &&
-            !PlanGuard.allowedAnyOf(context, entitlementAnyOf, featureName: title)) {
+            !PlanGuard.allowedAnyOf(
+              context,
+              entitlementAnyOf,
+              featureName: title,
+            )) {
           return;
         }
         onTap();
@@ -53,11 +58,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 color: iconColor.withValues(alpha: 0.1 * iconColor.a),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(
-                icon,
-                color: iconColor,
-                size: isTablet ? 30 : 28,
-              ),
+              child: Icon(icon, color: iconColor, size: isTablet ? 30 : 28),
             ),
             SizedBox(height: isTablet ? 14 : 12),
             Padding(
@@ -68,7 +69,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.poppins(
-                  fontSize: isTablet ? 14 : 13,
+                  fontSize: AppResponsive.bodyFontSize(context),
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
                   height: 1.3,
@@ -89,180 +90,245 @@ class _ReportsScreenState extends State<ReportsScreen> {
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(title: 'Reports'),
       body: SingleChildScrollView(
-              padding: AppResponsive.padding(context),
-              child: GridView.count(
-                    shrinkWrap: true,
-                    physics: NeverScrollableScrollPhysics(),
-                    crossAxisCount: AppResponsive.gridColumns(context, mobile: 2, tablet: 3, desktop: 4),
-                    crossAxisSpacing: AppResponsive.gridSpacing(context),
-                    mainAxisSpacing: AppResponsive.gridSpacing(context),
-                    childAspectRatio: AppResponsive.gridAspectRatio(context),
-                    children: [
-                      // All report tiles are shown; tapping a tile not in the plan
-                      // shows the upgrade blocker (handled in _buildReportCard).
-                      _buildReportCard(
-                        icon: Icons.shopping_bag_outlined,
-                        title: 'Total Sale',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsTotalSales),
-                        iconColor: AppColors.primary,
-                        isTablet: isTablet,
-                        entitlementKey: EntKeys.reportsTotalSale,
-                      ),
-                      _buildReportCard(
-                        icon: Icons.fastfood,
-                        title: 'Sales BY Items',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsSalesBYItem),
-                        iconColor: Colors.deepOrangeAccent,
-                        isTablet: isTablet,
-                        entitlementKey: EntKeys.reportsSaleByItem,
-                      ),
-                      _buildReportCard(
-                        icon: Icons.category,
-                        title: 'Sale By Category',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsSalesByCategory),
-                        iconColor: Colors.deepOrangeAccent,
-                        isTablet: isTablet,
-                        entitlementKey: EntKeys.reportsSaleByCategory,
-                      ),
-                      _buildReportCard(
-                        icon: Icons.auto_graph,
-                        title: 'Daily Closing Reports',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsDailyClosingReport),
-                        iconColor: Colors.deepOrangeAccent,
-                        isTablet: isTablet,
-                        entitlementKey: EntKeys.reportsDailyClosing,
-                      ),
-                      _buildReportCard(
-                        icon: Icons.list_alt,
-                        title: 'Customer List',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsCustomerList),
-                        iconColor: AppColors.primary,
-                        isTablet: isTablet,
-                        entitlementKey: EntKeys.reportsCustomerList,
-                      ),
-                      _buildReportCard(
-                        icon: Icons.trending_up,
-                        title: 'Sales Comparison',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsSalesComparison),
-                        iconColor: AppColors.primary,
-                        isTablet: isTablet,
-                        entitlementAnyOf: kComparisonPeriodEntitlements,
-                      ),
-                      _buildReportCard(
-                        icon: Icons.inventory_2_outlined,
-                        title: 'Comparison BY Product',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsComparisionByProduct),
-                        iconColor: AppColors.primary,
-                        isTablet: isTablet,
-                        entitlementKey: EntKeys.reportsComparisonProduct,
-                      ),
-                      _buildReportCard(
-                        icon: Icons.backspace_outlined,
-                        title: 'Refund Details',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsRefundDetails),
-                        iconColor: AppColors.primary,
-                        isTablet: isTablet,
-                        entitlementKey: EntKeys.reportsRefundDetails,
-                      ),
-                      _buildReportCard(
-                        icon: Icons.cancel_outlined,
-                        title: 'Void Order Report',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsVoidOrderReport),
-                        iconColor: AppColors.primary,
-                        isTablet: isTablet,
-                        entitlementKey: EntKeys.reportsVoidOrders,
-                      ),
-                      _buildReportCard(
-                        icon: Icons.remove_circle_outline,
-                        title: 'Item Cancellation Report',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsItemCancellation),
-                        iconColor: Colors.red,
-                        isTablet: isTablet,
-                        entitlementKey: EntKeys.reportsItemCancellation,
-                      ),
-                      _buildReportCard(
-                        icon: Icons.note_alt_outlined,
-                        title: 'Discount Order Reports',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsDiscountOrderReport),
-                        iconColor: Colors.deepOrangeAccent,
-                        isTablet: isTablet,
-                        entitlementKey: EntKeys.reportsDiscountOrders,
-                      ),
-                      _buildReportCard(
-                        icon: Icons.event_available,
-                        title: 'Pos End Day',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsPosOrder),
-                        iconColor: AppColors.primary,
-                        isTablet: isTablet,
-                        entitlementKey: EntKeys.reportsPosEndDay,
-                      ),
-                      _buildReportCard(
-                        icon: Icons.monetization_on_outlined,
-                        title: 'Customer List BY Revenue',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsCustomerListByRevenue),
-                        iconColor: Colors.deepOrangeAccent,
-                        isTablet: isTablet,
-                        entitlementKey: EntKeys.reportsCustomerRevenue,
-                      ),
-                      _buildReportCard(
-                        icon: Icons.receipt_long,
-                        title: 'Expense Report',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsExpense),
-                        iconColor: Colors.red,
-                        isTablet: isTablet,
-                        entitlementKey: EntKeys.reportsExpense,
-                      ),
-                      _buildReportCard(
-                        icon: Icons.account_balance_wallet_outlined,
-                        title: 'Sales by Payment Mode',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantReportsPaymentMode),
-                        iconColor: Colors.teal,
-                        isTablet: isTablet,
-                        entitlementKey: EntKeys.reportsPaymentMode,
-                      ),
-                      _buildReportCard(
-                        icon: Icons.analytics,
-                        title: 'Performance Statistics',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantPerformanceStats),
-                        iconColor: Colors.purple,
-                        isTablet: isTablet,
-                        entitlementKey: EntKeys.reportsPerformanceStatistics,
-                      ),
-                      _buildReportCard(
-                        icon: Icons.badge_outlined,
-                        title: 'Shift Report',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantShiftReport),
-                        iconColor: Colors.teal,
-                        isTablet: isTablet,
-                        entitlementKey: EntKeys.reportsShift,
-                      ),
-                      _buildReportCard(
-                        icon: Icons.leaderboard_rounded,
-                        title: 'Staff Performance',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantStaffPerformance),
-                        iconColor: Colors.deepPurple,
-                        isTablet: isTablet,
-                        entitlementKey: EntKeys.reportsStaffPerformance,
-                      ),
-                      _buildReportCard(
-                        icon: Icons.account_balance_wallet_outlined,
-                        title: 'Cash Drawer History',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantCashDrawerHistory),
-                        iconColor: Colors.teal,
-                        isTablet: isTablet,
-                        entitlementKey: EntKeys.reportsCashDrawerHistory,
-                      ),
-                      _buildReportCard(
-                        icon: Icons.access_time_rounded,
-                        title: 'Attendance Report',
-                        onTap: () => Navigator.pushNamed(context, RouteNames.restaurantAttendanceReport),
-                        iconColor: Colors.deepPurple,
-                        isTablet: isTablet,
-                        entitlementKey: EntKeys.reportsAttendance,
-                      ),
-                    ],
-                  ),
+        padding: AppResponsive.padding(context),
+        child: GridView.count(
+          shrinkWrap: true,
+          physics: NeverScrollableScrollPhysics(),
+          crossAxisCount: AppResponsive.gridColumns(
+            context,
+            mobile: 2,
+            tablet: 3,
+            desktop: 4,
+          ),
+          crossAxisSpacing: AppResponsive.gridSpacing(context),
+          mainAxisSpacing: AppResponsive.gridSpacing(context),
+          childAspectRatio: AppResponsive.gridAspectRatio(context),
+          children: [
+            // All report tiles are shown; tapping a tile not in the plan
+            // shows the upgrade blocker (handled in _buildReportCard).
+            _buildReportCard(
+              icon: Icons.shopping_bag_outlined,
+              title: 'Total Sale',
+              onTap: () => Navigator.pushNamed(
+                context,
+                RouteNames.restaurantReportsTotalSales,
+              ),
+              iconColor: AppColors.primary,
+              isTablet: isTablet,
+              entitlementKey: EntKeys.reportsTotalSale,
             ),
+            _buildReportCard(
+              icon: Icons.fastfood,
+              title: 'Sales BY Items',
+              onTap: () => Navigator.pushNamed(
+                context,
+                RouteNames.restaurantReportsSalesBYItem,
+              ),
+              iconColor: Colors.deepOrangeAccent,
+              isTablet: isTablet,
+              entitlementKey: EntKeys.reportsSaleByItem,
+            ),
+            _buildReportCard(
+              icon: Icons.category,
+              title: 'Sale By Category',
+              onTap: () => Navigator.pushNamed(
+                context,
+                RouteNames.restaurantReportsSalesByCategory,
+              ),
+              iconColor: Colors.deepOrangeAccent,
+              isTablet: isTablet,
+              entitlementKey: EntKeys.reportsSaleByCategory,
+            ),
+            _buildReportCard(
+              icon: Icons.auto_graph,
+              title: 'Daily Closing Reports',
+              onTap: () => Navigator.pushNamed(
+                context,
+                RouteNames.restaurantReportsDailyClosingReport,
+              ),
+              iconColor: Colors.deepOrangeAccent,
+              isTablet: isTablet,
+              entitlementKey: EntKeys.reportsDailyClosing,
+            ),
+            _buildReportCard(
+              icon: Icons.list_alt,
+              title: 'Customer List',
+              onTap: () => Navigator.pushNamed(
+                context,
+                RouteNames.restaurantReportsCustomerList,
+              ),
+              iconColor: AppColors.primary,
+              isTablet: isTablet,
+              entitlementKey: EntKeys.reportsCustomerList,
+            ),
+            _buildReportCard(
+              icon: Icons.trending_up,
+              title: 'Sales Comparison',
+              onTap: () => Navigator.pushNamed(
+                context,
+                RouteNames.restaurantReportsSalesComparison,
+              ),
+              iconColor: AppColors.primary,
+              isTablet: isTablet,
+              entitlementAnyOf: kComparisonPeriodEntitlements,
+            ),
+            _buildReportCard(
+              icon: Icons.inventory_2_outlined,
+              title: 'Comparison BY Product',
+              onTap: () => Navigator.pushNamed(
+                context,
+                RouteNames.restaurantReportsComparisionByProduct,
+              ),
+              iconColor: AppColors.primary,
+              isTablet: isTablet,
+              entitlementKey: EntKeys.reportsComparisonProduct,
+            ),
+            _buildReportCard(
+              icon: Icons.backspace_outlined,
+              title: 'Refund Details',
+              onTap: () => Navigator.pushNamed(
+                context,
+                RouteNames.restaurantReportsRefundDetails,
+              ),
+              iconColor: AppColors.primary,
+              isTablet: isTablet,
+              entitlementKey: EntKeys.reportsRefundDetails,
+            ),
+            _buildReportCard(
+              icon: Icons.cancel_outlined,
+              title: 'Void Order Report',
+              onTap: () => Navigator.pushNamed(
+                context,
+                RouteNames.restaurantReportsVoidOrderReport,
+              ),
+              iconColor: AppColors.primary,
+              isTablet: isTablet,
+              entitlementKey: EntKeys.reportsVoidOrders,
+            ),
+            _buildReportCard(
+              icon: Icons.remove_circle_outline,
+              title: 'Item Cancellation Report',
+              onTap: () => Navigator.pushNamed(
+                context,
+                RouteNames.restaurantReportsItemCancellation,
+              ),
+              iconColor: Colors.red,
+              isTablet: isTablet,
+              entitlementKey: EntKeys.reportsItemCancellation,
+            ),
+            _buildReportCard(
+              icon: Icons.note_alt_outlined,
+              title: 'Discount Order Reports',
+              onTap: () => Navigator.pushNamed(
+                context,
+                RouteNames.restaurantReportsDiscountOrderReport,
+              ),
+              iconColor: Colors.deepOrangeAccent,
+              isTablet: isTablet,
+              entitlementKey: EntKeys.reportsDiscountOrders,
+            ),
+            _buildReportCard(
+              icon: Icons.event_available,
+              title: 'Pos End Day',
+              onTap: () => Navigator.pushNamed(
+                context,
+                RouteNames.restaurantReportsPosOrder,
+              ),
+              iconColor: AppColors.primary,
+              isTablet: isTablet,
+              entitlementKey: EntKeys.reportsPosEndDay,
+            ),
+            _buildReportCard(
+              icon: Icons.monetization_on_outlined,
+              title: 'Customer List BY Revenue',
+              onTap: () => Navigator.pushNamed(
+                context,
+                RouteNames.restaurantReportsCustomerListByRevenue,
+              ),
+              iconColor: Colors.deepOrangeAccent,
+              isTablet: isTablet,
+              entitlementKey: EntKeys.reportsCustomerRevenue,
+            ),
+            _buildReportCard(
+              icon: Icons.receipt_long,
+              title: 'Expense Report',
+              onTap: () => Navigator.pushNamed(
+                context,
+                RouteNames.restaurantReportsExpense,
+              ),
+              iconColor: Colors.red,
+              isTablet: isTablet,
+              entitlementKey: EntKeys.reportsExpense,
+            ),
+            _buildReportCard(
+              icon: Icons.account_balance_wallet_outlined,
+              title: 'Sales by Payment Mode',
+              onTap: () => Navigator.pushNamed(
+                context,
+                RouteNames.restaurantReportsPaymentMode,
+              ),
+              iconColor: Colors.teal,
+              isTablet: isTablet,
+              entitlementKey: EntKeys.reportsPaymentMode,
+            ),
+            _buildReportCard(
+              icon: Icons.analytics,
+              title: 'Performance Statistics',
+              onTap: () => Navigator.pushNamed(
+                context,
+                RouteNames.restaurantPerformanceStats,
+              ),
+              iconColor: Colors.purple,
+              isTablet: isTablet,
+              entitlementKey: EntKeys.reportsPerformanceStatistics,
+            ),
+            _buildReportCard(
+              icon: Icons.badge_outlined,
+              title: 'Shift Report',
+              onTap: () => Navigator.pushNamed(
+                context,
+                RouteNames.restaurantShiftReport,
+              ),
+              iconColor: Colors.teal,
+              isTablet: isTablet,
+              entitlementKey: EntKeys.reportsShift,
+            ),
+            _buildReportCard(
+              icon: Icons.leaderboard_rounded,
+              title: 'Staff Performance',
+              onTap: () => Navigator.pushNamed(
+                context,
+                RouteNames.restaurantStaffPerformance,
+              ),
+              iconColor: Colors.deepPurple,
+              isTablet: isTablet,
+              entitlementKey: EntKeys.reportsStaffPerformance,
+            ),
+            _buildReportCard(
+              icon: Icons.account_balance_wallet_outlined,
+              title: 'Cash Drawer History',
+              onTap: () => Navigator.pushNamed(
+                context,
+                RouteNames.restaurantCashDrawerHistory,
+              ),
+              iconColor: Colors.teal,
+              isTablet: isTablet,
+              entitlementKey: EntKeys.reportsCashDrawerHistory,
+            ),
+            _buildReportCard(
+              icon: Icons.access_time_rounded,
+              title: 'Attendance Report',
+              onTap: () => Navigator.pushNamed(
+                context,
+                RouteNames.restaurantAttendanceReport,
+              ),
+              iconColor: Colors.deepPurple,
+              isTablet: isTablet,
+              entitlementKey: EntKeys.reportsAttendance,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

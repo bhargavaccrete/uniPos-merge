@@ -269,6 +269,8 @@ class _TaxSelectionScreenState extends State<TaxSelectionScreen> {
 
     await showDialog(
       context: context,
+      // Nearest navigator — stays inside the setup wizard's pane.
+      useRootNavigator: false,
       builder: (ctx) {
         Future<void> submit() async {
           final name = nameController.text.trim();

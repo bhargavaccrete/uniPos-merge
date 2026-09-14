@@ -63,19 +63,35 @@ class _FoodCostReportScreenState extends State<FoodCostReportScreen> {
           return (from: now.subtract(const Duration(days: 30)), to: now);
         }
         return (
-          from: DateTime(_customStart!.year, _customStart!.month, _customStart!.day),
-          to: DateTime(_customEnd!.year, _customEnd!.month, _customEnd!.day, 23, 59, 59),
+          from: DateTime(
+            _customStart!.year,
+            _customStart!.month,
+            _customStart!.day,
+          ),
+          to: DateTime(
+            _customEnd!.year,
+            _customEnd!.month,
+            _customEnd!.day,
+            23,
+            59,
+            59,
+          ),
         );
       case _QuickRange.last7:
       case _QuickRange.last30:
       case _QuickRange.last90:
-        return (from: now.subtract(Duration(days: _selectedRange.days!)), to: now);
+        return (
+          from: now.subtract(Duration(days: _selectedRange.days!)),
+          to: now,
+        );
     }
   }
 
   String get _rangeLabel {
     if (_selectedRange != _QuickRange.custom) return _selectedRange.label;
-    if (_customStart == null || _customEnd == null) return 'Custom (pick dates)';
+    if (_customStart == null || _customEnd == null) {
+      return 'Custom (pick dates)';
+    }
     final fmt = DateFormat('dd MMM yyyy');
     return '${fmt.format(_customStart!)} – ${fmt.format(_customEnd!)}';
   }
@@ -88,7 +104,10 @@ class _FoodCostReportScreenState extends State<FoodCostReportScreen> {
       lastDate: now,
       initialDateRange: (_customStart != null && _customEnd != null)
           ? DateTimeRange(start: _customStart!, end: _customEnd!)
-          : DateTimeRange(start: now.subtract(const Duration(days: 29)), end: now),
+          : DateTimeRange(
+              start: now.subtract(const Duration(days: 29)),
+              end: now,
+            ),
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
           colorScheme: ColorScheme.light(
@@ -121,8 +140,14 @@ class _FoodCostReportScreenState extends State<FoodCostReportScreen> {
             indicatorWeight: 3,
             labelColor: AppColors.white,
             unselectedLabelColor: AppColors.white.withValues(alpha: 0.65),
-            labelStyle: GoogleFonts.poppins(fontSize: 12.5, fontWeight: FontWeight.w600),
-            unselectedLabelStyle: GoogleFonts.poppins(fontSize: 12.5, fontWeight: FontWeight.w500),
+            labelStyle: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              fontWeight: FontWeight.w600,
+            ),
+            unselectedLabelStyle: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              fontWeight: FontWeight.w500,
+            ),
             tabs: const [
               Tab(text: 'Food Cost & Margin'),
               Tab(text: 'Ingredient Usage'),
@@ -138,21 +163,26 @@ class _FoodCostReportScreenState extends State<FoodCostReportScreen> {
                 // ignore: unused_local_variable
                 final _ = itemStore.items.length;
                 final rows = RecipeReportService.foodCostReport();
-                final priced =
-                    rows.where((r) => r.foodCostPercent != null).toList();
+                final priced = rows
+                    .where((r) => r.foodCostPercent != null)
+                    .toList();
                 final avgFoodCost = priced.isEmpty
                     ? null
-                    : priced.map((r) => r.foodCostPercent!).reduce((a, b) => a + b) /
-                        priced.length;
+                    : priced
+                              .map((r) => r.foodCostPercent!)
+                              .reduce((a, b) => a + b) /
+                          priced.length;
                 final avgMargin = priced.isEmpty
                     ? null
                     : priced
-                            .where((r) => r.marginPercent != null)
-                            .map((r) => r.marginPercent!)
-                            .fold(0.0, (a, b) => a + b) /
-                        (priced.where((r) => r.marginPercent != null).isEmpty
-                            ? 1
-                            : priced.where((r) => r.marginPercent != null).length);
+                              .where((r) => r.marginPercent != null)
+                              .map((r) => r.marginPercent!)
+                              .fold(0.0, (a, b) => a + b) /
+                          (priced.where((r) => r.marginPercent != null).isEmpty
+                              ? 1
+                              : priced
+                                    .where((r) => r.marginPercent != null)
+                                    .length);
 
                 return GradientHeroHeader(
                   title: 'Food Cost Report',
@@ -184,35 +214,41 @@ class _FoodCostReportScreenState extends State<FoodCostReportScreen> {
                 );
               },
             ),
+            // Hero and TabBar stay full-bleed; capping here covers all tabs.
             Expanded(
-              child: TabBarView(
-                children: [
-                  _FoodCostMarginTab(),
-            _IngredientUsageTab(
-              rangeLabel: _rangeLabel,
-              selectedRange: _selectedRange,
-              onRangeSelected: (r) {
-                if (r == _QuickRange.custom) {
-                  _pickCustomRange();
-                } else {
-                  setState(() => _selectedRange = r);
-                }
-              },
-              range: _effectiveRange,
-            ),
-            _WastageTab(
-              rangeLabel: _rangeLabel,
-              selectedRange: _selectedRange,
-              onRangeSelected: (r) {
-                if (r == _QuickRange.custom) {
-                  _pickCustomRange();
-                } else {
-                  setState(() => _selectedRange = r);
-                }
-              },
-              range: _effectiveRange,
-            ),
-                ],
+              child: AppResponsive.constrainedContent(
+                context: context,
+                maxWidth: AppResponsive.maxFormWidth(context),
+                alignment: Alignment.topCenter,
+                child: TabBarView(
+                  children: [
+                    _FoodCostMarginTab(),
+                    _IngredientUsageTab(
+                      rangeLabel: _rangeLabel,
+                      selectedRange: _selectedRange,
+                      onRangeSelected: (r) {
+                        if (r == _QuickRange.custom) {
+                          _pickCustomRange();
+                        } else {
+                          setState(() => _selectedRange = r);
+                        }
+                      },
+                      range: _effectiveRange,
+                    ),
+                    _WastageTab(
+                      rangeLabel: _rangeLabel,
+                      selectedRange: _selectedRange,
+                      onRangeSelected: (r) {
+                        if (r == _QuickRange.custom) {
+                          _pickCustomRange();
+                        } else {
+                          setState(() => _selectedRange = r);
+                        }
+                      },
+                      range: _effectiveRange,
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -248,45 +284,63 @@ class _FoodCostMarginTab extends StatelessWidget {
           return const AppEmptyState(
             icon: Icons.receipt_long_rounded,
             title: 'No recipes configured yet',
-            message: 'Mark an item Semi-Finished or Recipe-Based and add ingredients to see cost & margin here.',
+            message:
+                'Mark an item Semi-Finished or Recipe-Based and add ingredients to see cost & margin here.',
           );
         }
 
-        final pricedRows = rows.where((r) => r.foodCostPercent != null).toList();
+        final pricedRows = rows
+            .where((r) => r.foodCostPercent != null)
+            .toList();
         final unpricedCount = rows.length - pricedRows.length;
         final avgFoodCostPercent = pricedRows.isEmpty
             ? null
-            : pricedRows.map((r) => r.foodCostPercent!).reduce((a, b) => a + b) / pricedRows.length;
+            : pricedRows
+                      .map((r) => r.foodCostPercent!)
+                      .reduce((a, b) => a + b) /
+                  pricedRows.length;
 
         return ListView(
           padding: AppResponsive.padding(context),
           children: [
-            ReportSummaryRow(cards: [
-              ReportSummaryCard(
-                title: 'Recipes Tracked',
-                value: rows.length.toString(),
-                icon: Icons.receipt_long_rounded,
-                color: AppColors.primary,
-              ),
-              ReportSummaryCard(
-                title: 'Avg Food Cost %',
-                value: avgFoodCostPercent == null ? '—' : '${avgFoodCostPercent.toStringAsFixed(1)}%',
-                icon: Icons.pie_chart_rounded,
-                color: avgFoodCostPercent == null ? AppColors.textSecondary : _foodCostColor(avgFoodCostPercent),
-              ),
-              ReportSummaryCard(
-                title: 'Not Priced',
-                value: unpricedCount.toString(),
-                icon: Icons.price_change_rounded,
-                color: unpricedCount > 0 ? AppColors.warning : AppColors.success,
-                subtitle: unpricedCount > 0 ? 'Set a price to see margin' : 'All priced',
-              ),
-            ]),
+            ReportSummaryRow(
+              cards: [
+                ReportSummaryCard(
+                  title: 'Recipes Tracked',
+                  value: rows.length.toString(),
+                  icon: Icons.receipt_long_rounded,
+                  color: AppColors.primary,
+                ),
+                ReportSummaryCard(
+                  title: 'Avg Food Cost %',
+                  value: avgFoodCostPercent == null
+                      ? '—'
+                      : '${avgFoodCostPercent.toStringAsFixed(1)}%',
+                  icon: Icons.pie_chart_rounded,
+                  color: avgFoodCostPercent == null
+                      ? AppColors.textSecondary
+                      : _foodCostColor(avgFoodCostPercent),
+                ),
+                ReportSummaryCard(
+                  title: 'Not Priced',
+                  value: unpricedCount.toString(),
+                  icon: Icons.price_change_rounded,
+                  color: unpricedCount > 0
+                      ? AppColors.warning
+                      : AppColors.success,
+                  subtitle: unpricedCount > 0
+                      ? 'Set a price to see margin'
+                      : 'All priced',
+                ),
+              ],
+            ),
             AppResponsive.verticalSpace(context, size: SpacingSize.large),
-            ...rows.map((row) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _FoodCostCard(row: row, colorOf: _foodCostColor),
-                )),
+            ...rows.map(
+              (row) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _FoodCostCard(row: row, colorOf: _foodCostColor),
+              ),
+            ),
           ],
         );
       },
@@ -304,7 +358,9 @@ class _FoodCostCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final foodCostPercent = row.foodCostPercent;
     final marginPercent = row.marginPercent;
-    final Color pillColor = foodCostPercent == null ? AppColors.textSecondary : colorOf(foodCostPercent);
+    final Color pillColor = foodCostPercent == null
+        ? AppColors.textSecondary
+        : colorOf(foodCostPercent);
     final isSemi = row.item.isSemiFinished;
 
     return Container(
@@ -331,24 +387,34 @@ class _FoodCostCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
-                        color: (row.item.isSemiFinished
-                                ? AppColors.info
-                                : (row.item.isRecipeBased ? AppColors.orange : AppColors.success))
-                            .withValues(alpha: 0.12),
+                        color:
+                            (row.item.isSemiFinished
+                                    ? AppColors.info
+                                    : (row.item.isRecipeBased
+                                          ? AppColors.orange
+                                          : AppColors.success))
+                                .withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         row.item.isSemiFinished
                             ? 'Semi-Finished'
-                            : (row.item.isRecipeBased ? 'Recipe-Based' : 'Finished Good'),
+                            : (row.item.isRecipeBased
+                                  ? 'Recipe-Based'
+                                  : 'Finished Good'),
                         style: GoogleFonts.poppins(
-                          fontSize: 10.5,
+                          fontSize: AppResponsive.captionFontSize(context),
                           fontWeight: FontWeight.w700,
                           color: row.item.isSemiFinished
                               ? AppColors.info
-                              : (row.item.isRecipeBased ? AppColors.orange : AppColors.success),
+                              : (row.item.isRecipeBased
+                                    ? AppColors.orange
+                                    : AppColors.success),
                         ),
                       ),
                     ),
@@ -356,7 +422,7 @@ class _FoodCostCard extends StatelessWidget {
                     Text(
                       row.item.name,
                       style: GoogleFonts.poppins(
-                        fontSize: 15,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
@@ -364,13 +430,19 @@ class _FoodCostCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       '${row.ingredientCount} ingredient${row.ingredientCount == 1 ? '' : 's'}',
-                      style: GoogleFonts.poppins(fontSize: 11.5, color: AppColors.textSecondary),
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.captionFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: pillColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
@@ -380,11 +452,21 @@ class _FoodCostCard extends StatelessWidget {
                   children: [
                     Text(
                       'Food Cost',
-                      style: GoogleFonts.poppins(fontSize: 9.5, color: pillColor, fontWeight: FontWeight.w600),
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.captionFontSize(context),
+                        color: pillColor,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     Text(
-                      foodCostPercent == null ? '—' : '${foodCostPercent.toStringAsFixed(1)}%',
-                      style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w700, color: pillColor),
+                      foodCostPercent == null
+                          ? '—'
+                          : '${foodCostPercent.toStringAsFixed(1)}%',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.subheadingFontSize(context),
+                        fontWeight: FontWeight.w700,
+                        color: pillColor,
+                      ),
                     ),
                   ],
                 ),
@@ -400,23 +482,38 @@ class _FoodCostCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Expanded(child: _statColumn('Cost/Unit', '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(row.costPerUnit)}', AppColors.textPrimary)),
                 Expanded(
                   child: _statColumn(
-                    'Selling Price',
-                    row.sellingPrice == null
-                        ? 'Not priced'
-                        : '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(row.sellingPrice!)}',
-                    row.sellingPrice == null ? AppColors.warning : AppColors.textPrimary,
+                    context,
+                    'Cost/Unit',
+                    '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(row.costPerUnit)}',
+                    AppColors.textPrimary,
                   ),
                 ),
                 Expanded(
                   child: _statColumn(
+                    context,
+                    'Selling Price',
+                    row.sellingPrice == null
+                        ? 'Not priced'
+                        : '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(row.sellingPrice!)}',
+                    row.sellingPrice == null
+                        ? AppColors.warning
+                        : AppColors.textPrimary,
+                  ),
+                ),
+                Expanded(
+                  child: _statColumn(
+                    context,
                     'Margin',
-                    marginPercent == null ? '—' : '${marginPercent.toStringAsFixed(1)}%',
+                    marginPercent == null
+                        ? '—'
+                        : '${marginPercent.toStringAsFixed(1)}%',
                     marginPercent == null
                         ? AppColors.textSecondary
-                        : (marginPercent >= 0 ? AppColors.success : AppColors.danger),
+                        : (marginPercent >= 0
+                              ? AppColors.success
+                              : AppColors.danger),
                   ),
                 ),
               ],
@@ -427,15 +524,30 @@ class _FoodCostCard extends StatelessWidget {
     );
   }
 
-  Widget _statColumn(String label, String value, Color valueColor) {
+  Widget _statColumn(
+    BuildContext context,
+    String label,
+    String value,
+    Color valueColor,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: GoogleFonts.poppins(fontSize: 10, color: AppColors.textSecondary)),
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.captionFontSize(context),
+            color: AppColors.textSecondary,
+          ),
+        ),
         const SizedBox(height: 2),
         Text(
           value,
-          style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w700, color: valueColor),
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w700,
+            color: valueColor,
+          ),
         ),
       ],
     );
@@ -471,13 +583,21 @@ class _DateRangeSelector extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.date_range_rounded, size: 16, color: AppColors.primary),
+              Icon(
+                Icons.date_range_rounded,
+                size: 16,
+                color: AppColors.primary,
+              ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   rangeLabel,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
             ],
@@ -492,25 +612,43 @@ class _DateRangeSelector extends StatelessWidget {
                 onTap: () => onRangeSelected(r),
                 borderRadius: BorderRadius.circular(9),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
-                    color: selected ? AppColors.primary.withValues(alpha: 0.12) : AppColors.surfaceLight,
+                    color: selected
+                        ? AppColors.primary.withValues(alpha: 0.12)
+                        : AppColors.surfaceLight,
                     borderRadius: BorderRadius.circular(9),
-                    border: Border.all(color: selected ? AppColors.primary : AppColors.divider, width: selected ? 1.5 : 1),
+                    border: Border.all(
+                      color: selected ? AppColors.primary : AppColors.divider,
+                      width: selected ? 1.5 : 1,
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (r == _QuickRange.custom) ...[
-                        Icon(Icons.edit_calendar_rounded, size: 13, color: selected ? AppColors.primary : AppColors.textSecondary),
+                        Icon(
+                          Icons.edit_calendar_rounded,
+                          size: 13,
+                          color: selected
+                              ? AppColors.primary
+                              : AppColors.textSecondary,
+                        ),
                         const SizedBox(width: 5),
                       ],
                       Text(
                         r.label,
                         style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                          color: selected ? AppColors.primary : AppColors.textPrimary,
+                          fontSize: AppResponsive.smallFontSize(context),
+                          fontWeight: selected
+                              ? FontWeight.w600
+                              : FontWeight.w500,
+                          color: selected
+                              ? AppColors.primary
+                              : AppColors.textPrimary,
                         ),
                       ),
                     ],
@@ -544,41 +682,52 @@ class _IngredientUsageTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rows = RecipeReportService.ingredientUsageReport(from: range.from, to: range.to);
+    final rows = RecipeReportService.ingredientUsageReport(
+      from: range.from,
+      to: range.to,
+    );
     final totalCost = rows.fold(0.0, (s, r) => s + r.estimatedCost);
     final totalMovements = rows.fold(0, (s, r) => s + r.movementCount);
 
     return ListView(
       padding: AppResponsive.padding(context),
       children: [
-        _DateRangeSelector(rangeLabel: rangeLabel, selectedRange: selectedRange, onRangeSelected: onRangeSelected),
+        _DateRangeSelector(
+          rangeLabel: rangeLabel,
+          selectedRange: selectedRange,
+          onRangeSelected: onRangeSelected,
+        ),
         AppResponsive.verticalSpace(context, size: SpacingSize.large),
-        ReportSummaryRow(cards: [
-          ReportSummaryCard(
-            title: 'Ingredients Used',
-            value: rows.length.toString(),
-            icon: Icons.grass_rounded,
-            color: AppColors.primary,
-          ),
-          ReportSummaryCard(
-            title: 'Total Cost',
-            value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(totalCost)}',
-            icon: Icons.currency_exchange_rounded,
-            color: AppColors.orange,
-          ),
-          ReportSummaryCard(
-            title: 'Movements',
-            value: totalMovements.toString(),
-            icon: Icons.swap_horiz_rounded,
-            color: AppColors.info,
-          ),
-        ]),
+        ReportSummaryRow(
+          cards: [
+            ReportSummaryCard(
+              title: 'Ingredients Used',
+              value: rows.length.toString(),
+              icon: Icons.grass_rounded,
+              color: AppColors.primary,
+            ),
+            ReportSummaryCard(
+              title: 'Total Cost',
+              value:
+                  '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(totalCost)}',
+              icon: Icons.currency_exchange_rounded,
+              color: AppColors.orange,
+            ),
+            ReportSummaryCard(
+              title: 'Movements',
+              value: totalMovements.toString(),
+              icon: Icons.swap_horiz_rounded,
+              color: AppColors.info,
+            ),
+          ],
+        ),
         AppResponsive.verticalSpace(context, size: SpacingSize.large),
         if (rows.isEmpty)
           const AppEmptyState(
             icon: Icons.grass_rounded,
             title: 'No ingredient usage found',
-            message: 'No recipe-cascaded sales or production consumed raw materials in this range.',
+            message:
+                'No recipe-cascaded sales or production consumed raw materials in this range.',
           )
         else
           ...List.generate(rows.length, (i) {
@@ -620,35 +769,45 @@ class _WastageTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rows = RecipeReportService.wastageReport(from: range.from, to: range.to);
+    final rows = RecipeReportService.wastageReport(
+      from: range.from,
+      to: range.to,
+    );
     final totalCost = rows.fold(0.0, (s, r) => s + r.estimatedCost);
     final totalMovements = rows.fold(0, (s, r) => s + r.movementCount);
 
     return ListView(
       padding: AppResponsive.padding(context),
       children: [
-        _DateRangeSelector(rangeLabel: rangeLabel, selectedRange: selectedRange, onRangeSelected: onRangeSelected),
+        _DateRangeSelector(
+          rangeLabel: rangeLabel,
+          selectedRange: selectedRange,
+          onRangeSelected: onRangeSelected,
+        ),
         AppResponsive.verticalSpace(context, size: SpacingSize.large),
-        ReportSummaryRow(cards: [
-          ReportSummaryCard(
-            title: 'Items Wasted',
-            value: rows.length.toString(),
-            icon: Icons.delete_outline_rounded,
-            color: AppColors.danger,
-          ),
-          ReportSummaryCard(
-            title: 'Wastage Cost',
-            value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(totalCost)}',
-            icon: Icons.currency_exchange_rounded,
-            color: AppColors.danger,
-          ),
-          ReportSummaryCard(
-            title: 'Movements',
-            value: totalMovements.toString(),
-            icon: Icons.swap_horiz_rounded,
-            color: AppColors.info,
-          ),
-        ]),
+        ReportSummaryRow(
+          cards: [
+            ReportSummaryCard(
+              title: 'Items Wasted',
+              value: rows.length.toString(),
+              icon: Icons.delete_outline_rounded,
+              color: AppColors.danger,
+            ),
+            ReportSummaryCard(
+              title: 'Wastage Cost',
+              value:
+                  '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(totalCost)}',
+              icon: Icons.currency_exchange_rounded,
+              color: AppColors.danger,
+            ),
+            ReportSummaryCard(
+              title: 'Movements',
+              value: totalMovements.toString(),
+              icon: Icons.swap_horiz_rounded,
+              color: AppColors.info,
+            ),
+          ],
+        ),
         AppResponsive.verticalSpace(context, size: SpacingSize.large),
         if (rows.isEmpty)
           const AppEmptyState(
@@ -725,7 +884,11 @@ class _UsageCard extends StatelessWidget {
             ),
             child: Text(
               '$rank',
-              style: GoogleFonts.poppins(fontSize: 12.5, fontWeight: FontWeight.w700, color: accent),
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                fontWeight: FontWeight.w700,
+                color: accent,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -737,12 +900,19 @@ class _UsageCard extends StatelessWidget {
                   name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   '${DecimalSettings.formatAmount(qty)} $unit  •  $movementCount movement${movementCount == 1 ? '' : 's'}',
-                  style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textSecondary),
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.captionFontSize(context),
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -750,7 +920,11 @@ class _UsageCard extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(cost)}',
-            style: GoogleFonts.poppins(fontSize: 13.5, fontWeight: FontWeight.w700, color: accent),
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w700,
+              color: accent,
+            ),
           ),
         ],
       ),

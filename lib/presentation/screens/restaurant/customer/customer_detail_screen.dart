@@ -6,7 +6,7 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/common/customer_model_125.dart';
-import 'add_edit_customer_screen.dart';
+import 'customer_form_dialog.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
@@ -39,7 +39,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
   }
 
   Future<void> _refreshCustomerData() async {
-    final updatedCustomer = await customerStore.getCustomerById(_customer.customerId);
+    final updatedCustomer = await customerStore.getCustomerById(
+      _customer.customerId,
+    );
     if (updatedCustomer != null) {
       setState(() {
         _customer = updatedCustomer;
@@ -48,17 +50,14 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
   }
 
   Future<void> _editCustomer() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AddEditCustomerScreen(customer: _customer),
-      ),
-    );
+    final result = await showCustomerFormDialog(context, customer: _customer);
 
     if (result == 'updated') {
       await _refreshCustomerData();
       if (mounted) {
-        NotificationService.instance.showSuccess('Customer updated successfully');
+        NotificationService.instance.showSuccess(
+          'Customer updated successfully',
+        );
       }
     }
   }
@@ -67,7 +66,10 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     if (_isLoading) return;
     _pointsController.clear();
     final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        ? ((AppResponsive.screenWidth(context) -
+                      AppResponsive.dialogWidth(context)) /
+                  2)
+              .clamp(40.0, double.infinity)
         : 24.0;
     final result = await showDialog<bool>(
       context: context,
@@ -86,8 +88,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.06),
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
+                ),
               ),
               child: Row(
                 children: [
@@ -97,16 +100,22 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                       color: AppColors.primary.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.stars_rounded,
-                        color: AppColors.primary, size: 24),
+                    child: Icon(
+                      Icons.stars_rounded,
+                      color: AppColors.primary,
+                      size: 24,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text('Add Loyalty Points',
-                        style: GoogleFonts.poppins(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary)),
+                    child: Text(
+                      'Add Loyalty Points',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.subheadingFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -138,11 +147,15 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                           side: BorderSide(color: AppColors.divider),
                           padding: const EdgeInsets.symmetric(vertical: 13),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
-                        child: Text('Cancel',
-                            style:
-                                GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                        child: Text(
+                          'Cancel',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -155,12 +168,16 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                           elevation: 0,
                           padding: const EdgeInsets.symmetric(vertical: 13),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
-                        child: Text('Add Points',
-                            textAlign: TextAlign.center,
-                            style:
-                                GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                        child: Text(
+                          'Add Points',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -176,26 +193,40 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
 
     if (result != true) return;
     if (rawText.isEmpty) {
-      NotificationService.instance.showError('Please enter the number of points');
+      NotificationService.instance.showError(
+        'Please enter the number of points',
+      );
       return;
     }
     final points = int.tryParse(rawText);
     if (points == null || points <= 0) {
-      NotificationService.instance.showError('Points must be a number greater than 0');
+      NotificationService.instance.showError(
+        'Points must be a number greater than 0',
+      );
       return;
     }
 
-    setState(() { _isLoading = true; });
+    setState(() {
+      _isLoading = true;
+    });
     try {
-      final success = await customerStore.addLoyaltyPoints(_customer.customerId, points);
+      final success = await customerStore.addLoyaltyPoints(
+        _customer.customerId,
+        points,
+      );
       if (success) {
         await _refreshCustomerData();
         if (mounted) {
-          NotificationService.instance.showSuccess('$points loyalty points added');
+          NotificationService.instance.showSuccess(
+            '$points loyalty points added',
+          );
         }
       }
     } finally {
-      if (mounted) setState(() { _isLoading = false; });
+      if (mounted)
+        setState(() {
+          _isLoading = false;
+        });
     }
   }
 
@@ -211,16 +242,25 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     );
 
     if (confirm) {
-      setState(() { _isLoading = true; });
+      setState(() {
+        _isLoading = true;
+      });
       try {
-        final success = await customerStore.deleteCustomer(_customer.customerId);
+        final success = await customerStore.deleteCustomer(
+          _customer.customerId,
+        );
         if (mounted && success) {
           Navigator.pop(context, 'deleted');
         } else if (mounted) {
-          setState(() { _isLoading = false; });
+          setState(() {
+            _isLoading = false;
+          });
         }
       } catch (_) {
-        if (mounted) setState(() { _isLoading = false; });
+        if (mounted)
+          setState(() {
+            _isLoading = false;
+          });
       }
     }
   }
@@ -235,11 +275,8 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
-    final isTablet = !AppResponsive.isMobile(context);
-
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
@@ -249,7 +286,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
             icon: Icon(
               Icons.edit_rounded,
               color: Colors.orange,
-              size: isTablet ? 24 : 22,
+              size: AppResponsive.iconSize(context),
             ),
             onPressed: _editCustomer,
             tooltip: 'Edit',
@@ -262,7 +299,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
             icon: Icon(
               Icons.delete_rounded,
               color: Colors.red,
-              size: isTablet ? 24 : 22,
+              size: AppResponsive.iconSize(context),
             ),
             onPressed: _deleteCustomer,
             tooltip: 'Delete',
@@ -274,11 +311,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
         ],
       ),
       body: _isLoading
-          ? Center(
-              child: CircularProgressIndicator(
-                color: AppColors.primary,
-              ),
-            )
+          ? Center(child: CircularProgressIndicator(color: AppColors.primary))
           : SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -287,12 +320,24 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                   Container(
                     width: double.infinity,
                     color: AppColors.white,
-                    padding: EdgeInsets.all(isTablet ? 28 : 24),
+                    padding: EdgeInsets.all(
+                      AppResponsive.extraLargeSpacing(context),
+                    ),
                     child: Column(
                       children: [
                         Container(
-                          width: isTablet ? 100 : 90,
-                          height: isTablet ? 100 : 90,
+                          width: AppResponsive.getValue(
+                            context,
+                            mobile: 90.0,
+                            tablet: 100.0,
+                            desktop: 110.0,
+                          ),
+                          height: AppResponsive.getValue(
+                            context,
+                            mobile: 90.0,
+                            tablet: 100.0,
+                            desktop: 110.0,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.primary.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
@@ -303,18 +348,28 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                                   ? _customer.name![0].toUpperCase()
                                   : '?',
                               style: GoogleFonts.poppins(
-                                fontSize: isTablet ? 42 : 38,
+                                fontSize: AppResponsive.getValue(
+                                  context,
+                                  mobile: 38.0,
+                                  tablet: 42.0,
+                                  desktop: 46.0,
+                                ),
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.primary,
                               ),
                             ),
                           ),
                         ),
-                        SizedBox(height: isTablet ? 18 : 16),
+                        SizedBox(height: AppResponsive.largeSpacing(context)),
                         Text(
                           _customer.name ?? 'Unknown Customer',
                           style: GoogleFonts.poppins(
-                            fontSize: isTablet ? 24 : 22,
+                            fontSize: AppResponsive.getValue(
+                              context,
+                              mobile: 22.0,
+                              tablet: 24.0,
+                              desktop: 26.0,
+                            ),
                             fontWeight: FontWeight.w600,
                             color: Colors.black87,
                           ),
@@ -327,13 +382,13 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                               Icon(
                                 Icons.phone_rounded,
                                 color: AppColors.textSecondary,
-                                size: isTablet ? 18 : 16,
+                                size: AppResponsive.largeSpacing(context),
                               ),
                               SizedBox(width: 8),
                               Text(
                                 _customer.phone!,
                                 style: GoogleFonts.poppins(
-                                  fontSize: isTablet ? 16 : 15,
+                                  fontSize: AppResponsive.bodyFontSize(context),
                                   color: AppColors.textSecondary,
                                 ),
                               ),
@@ -346,8 +401,8 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
 
                   // Stats Cards
                   Container(
-                    margin: EdgeInsets.all(isTablet ? 20 : 16),
-                    padding: EdgeInsets.all(isTablet ? 20 : 16),
+                    margin: AppResponsive.padding(context),
+                    padding: AppResponsive.padding(context),
                     decoration: BoxDecoration(
                       color: AppColors.white,
                       borderRadius: BorderRadius.circular(12),
@@ -361,17 +416,15 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                             _customer.totalVisites.toString(),
                             Icons.restaurant_rounded,
                             Colors.blue,
-                            isTablet,
                           ),
                         ),
-                        SizedBox(width: isTablet ? 16 : 12),
+                        SizedBox(width: AppResponsive.mediumSpacing(context)),
                         Expanded(
                           child: _buildStatCard(
                             'Loyalty Points',
                             _customer.loyaltyPoints.toString(),
                             Icons.stars_rounded,
                             Colors.orange,
-                            isTablet,
                           ),
                         ),
                       ],
@@ -380,73 +433,70 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
 
                   // Information Sections
                   Padding(
-                    padding: EdgeInsets.all(isTablet ? 20 : 16),
+                    padding: AppResponsive.padding(context),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Last Visit Info
-                        _buildSectionTitle('Last Visit Information', isTablet),
-                        SizedBox(height: isTablet ? 14 : 12),
-                        _buildInfoCard(
-                          [
+                        _buildSectionTitle('Last Visit Information'),
+                        SizedBox(height: AppResponsive.mediumSpacing(context)),
+                        _buildInfoCard([
+                          _buildInfoRow(
+                            Icons.calendar_today_rounded,
+                            'Last Visit',
+                            _formatDate(_customer.lastVisitAt),
+                          ),
+                          if (_customer.lastorderType != null)
                             _buildInfoRow(
-                              Icons.calendar_today_rounded,
-                              'Last Visit',
-                              _formatDate(_customer.lastVisitAt),
-                              isTablet,
+                              Icons.delivery_dining_rounded,
+                              'Order Type',
+                              _customer.lastorderType!,
                             ),
-                            if (_customer.lastorderType != null)
-                              _buildInfoRow(
-                                Icons.delivery_dining_rounded,
-                                'Order Type',
-                                _customer.lastorderType!,
-                                isTablet,
-                              ),
-                          ],
-                          isTablet,
-                        ),
+                        ]),
 
-                        SizedBox(height: isTablet ? 28 : 24),
+                        SizedBox(
+                          height: AppResponsive.extraLargeSpacing(context),
+                        ),
 
                         // Preferences
-                        _buildSectionTitle('Preferences', isTablet),
-                        SizedBox(height: isTablet ? 14 : 12),
-                        _buildInfoCard(
-                          [
-                            if (_customer.foodPrefrence != null)
-                              _buildInfoRow(
-                                Icons.restaurant_menu_rounded,
-                                'Food Preference',
-                                _customer.foodPrefrence!,
-                                isTablet,
-                              )
-                            else
-                              _buildInfoRow(
-                                Icons.restaurant_menu_rounded,
-                                'Food Preference',
-                                'Not specified',
-                                isTablet,
-                                isSubdued: true,
-                              ),
-                            if (_customer.favoriteItems != null)
-                              _buildInfoRow(
-                                Icons.favorite_rounded,
-                                'Favorite Items',
-                                _customer.favoriteItems!,
-                                isTablet,
-                              ),
-                          ],
-                          isTablet,
-                        ),
+                        _buildSectionTitle('Preferences'),
+                        SizedBox(height: AppResponsive.mediumSpacing(context)),
+                        _buildInfoCard([
+                          if (_customer.foodPrefrence != null)
+                            _buildInfoRow(
+                              Icons.restaurant_menu_rounded,
+                              'Food Preference',
+                              _customer.foodPrefrence!,
+                            )
+                          else
+                            _buildInfoRow(
+                              Icons.restaurant_menu_rounded,
+                              'Food Preference',
+                              'Not specified',
+                              isSubdued: true,
+                            ),
+                          if (_customer.favoriteItems != null)
+                            _buildInfoRow(
+                              Icons.favorite_rounded,
+                              'Favorite Items',
+                              _customer.favoriteItems!,
+                            ),
+                        ]),
 
-                        SizedBox(height: isTablet ? 28 : 24),
+                        SizedBox(
+                          height: AppResponsive.extraLargeSpacing(context),
+                        ),
 
                         // Notes
                         if (_customer.notes != null) ...[
-                          _buildSectionTitle('Notes', isTablet),
-                          SizedBox(height: isTablet ? 14 : 12),
+                          _buildSectionTitle('Notes'),
+                          SizedBox(
+                            height: AppResponsive.mediumSpacing(context),
+                          ),
                           Container(
-                            padding: EdgeInsets.all(isTablet ? 16 : 14),
+                            padding: EdgeInsets.all(
+                              AppResponsive.mediumSpacing(context),
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.white,
                               borderRadius: BorderRadius.circular(12),
@@ -458,14 +508,16 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                                 Icon(
                                   Icons.notes_rounded,
                                   color: AppColors.primary,
-                                  size: isTablet ? 22 : 20,
+                                  size: AppResponsive.iconSize(context),
                                 ),
                                 SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
                                     _customer.notes!,
                                     style: GoogleFonts.poppins(
-                                      fontSize: isTablet ? 14 : 13,
+                                      fontSize: AppResponsive.smallFontSize(
+                                        context,
+                                      ),
                                       color: AppColors.textPrimary,
                                     ),
                                   ),
@@ -473,44 +525,45 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                               ],
                             ),
                           ),
-                          SizedBox(height: isTablet ? 28 : 24),
+                          SizedBox(
+                            height: AppResponsive.extraLargeSpacing(context),
+                          ),
                         ],
 
                         // Account Info
-                        _buildSectionTitle('Account Information', isTablet),
-                        SizedBox(height: isTablet ? 14 : 12),
-                        _buildInfoCard(
-                          [
+                        _buildSectionTitle('Account Information'),
+                        SizedBox(height: AppResponsive.mediumSpacing(context)),
+                        _buildInfoCard([
+                          _buildInfoRow(
+                            Icons.person_add_rounded,
+                            'Created',
+                            _formatDate(_customer.createdAt),
+                          ),
+                          if (_customer.updatedAt != null)
                             _buildInfoRow(
-                              Icons.person_add_rounded,
-                              'Created',
-                              _formatDate(_customer.createdAt),
-                              isTablet,
+                              Icons.update_rounded,
+                              'Last Updated',
+                              _formatDate(_customer.updatedAt),
                             ),
-                            if (_customer.updatedAt != null)
-                              _buildInfoRow(
-                                Icons.update_rounded,
-                                'Last Updated',
-                                _formatDate(_customer.updatedAt),
-                                isTablet,
-                              ),
-                            _buildInfoRow(
-                              Icons.badge_rounded,
-                              'Customer ID',
-                              '${_customer.customerId.substring(0, 8)}...',
-                              isTablet,
-                              isSubdued: true,
-                            ),
-                          ],
-                          isTablet,
-                        ),
+                          _buildInfoRow(
+                            Icons.badge_rounded,
+                            'Customer ID',
+                            '${_customer.customerId.substring(0, 8)}...',
+                            isSubdued: true,
+                          ),
+                        ]),
 
-                        SizedBox(height: isTablet ? 36 : 32),
+                        SizedBox(height: AppResponsive.largeIconSize(context)),
 
                         // Action Button
                         SizedBox(
                           width: double.infinity,
-                          height: isTablet ? 54 : 50,
+                          height: AppResponsive.getValue(
+                            context,
+                            mobile: 50.0,
+                            tablet: 54.0,
+                            desktop: 58.0,
+                          ),
                           child: ElevatedButton.icon(
                             onPressed: _addLoyaltyPoints,
                             style: ElevatedButton.styleFrom(
@@ -523,19 +576,21 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                             ),
                             icon: Icon(
                               Icons.add_circle_rounded,
-                              size: isTablet ? 24 : 22,
+                              size: AppResponsive.iconSize(context),
                             ),
                             label: Text(
                               'Add Loyalty Points',
                               style: GoogleFonts.poppins(
-                                fontSize: isTablet ? 17 : 16,
+                                fontSize: AppResponsive.subheadingFontSize(
+                                  context,
+                                ),
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
                         ),
 
-                        SizedBox(height: isTablet ? 20 : 16),
+                        SizedBox(height: AppResponsive.largeSpacing(context)),
                       ],
                     ),
                   ),
@@ -545,11 +600,16 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color, bool isTablet) {
+  Widget _buildStatCard(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Column(
       children: [
         Container(
-          padding: EdgeInsets.all(isTablet ? 12 : 10),
+          padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
@@ -557,14 +617,14 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
           child: Icon(
             icon,
             color: color,
-            size: isTablet ? 28 : 24,
+            size: AppResponsive.extraLargeSpacing(context),
           ),
         ),
-        SizedBox(height: isTablet ? 10 : 8),
+        SizedBox(height: AppResponsive.smallSpacing(context)),
         Text(
           value,
           style: GoogleFonts.poppins(
-            fontSize: isTablet ? 22 : 20,
+            fontSize: AppResponsive.headingFontSize(context),
             fontWeight: FontWeight.w600,
             color: color,
           ),
@@ -573,7 +633,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
         Text(
           label,
           style: GoogleFonts.poppins(
-            fontSize: isTablet ? 13 : 12,
+            fontSize: AppResponsive.smallFontSize(context),
             color: AppColors.textSecondary,
             fontWeight: FontWeight.w500,
           ),
@@ -583,46 +643,45 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     );
   }
 
-  Widget _buildSectionTitle(String title, bool isTablet) {
+  Widget _buildSectionTitle(String title) {
     return Text(
       title,
       style: GoogleFonts.poppins(
-        fontSize: isTablet ? 18 : 17,
+        fontSize: AppResponsive.subheadingFontSize(context),
         fontWeight: FontWeight.w600,
         color: Colors.black87,
       ),
     );
   }
 
-  Widget _buildInfoCard(List<Widget> children, bool isTablet) {
+  Widget _buildInfoCard(List<Widget> children) {
     return Container(
-      padding: EdgeInsets.all(isTablet ? 16 : 14),
+      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.divider),
       ),
-      child: Column(
-        children: children,
-      ),
+      child: Column(children: children),
     );
   }
 
   Widget _buildInfoRow(
     IconData icon,
     String label,
-    String value,
-    bool isTablet, {
+    String value, {
     bool isSubdued = false,
   }) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: isTablet ? 10 : 8),
+      padding: EdgeInsets.symmetric(
+        vertical: AppResponsive.smallSpacing(context),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
             icon,
-            size: isTablet ? 22 : 20,
+            size: AppResponsive.iconSize(context),
             color: isSubdued ? AppColors.textSecondary : AppColors.primary,
           ),
           SizedBox(width: 12),
@@ -633,7 +692,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                 Text(
                   label,
                   style: GoogleFonts.poppins(
-                    fontSize: isTablet ? 13 : 12,
+                    fontSize: AppResponsive.smallFontSize(context),
                     color: AppColors.textSecondary,
                     fontWeight: FontWeight.w500,
                   ),
@@ -642,8 +701,10 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                 Text(
                   value,
                   style: GoogleFonts.poppins(
-                    fontSize: isTablet ? 15 : 14,
-                    color: isSubdued ? AppColors.textSecondary : AppColors.textPrimary,
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    color: isSubdued
+                        ? AppColors.textSecondary
+                        : AppColors.textPrimary,
                     fontWeight: isSubdued ? FontWeight.normal : FontWeight.w500,
                   ),
                 ),

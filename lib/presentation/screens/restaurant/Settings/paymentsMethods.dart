@@ -72,17 +72,17 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
   void _refreshUpiPreview() {
     _upiQrData.value = _upiIdController.text.trim().isEmpty
         ? ''
-        : UpiQrHelper.buildUpiUri(_upiIdController.text,
-            payee: _upiPayeeController.text);
+        : UpiQrHelper.buildUpiUri(
+            _upiIdController.text,
+            payee: _upiPayeeController.text,
+          );
   }
 
   /// Debounced preview update fired from field onChanged callbacks.
   void _scheduleUpiPreview() {
     _qrDebounce?.cancel();
-    _qrDebounce =
-        Timer(const Duration(milliseconds: 350), _refreshUpiPreview);
+    _qrDebounce = Timer(const Duration(milliseconds: 350), _refreshUpiPreview);
   }
-
 
   // Icon mapping for payment methods
   IconData _getIcon(String iconName) {
@@ -116,8 +116,9 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
             iconName: 'payment',
           );
           if (mounted) Navigator.pop(context);
-          NotificationService.instance
-              .showSuccess('${_nameController.text} added successfully');
+          NotificationService.instance.showSuccess(
+            '${_nameController.text} added successfully',
+          );
         }
 
         return AppDialogShell(
@@ -138,10 +139,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
           actions: [
             appDialogCancelButton(context),
             const SizedBox(width: 12),
-            appDialogPrimaryButton(
-              label: 'Add',
-              onPressed: submitAdd,
-            ),
+            appDialogPrimaryButton(label: 'Add', onPressed: submitAdd),
           ],
         );
       },
@@ -185,141 +183,149 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
           }
           if (mounted) {
             Navigator.pop(context);
-            NotificationService.instance
-                .showSuccess('Payment method updated successfully');
+            NotificationService.instance.showSuccess(
+              'Payment method updated successfully',
+            );
           }
         }
 
         return AppDialogShell(
-        title: isUpi ? 'UPI Setup' : 'Edit Payment Method',
-        subtitle:
-            isUpi ? 'Set your merchant UPI ID & QR' : 'Update payment details',
-        accent: AppColors.primary,
-        icon: isUpi ? Icons.qr_code_2_rounded : Icons.edit_rounded,
-        body: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AppTextField(
-              controller: _nameController,
-              autofocus: true,
-              label: 'Method Name',
-              hint: 'Enter method name',
-              icon: Icons.payment_rounded,
-              required: true,
-              textInputAction:
-                  isUpi ? TextInputAction.next : TextInputAction.done,
-              onFieldSubmitted: (_) {
-                if (isUpi) {
-                  _upiIdFocus.requestFocus();
-                } else {
-                  submit();
-                }
-              },
-            ),
-            if (isUpi) ...[
-              const SizedBox(height: 16),
+          title: isUpi ? 'UPI Setup' : 'Edit Payment Method',
+          subtitle: isUpi
+              ? 'Set your merchant UPI ID & QR'
+              : 'Update payment details',
+          accent: AppColors.primary,
+          icon: isUpi ? Icons.qr_code_2_rounded : Icons.edit_rounded,
+          body: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               AppTextField(
-                controller: _upiIdController,
-                focusNode: _upiIdFocus,
-                label: 'Merchant UPI ID (VPA)',
-                hint: 'e.g., merchant@okhdfc',
-                icon: Icons.alternate_email_rounded,
-                textInputAction: TextInputAction.next,
-                onFieldSubmitted: (_) => _upiPayeeFocus.requestFocus(),
-                onChanged: (_) => _scheduleUpiPreview(),
+                controller: _nameController,
+                autofocus: true,
+                label: 'Method Name',
+                hint: 'Enter method name',
+                icon: Icons.payment_rounded,
+                required: true,
+                textInputAction: isUpi
+                    ? TextInputAction.next
+                    : TextInputAction.done,
+                onFieldSubmitted: (_) {
+                  if (isUpi) {
+                    _upiIdFocus.requestFocus();
+                  } else {
+                    submit();
+                  }
+                },
               ),
-              const SizedBox(height: 16),
-              AppTextField(
-                controller: _upiPayeeController,
-                focusNode: _upiPayeeFocus,
-                label: 'Payee Name (Optional)',
-                hint: 'Falls back to Store Name',
-                icon: Icons.person_outline_rounded,
-                textInputAction: TextInputAction.done,
-                onFieldSubmitted: (_) => submit(),
-                onChanged: (_) => _scheduleUpiPreview(),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Payment QR Preview',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+              if (isUpi) ...[
+                const SizedBox(height: 16),
+                AppTextField(
+                  controller: _upiIdController,
+                  focusNode: _upiIdFocus,
+                  label: 'Merchant UPI ID (VPA)',
+                  hint: 'e.g., merchant@okhdfc',
+                  icon: Icons.alternate_email_rounded,
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) => _upiPayeeFocus.requestFocus(),
+                  onChanged: (_) => _scheduleUpiPreview(),
                 ),
-              ),
-              const SizedBox(height: 8),
-              ValueListenableBuilder<String>(
-                valueListenable: _upiQrData,
-                builder: (context, qrData, _) => Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceLight,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.divider),
+                const SizedBox(height: 16),
+                AppTextField(
+                  controller: _upiPayeeController,
+                  focusNode: _upiPayeeFocus,
+                  label: 'Payee Name (Optional)',
+                  hint: 'Falls back to Store Name',
+                  icon: Icons.person_outline_rounded,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => submit(),
+                  onChanged: (_) => _scheduleUpiPreview(),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Payment QR Preview',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
                   ),
-                  child: qrData.isEmpty
-                      ? Column(
-                          children: [
-                            Icon(Icons.qr_code_2,
+                ),
+                const SizedBox(height: 8),
+                ValueListenableBuilder<String>(
+                  valueListenable: _upiQrData,
+                  builder: (context, qrData, _) => Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceLight,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.divider),
+                    ),
+                    child: qrData.isEmpty
+                        ? Column(
+                            children: [
+                              Icon(
+                                Icons.qr_code_2,
                                 size: 48,
-                                color: AppColors.textSecondary
-                                    .withValues(alpha: 0.5)),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Enter a UPI ID to generate the QR code',
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  color: AppColors.textSecondary),
-                            ),
-                          ],
-                        )
-                      : Column(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
-                                border:
-                                    Border.all(color: AppColors.divider),
-                              ),
-                              child: SizedBox(
-                                width: 160,
-                                height: 160,
-                                child: QrImageView(
-                                  data: qrData,
-                                  version: QrVersions.auto,
-                                  size: 160,
-                                  gapless: true,
+                                color: AppColors.textSecondary.withValues(
+                                  alpha: 0.5,
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              'Auto-generated from the UPI ID above',
-                              style: GoogleFonts.poppins(
-                                  fontSize: 11,
-                                  color: AppColors.textSecondary),
-                            ),
-                          ],
-                        ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Enter a UPI ID to generate the QR code',
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.smallFontSize(
+                                    context,
+                                  ),
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          )
+                        : Column(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AppColors.divider),
+                                ),
+                                child: SizedBox(
+                                  width: 160,
+                                  height: 160,
+                                  child: QrImageView(
+                                    data: qrData,
+                                    version: QrVersions.auto,
+                                    size: 160,
+                                    gapless: true,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                'Auto-generated from the UPI ID above',
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.captionFontSize(
+                                    context,
+                                  ),
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
                 ),
-              ),
+              ],
             ],
-          ],
-        ),
-        actions: [
-          appDialogCancelButton(context),
-          const SizedBox(width: 12),
-          appDialogPrimaryButton(
-            label: 'Update',
-            onPressed: submit,
           ),
-        ],
+          actions: [
+            appDialogCancelButton(context),
+            const SizedBox(width: 12),
+            appDialogPrimaryButton(label: 'Update', onPressed: submit),
+          ],
         );
       },
     );
@@ -351,24 +357,24 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Payment Methods',
-        titleFontSize: isTablet ? 22 : 20,
+        titleFontSize: AppResponsive.headingFontSize(context),
         actions: [
           Padding(
             padding: EdgeInsets.symmetric(
-              horizontal: isTablet ? 16 : 12,
+              horizontal: AppResponsive.mediumSpacing(context),
               vertical: 8,
             ),
             child: Row(
               children: [
                 Container(
-                  padding: EdgeInsets.all(isTablet ? 10 : 8),
+                  padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     Icons.person,
-                    size: isTablet ? 22 : 20,
+                    size: AppResponsive.iconSize(context),
                     color: AppColors.primary,
                   ),
                 ),
@@ -377,7 +383,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
                   Text(
                     'Admin',
                     style: GoogleFonts.poppins(
-                      fontSize: 15,
+                      fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w500,
                       color: Colors.white,
                     ),
@@ -398,74 +404,94 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
       body: Column(
         children: [
           Expanded(
-            child: Observer(
-              builder: (_) {
-                if (_paymentStore.isLoading) {
-                  return Center(
-                    child: CircularProgressIndicator(color: AppColors.primary),
-                  );
-                }
-
-                if (_paymentStore.paymentMethods.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(isTablet ? 24 : 20),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceMedium,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.payment_rounded,
-                            size: isTablet ? 64 : 56,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        SizedBox(height: 16),
-                        Text(
-                          'No payment methods found',
-                          style: GoogleFonts.poppins(
-                            fontSize: isTablet ? 18 : 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Add a payment method to get started',
-                          style: GoogleFonts.poppins(
-                            fontSize: isTablet ? 15 : 14,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                // Card list — mobile-friendly replacement for the old DataTable.
-                // Each method is a card: colored icon, name + status, an enable
-                // switch, and a ⋮ overflow menu (Edit / Delete).
-                return ListView.builder(
-                  // Extra bottom padding so the FAB never covers the last card.
-                  padding: EdgeInsets.fromLTRB(
-                    isTablet ? 20 : 16,
-                    isTablet ? 20 : 16,
-                    isTablet ? 20 : 16,
-                    88,
-                  ),
-                  itemCount: _paymentStore.paymentMethods.length,
-                  itemBuilder: (context, index) {
-                    return _buildMethodCard(
-                      context,
-                      _paymentStore.paymentMethods[index],
-                      isTablet,
+            child: AppResponsive.constrainedContent(
+              context: context,
+              maxWidth: AppResponsive.maxFormWidth(context),
+              alignment: Alignment.topCenter,
+              child: Observer(
+                builder: (_) {
+                  if (_paymentStore.isLoading) {
+                    return Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
+                      ),
                     );
-                  },
-                );
-              },
+                  }
+
+                  if (_paymentStore.paymentMethods.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(
+                              AppResponsive.getValue(
+                                context,
+                                mobile: 20.0,
+                                tablet: 24.0,
+                                desktop: 28.0,
+                              ),
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceMedium,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.payment_rounded,
+                              size: AppResponsive.getValue(
+                                context,
+                                mobile: 56.0,
+                                tablet: 64.0,
+                                desktop: 72.0,
+                              ),
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          SizedBox(height: 16),
+                          Text(
+                            'No payment methods found',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.subheadingFontSize(
+                                context,
+                              ),
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Add a payment method to get started',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.bodyFontSize(context),
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  // Card list — mobile-friendly replacement for the old DataTable.
+                  // Each method is a card: colored icon, name + status, an enable
+                  // switch, and a ⋮ overflow menu (Edit / Delete).
+                  return ListView.builder(
+                    // Extra bottom padding so the FAB never covers the last card.
+                    padding: EdgeInsets.fromLTRB(
+                      AppResponsive.largeSpacing(context),
+                      AppResponsive.largeSpacing(context),
+                      AppResponsive.largeSpacing(context),
+                      88,
+                    ),
+                    itemCount: _paymentStore.paymentMethods.length,
+                    itemBuilder: (context, index) {
+                      return _buildMethodCard(
+                        context,
+                        _paymentStore.paymentMethods[index],
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ),
         ],
@@ -498,7 +524,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
           Text(
             label,
             style: GoogleFonts.poppins(
-              fontSize: 14,
+              fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.w500,
               color: color == Colors.red ? Colors.red : AppColors.textPrimary,
             ),
@@ -509,16 +535,12 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
   }
 
   /// One payment method rendered as a card row.
-  Widget _buildMethodCard(
-    BuildContext context,
-    PaymentMethod method,
-    bool isTablet,
-  ) {
+  Widget _buildMethodCard(BuildContext context, PaymentMethod method) {
     final enabled = method.isEnabled;
     final statusColor = enabled ? Colors.green : AppColors.textSecondary;
 
     return Container(
-      margin: EdgeInsets.only(bottom: isTablet ? 14 : 12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(14),
@@ -532,12 +554,26 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
         ],
       ),
       child: Padding(
-        padding: EdgeInsets.all(isTablet ? 16 : 14),
+        padding: EdgeInsets.all(
+          AppResponsive.getValue(
+            context,
+            mobile: 14.0,
+            tablet: 16.0,
+            desktop: 18.0,
+          ),
+        ),
         child: Row(
           children: [
             // Colored icon tile
             Container(
-              padding: EdgeInsets.all(isTablet ? 12 : 10),
+              padding: EdgeInsets.all(
+                AppResponsive.getValue(
+                  context,
+                  mobile: 10.0,
+                  tablet: 12.0,
+                  desktop: 14.0,
+                ),
+              ),
               decoration: BoxDecoration(
                 color: statusColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
@@ -545,10 +581,22 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
               child: Icon(
                 _getIcon(method.iconName),
                 color: statusColor,
-                size: isTablet ? 26 : 24,
+                size: AppResponsive.getValue(
+                  context,
+                  mobile: 24.0,
+                  tablet: 26.0,
+                  desktop: 28.0,
+                ),
               ),
             ),
-            SizedBox(width: isTablet ? 16 : 14),
+            SizedBox(
+              width: AppResponsive.getValue(
+                context,
+                mobile: 14.0,
+                tablet: 16.0,
+                desktop: 18.0,
+              ),
+            ),
 
             // Name + status
             Expanded(
@@ -558,7 +606,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
                   Text(
                     method.name,
                     style: GoogleFonts.poppins(
-                      fontSize: isTablet ? 16 : 15,
+                      fontSize: AppResponsive.buttonFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: Colors.black87,
                     ),
@@ -579,7 +627,7 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
                       Text(
                         enabled ? 'Enabled' : 'Disabled',
                         style: GoogleFonts.poppins(
-                          fontSize: isTablet ? 13 : 12,
+                          fontSize: AppResponsive.smallFontSize(context),
                           fontWeight: FontWeight.w500,
                           color: AppColors.textSecondary,
                         ),
@@ -598,15 +646,24 @@ class _paymentsmethodsState extends State<Paymentsmethods> {
                 await _paymentStore.togglePaymentMethod(method.id);
                 if (mounted) {
                   NotificationService.instance.showSuccess(
-                      '${method.name} ${value ? 'enabled' : 'disabled'}');
+                    '${method.name} ${value ? 'enabled' : 'disabled'}',
+                  );
                 }
               },
             ),
 
             // Overflow menu — Edit / Delete
             PopupMenuButton<String>(
-              icon: Icon(Icons.more_vert_rounded,
-                  color: AppColors.textSecondary, size: isTablet ? 24 : 22),
+              icon: Icon(
+                Icons.more_vert_rounded,
+                color: AppColors.textSecondary,
+                size: AppResponsive.getValue(
+                  context,
+                  mobile: 22.0,
+                  tablet: 24.0,
+                  desktop: 26.0,
+                ),
+              ),
               // White sheet — kill the Material 3 elevation tint (the purple wash).
               color: AppColors.white,
               surfaceTintColor: Colors.transparent,

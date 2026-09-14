@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -24,13 +23,15 @@ class CategoryTab extends StatefulWidget {
   State<CategoryTab> createState() => _CategoryTabState();
 }
 
-class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClientMixin {
+class _CategoryTabState extends State<CategoryTab>
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
   final TextEditingController _searchController = TextEditingController();
 
   /// Only admin and manager can add, edit, or delete categories.
-  bool get _canEdit => RestaurantSession.isAdmin || RestaurantSession.staffRole == 'Manager';
+  bool get _canEdit =>
+      RestaurantSession.isAdmin || RestaurantSession.staffRole == 'Manager';
   String query = '';
 
   @override
@@ -56,10 +57,14 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
   }
 
   Future<void> _showAddCategoryBottomSheet() async {
-    if (!PlanGuard.allowedOr(context, EntKeys.manageMenuCategoriesAdd, featureName: 'Add Categories')) return;
+    if (!PlanGuard.allowedOr(
+      context,
+      EntKeys.manageMenuCategoriesAdd,
+      featureName: 'Add Categories',
+    ))
+      return;
     await AddCategoryDialog.show(context);
   }
-
 
   @override
   @override
@@ -81,7 +86,11 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
               icon: Icons.search_rounded,
               suffixIcon: query.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.clear, color: Colors.grey, size: 20),
+                      icon: Icon(
+                        Icons.clear,
+                        color: Colors.grey,
+                        size: AppResponsive.iconSize(context),
+                      ),
                       onPressed: () {
                         _searchController.clear();
                       },
@@ -92,12 +101,13 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
 
           // Categories List
           Expanded(
-            child: isTablet ? _buildTabletLayout(size) : _buildMobileLayout(size),
+            child: isTablet
+                ? _buildTabletLayout(size)
+                : _buildMobileLayout(size),
           ),
 
           // Add Category Button — admin/manager (plan enforced on tap).
-          if (_canEdit)
-            _buildAddButton(),
+          if (_canEdit) _buildAddButton(),
         ],
       ),
     );
@@ -143,11 +153,27 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
         return GridView.builder(
           padding: AppResponsive.padding(context),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: AppResponsive.gridColumns(context, mobile: 2, tablet: 3, desktop: 4),
+            crossAxisCount: AppResponsive.gridColumns(
+              context,
+              mobile: 2,
+              tablet: 3,
+              desktop: 4,
+            ),
             crossAxisSpacing: AppResponsive.gridSpacing(context),
             mainAxisSpacing: AppResponsive.gridSpacing(context),
-            // Lower ratio = taller cells, so the card content never bottom-overflows.
-            childAspectRatio: AppResponsive.getValue(context, mobile: 3.0, tablet: 2.6, desktop: 3.0),
+            // Absolute height for tablet AND desktop — see the full note in
+            // items_tab.dart. This grid never runs on mobile
+            // (_buildMobileLayout returns a ListView).
+            //
+            // Sized from the content, not guessed: the grid card is ONE row
+            // (icon · name · count · actions) whose name is maxLines: 1, and
+            // the audit line is `!isGrid` so it never appears here. That's
+            // ~42px of text plus 24px of vertical padding at desktop sizes,
+            // ~61px total on tablet — hence 76 with a little headroom.
+            //
+            // Much shorter than items_tab's 124 because that card stacks two
+            // rows and can show an audit line; this one cannot.
+            mainAxisExtent: 76.0,
           ),
           itemCount: filteredCategories.length,
           itemBuilder: (context, index) {
@@ -178,22 +204,24 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Lottie.asset(AppImages.notfoundanimation, height: height * 0.25),
-          SizedBox(height: 16),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
           Text(
             query.isEmpty ? 'No Categories Found' : 'No matching categories',
             style: GoogleFonts.poppins(
-              fontSize: 18,
+              fontSize: AppResponsive.subheadingFontSize(context),
               fontWeight: FontWeight.w600,
               color: Colors.grey.shade700,
             ),
           ),
           if (query.isEmpty)
             Padding(
-              padding: EdgeInsets.only(top: 8),
+              padding: EdgeInsets.only(
+                top: AppResponsive.smallSpacing(context),
+              ),
               child: Text(
                 'Start by adding your first category',
                 style: GoogleFonts.poppins(
-                  fontSize: 14,
+                  fontSize: AppResponsive.bodyFontSize(context),
                   color: Colors.grey.shade500,
                 ),
               ),
@@ -203,16 +231,27 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
     );
   }
 
-  Widget _buildCategoryCard(Category category, List<Items> items, {required bool isGrid}) {
+  Widget _buildCategoryCard(
+    Category category,
+    List<Items> items, {
+    required bool isGrid,
+  }) {
     return Container(
-      margin: isGrid ? EdgeInsets.zero : EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
+      margin: isGrid
+          ? EdgeInsets.zero
+          : EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       // Grid cells have a fixed (short) height — keep vertical padding tight there.
       padding: isGrid
-          ? const EdgeInsets.symmetric(horizontal: 12, vertical: 10)
+          ? EdgeInsets.symmetric(
+              horizontal: AppResponsive.mediumSpacing(context),
+              vertical: AppResponsive.smallSpacing(context),
+            )
           : AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider.withOpacity(0.5)),
         boxShadow: [
           BoxShadow(
@@ -231,15 +270,25 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
             children: [
               // Compact plain icon in the short grid cells; tinted box in the list.
               if (isGrid)
-                Icon(Icons.category_rounded, color: AppColors.primary, size: AppResponsive.iconSize(context))
+                Icon(
+                  Icons.category_rounded,
+                  color: AppColors.primary,
+                  size: AppResponsive.iconSize(context),
+                )
               else
                 Container(
                   padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.smallBorderRadius(context),
+                    ),
                   ),
-                  child: Icon(Icons.category_rounded, color: AppColors.primary, size: AppResponsive.iconSize(context)),
+                  child: Icon(
+                    Icons.category_rounded,
+                    color: AppColors.primary,
+                    size: AppResponsive.iconSize(context),
+                  ),
                 ),
               SizedBox(width: isGrid ? 8 : 12),
               Expanded(
@@ -247,8 +296,23 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(category.name, style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    Text('${items.length} items', style: GoogleFonts.poppins(fontSize: AppResponsive.smallFontSize(context), color: AppColors.textSecondary)),
+                    Text(
+                      category.name,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      '${items.length} items',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -256,31 +320,56 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
               if (_canEdit)
                 InkWell(
                   onTap: () {
-                    if (!PlanGuard.allowedOr(context, EntKeys.manageMenuCategoriesEdit, featureName: 'Edit Categories')) return;
+                    if (!PlanGuard.allowedOr(
+                      context,
+                      EntKeys.manageMenuCategoriesEdit,
+                      featureName: 'Edit Categories',
+                    ))
+                      return;
                     AddCategoryDialog.show(context, editCategory: category);
                   },
-                  child: Padding(padding: const EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: AppResponsive.smallIconSize(context), color: AppColors.primary)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Icon(
+                      Icons.edit_outlined,
+                      size: AppResponsive.smallIconSize(context),
+                      color: AppColors.primary,
+                    ),
+                  ),
                 ),
               if (_canEdit)
                 InkWell(
                   onTap: () => _showDeleteDialog(category),
-                  child: Padding(padding: const EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: AppResponsive.smallIconSize(context), color: Colors.red)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Icon(
+                      Icons.delete_outline,
+                      size: AppResponsive.smallIconSize(context),
+                      color: Colors.red,
+                    ),
+                  ),
                 ),
               if (items.isNotEmpty)
-                Builder(builder: (_) {
-                  final allEnabled = items.every((i) => i.isEnabled);
-                  return InkWell(
-                    onTap: () => _bulkToggleCategory(category.id, items),
-                    child: Padding(
-                      padding: const EdgeInsets.all(6),
-                      child: Icon(
-                        allEnabled ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                        size: AppResponsive.smallIconSize(context),
-                        color: allEnabled ? Colors.orange.shade700 : Colors.green.shade700,
+                Builder(
+                  builder: (_) {
+                    final allEnabled = items.every((i) => i.isEnabled);
+                    return InkWell(
+                      onTap: () => _bulkToggleCategory(category.id, items),
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Icon(
+                          allEnabled
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          size: AppResponsive.smallIconSize(context),
+                          color: allEnabled
+                              ? Colors.orange.shade700
+                              : Colors.green.shade700,
+                        ),
                       ),
-                    ),
-                  );
-                }),
+                    );
+                  },
+                ),
             ],
           ),
           // Audit trail — compact (mobile only)
@@ -289,7 +378,10 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
               padding: EdgeInsets.only(top: 4),
               child: Text(
                 'Edited ${category.editCount}x • ${category.lastEditedTime!.day}/${category.lastEditedTime!.month}/${category.lastEditedTime!.year}${category.editedBy != null ? ' by ${category.editedBy}' : ''}',
-                style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey.shade500),
+                style: GoogleFonts.poppins(
+                  fontSize: 10,
+                  color: Colors.grey.shade500,
+                ),
               ),
             ),
         ],
@@ -299,8 +391,7 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
 
   // ── Bulk toggle ──────────────────────────────────────────────────────────────
 
-  Future<void> _bulkToggleCategory(
-      String categoryId, List<Items> items) async {
+  Future<void> _bulkToggleCategory(String categoryId, List<Items> items) async {
     // Enable all if any disabled; disable all if every item is enabled
     final anyDisabled = items.any((i) => !i.isEnabled);
     for (final item in items.where((i) => i.isEnabled != anyDisabled)) {
@@ -308,10 +399,16 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
     }
   }
 
-
   void _showDeleteDialog(Category category) async {
-    if (!PlanGuard.allowedOr(context, EntKeys.manageMenuCategoriesDelete, featureName: 'Delete Categories')) return;
-    final itemCount = itemStore.items.where((i) => i.categoryOfItem == category.id).length;
+    if (!PlanGuard.allowedOr(
+      context,
+      EntKeys.manageMenuCategoriesDelete,
+      featureName: 'Delete Categories',
+    ))
+      return;
+    final itemCount = itemStore.items
+        .where((i) => i.categoryOfItem == category.id)
+        .length;
     final confirmed = await showAppConfirmDialog(
       context: context,
       title: 'Delete "${category.name}"?',
@@ -348,13 +445,23 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
           child: ElevatedButton.icon(
             onPressed: _showAddCategoryBottomSheet,
             icon: Icon(Icons.add, size: AppResponsive.iconSize(context)),
-            label: Text('Add Category', style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w500)),
+            label: Text(
+              'Add Category',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               elevation: 0,
-              padding: EdgeInsets.symmetric(vertical: AppResponsive.mediumSpacing(context)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: EdgeInsets.symmetric(
+                vertical: AppResponsive.mediumSpacing(context),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           ),
         ),

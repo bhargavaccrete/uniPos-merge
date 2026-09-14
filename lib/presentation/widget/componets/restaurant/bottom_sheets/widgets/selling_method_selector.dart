@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/core/constants/item_units.dart';
 import '../../../../../../util/color.dart';
 import '../add_item_form_state.dart';
@@ -40,6 +41,9 @@ class SellingMethodSheet extends StatefulWidget {
   }) async {
     return showModalBottomSheet<SellingMethodResult>(
       context: context,
+      // Nearest navigator, so the sheet stays inside the setup wizard's pane
+      // rather than covering the sidebar. No-op outside a nested navigator.
+      useRootNavigator: false,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
@@ -72,9 +76,9 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
   }
 
   OutlineInputBorder _border(Color c) => OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: c),
-      );
+    borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+    borderSide: BorderSide(color: c),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -84,7 +88,11 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.fromLTRB(
-          20, 8, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
+        20,
+        8,
+        20,
+        20 + MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -111,23 +119,33 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
                   color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.sell_outlined,
-                    color: AppColors.primary, size: 20),
+                child: Icon(
+                  Icons.sell_outlined,
+                  color: AppColors.primary,
+                  size: AppResponsive.iconSize(context),
+                ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(widget.unitOnly ? 'Stock Unit' : 'Selling Method',
-                        style: GoogleFonts.poppins(
-                            fontSize: 16, fontWeight: FontWeight.w600)),
                     Text(
-                        widget.unitOnly
-                            ? 'What unit is this item measured and stocked in?'
-                            : 'How is this item measured?',
-                        style: GoogleFonts.poppins(
-                            fontSize: 12, color: Colors.grey.shade500)),
+                      widget.unitOnly ? 'Stock Unit' : 'Selling Method',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.subheadingFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      widget.unitOnly
+                          ? 'What unit is this item measured and stocked in?'
+                          : 'How is this item measured?',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -138,7 +156,7 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
 
           // ── Method cards (skipped in Stock Unit mode — Selling Method is
           // a POS-sale concept that doesn't apply to an unsellable item) ──
@@ -149,7 +167,7 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
               subtitle: 'Sold as individual pieces (e.g. burger, pizza)',
               icon: Icons.countertops_outlined,
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: AppResponsive.smallSpacing(context)),
             _methodCard(
               method: SellingMethod.byWeight,
               label: 'By Weight',
@@ -161,11 +179,11 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
           // ── Unit selector — shown for Weight, or unconditionally in
           // Stock Unit mode ────────────────────────────────────────────
           if (widget.unitOnly || _method == SellingMethod.byWeight) ...[
-            const SizedBox(height: 14),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             _unitChips(),
           ],
 
-          const SizedBox(height: 20),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
 
           // ── Confirm button ───────────────────────────────────────────
           SizedBox(
@@ -178,14 +196,23 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: EdgeInsets.symmetric(
+                  vertical: AppResponsive.mediumSpacing(context),
+                ),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.borderRadius(context),
+                  ),
+                ),
                 elevation: 0,
               ),
-              child: Text('Confirm',
-                  style: GoogleFonts.poppins(
-                      fontSize: 14, fontWeight: FontWeight.w600)),
+              child: Text(
+                'Confirm',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ],
@@ -199,12 +226,15 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Select Unit',
-            style: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade600)),
-        const SizedBox(height: 8),
+        Text(
+          'Select Unit',
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.smallFontSize(context),
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade600,
+          ),
+        ),
+        SizedBox(height: AppResponsive.smallSpacing(context)),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -214,8 +244,10 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
               onTap: () => setState(() => _unit = u),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 120),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: isSel ? AppColors.primary : AppColors.surfaceLight,
                   borderRadius: BorderRadius.circular(20),
@@ -223,12 +255,14 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
                     color: isSel ? AppColors.primary : AppColors.divider,
                   ),
                 ),
-                child: Text(u,
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: isSel ? Colors.white : AppColors.textSecondary,
-                    )),
+                child: Text(
+                  u,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: isSel ? Colors.white : AppColors.textSecondary,
+                  ),
+                ),
               ),
             );
           }).toList(),
@@ -237,15 +271,16 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
     );
   }
 
-  Widget _methodCard(
-      {required SellingMethod method,
-      required String label,
-      required String subtitle,
-      required IconData icon}) {
+  Widget _methodCard({
+    required SellingMethod method,
+    required String label,
+    required String subtitle,
+    required IconData icon,
+  }) {
     final isSelected = _method == method;
     return InkWell(
       onTap: () => setState(() => _method = method),
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -253,7 +288,9 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
           color: isSelected
               ? AppColors.primary.withValues(alpha: 0.07)
               : AppColors.surfaceLight,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.borderRadius(context),
+          ),
           border: Border.all(
             color: isSelected ? AppColors.primary : AppColors.divider,
             width: isSelected ? 1.5 : 1,
@@ -265,29 +302,39 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: AppColors.primary
-                    .withValues(alpha: isSelected ? 0.15 : 0.08),
-                borderRadius: BorderRadius.circular(12),
+                color: AppColors.primary.withValues(
+                  alpha: isSelected ? 0.15 : 0.08,
+                ),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.borderRadius(context),
+                ),
               ),
-              child: Icon(icon,
-                  color: AppColors.primary, size: 22),
+              child: Icon(
+                icon,
+                color: AppColors.primary,
+                size: AppResponsive.iconSize(context),
+              ),
             ),
-            const SizedBox(width: 14),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label,
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: isSelected
-                            ? AppColors.primary
-                            : Colors.black87,
-                      )),
-                  Text(subtitle,
-                      style: GoogleFonts.poppins(
-                          fontSize: 12, color: Colors.grey.shade500)),
+                  Text(
+                    label,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? AppColors.primary : Colors.black87,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -296,17 +343,21 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
                 width: 24,
                 height: 24,
                 decoration: const BoxDecoration(
-                    color: AppColors.primary, shape: BoxShape.circle),
-                child: const Icon(Icons.check_rounded,
-                    size: 14, color: Colors.white),
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_rounded,
+                  size: 14,
+                  color: Colors.white,
+                ),
               )
             else
               Container(
                 width: 24,
                 height: 24,
                 decoration: BoxDecoration(
-                  border: Border.all(
-                      color: Colors.grey.shade300, width: 1.5),
+                  border: Border.all(color: Colors.grey.shade300, width: 1.5),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -340,44 +391,60 @@ class SellingMethodButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final isByWeight = method == SellingMethod.byWeight;
     final title = unitOnly ? 'Stock Unit' : 'Selling Method';
-    final label =
-        unitOnly ? unit : (isByWeight ? 'By Weight · $unit' : 'By Unit');
+    final label = unitOnly
+        ? unit
+        : (isByWeight ? 'By Weight · $unit' : 'By Unit');
     final icon = unitOnly
         ? Icons.straighten_outlined
         : (isByWeight ? Icons.scale_outlined : Icons.countertops_outlined);
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
           color: AppColors.surfaceLight,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.borderRadius(context),
+          ),
           border: Border.all(color: AppColors.divider),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: AppColors.primary),
-            const SizedBox(width: 10),
+            Icon(
+              icon,
+              size: AppResponsive.iconSize(context),
+              color: AppColors.primary,
+            ),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: GoogleFonts.poppins(
-                          fontSize: 11,
-                          color: AppColors.textSecondary)),
-                  Text(label,
-                      style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textPrimary)),
+                  Text(
+                    title,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  Text(
+                    label,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
                 ],
               ),
             ),
-            Icon(Icons.keyboard_arrow_down_rounded,
-                size: 22, color: AppColors.textSecondary),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: AppResponsive.iconSize(context),
+              color: AppColors.textSecondary,
+            ),
           ],
         ),
       ),
